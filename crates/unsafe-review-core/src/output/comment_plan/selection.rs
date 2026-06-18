@@ -248,14 +248,14 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     }
 }
 
-/// Determine whether an owner/declaration/fallback-site card's changed
-/// region is already covered by at least one concrete operation card in
-/// `all_cards`.
+/// Determine whether an owner/declaration/fallback-site card's changed region
+/// is already covered by at least one concrete operation card in `all_cards`.
 ///
-/// "Same region" is defined as the same file. Owner cards (`unsafe fn` sites)
-/// span an entire function body and the specific operation cards they generate
-/// are located inside that function, so file-level co-location is the right
-/// granularity for grouping.
+/// "Same region" is defined as the same file and inferred owner/declaration
+/// context. Owner cards (`unsafe fn` sites) span an entire function body and the
+/// specific operation cards they generate are located inside that function, so
+/// owner context prevents unrelated declarations in the same file from being
+/// marked as covered.
 ///
 /// This function is used only for the `not_selected` non-selection reason; it
 /// does not change card identity, evidence counts, or structured artifacts.
@@ -267,11 +267,17 @@ pub(super) fn owner_card_covered_by_specific_operation(
         return false;
     }
     let owner_file = &owner_card.site.location.file;
+    let owner_context = owner_card.site.owner.as_deref();
     all_cards.iter().any(|other| {
         comment_surfacing_disposition(other).allows_inline_comment()
             && other.site.changed
             && &other.site.location.file == owner_file
+            && same_owner_context(owner_context, other.site.owner.as_deref())
     })
+}
+
+fn same_owner_context(owner: Option<&str>, other: Option<&str>) -> bool {
+    matches!((owner, other), (Some(owner), Some(other)) if !owner.trim().is_empty() && owner == other)
 }
 
 /// Derive the primary coverage gap for a card (SPEC-0032).

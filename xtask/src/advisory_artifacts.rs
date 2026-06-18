@@ -39,6 +39,7 @@ struct CardProjection {
     hazards: Vec<String>,
     path: String,
     site_kind: String,
+    owner: String,
     line: u64,
     column: u64,
     operation: String,
@@ -7143,6 +7144,8 @@ fn advisory_card_projections(
             super::require_non_empty_json_str(site, "kind", "cards.json card site")?.to_string();
         let path =
             super::require_non_empty_json_str(site, "file", "cards.json card site")?.to_string();
+        let owner =
+            super::require_non_empty_json_str(site, "owner", "cards.json card site")?.to_string();
         let line = super::json_usize_at(card, "/site/line", "cards.json card")? as u64;
         let column = super::json_usize_at(card, "/site/column", "cards.json card")? as u64;
         let operation =
@@ -7295,6 +7298,7 @@ fn advisory_card_projections(
             hazards,
             path,
             site_kind,
+            owner,
             line,
             column,
             operation,
@@ -7983,7 +7987,12 @@ fn owner_card_covered_by_specific_operation(
             && changed_card_ids.contains(&other.id)
             && comment_surfacing_disposition(other).allows_inline_comment()
             && other.path == owner_card.path
+            && same_owner_context(&owner_card.owner, &other.owner)
     })
+}
+
+fn same_owner_context(owner: &str, other: &str) -> bool {
+    !owner.trim().is_empty() && owner != "unknown" && owner == other
 }
 
 /// Derive the expected `selection_reason` string from the card's coverage block

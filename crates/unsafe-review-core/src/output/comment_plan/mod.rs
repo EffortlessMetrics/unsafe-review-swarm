@@ -971,6 +971,59 @@ mod tests {
         Ok(())
     }
 
+    /// Guardrail: an owner card is not considered covered merely because an
+    /// inline operation card exists elsewhere in the same file. The operation
+    /// must share the same inferred owner/declaration context.
+    #[test]
+    fn comment_plan_owner_card_requires_same_owner_context_for_covered_reason() -> Result<(), String>
+    {
+        let mut output = fixture_output("attributed_unsafe_fn_no_duplicate")?;
+        let mut owner_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::UnsafeDeclaration)
+            .cloned()
+            .ok_or_else(|| "fixture should contain an unsafe declaration card".to_string())?;
+        let mut operation_card = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::RawPointerWrite)
+            .cloned()
+            .ok_or_else(|| "fixture should contain a raw pointer write card".to_string())?;
+
+        owner_card.site.owner = Some("write_one".to_string());
+        operation_card.site.owner = Some("different_owner".to_string());
+        operation_card.site.location.file = owner_card.site.location.file.clone();
+        operation_card.site.changed = true;
+        operation_card.priority = Priority::High;
+        operation_card.confidence = Confidence::High;
+
+        output.cards = vec![owner_card, operation_card];
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
+
+        let value = parse_json(&render(&output))?;
+        let not_selected = value["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        let owner_entry = not_selected
+            .iter()
+            .find(|card| card["operation_family"] == "unsafe_declaration")
+            .ok_or_else(|| {
+                "owner card must be in not_selected for mismatched-owner case".to_string()
+            })?;
+
+        assert_eq!(
+            owner_entry["reason_code"], "human_deep_review_only",
+            "same-file operation with a different owner must not cover the owner card"
+        );
+        assert_eq!(
+            owner_entry["reason"],
+            "unsafe declaration is not selected for inline comments"
+        );
+        Ok(())
+    }
+
     /// Drift-lock: `no_changed_gaps` IS emitted only when there are truly no cards at all
     /// (both comments and not_selected are empty), matching the human/witness surface semantics.
     #[test]
