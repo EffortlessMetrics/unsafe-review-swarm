@@ -12,6 +12,7 @@ use crate::output::{REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, UNKNOWN_OWNER};
 use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::Serialize;
+use std::path::{Path, PathBuf};
 
 /// Schema version for the plain (no-provenance) JSON analyze artifact.
 const SCHEMA_VERSION_PLAIN: &str = "0.1";
@@ -1130,14 +1131,21 @@ pub fn bless_fixture_surface_goldens(
     fixture: &str,
     surfaces: &[&str],
 ) -> Result<Vec<std::path::PathBuf>, String> {
+    let workspace = default_fixture_workspace();
+    bless_fixture_surface_goldens_from_workspace(&workspace, fixture, surfaces)
+}
+
+pub fn bless_fixture_surface_goldens_from_workspace(
+    workspace: &Path,
+    fixture: &str,
+    surfaces: &[&str],
+) -> Result<Vec<std::path::PathBuf>, String> {
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
     use std::fs;
-    use std::path::PathBuf;
 
     if surfaces.is_empty() {
         return Ok(Vec::new());
     }
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
     let root = workspace.join("fixtures").join(fixture);
     let output = analyze(AnalyzeInput {
         root: root.clone(),
@@ -1155,21 +1163,21 @@ pub fn bless_fixture_surface_goldens(
                 let text = crate::output::lsp::render(&output);
                 (
                     "expected.lsp.json",
-                    normalize_surface_json(text, &root, &workspace),
+                    normalize_surface_json(text, &root, workspace),
                 )
             }
             "repair-queue" => {
                 let text = crate::output::repair_queue::render(&output);
                 (
                     "expected.repair-queue.json",
-                    normalize_surface_json(text, &root, &workspace),
+                    normalize_surface_json(text, &root, workspace),
                 )
             }
             "comment-plan" => {
                 let text = crate::output::comment_plan::render(&output);
                 (
                     "expected.comment-plan.json",
-                    normalize_surface_json(text, &root, &workspace),
+                    normalize_surface_json(text, &root, workspace),
                 )
             }
             other => {
@@ -1195,10 +1203,17 @@ pub fn bless_fixture_surface_goldens(
 /// Used by the surface-parity gate to produce the reference text for diffing
 /// against the committed golden without writing a file.
 pub fn render_fixture_surface(fixture: &str, surface: &str) -> Result<String, String> {
-    use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
-    use std::path::PathBuf;
+    let workspace = default_fixture_workspace();
+    render_fixture_surface_from_workspace(&workspace, fixture, surface)
+}
 
-    let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+pub fn render_fixture_surface_from_workspace(
+    workspace: &Path,
+    fixture: &str,
+    surface: &str,
+) -> Result<String, String> {
+    use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
+
     let root = workspace.join("fixtures").join(fixture);
     let output = analyze(AnalyzeInput {
         root: root.clone(),
@@ -1219,7 +1234,7 @@ pub fn render_fixture_surface(fixture: &str, surface: &str) -> Result<String, St
             ));
         }
     };
-    let mut text = normalize_surface_json(raw, &root, &workspace);
+    let mut text = normalize_surface_json(raw, &root, workspace);
     text.push('\n');
     let text = text.replace("\r\n", "\n");
     Ok(text)
@@ -1256,10 +1271,18 @@ fn normalize_surface_json(
     // Replace any occurrence of the absolute path (forward- or backslash form)
     // with the relative path. We normalise the input text's path separators first.
     let abs_forward = abs.to_string_lossy().replace('\\', "/");
-    let abs_backward = abs.to_string_lossy().replace('/', "\\\\");
+    let abs_backward = json_escaped_backslash_path(&abs);
     let result = text.replace(&*abs_forward, &rel_str);
     // Also replace JSON-escaped backslash forms (Windows paths in JSON appear as \\).
     result.replace(&*abs_backward, &rel_str)
+}
+
+fn default_fixture_workspace() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+}
+
+fn json_escaped_backslash_path(path: &Path) -> String {
+    path.to_string_lossy().replace('\\', "\\\\")
 }
 
 #[cfg(test)]
@@ -1488,6 +1511,16 @@ mod tests {
 
     fn workspace_root() -> PathBuf {
         PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..")
+    }
+
+    #[test]
+    fn json_escaped_backslash_path_doubles_backslashes() {
+        let path = PathBuf::from(r"C:\repo\fixtures\case");
+
+        assert_eq!(
+            json_escaped_backslash_path(&path),
+            r"C:\\repo\\fixtures\\case"
+        );
     }
 
     fn parse_json(text: &str) -> Result<serde_json::Value, String> {

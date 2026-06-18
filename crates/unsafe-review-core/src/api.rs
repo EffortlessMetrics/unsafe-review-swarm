@@ -412,13 +412,26 @@ pub fn bless_fixture_card_goldens(names: &[&str]) -> Result<Vec<PathBuf>, String
 /// Regenerate surface goldens (`expected.lsp.json`, `expected.repair-queue.json`)
 /// for a single named fixture, writing LF line endings.
 ///
-/// `surfaces` must contain only `"lsp"` or `"repair-queue"`. Paths inside the
-/// rendered JSON are normalised to relative form so goldens are byte-stable.
+/// `surfaces` must contain only `"lsp"`, `"repair-queue"`, or
+/// `"comment-plan"`. Paths inside the rendered JSON are normalised to relative
+/// form so goldens are byte-stable.
 pub fn bless_fixture_surface_goldens(
     fixture: &str,
     surfaces: &[&str],
 ) -> Result<Vec<PathBuf>, String> {
     json::bless_fixture_surface_goldens(fixture, surfaces)
+}
+
+/// Runtime-root-aware variant of [`bless_fixture_surface_goldens`].
+///
+/// This is used by `xtask` so a reused shared target directory cannot make a
+/// cached binary read fixtures from the checkout where it was compiled.
+pub fn bless_fixture_surface_goldens_from_workspace(
+    workspace: &Path,
+    fixture: &str,
+    surfaces: &[&str],
+) -> Result<Vec<PathBuf>, String> {
+    json::bless_fixture_surface_goldens_from_workspace(workspace, fixture, surfaces)
 }
 
 /// Render a single surface for a fixture as the bless path would write it
@@ -428,6 +441,18 @@ pub fn bless_fixture_surface_goldens(
 /// diffing against the committed golden.
 pub fn render_fixture_surface(fixture: &str, surface: &str) -> Result<String, String> {
     json::render_fixture_surface(fixture, surface)
+}
+
+/// Runtime-root-aware variant of [`render_fixture_surface`].
+///
+/// This is used by `xtask` so parity and determinism checks render from the
+/// active workspace root selected at runtime.
+pub fn render_fixture_surface_from_workspace(
+    workspace: &Path,
+    fixture: &str,
+    surface: &str,
+) -> Result<String, String> {
+    json::render_fixture_surface_from_workspace(workspace, fixture, surface)
 }
 
 pub fn render_json(output: &AnalyzeOutput) -> String {

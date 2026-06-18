@@ -65,7 +65,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review the unsafe declaration manually and add the missing obligation-specific guard once the caller contract is identified.",
+    "next_action": "Review the unsafe declaration manually and add or expose the missing obligation-specific guard.",
     "verify_commands": [],
     "confirmation_cue": {
       "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe fn private_helper() {}`; confirm with external evidence before treating it as observed runtime behavior",

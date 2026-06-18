@@ -20,7 +20,9 @@ pub(super) fn next_action_summary(
                 .to_string()
         }
         ReviewClass::ContractMissing => "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.".to_string(),
-        ReviewClass::GuardMissing if operation == "unsafe_declaration" => "Review the unsafe declaration manually and add the missing obligation-specific guard once the caller contract is identified.".to_string(),
+        ReviewClass::GuardMissing if operation == "unsafe_declaration" => {
+            "Review the unsafe declaration manually and add or expose the missing obligation-specific guard.".to_string()
+        }
         ReviewClass::GuardMissing if operation == "unknown" => "Review the unsafe site manually and add the missing obligation-specific guard once the contract is identified.".to_string(),
         ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
         ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),

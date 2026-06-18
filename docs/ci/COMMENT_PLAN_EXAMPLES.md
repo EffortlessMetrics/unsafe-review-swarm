@@ -166,9 +166,9 @@ Fixture: `public_unsafe_fn_missing_safety`
 
 When a changed `pub unsafe fn` lacks a precise public `# Safety` section,
 `unsafe-review` still emits a `contract_missing` card. The inline comment plan
-keeps it out of `comments[]` because the operation family is `unknown`, which
-is often an owner-contract or inventory-like surface rather than a precise
-changed unsafe operation. The card remains visible in the bundle.
+keeps it out of `comments[]` because explicit surfacing policy treats
+`unsafe_declaration` cards as owner-contract review surfaces rather than precise
+inline operation comments. The card remains visible in the bundle.
 
 ```json
 {

@@ -20,6 +20,7 @@ owner = "repo-infra"
 #   kind         — "synthetic-fixture" (pinned, deterministic, in-repo)
 #   root         — path to the fixture root, relative to workspace root
 #   diff         — diff filename, relative to root
+#   no_new_debt_exit_code — expected exit code when --policy no-new-debt is passed
 #   [pr.expected]
 #     new_gaps        — expected summary.new_gaps count
 #     worsened_gaps   — expected summary.worsened_gaps count
@@ -28,7 +29,6 @@ owner = "repo-infra"
 #     inherited_gaps  — expected summary.inherited_gaps count
 #     selected_count     — expected comment-plan summary.selected_count
 #     not_selected_count — expected comment-plan summary.not_selected_count
-#   no_new_debt_exit_code — expected exit code when --policy no-new-debt is passed
 
 # Movement counts observed by running:
 #   cargo run --locked -p unsafe-review -- check \
@@ -43,6 +43,8 @@ id = "brownfield-inherited"
 kind = "synthetic-fixture"
 root = "fixtures/raw_pointer_deref_brownfield_inherited"
 diff = "change.diff"
+# no-new-debt passes because no new gap was introduced.
+no_new_debt_exit_code = 0
 
 [pr.expected]
 # Advisory run: baseline card is pre-existing; the PR adds nothing new.
@@ -56,14 +58,14 @@ inherited_gaps = 1
 # they must NOT be selected for inline PR comments.
 selected_count = 0
 not_selected_count = 1
-# no-new-debt passes because no new gap was introduced.
-no_new_debt_exit_code = 0
 
 [[pr]]
 id = "baseline-resolved"
 kind = "synthetic-fixture"
 root = "fixtures/raw_pointer_deref_resolved"
 diff = "change.diff"
+# no-new-debt passes because no new gap was introduced (the existing one resolved).
+no_new_debt_exit_code = 0
 
 [pr.expected]
 # Advisory run: PR adds a # Safety contract, removing the baseline card.
@@ -76,14 +78,14 @@ inherited_gaps = 0
 # Comment-plan: no cards in the post-PR output; both counts are 0.
 selected_count = 0
 not_selected_count = 0
-# no-new-debt passes because no new gap was introduced (the existing one resolved).
-no_new_debt_exit_code = 0
 
 [[pr]]
 id = "coverage-improved"
 kind = "synthetic-fixture"
 root = "fixtures/raw_pointer_deref_coverage_improved"
 diff = "change.diff"
+# no-new-debt passes because no new gap was introduced.
+no_new_debt_exit_code = 0
 
 [pr.expected]
 # Advisory run: PR adds a # Safety contract; the baseline card remains but
@@ -97,14 +99,14 @@ inherited_gaps = 1
 # Comment-plan: baseline_known card is not actionable → not selected.
 selected_count = 0
 not_selected_count = 1
-# no-new-debt passes because no new gap was introduced.
-no_new_debt_exit_code = 0
 
 [[pr]]
 id = "coverage-worsened"
 kind = "synthetic-fixture"
 root = "fixtures/raw_pointer_deref_coverage_worsened"
 diff = "change.diff"
+# no-new-debt exits 1 because worsened coverage is treated as a policy signal.
+no_new_debt_exit_code = 1
 
 [pr.expected]
 # Advisory run: PR removes the # Safety contract; the baseline card
@@ -118,5 +120,3 @@ inherited_gaps = 1
 # Comment-plan: baseline_known (worsened) card is not actionable → not selected.
 selected_count = 0
 not_selected_count = 1
-# no-new-debt exits 1 because worsened coverage is treated as a policy signal.
-no_new_debt_exit_code = 1

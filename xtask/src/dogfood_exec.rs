@@ -421,6 +421,21 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
     }
 
     // Step 2: run unsafe-review repo.
+    match fs::remove_file(&artifact_path) {
+        Ok(()) => {}
+        Err(err) if err.kind() == std::io::ErrorKind::NotFound => {}
+        Err(err) => {
+            return TargetResult {
+                id: target.id.clone(),
+                repository: target.repository.clone(),
+                commit: target.commit.clone(),
+                status: TargetStatus::SchemaFailed(format!(
+                    "failed to remove stale artifact {} before scan: {err}",
+                    artifact_path.display()
+                )),
+            };
+        }
+    }
     let scan_run = match run_unsafe_review(&work_dir, &artifact_path, args.max_cards, deadline) {
         Ok(run) => run,
         Err(err) => {
@@ -448,8 +463,8 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
     };
 
     // Exit code 0 (clean/advisory) or 1 (policy violation) are both acceptable.
-    // Exit code 2 is a tool error.
-    if exit_code == 2 {
+    // Any other exit is a tool/process failure; do not read a previous artifact.
+    if !scan_exit_allows_artifact_read(exit_code) {
         return TargetResult {
             id: target.id.clone(),
             repository: target.repository.clone(),
@@ -513,8 +528,8 @@ fn run_target(target: &TargetSpec, args: &DogfoodExecArgs) -> TargetResult {
 ///   2b. `git clone https://github.com/<repo> <work_dir>`
 ///   3b. `git -C <work_dir> checkout <commit>`
 ///
-/// If `work_dir` already exists and is non-empty, the clone steps are skipped
-/// (the caller is responsible for --clean if a fresh clone is wanted).
+/// If `work_dir` already exists as a git checkout, the command still fetches or
+/// checks out `commit` so reruns cannot silently drift from the pinned corpus.
 ///
 /// Every git subprocess is bounded by `deadline`.  A timeout error propagates
 /// as an `Err` containing "timed out" so the caller can record it as
@@ -525,15 +540,14 @@ fn clone_at_commit(
     commit: &str,
     deadline: Instant,
 ) -> Result<(), String> {
-    // If the work dir already exists and has a .git directory, skip cloning.
-    if work_dir.join(".git").exists() {
-        return Ok(());
-    }
-
     let url = format!("https://github.com/{repository}");
     let work_dir_str = work_dir
         .to_str()
         .ok_or_else(|| format!("work dir path is not valid UTF-8: {}", work_dir.display()))?;
+
+    if work_dir.join(".git").exists() {
+        return pin_existing_checkout(work_dir_str, &url, commit, deadline);
+    }
 
     // git init
     run_git(&["init", work_dir_str], "git init", deadline)?;
@@ -565,6 +579,35 @@ fn clone_at_commit(
             deadline,
         )
     }
+}
+
+fn pin_existing_checkout(
+    work_dir_str: &str,
+    url: &str,
+    commit: &str,
+    deadline: Instant,
+) -> Result<(), String> {
+    let fetch_result = run_git(
+        &["-C", work_dir_str, "fetch", "--depth", "1", url, commit],
+        "git fetch existing checkout",
+        deadline,
+    );
+    if fetch_result.is_ok() {
+        return run_git(
+            &["-C", work_dir_str, "checkout", "FETCH_HEAD"],
+            "git checkout FETCH_HEAD",
+            deadline,
+        );
+    }
+    run_git(
+        &["-C", work_dir_str, "checkout", commit],
+        "git checkout pinned commit",
+        deadline,
+    )
+}
+
+fn scan_exit_allows_artifact_read(exit_code: i32) -> bool {
+    matches!(exit_code, 0 | 1)
 }
 
 /// Run a `git` command with a wall-clock deadline, returning `Ok(())` on
@@ -702,6 +745,43 @@ fn run_with_timeout(mut cmd: Command, deadline: Instant, label: &str) -> Result<
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn temp_test_dir(name: &str) -> Result<PathBuf, String> {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| format!("system time before UNIX_EPOCH: {err}"))?
+            .as_nanos();
+        let dir = std::env::temp_dir().join(format!(
+            "unsafe-review-dogfood-{name}-{}-{nonce}",
+            std::process::id()
+        ));
+        fs::create_dir_all(&dir)
+            .map_err(|err| format!("create {} failed: {err}", dir.display()))?;
+        Ok(dir)
+    }
+
+    fn run_git_capture(args: &[&str]) -> Result<String, String> {
+        let output = Command::new("git")
+            .args(args)
+            .output()
+            .map_err(|err| format!("git {} failed to spawn: {err}", args.join(" ")))?;
+        if !output.status.success() {
+            return Err(format!(
+                "git {} failed with status {:?}:\nstdout:\n{}\nstderr:\n{}",
+                args.join(" "),
+                output.status.code(),
+                String::from_utf8_lossy(&output.stdout),
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+    }
+
+    fn path_str(path: &Path) -> Result<&str, String> {
+        path.to_str()
+            .ok_or_else(|| format!("path is not valid UTF-8: {}", path.display()))
+    }
 
     /// Valid scan JSON with a mix of operation families produces correct diagnostics.
     #[test]
@@ -790,6 +870,55 @@ mod tests {
             err.contains("summary"),
             "error message should mention 'summary': {err}"
         );
+    }
+
+    #[test]
+    fn dogfood_exec_accepts_only_advisory_exit_codes_for_artifact_read() {
+        assert!(scan_exit_allows_artifact_read(0));
+        assert!(scan_exit_allows_artifact_read(1));
+        assert!(!scan_exit_allows_artifact_read(2));
+        assert!(!scan_exit_allows_artifact_read(101));
+        assert!(!scan_exit_allows_artifact_read(-1));
+    }
+
+    #[test]
+    fn dogfood_exec_reuses_existing_checkout_but_pins_requested_commit() -> Result<(), String> {
+        let dir = temp_test_dir("existing-pin")?;
+        let repo = dir.join("repo");
+        let work = dir.join("work");
+        let repo_str = path_str(&repo)?;
+        let work_str = path_str(&work)?;
+
+        run_git_capture(&["init", repo_str])?;
+        run_git_capture(&[
+            "-C",
+            repo_str,
+            "config",
+            "user.email",
+            "unsafe-review@example.test",
+        ])?;
+        run_git_capture(&["-C", repo_str, "config", "user.name", "unsafe-review test"])?;
+        fs::write(repo.join("file.txt"), "one\n")
+            .map_err(|err| format!("write first file failed: {err}"))?;
+        run_git_capture(&["-C", repo_str, "add", "file.txt"])?;
+        run_git_capture(&["-C", repo_str, "commit", "-m", "one"])?;
+        let first = run_git_capture(&["-C", repo_str, "rev-parse", "HEAD"])?;
+
+        fs::write(repo.join("file.txt"), "two\n")
+            .map_err(|err| format!("write second file failed: {err}"))?;
+        run_git_capture(&["-C", repo_str, "commit", "-am", "two"])?;
+        let second = run_git_capture(&["-C", repo_str, "rev-parse", "HEAD"])?;
+
+        run_git_capture(&["clone", repo_str, work_str])?;
+        run_git_capture(&["-C", work_str, "checkout", &first])?;
+
+        let deadline = Instant::now() + Duration::from_secs(30);
+        pin_existing_checkout(work_str, repo_str, &second, deadline)?;
+
+        let current = run_git_capture(&["-C", work_str, "rev-parse", "HEAD"])?;
+        let _ = fs::remove_dir_all(&dir);
+        assert_eq!(current, second);
+        Ok(())
     }
 
     /// A corpus with mixed kinds returns only repo-snapshot targets.

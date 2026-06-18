@@ -768,7 +768,7 @@ fn render_pr_summary_card_table(out: &mut String, ranked_cards: &[&ReviewCard]) 
         };
         let family_summary = grouped_family_summary(&owner_cards);
         out.push_str(&format!(
-            "| (grouped) | owner_contract | — | {} | `{}` | {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list | — | — | — | — |\n",
+            "| (grouped) | owner_contract | — | {} | `{}` | {} owner-contract obligation{} across {} unsafe declaration {} — see `cards.json` for full list | — | — | — | — |\n",
             md_cell(&location_summary),
             md_cell(&family_summary),
             unsafe_fn_count,
@@ -855,7 +855,7 @@ fn render_pr_summary_witness_plan(out: &mut String, ranked_cards: &[&ReviewCard]
     // stays focused on executable witness routes. Full details are in cards.json.
     if !owner_cards.is_empty() {
         out.push_str(&format!(
-            "- (grouped) {} owner-contract obligation{} across {} `unsafe fn` {} — see `cards.json` for full list\n",
+            "- (grouped) {} owner-contract obligation{} across {} unsafe declaration {} — see `cards.json` for full list\n",
             owner_cards.len(),
             if owner_cards.len() == 1 { "" } else { "s" },
             owner_cards.len(),

@@ -1191,7 +1191,8 @@ struct GateReport {
 /// Pure (no file I/O) evaluation of a parsed detector-contracts ledger value.
 ///
 /// Blocking findings: malformed schema, missing/empty identity, duplicate id, empty required
-/// arrays (obligations/surfaces), non-array where array required, missing required scalars.
+/// arrays (obligations/positive_fixtures/surfaces), non-array where array required,
+/// missing required scalars.
 /// The negative_fixtures gap is blocking unless the contract carries non-empty `proof_gap` AND
 /// non-empty `owner` AND non-empty `review_after` — in that case it is a tracked exception.
 fn evaluate_detector_contracts(value: &toml::Value, path: &str) -> Result<GateReport, String> {
@@ -1235,39 +1236,40 @@ fn evaluate_detector_contracts(value: &toml::Value, path: &str) -> Result<GateRe
             seen_ids.push(id.clone());
         }
 
-        // obligations: required non-empty array — blocking.
-        match entry.get("obligations") {
-            None => {
-                report
-                    .blocking
-                    .push(format!("contract `{id}`: no obligations declared"));
-            }
-            Some(arr_val) => match arr_val.as_array() {
-                None => report
-                    .blocking
-                    .push(format!("contract `{id}`: `obligations` must be an array")),
-                Some(arr) if arr.is_empty() => {
-                    report
-                        .blocking
-                        .push(format!("contract `{id}`: obligations array is empty"));
-                }
-                _ => {}
-            },
-        }
+        validate_detector_contract_string_array(
+            table,
+            &id,
+            "obligations",
+            "no obligations declared",
+            "obligations array is empty",
+            &mut report,
+        );
+        validate_detector_contract_string_array(
+            table,
+            &id,
+            "positive_fixtures",
+            "no positive_fixtures declared",
+            "positive_fixtures array is empty",
+            &mut report,
+        );
 
         // negative_fixtures: empty/absent is blocking UNLESS proof_gap + owner + review_after
         // are all non-empty — then it is a tracked exception.
-        let neg_gap = match entry.get("negative_fixtures") {
+        let neg_gap = match table.get("negative_fixtures") {
             None => true,
-            Some(arr_val) => match arr_val.as_array() {
-                None => {
-                    report.blocking.push(format!(
-                        "contract `{id}`: `negative_fixtures` must be an array"
-                    ));
-                    false // already reported as blocking (wrong type)
+            Some(arr_val) => {
+                match toml_str_array(
+                    arr_val,
+                    path,
+                    &format!("contract `{id}` `negative_fixtures`"),
+                ) {
+                    Ok(values) => values.is_empty(),
+                    Err(err) => {
+                        report.blocking.push(err);
+                        false // already reported as blocking (wrong type or member)
+                    }
                 }
-                Some(arr) => arr.is_empty(),
-            },
+            }
         };
         if neg_gap {
             let proof_gap = table
@@ -1299,27 +1301,14 @@ fn evaluate_detector_contracts(value: &toml::Value, path: &str) -> Result<GateRe
             }
         }
 
-        // surfaces: required non-empty array — blocking.
-        match entry.get("surfaces") {
-            None => {
-                report
-                    .blocking
-                    .push(format!("contract `{id}`: no surfaces declared"));
-            }
-            Some(arr_val) => match arr_val.as_array() {
-                None => {
-                    report
-                        .blocking
-                        .push(format!("contract `{id}`: `surfaces` must be an array"));
-                }
-                Some(arr) if arr.is_empty() => {
-                    report
-                        .blocking
-                        .push(format!("contract `{id}`: surfaces array is empty"));
-                }
-                _ => {}
-            },
-        }
+        validate_detector_contract_string_array(
+            table,
+            &id,
+            "surfaces",
+            "no surfaces declared",
+            "surfaces array is empty",
+            &mut report,
+        );
     }
 
     // Handle optional [[exception]] entries — structural errors are blocking.
@@ -1352,6 +1341,36 @@ fn evaluate_detector_contracts(value: &toml::Value, path: &str) -> Result<GateRe
     }
 
     Ok(report)
+}
+
+fn validate_detector_contract_string_array(
+    table: &toml::map::Map<String, toml::Value>,
+    id: &str,
+    key: &str,
+    missing_message: &str,
+    empty_message: &str,
+    report: &mut GateReport,
+) {
+    let Some(value) = table.get(key) else {
+        report
+            .blocking
+            .push(format!("contract `{id}`: {missing_message}"));
+        return;
+    };
+
+    match toml_str_array(
+        value,
+        DETECTOR_CONTRACTS_LEDGER,
+        &format!("contract `{id}` `{key}`"),
+    ) {
+        Ok(values) if values.is_empty() => {
+            report
+                .blocking
+                .push(format!("contract `{id}`: {empty_message}"));
+        }
+        Ok(_) => {}
+        Err(err) => report.blocking.push(err),
+    }
 }
 
 /// Enforcing gate: validates ledger shape of `policy/detector-contracts.toml`.
@@ -3818,6 +3837,7 @@ fn check_fixtures() -> Result<(), String> {
 /// bytes on every run.
 fn check_fixture_surface_parity() -> Result<(), String> {
     let manifest = calibration_manifest::validate()?;
+    let workspace_root = workspace_path("");
     let mut checked = 0usize;
     let mut mismatches: Vec<String> = Vec::new();
 
@@ -3836,13 +3856,17 @@ fn check_fixture_surface_parity() -> Result<(), String> {
                 )
             })?;
 
-            let rendered =
-                unsafe_review_core::render_fixture_surface(fixture, surface).map_err(|err| {
-                    format!(
-                        "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
-                         render failed: {err}"
-                    )
-                })?;
+            let rendered = unsafe_review_core::render_fixture_surface_from_workspace(
+                &workspace_root,
+                fixture,
+                surface,
+            )
+            .map_err(|err| {
+                format!(
+                    "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
+                     render failed: {err}"
+                )
+            })?;
 
             if committed != rendered {
                 let first_diff = first_differing_line(&committed, &rendered);
@@ -3873,6 +3897,7 @@ const SURFACE_DETERMINISM_RUNS: usize = 3;
 /// repeated generation in one process.
 fn check_surface_determinism() -> Result<(), String> {
     let manifest = calibration_manifest::validate()?;
+    let workspace_root = workspace_path("");
     let mut checked = 0usize;
     let mut mismatches: Vec<String> = Vec::new();
 
@@ -3881,22 +3906,30 @@ fn check_surface_determinism() -> Result<(), String> {
             continue;
         }
         for surface in &case.surface_goldens {
-            let baseline =
-                unsafe_review_core::render_fixture_surface(fixture, surface).map_err(|err| {
-                    format!(
-                        "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
-                         initial render failed: {err}"
-                    )
-                })?;
+            let baseline = unsafe_review_core::render_fixture_surface_from_workspace(
+                &workspace_root,
+                fixture,
+                surface,
+            )
+            .map_err(|err| {
+                format!(
+                    "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
+                     initial render failed: {err}"
+                )
+            })?;
 
             for run_idx in 2..=SURFACE_DETERMINISM_RUNS {
-                let candidate = unsafe_review_core::render_fixture_surface(fixture, surface)
-                    .map_err(|err| {
-                        format!(
-                            "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
+                let candidate = unsafe_review_core::render_fixture_surface_from_workspace(
+                    &workspace_root,
+                    fixture,
+                    surface,
+                )
+                .map_err(|err| {
+                    format!(
+                        "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
                              render {run_idx} failed: {err}"
-                        )
-                    })?;
+                    )
+                })?;
                 if baseline != candidate {
                     let first_diff = first_differing_line(&baseline, &candidate);
                     mismatches.push(format!(
@@ -4019,6 +4052,7 @@ fn sync_calibration_snapshot() -> Result<(), String> {
 fn bless_goldens(names: &[String]) -> Result<(), String> {
     let refs: Vec<&str> = names.iter().map(|s| s.as_str()).collect();
     let mut written = unsafe_review_core::bless_fixture_card_goldens(&refs)?;
+    let workspace_root = workspace_path("");
 
     // Also bless surface goldens for fixtures that declare `surface_goldens`
     // in calibration.toml. When specific fixtures are named, only bless those;
@@ -4033,8 +4067,11 @@ fn bless_goldens(names: &[String]) -> Result<(), String> {
             continue;
         }
         let surfaces: Vec<&str> = case.surface_goldens.iter().map(|s| s.as_str()).collect();
-        let surface_written =
-            unsafe_review_core::bless_fixture_surface_goldens(fixture, &surfaces)?;
+        let surface_written = unsafe_review_core::bless_fixture_surface_goldens_from_workspace(
+            &workspace_root,
+            fixture,
+            &surfaces,
+        )?;
         written.extend(surface_written);
     }
 
@@ -25263,6 +25300,73 @@ review_after = "2027-01-01"
             report.blocking
         );
         assert!(report.tracked.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn detector_contracts_rejects_non_string_array_members() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "transmute"
+obligations = ["D1", 42]
+positive_fixtures = ["transmute_basic"]
+negative_fixtures = ["transmute_safe_no_card"]
+surfaces = ["json", false]
+evidence = "fixture coverage"
+review_after = "2027-01-01"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            report
+                .blocking
+                .iter()
+                .any(|err| err.contains("obligations") && err.contains("[1] must be a string")),
+            "expected non-string obligation member to block, got: {:?}",
+            report.blocking
+        );
+        assert!(
+            report
+                .blocking
+                .iter()
+                .any(|err| err.contains("surfaces") && err.contains("[1] must be a string")),
+            "expected non-string surface member to block, got: {:?}",
+            report.blocking
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn detector_contracts_rejects_empty_string_array_members() -> Result<(), String> {
+        let toml: toml::Value = r#"
+schema_version = "1.0"
+[[contract]]
+operation_family = "transmute"
+obligations = ["D1"]
+positive_fixtures = ["transmute_basic"]
+negative_fixtures = [""]
+surfaces = ["json"]
+evidence = "fixture coverage"
+review_after = "2027-01-01"
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let report = evaluate_detector_contracts(&toml, "test")?;
+        assert!(
+            report
+                .blocking
+                .iter()
+                .any(|err| err.contains("negative_fixtures")
+                    && err.contains("[0] must not be empty")),
+            "expected empty negative fixture member to block, got: {:?}",
+            report.blocking
+        );
         Ok(())
     }
 

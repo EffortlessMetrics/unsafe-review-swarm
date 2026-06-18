@@ -9,14 +9,15 @@ Created: 2026-06-15
 This spec defines the schema for `policy/detector-contracts.toml` — the
 detector-discipline contract ledger introduced by the detector-discipline
 control-plane lane. The ledger records, for each registered operation family,
-which D1–D5 discipline obligations the detector must enforce, which fixtures
+which D1-D5 discipline obligations the detector must enforce, which fixtures
 exercise it positively and negatively, which output surfaces project its cards,
-and any tracked exceptions. A future xtask gate (`check-detector-contracts`)
-validates ledger shape and discipline declarations against these requirements.
+and any tracked exceptions. The enforcing xtask gate
+(`check-detector-contracts`) validates ledger shape and discipline declarations
+against these requirements.
 
 This spec does not introduce new analyzer behavior, new operation families, or
 new output surfaces. It defines a process-discipline ledger and the schema for
-its future validating gate.
+its validating gate.
 
 ## Canonical source for D1–D5
 
@@ -90,19 +91,18 @@ review_after = "<ISO-8601 date>"
 
 **`operation_family`** (string, required): must match a variant returned by
 `OperationFamily::as_str()` in `crates/unsafe-review-core/src/domain/operation.rs`.
-There are 36 operation families (35 named + `Unknown`). The future gate will
-reject any entry whose `operation_family` value does not match a registered
-variant.
+There are 36 operation families (35 named + `Unknown`). The gate rejects any
+entry whose `operation_family` value does not match a registered variant.
 
-**`obligations`** (array of obligation identifiers, required): a subset drawn
-exclusively from `["D1", "D2", "D3", "D4", "D5"]` as defined in the SPEC-0005
-appendix. No other identifiers are valid. An empty array is permitted only when
-all five obligations are inapplicable and covered by `[[exception]]` entries.
+**`obligations`** (non-empty array of obligation identifiers, required): a
+subset drawn exclusively from `["D1", "D2", "D3", "D4", "D5"]` as defined in
+the SPEC-0005 appendix. No other identifiers are valid. The enforcing gate
+rejects an empty array or non-string entries.
 
-**`positive_fixtures`** (array of strings, required): fixture directory names
-(under `fixtures/`) that exercise a positive detection for this family. Must
-name at least one fixture. The future gate cross-checks that named fixtures
-exist.
+**`positive_fixtures`** (non-empty array of strings, required): fixture
+directory names (under `fixtures/`) that exercise a positive detection for this
+family. The enforcing gate rejects an empty array or non-string entries; fixture
+existence cross-checking remains a future extension.
 
 **`negative_fixtures`** (array of strings, required): fixture directory names
 (under `fixtures/`) that exercise negative controls — cases where the detector
@@ -115,11 +115,11 @@ D3 unrelated-origin, D4 comment/string masking, D5 path segment). The fixture
 suite alone is blind to assumptions the author did not know they were making;
 adversarial negative controls are required before promotion.
 
-**`surfaces`** (array of strings, required): the output surface names that
+**`surfaces`** (non-empty array of strings, required): the output surface names that
 project cards from this family. Valid values are the surface names used in the
 pipeline: `"json"`, `"sarif"`, `"markdown"`, `"lsp"`, `"agent"`,
 `"comment_plan"`, `"witness_plan"`, `"badges"`, `"baselines"`, `"outcome"`.
-An empty array is permitted only if the family produces no cards.
+The enforcing gate rejects an empty array or non-string entries.
 
 **`evidence`** (string, required): a typed note describing the evidence type
 and its relationship to the obligation. May reference fixture names or spec
@@ -168,9 +168,11 @@ undocumented gaps fail the gate.
 - Malformed TOML or missing `schema_version`.
 - Missing or empty `operation_family` in a `[[contract]]` entry.
 - Duplicate `operation_family` values.
-- Missing or empty `obligations` array.
+- Missing or empty `obligations` array, or non-string/empty-string entries.
+- Missing or empty `positive_fixtures` array, or non-string/empty-string entries.
 - Empty `negative_fixtures` array (or absent) without a documented gap.
-- Missing or empty `surfaces` array.
+- Non-string/empty-string `negative_fixtures` entries.
+- Missing or empty `surfaces` array, or non-string/empty-string entries.
 - Missing or empty `id` in a `[[exception]]` entry.
 - Duplicate `id` values in `[[exception]]` entries.
 

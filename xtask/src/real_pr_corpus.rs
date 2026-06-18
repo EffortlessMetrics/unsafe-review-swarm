@@ -17,6 +17,7 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const PR_CORPUS_LEDGER: &str = "policy/pr-corpus.toml";
+const PR_CORPUS_SCHEMA_VERSION: &str = "1.0";
 
 /// A parsed `[[pr]]` case from the ledger.
 struct PrCase {
@@ -96,8 +97,7 @@ fn run_case(case: &PrCase) -> Result<(), String> {
     assert_movement_counts(id, &check_json, &case.expected)?;
 
     // --- Comment-plan: run first-pr into a target/ temp dir ---
-    let out_dir_rel = format!("target/unsafe-review-pr-corpus-{id}");
-    let out_dir = PathBuf::from(&out_dir_rel);
+    let out_dir = PathBuf::from("target").join(format!("unsafe-review-pr-corpus-{id}"));
 
     // Clean the temp dir before use (safe: it is always under target/).
     if out_dir.exists() {
@@ -242,10 +242,16 @@ fn parse_ledger(path: &Path) -> Result<Vec<PrCase>, String> {
         .map_err(|err| format!("{} is not valid TOML: {err}", path.display()))?;
 
     // Validate schema_version.
-    let _schema = doc
+    let schema = doc
         .get("schema_version")
         .and_then(toml::Value::as_str)
         .ok_or_else(|| format!("{} missing string key `schema_version`", path.display()))?;
+    if schema != PR_CORPUS_SCHEMA_VERSION {
+        return Err(format!(
+            "{} unsupported schema_version `{schema}`; expected `{PR_CORPUS_SCHEMA_VERSION}`",
+            path.display()
+        ));
+    }
 
     let ledger_path = path.display().to_string();
 
@@ -269,6 +275,8 @@ fn parse_ledger(path: &Path) -> Result<Vec<PrCase>, String> {
             .filter(|s| !s.trim().is_empty())
             .ok_or_else(|| format!("{ledger_path} pr[{idx}] missing non-empty `id`"))?
             .to_string();
+        validate_case_id(&id)
+            .map_err(|err| format!("{ledger_path} pr[{idx}] id `{id}` is invalid: {err}"))?;
 
         // Validate kind == "synthetic-fixture" (only kind supported in this gate).
         let kind = table
@@ -305,10 +313,26 @@ fn parse_ledger(path: &Path) -> Result<Vec<PrCase>, String> {
 
         let expected = parse_expected_counts(&id, &ledger_path, idx, expected_table)?;
 
+        if expected_table.contains_key("no_new_debt_exit_code") {
+            return Err(format!(
+                "{ledger_path} pr[{idx}] ({id}) places `no_new_debt_exit_code` inside \
+                 `[pr.expected]`; declare it before `[pr.expected]` so the parent case owns \
+                 the no-new-debt assertion"
+            ));
+        }
+
         let no_new_debt_exit_code = table
             .get("no_new_debt_exit_code")
             .and_then(toml::Value::as_integer)
-            .map(|v| v as i32);
+            .map(|v| {
+                i32::try_from(v).map_err(|err| {
+                    format!(
+                        "{ledger_path} pr[{idx}] ({id}) `no_new_debt_exit_code` value `{v}` \
+                         is outside the i32 exit-code range: {err}"
+                    )
+                })
+            })
+            .transpose()?;
 
         cases.push(PrCase {
             id,
@@ -320,6 +344,25 @@ fn parse_ledger(path: &Path) -> Result<Vec<PrCase>, String> {
     }
 
     Ok(cases)
+}
+
+fn validate_case_id(id: &str) -> Result<(), &'static str> {
+    if id.is_empty() {
+        return Err("id must not be empty");
+    }
+    if id.starts_with('-') || id.ends_with('-') {
+        return Err("id must not start or end with `-`");
+    }
+    if id.split('-').any(str::is_empty) {
+        return Err("id must not contain empty hyphen-separated segments");
+    }
+    if !id
+        .chars()
+        .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
+    {
+        return Err("id must contain only lowercase ASCII letters, digits, and `-`");
+    }
+    Ok(())
 }
 
 /// Parse an `[pr.expected]` table into `ExpectedCounts`.
@@ -367,8 +410,8 @@ fn parse_expected_counts(
 }
 
 /// Run `cargo run --locked -p unsafe-review -- <args>` and capture stdout.
-/// Exits with an error if the process exits with code 2 (tool error).
-/// Exit codes 0 and 1 are both acceptable (advisory / policy violation).
+/// Exits with an error unless the process exits with 0 or 1
+/// (advisory / policy violation).
 fn run_unsafe_review_capture(args: impl IntoIterator<Item = OsString>) -> Result<String, String> {
     let args: Vec<OsString> = args.into_iter().collect();
     let display = args
@@ -383,10 +426,10 @@ fn run_unsafe_review_capture(args: impl IntoIterator<Item = OsString>) -> Result
         .output()
         .map_err(|err| format!("failed to spawn unsafe-review {display}: {err}"))?;
 
-    // Exit 2 means the tool itself failed (bad args, IO error, etc.).
-    if output.status.code() == Some(2) {
+    let exit_code = output.status.code().unwrap_or(-1);
+    if !unsafe_review_exit_allows_stdout(exit_code) {
         return Err(format!(
-            "unsafe-review {display} exited with code 2 (tool error):\nstderr:\n{}",
+            "unsafe-review {display} exited with code {exit_code} (tool error):\nstderr:\n{}",
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
@@ -395,7 +438,8 @@ fn run_unsafe_review_capture(args: impl IntoIterator<Item = OsString>) -> Result
 }
 
 /// Run `cargo run --locked -p unsafe-review -- <args>`, discarding stdout/stderr.
-/// Exits with an error if the process exits with code 2.
+/// Exits with an error unless the process exits with 0 or 1
+/// (advisory / policy violation).
 fn run_unsafe_review_silent(args: impl IntoIterator<Item = OsString>) -> Result<(), String> {
     let args: Vec<OsString> = args.into_iter().collect();
     let display = args
@@ -410,9 +454,10 @@ fn run_unsafe_review_silent(args: impl IntoIterator<Item = OsString>) -> Result<
         .output()
         .map_err(|err| format!("failed to spawn unsafe-review {display}: {err}"))?;
 
-    if output.status.code() == Some(2) {
+    let exit_code = output.status.code().unwrap_or(-1);
+    if !unsafe_review_exit_allows_stdout(exit_code) {
         return Err(format!(
-            "unsafe-review {display} exited with code 2 (tool error):\nstderr:\n{}",
+            "unsafe-review {display} exited with code {exit_code} (tool error):\nstderr:\n{}",
             String::from_utf8_lossy(&output.stderr).trim()
         ));
     }
@@ -441,4 +486,133 @@ fn run_unsafe_review_exit_code(args: impl IntoIterator<Item = OsString>) -> Resu
 
 fn os(s: &str) -> OsString {
     OsString::from(s)
+}
+
+fn unsafe_review_exit_allows_stdout(exit_code: i32) -> bool {
+    matches!(exit_code, 0 | 1)
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn minimal_ledger(case_header: &str, expected_extra: &str) -> String {
+        format!(
+            r#"schema_version = "1.0"
+policy = "unsafe-review-pr-corpus"
+status = "active"
+owner = "repo-infra"
+
+[[pr]]
+id = "case-one"
+kind = "synthetic-fixture"
+root = "fixtures/raw_pointer_alignment"
+diff = "change.diff"
+{case_header}
+
+[pr.expected]
+new_gaps = 0
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+selected_count = 0
+not_selected_count = 0
+{expected_extra}
+"#
+        )
+    }
+
+    fn write_temp_ledger(name: &str, text: &str) -> Result<PathBuf, String> {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| format!("system time before UNIX_EPOCH: {err}"))?
+            .as_nanos();
+        let path = std::env::temp_dir().join(format!(
+            "unsafe-review-pr-corpus-{name}-{}-{nonce}.toml",
+            std::process::id()
+        ));
+        fs::write(&path, text).map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        Ok(path)
+    }
+
+    fn parse_temp_ledger(name: &str, text: &str) -> Result<Vec<PrCase>, String> {
+        let path = write_temp_ledger(name, text)?;
+        let result = parse_ledger(&path);
+        let _ = fs::remove_file(&path);
+        result
+    }
+
+    #[test]
+    fn parse_ledger_reads_parent_no_new_debt_exit_code() -> Result<(), String> {
+        let cases = parse_temp_ledger(
+            "parent-exit-code",
+            &minimal_ledger("no_new_debt_exit_code = 1", ""),
+        )?;
+
+        assert_eq!(cases.len(), 1);
+        assert_eq!(cases[0].no_new_debt_exit_code, Some(1));
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_review_exit_allows_only_advisory_and_policy_codes() {
+        assert!(unsafe_review_exit_allows_stdout(0));
+        assert!(unsafe_review_exit_allows_stdout(1));
+        assert!(!unsafe_review_exit_allows_stdout(2));
+        assert!(!unsafe_review_exit_allows_stdout(101));
+        assert!(!unsafe_review_exit_allows_stdout(-1));
+    }
+
+    #[test]
+    fn parse_ledger_rejects_expected_scoped_no_new_debt_exit_code() -> Result<(), String> {
+        let err = parse_temp_ledger(
+            "nested-exit-code",
+            &minimal_ledger("", "no_new_debt_exit_code = 1"),
+        )
+        .err()
+        .ok_or_else(|| "expected nested no_new_debt_exit_code to fail".to_string())?;
+
+        assert!(err.contains("inside `[pr.expected]`"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn parse_ledger_rejects_path_like_case_id() -> Result<(), String> {
+        let text = minimal_ledger("no_new_debt_exit_code = 0", "")
+            .replace(r#"id = "case-one""#, r#"id = "../case-one""#);
+
+        let err = parse_temp_ledger("path-like-id", &text)
+            .err()
+            .ok_or_else(|| "expected path-like id to fail".to_string())?;
+
+        assert!(err.contains("id `../case-one` is invalid"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn parse_ledger_rejects_unsupported_schema_version() -> Result<(), String> {
+        let text = minimal_ledger("no_new_debt_exit_code = 0", "")
+            .replace(r#"schema_version = "1.0""#, r#"schema_version = "2.0""#);
+
+        let err = parse_temp_ledger("bad-schema", &text)
+            .err()
+            .ok_or_else(|| "expected unsupported schema_version to fail".to_string())?;
+
+        assert!(err.contains("unsupported schema_version `2.0`"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn parse_ledger_rejects_exit_code_outside_i32_range() -> Result<(), String> {
+        let text = minimal_ledger("no_new_debt_exit_code = 2147483648", "");
+
+        let err = parse_temp_ledger("wide-exit-code", &text)
+            .err()
+            .ok_or_else(|| "expected wide exit code to fail".to_string())?;
+
+        assert!(err.contains("outside the i32 exit-code range"), "{err}");
+        Ok(())
+    }
 }

@@ -21,7 +21,7 @@ index and a discipline document, not a replacement for those ledgers.
 
 The four layers answer different questions. They must not be collapsed:
 
-```
+```text
 detector controls : do detectors avoid known false-credit failure modes?   (exact)
 pure examples      : is each evidence shape presented correctly per surface? (exact)
 real-repo corpus   : does the tool behave on real unsafe-heavy code?         (invariants)
@@ -283,7 +283,7 @@ fixture and one piece of evidence.
 
 The tie from spec obligation to corpus case to surface to check is:
 
-```
+```text
 spec obligation (SPEC-XXXX clause)
   -> stance-decisions.toml entry (owner-decided stance)
     -> fixtures/<name>/  (detector-control or pure-example layer)
