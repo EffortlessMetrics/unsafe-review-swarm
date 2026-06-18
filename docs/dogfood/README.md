@@ -32,6 +32,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-06-18 residual unknown classifier report](reports/2026-06-18-residual-unknown-classifier-report.md)
 - [2026-06-15 fresh-crate control-plane validation](reports/2026-06-15-fresh-control-plane-validation.md)
 - [2026-06-14 stance-change validation (#1705-1718)](reports/2026-06-14-stance-change-validation.md)
 - [2026-06-13 fresh-crate capstone validation](reports/2026-06-13-fresh-crate-capstone-validation.md)
