@@ -1213,7 +1213,10 @@ fn is_public_api_surface(kind: &UnsafeSiteKind, snippet: &str) -> bool {
 mod tests {
     use super::*;
     use std::fs;
+    use std::sync::atomic::{AtomicU64, Ordering};
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    static TEMP_DIR_COUNTER: AtomicU64 = AtomicU64::new(0);
 
     #[test]
     fn duplicate_operation_pruning_removes_containing_parent_operation() {
@@ -2432,6 +2435,10 @@ impl<T> Tagged<T> {\n\
             .duration_since(UNIX_EPOCH)
             .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
             .as_nanos();
-        Ok(std::env::temp_dir().join(format!("unsafe-review-scanner-test-{nanos}")))
+        let counter = TEMP_DIR_COUNTER.fetch_add(1, Ordering::Relaxed);
+        let process = std::process::id();
+        Ok(std::env::temp_dir().join(format!(
+            "unsafe-review-scanner-test-{process}-{nanos}-{counter}"
+        )))
     }
 }
