@@ -232,7 +232,8 @@ findings into a "your call" list.
 - Resolve repository-tool roots at runtime. A cached helper binary must not bake a
   checkout path into its behavior; shared target dirs and worktree reuse can
   otherwise make it read a stale or deleted checkout. Prefer an explicit
-  `--workspace-root` or env override with validated git/current-dir fallback.
+  `--workspace-root` or env override with validated Git repository or
+  current-directory fallback.
   `xtask` enforces this invariant after #1748; the doc records the guard rather
   than serving as the mitigation.
 - CI-watch every PR. Run the hosted check to completion before declaring green.
@@ -540,7 +541,7 @@ wrong logic inside an agent but coordination seams between them:
 - calibration merge conflicts on the shared `policy/calibration.toml`
 - `cargo fmt` not run inside `check-pr` (the gate passes while a fmt-only push
   would fail in CI)
-- cached helper binaries carrying compile-time checkout identity (for example,
+- cached helper binaries carrying compile-time checkout path (for example,
   `env!("CARGO_MANIFEST_DIR")`) across shared target dirs and worktrees
 - a worktree leaking state onto the main checkout
 
