@@ -469,6 +469,7 @@ outside_changed_hunk
 human_deep_review_only
 lower_relevance
 covered_by_selected_family_obligation
+covered_by_specific_operation_card
 budget_exhausted
 not_selected_by_policy
 ```

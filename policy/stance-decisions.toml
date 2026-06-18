@@ -95,6 +95,34 @@ fixtures = [
 ]
 
 [[stance]]
+id = "comment-eligibility-from-surfacing-disposition"
+summary = "Comment-plan inline eligibility derives from surfacing disposition, not operation family."
+rationale = """
+Operation family is evidence classification and budget metadata. Inline comment
+eligibility belongs to the comment-plan surfacing policy: declaration owner
+cards and fallback unsafe-site cards stay human-review-only under the active
+stance even if their family labels are refined; concrete operation cards can be
+ranked without using Unknown as a proxy. This stance rejects using
+OperationFamily::Unknown or OperationFamily::UnsafeDeclaration as a hidden
+eligibility switch. It does not make unsafe declarations inline-commentable or
+claim that unknown fallback cards are invalid findings.
+"""
+owner = "core / analysis"
+linked_spec = "UNSAFE-REVIEW-SPEC-0022"
+linked_tests = [
+  "unsafe_review_core::output::comment_plan::tests::comment_plan_declaration_eligibility_does_not_depend_on_family_label",
+  "unsafe_review_core::output::comment_plan::tests::comment_plan_unknown_fallback_site_keeps_human_review_only_reason",
+]
+review_after = "2026-12-15"
+# Corpus evidence: declaration cards and fallback unsafe-block cards both stay
+# visible in not_selected while remaining out of the inline-comment budget.
+fixtures = [
+  "public_unsafe_fn_missing_safety",
+  "split_unsafe_block",
+]
+surfaces = ["comment-plan"]
+
+[[stance]]
 id = "receipt-not-proof"
 summary = "Formal-tool site_reached requires verifiable tool provenance; hand-authored loom/shuttle/kani/crux site_reached is rejected at load."
 rationale = """

@@ -20,8 +20,8 @@ use std::collections::HashMap;
 /// - `NotSelected` — the card was eligible but displaced by the budget cap or
 ///   family/obligation dedup.
 /// - `NotEligible` — the card failed the `should_plan_comment` eligibility
-///   gate (e.g. unchanged site, non-actionable class, unknown family, or low
-///   confidence).
+///   gate (e.g. unchanged site, non-actionable class, human-review-only
+///   surfacing disposition, or low confidence).
 ///
 /// This function is the single source of truth for `comment_plan_status` in the
 /// coverage block (SPEC-0029 / SPEC-0032).  `json::render` and
@@ -567,7 +567,7 @@ mod tests {
     }
 
     #[test]
-    fn comment_plan_skips_unsafe_declaration_operation_family_cards() -> Result<(), String> {
+    fn comment_plan_skips_unsafe_declaration_surfacing_disposition_cards() -> Result<(), String> {
         let output = fixture_output("public_unsafe_fn_missing_safety")?;
         let value = parse_json(&render(&output))?;
 
@@ -628,6 +628,56 @@ mod tests {
         assert_eq!(
             value["not_selected"][0]["context_command"],
             format!("unsafe-review context {} --json", output.cards[0].id)
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_declaration_eligibility_does_not_depend_on_family_label() -> Result<(), String>
+    {
+        let mut output = fixture_output("public_unsafe_fn_missing_safety")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit a declaration card".to_string())?;
+        card.operation.family = OperationFamily::RawPointerRead;
+
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
+        assert_eq!(
+            value["not_selected"][0]["operation_family"],
+            "raw_pointer_read"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "unsafe declaration is not selected for inline comments"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "human_deep_review_only"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_unknown_fallback_site_keeps_human_review_only_reason() -> Result<(), String> {
+        let output = fixture_output("split_unsafe_block")?;
+        let value = parse_json(&render(&output))?;
+
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+        assert_review_budget_summary(&value, 0, 1)?;
+        assert_eq!(value["not_selected"][0]["operation_family"], "unknown");
+        assert_eq!(
+            value["not_selected"][0]["reason"],
+            "operation family unknown"
+        );
+        assert_eq!(
+            value["not_selected"][0]["reason_code"],
+            "human_deep_review_only"
         );
         Ok(())
     }

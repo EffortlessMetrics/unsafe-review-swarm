@@ -1,5 +1,5 @@
 use crate::domain::coverage::{Coverage, WitnessReceiptCoverage};
-use crate::domain::{Confidence, OperationFamily, Priority, ReviewCard, ReviewClass};
+use crate::domain::{Confidence, Priority, ReviewCard, ReviewClass, UnsafeSiteKind};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
 
@@ -185,25 +185,57 @@ const NOT_SELECTED_POLICY_FALLBACK_REASON: ReviewBudgetReason = ReviewBudgetReas
     message: "not selected by current inline comment policy",
 };
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CommentSurfacingDisposition {
+    InlineCandidate,
+    UnsafeDeclaration,
+    FallbackUnsafeSite,
+}
+
+impl CommentSurfacingDisposition {
+    fn allows_inline_comment(self) -> bool {
+        matches!(self, Self::InlineCandidate)
+    }
+
+    fn is_owner_or_fallback(self) -> bool {
+        matches!(self, Self::UnsafeDeclaration | Self::FallbackUnsafeSite)
+    }
+}
+
+fn comment_surfacing_disposition(card: &ReviewCard) -> CommentSurfacingDisposition {
+    match &card.site.kind {
+        UnsafeSiteKind::UnsafeFn | UnsafeSiteKind::UnsafeTrait => {
+            CommentSurfacingDisposition::UnsafeDeclaration
+        }
+        UnsafeSiteKind::UnsafeBlock | UnsafeSiteKind::UnsafeImpl => {
+            CommentSurfacingDisposition::FallbackUnsafeSite
+        }
+        UnsafeSiteKind::UnsafeImplSend
+        | UnsafeSiteKind::UnsafeImplSync
+        | UnsafeSiteKind::ExternBlock
+        | UnsafeSiteKind::FfiCall
+        | UnsafeSiteKind::StaticMut
+        | UnsafeSiteKind::Operation => CommentSurfacingDisposition::InlineCandidate,
+    }
+}
+
 pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
     card.site.changed
         && card.class.is_actionable()
-        && !matches!(
-            card.operation.family,
-            OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
-        )
+        && comment_surfacing_disposition(card).allows_inline_comment()
         && (matches!(card.priority, Priority::High) || matches!(card.confidence, Confidence::High))
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
 }
 
 pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
+    let surfacing = comment_surfacing_disposition(card);
     if !card.site.changed {
         NOT_SELECTED_OUTSIDE_CHANGED_HUNK_REASON
     } else if !card.class.is_actionable() {
         NOT_SELECTED_CLASS_INELIGIBLE_REASON
-    } else if matches!(card.operation.family, OperationFamily::UnsafeDeclaration) {
+    } else if matches!(surfacing, CommentSurfacingDisposition::UnsafeDeclaration) {
         NOT_SELECTED_UNSAFE_DECLARATION_REASON
-    } else if matches!(card.operation.family, OperationFamily::Unknown) {
+    } else if matches!(surfacing, CommentSurfacingDisposition::FallbackUnsafeSite) {
         NOT_SELECTED_UNKNOWN_FAMILY_REASON
     } else if matches!(card.confidence, Confidence::Low | Confidence::Unknown) {
         NOT_SELECTED_CONFIDENCE_REASON
@@ -216,7 +248,7 @@ pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {
     }
 }
 
-/// Determine whether an owner/declaration/fallback-family card's changed
+/// Determine whether an owner/declaration/fallback-site card's changed
 /// region is already covered by at least one concrete operation card in
 /// `all_cards`.
 ///
@@ -231,18 +263,13 @@ pub(super) fn owner_card_covered_by_specific_operation(
     owner_card: &ReviewCard,
     all_cards: &[ReviewCard],
 ) -> bool {
-    if !matches!(
-        owner_card.operation.family,
-        OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
-    ) {
+    if !comment_surfacing_disposition(owner_card).is_owner_or_fallback() {
         return false;
     }
     let owner_file = &owner_card.site.location.file;
     all_cards.iter().any(|other| {
-        !matches!(
-            other.operation.family,
-            OperationFamily::UnsafeDeclaration | OperationFamily::Unknown
-        ) && other.site.changed
+        comment_surfacing_disposition(other).allows_inline_comment()
+            && other.site.changed
             && &other.site.location.file == owner_file
     })
 }

@@ -38,6 +38,7 @@ struct CardProjection {
     proof_path: String,
     hazards: Vec<String>,
     path: String,
+    site_kind: String,
     line: u64,
     column: u64,
     operation: String,
@@ -203,6 +204,7 @@ const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
     "confidence below inline comment threshold",
     "priority/confidence below inline comment threshold",
     "covered by selected family/obligation sibling",
+    "owner-contract obligation covered by a more-specific operation card at the same region",
     "comment-plan max of three candidates reached",
     "not selected by current inline comment policy",
 ];
@@ -211,6 +213,7 @@ const COMMENT_PLAN_NON_SELECTION_REASON_CODES: &[&str] = &[
     "human_deep_review_only",
     "lower_relevance",
     "covered_by_selected_family_obligation",
+    "covered_by_specific_operation_card",
     "budget_exhausted",
     "not_selected_by_policy",
 ];
@@ -6257,10 +6260,20 @@ fn check_comment_plan_artifact(
         comment_body_projections.push((comment, body, card_projection));
     }
     let mut not_selected_card_ids = BTreeSet::new();
+    let mut changed_card_ids = comment_card_ids.clone();
     if let Some(not_selected) = comment_plan.get("not_selected") {
         let Some(not_selected) = not_selected.as_array() else {
             return Err("comment-plan.json not_selected must be an array".to_string());
         };
+        for card in not_selected {
+            if let (Some(card_id), Some(true)) = (
+                card.get("card_id").and_then(serde_json::Value::as_str),
+                card.get("changed_line")
+                    .and_then(serde_json::Value::as_bool),
+            ) {
+                changed_card_ids.insert(card_id.to_string());
+            }
+        }
         for card in not_selected {
             let Some(card_id) = card.get("card_id").and_then(serde_json::Value::as_str) else {
                 return Err("comment-plan.json not_selected entry is missing card_id".to_string());
@@ -6343,6 +6356,8 @@ fn check_comment_plan_artifact(
                     comments.len(),
                     &comment_budget_keys,
                     changed_line,
+                    card_projections,
+                    &changed_card_ids,
                 ),
                 "comment-plan.json not_selected reason",
             )?;
@@ -6363,6 +6378,8 @@ fn check_comment_plan_artifact(
                     comments.len(),
                     &comment_budget_keys,
                     changed_line,
+                    card_projections,
+                    &changed_card_ids,
                 ),
                 "comment-plan.json not_selected reason_code",
             )?;
@@ -7119,13 +7136,13 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
-        let path = super::require_non_empty_json_str(
-            card.pointer("/site")
-                .ok_or_else(|| "cards.json card is missing site".to_string())?,
-            "file",
-            "cards.json card site",
-        )?
-        .to_string();
+        let site = card
+            .pointer("/site")
+            .ok_or_else(|| "cards.json card is missing site".to_string())?;
+        let site_kind =
+            super::require_non_empty_json_str(site, "kind", "cards.json card site")?.to_string();
+        let path =
+            super::require_non_empty_json_str(site, "file", "cards.json card site")?.to_string();
         let line = super::json_usize_at(card, "/site/line", "cards.json card")? as u64;
         let column = super::json_usize_at(card, "/site/column", "cards.json card")? as u64;
         let operation =
@@ -7277,6 +7294,7 @@ fn advisory_card_projections(
             proof_path,
             hazards,
             path,
+            site_kind,
             line,
             column,
             operation,
@@ -7922,13 +7940,50 @@ fn require_allowed_value(actual: &str, allowed: &[&str], context: &str) -> Resul
 
 fn should_project_planned_comment(card: &CardProjection) -> bool {
     class_is_actionable(&card.class_name)
-        && !is_human_review_only_operation_family(&card.operation_family)
+        && comment_surfacing_disposition(card).allows_inline_comment()
         && (card.priority == "high" || card.confidence == "high")
         && !matches!(card.confidence.as_str(), "low" | "unknown")
 }
 
-fn is_human_review_only_operation_family(operation_family: &str) -> bool {
-    matches!(operation_family, "unsafe_declaration" | "unknown")
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum CommentSurfacingDisposition {
+    InlineCandidate,
+    UnsafeDeclaration,
+    FallbackUnsafeSite,
+}
+
+impl CommentSurfacingDisposition {
+    fn allows_inline_comment(self) -> bool {
+        matches!(self, Self::InlineCandidate)
+    }
+
+    fn is_human_review_only(self) -> bool {
+        matches!(self, Self::UnsafeDeclaration | Self::FallbackUnsafeSite)
+    }
+}
+
+fn comment_surfacing_disposition(card: &CardProjection) -> CommentSurfacingDisposition {
+    match card.site_kind.as_str() {
+        "unsafe_fn" | "unsafe_trait" => CommentSurfacingDisposition::UnsafeDeclaration,
+        "unsafe_block" | "unsafe_impl" => CommentSurfacingDisposition::FallbackUnsafeSite,
+        _ => CommentSurfacingDisposition::InlineCandidate,
+    }
+}
+
+fn owner_card_covered_by_specific_operation(
+    owner_card: &CardProjection,
+    card_projections: &BTreeMap<String, CardProjection>,
+    changed_card_ids: &BTreeSet<String>,
+) -> bool {
+    if !comment_surfacing_disposition(owner_card).is_human_review_only() {
+        return false;
+    }
+    card_projections.values().any(|other| {
+        other.id != owner_card.id
+            && changed_card_ids.contains(&other.id)
+            && comment_surfacing_disposition(other).allows_inline_comment()
+            && other.path == owner_card.path
+    })
 }
 
 /// Derive the expected `selection_reason` string from the card's coverage block
@@ -7991,14 +8046,24 @@ fn expected_non_selection_reason(
     planned_count: usize,
     selected_budget_keys: &BTreeSet<String>,
     changed_line: bool,
+    card_projections: &BTreeMap<String, CardProjection>,
+    changed_card_ids: &BTreeSet<String>,
 ) -> &'static str {
-    if !changed_line {
+    if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
+        "owner-contract obligation covered by a more-specific operation card at the same region"
+    } else if !changed_line {
         "outside changed hunk"
     } else if !class_is_actionable(&card.class_name) {
         "class not eligible for inline comments"
-    } else if card.operation_family == "unsafe_declaration" {
+    } else if matches!(
+        comment_surfacing_disposition(card),
+        CommentSurfacingDisposition::UnsafeDeclaration
+    ) {
         "unsafe declaration is not selected for inline comments"
-    } else if card.operation_family == "unknown" {
+    } else if matches!(
+        comment_surfacing_disposition(card),
+        CommentSurfacingDisposition::FallbackUnsafeSite
+    ) {
         "operation family unknown"
     } else if matches!(card.confidence.as_str(), "low" | "unknown") {
         "confidence below inline comment threshold"
@@ -8018,11 +8083,15 @@ fn expected_non_selection_reason_code(
     planned_count: usize,
     selected_budget_keys: &BTreeSet<String>,
     changed_line: bool,
+    card_projections: &BTreeMap<String, CardProjection>,
+    changed_card_ids: &BTreeSet<String>,
 ) -> &'static str {
-    if !changed_line {
+    if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
+        "covered_by_specific_operation_card"
+    } else if !changed_line {
         "outside_changed_hunk"
     } else if !class_is_actionable(&card.class_name)
-        || is_human_review_only_operation_family(&card.operation_family)
+        || comment_surfacing_disposition(card).is_human_review_only()
     {
         "human_deep_review_only"
     } else if matches!(card.confidence.as_str(), "low" | "unknown")

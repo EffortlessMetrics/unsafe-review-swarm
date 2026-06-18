@@ -128,9 +128,16 @@ The `comments[]` list is ordered by this importance ranking. This ranking is
 advisory reviewer-noise budgeting — it surfaces the most urgent coverage gap
 first. It is not a severity claim, proof, or policy gate.
 
-Never select suppressed, `baseline_known`, `static_unknown`, or
-`operation_family: "unknown"` and `operation_family: "unsafe_declaration"` cards. Prefer actionable changed unsafe
-operations that name specific missing evidence and a concrete next action.
+Inline eligibility comes from explicit comment surfacing disposition, not
+`operation_family`. Never select suppressed, `baseline_known`,
+`static_unknown`, declaration owner cards (`site.kind: "unsafe_fn"` or
+`site.kind: "unsafe_trait"`), or fallback human-review cards
+(`site.kind: "unsafe_block"` or `site.kind: "unsafe_impl"`). The
+`operation_family: "unknown"` and `operation_family: "unsafe_declaration"`
+labels remain evidence classification and budget metadata; changing a family
+label alone must not make a card inline-comment eligible. Prefer actionable
+changed unsafe operations that name specific missing evidence and a concrete
+next action.
 Additional cards in an already-selected operation family and missing-obligation
 set remain in `not_selected[]` with reason `covered by selected
 family/obligation sibling`; this preserves the review budget without hiding the
@@ -154,9 +161,11 @@ Selected `selection_reason_code` values use this closed vocabulary:
 - `outside changed hunk`
 - `class not eligible for inline comments`
 - `operation family unknown`
+- `unsafe declaration is not selected for inline comments`
 - `confidence below inline comment threshold`
 - `priority/confidence below inline comment threshold`
 - `covered by selected family/obligation sibling`
+- `owner-contract obligation covered by a more-specific operation card at the same region`
 - `comment-plan max of three candidates reached`
 - `not selected by current inline comment policy`
 
@@ -167,6 +176,7 @@ Summary and `not_selected[].reason_code` values use this closed vocabulary:
 - `human_deep_review_only`
 - `lower_relevance`
 - `covered_by_selected_family_obligation`
+- `covered_by_specific_operation_card`
 - `budget_exhausted`
 - `not_selected_by_policy`
 
@@ -275,14 +285,17 @@ document is a future-lane contract, not a live workflow.
 - body text over 220 words
 - forbidden overclaim wording
 - forbidden classes (`static_unknown`, `baseline_known`, suppressed)
-- forbidden unknown operation-family comments
+- forbidden declaration/fallback human-review-only comments
 
 ## 11. Acceptance examples
 
 Representative outcomes:
 
 - changed raw pointer read with missing alignment evidence -> one `guard_missing` candidate with concrete repair and trust boundary.
-- `static_unknown`, `operation_family: "unknown"`, `operation_family: "unsafe_declaration"`, `baseline_known`, low-signal witness-only cards, or no changed-line anchor -> no inline comment, with explicit `not_selected` reason.
+- `static_unknown`, declaration/fallback human-review-only surfacing
+  dispositions, `baseline_known`, low-signal witness-only cards, or no
+  changed-line anchor -> no inline comment, with explicit `not_selected`
+  reason.
 - malformed overclaim comment text -> verifier failure.
 
 Fixture-backed selected, card-present/not-selected, and no-card examples are in
