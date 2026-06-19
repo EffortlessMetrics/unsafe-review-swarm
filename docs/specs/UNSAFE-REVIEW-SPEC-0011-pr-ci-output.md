@@ -958,6 +958,11 @@ overclaim wording, including `review-kit.json`, `cards.json`, `pr-summary.md`,
 `tokmd-packets.json`, `usefulness-telemetry.json`, `lsp.json`,
 `repair-queue.json`, and `unsafe-review-gate.json`.
 
+For `unsafe-review-gate.json`, the verifier also checks the consumer contract:
+schema/dialect/tool/status, fixed advisory trust-boundary limits, no volatile
+timestamp or wall-clock fields, movement counts copied from `cards.json`
+summary, and artifact pointers to the structured first-pr bundle files.
+
 ### 8. Policy report relationship
 
 The default first-pr gate does not require policy report artifacts.

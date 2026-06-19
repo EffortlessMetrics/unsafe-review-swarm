@@ -17004,6 +17004,139 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_gate_manifest_movement_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-gate-movement-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("unsafe-review-gate.json");
+        let mut manifest = parse_json_file(&path)?;
+        manifest["summary"]["new_gaps"] = serde_json::json!(99);
+        fs::write(&path, manifest.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("gate manifest movement drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "unsafe-review-gate.json summary.new_gaps must project cards.json summary.new_gaps `1`; got `99`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_gate_manifest_artifact_pointer_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-gate-artifact-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("unsafe-review-gate.json");
+        let mut manifest = parse_json_file(&path)?;
+        manifest["artifacts"]["comment_plan"] = serde_json::json!("pr-summary.md");
+        fs::write(&path, manifest.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("gate manifest artifact pointer drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "unsafe-review-gate.json artifacts.comment_plan must be `comment-plan.json`; got `pr-summary.md`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_gate_manifest_status_drift() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-gate-status-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("unsafe-review-gate.json");
+        let mut manifest = parse_json_file(&path)?;
+        manifest["status"] = serde_json::json!("blocking");
+        fs::write(&path, manifest.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("gate manifest status drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unsafe-review-gate.json key `status` is `blocking`, expected `advisory`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_gate_manifest_trust_boundary_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-gate-boundary-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("unsafe-review-gate.json");
+        let mut manifest = parse_json_file(&path)?;
+        manifest["trust_boundary"] = serde_json::json!("safe; not proof; not a merge verdict");
+        fs::write(&path, manifest.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("gate manifest trust boundary drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "unsafe-review-gate.json trust_boundary must be `static unsafe-review coverage evidence; not proof, not a merge verdict`; got `safe; not proof; not a merge verdict`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_gate_manifest_volatile_field() -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-gate-volatile")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("unsafe-review-gate.json");
+        let mut manifest = parse_json_file(&path)?;
+        manifest["generated_at"] = serde_json::json!("2026-06-19T00:00:00Z");
+        fs::write(&path, manifest.to_string())
+            .map_err(|err| format!("write gate manifest failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("gate manifest volatile field should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains("unsafe-review-gate.json must not contain volatile `generated_at`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_cards_json_missing_confirmation_cue() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-cards-missing-confirmation-cue")?;
@@ -23422,16 +23555,22 @@ review_after = "2026-08-01"
     }
 
     fn write_gate_manifest_artifact(dir: &Path) -> Result<(), String> {
+        let cards = parse_json_file(&dir.join("cards.json"))?;
+        let new_gaps = json_usize_at(&cards, "/summary/new_gaps", "cards.json")?;
+        let worsened_gaps = json_usize_at(&cards, "/summary/worsened_gaps", "cards.json")?;
+        let improved_gaps = json_usize_at(&cards, "/summary/improved_gaps", "cards.json")?;
+        let resolved_gaps = json_usize_at(&cards, "/summary/resolved_gaps", "cards.json")?;
+        let inherited_gaps = json_usize_at(&cards, "/summary/inherited_gaps", "cards.json")?;
         let value = serde_json::json!({
             "schema_version": "unsafe-review-gate/v1",
             "dialect": "unsafe-review",
             "status": "advisory",
             "summary": {
-                "new_gaps": 0,
-                "worsened_gaps": 0,
-                "improved_gaps": 0,
-                "resolved_gaps": 0,
-                "inherited_gaps": 0
+                "new_gaps": new_gaps,
+                "worsened_gaps": worsened_gaps,
+                "improved_gaps": improved_gaps,
+                "resolved_gaps": resolved_gaps,
+                "inherited_gaps": inherited_gaps
             },
             "artifacts": {
                 "cards": "cards.json",
@@ -24899,7 +25038,7 @@ review_after = "2026-08-01"
     fn write_valid_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5,"kind":"operation","owner":"read_header"},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":1,"open_actionable_gaps":1,"new_gaps":1,"worsened_gaps":0,"improved_gaps":0,"resolved_gaps":0,"inherited_gaps":0},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5,"kind":"operation","owner":"read_header"},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","obligation_evidence":[{"key":"alignment","description":"pointer aligned","contract":{"present":true,"state":"present","summary":"safety contract"},"discharge":{"present":false,"state":"missing","summary":"No visible local guard"},"reach":{"present":true,"state":"present","summary":"related test mention"},"witness":{"present":false,"state":"missing","summary":"No imported witness receipt"}}],"contract":"safety contract","discharge":"No visible local guard","reach":"related test mention","witness":"No imported witness receipt","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
@@ -25020,7 +25159,7 @@ review_after = "2026-08-01"
         write_valid_artifacts(dir)?;
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5,"kind":"operation","owner":"read_header"},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1,"kind":"unsafe_fn","owner":"read_header"},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unsafe_declaration","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":1,"changed_rust_files":1,"changed_non_rust_files":0,"cards":2,"open_actionable_gaps":2,"new_gaps":2,"worsened_gaps":0,"improved_gaps":0,"resolved_gaps":0,"inherited_gaps":0},"cards":[{"id":"card-1","class":"guard_missing","priority":"high","confidence":"medium","proof_path":"source_route_only","hazards":["alignment"],"site":{"file":"src/lib.rs","line":7,"column":5,"kind":"operation","owner":"read_header"},"operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","verify_commands":["cargo +nightly miri test card"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}]},{"id":"card-2","class":"contract_missing","priority":"high","confidence":"high","proof_path":"human_review_only","hazards":["unknown"],"site":{"file":"src/lib.rs","line":7,"column":1,"kind":"unsafe_fn","owner":"read_header"},"operation":"unsafe fn read_header(ptr: *const u8)","operation_family":"unsafe_declaration","next_action":"Add a precise public `# Safety` section that names the required caller obligations.","verify_commands":[],"witness_routes":[{"kind":"human-deep-review","reason":"route","command":null,"required":false}]}]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
@@ -25177,7 +25316,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
         fs::write(
             dir.join("cards.json"),
-            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"open_actionable_gaps":0},"cards":[]}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","policy":"advisory","scope":"diff","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","summary":{"changed_files":0,"changed_rust_files":0,"changed_non_rust_files":0,"cards":0,"open_actionable_gaps":0,"new_gaps":0,"worsened_gaps":0,"improved_gaps":0,"resolved_gaps":0,"inherited_gaps":0},"cards":[]}"#,
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         fs::write(
