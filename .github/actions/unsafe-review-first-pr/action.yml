@@ -43,7 +43,7 @@ inputs:
       unsafe-review crate version to install from crates.io. Pin this to a
       known-good version to prevent silent breakage on new releases.
     required: false
-    default: "0.3.6"
+    default: "0.3.8"
   fetch_depth:
     description: >
       Depth passed to `git fetch --depth` when fetching the base ref. The

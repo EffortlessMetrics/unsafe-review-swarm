@@ -11,7 +11,7 @@ Add `unsafe-review` PR coverage to any Rust repository in two steps.
     persist-credentials: false
 - uses: EffortlessMetrics/unsafe-review@v1
   with:
-    version: "0.3.6"
+    version: "0.3.8"
 ```
 
 That is the full integration. The action installs `unsafe-review` from
@@ -40,7 +40,7 @@ jobs:
       - uses: EffortlessMetrics/unsafe-review@v1
         id: ur
         with:
-          version: "0.3.6"
+          version: "0.3.8"
 
       - uses: actions/upload-artifact@v7
         if: always()
@@ -58,7 +58,7 @@ anything.
 | Input | Default | Description |
 |---|---|---|
 | `base_ref` | repo default branch | Base ref to diff against |
-| `version` | `0.3.6` | `unsafe-review` version from crates.io |
+| `version` | `0.3.8` | `unsafe-review` version from crates.io |
 | `fetch_depth` | `100` | Depth passed to `git fetch --depth` when fetching the base ref. Increase for repositories with very long histories. |
 | `out_dir` | `target/unsafe-review` | Bundle output directory |
 | `fail_on_new_debt` | `false` | When `true`, fail the job on new or worsened coverage gaps (never on inherited gaps). Advisory by default. |
