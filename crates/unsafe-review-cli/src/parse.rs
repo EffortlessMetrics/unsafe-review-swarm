@@ -585,8 +585,8 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     if options.check.base.is_none() && options.check.diff.is_none() {
         options.check.base = Some("origin/main".to_string());
     }
-    validate_check_options(&options.check)?;
     validate_first_pr_exact_sha_options(&options, saw_base_ref, saw_base_sha)?;
+    validate_check_options(&options.check)?;
     Ok(options)
 }
 
@@ -989,6 +989,9 @@ fn validate_first_pr_exact_sha_options(
 ) -> Result<(), String> {
     if saw_base_ref && saw_base_sha {
         return Err("choose only one of --base or --base-sha".to_string());
+    }
+    if saw_base_sha && options.check.diff.is_some() {
+        return Err("choose only one of --base-sha or --diff".to_string());
     }
     if options.expected_head_sha.is_some() && options.check.diff.is_some() {
         return Err("choose only one of --head-sha or --diff".to_string());
@@ -1863,6 +1866,21 @@ mod tests {
         .unwrap_or_default();
 
         assert_eq!(err, "choose only one of --head-sha or --diff");
+    }
+
+    #[test]
+    fn first_pr_rejects_base_sha_with_diff() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--base-sha",
+            "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+            "--diff=change.diff",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert_eq!(err, "choose only one of --base-sha or --diff");
     }
 
     #[test]
