@@ -63,6 +63,7 @@ impl Default for CheckOptions {
 pub(crate) struct FirstPrOptions {
     pub check: CheckOptions,
     pub out_dir: PathBuf,
+    pub entrypoint: FirstPrEntrypoint,
     /// When `true`, execute auto-detects the git root and default base ref
     /// rather than using the parse-time defaults.  Set only when the user
     /// invokes `unsafe-review pr` without explicit `--root`/`--base`/`--diff`.
@@ -74,7 +75,23 @@ impl Default for FirstPrOptions {
         Self {
             check: CheckOptions::default(),
             out_dir: PathBuf::from("target/unsafe-review"),
+            entrypoint: FirstPrEntrypoint::FirstPr,
             auto_detect: false,
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum FirstPrEntrypoint {
+    FirstPr,
+    Pr,
+}
+
+impl FirstPrEntrypoint {
+    pub(crate) const fn terminal_command(self) -> &'static str {
+        match self {
+            Self::FirstPr => "first-pr",
+            Self::Pr => "pr",
         }
     }
 }

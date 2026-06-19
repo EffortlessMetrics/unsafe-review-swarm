@@ -82,7 +82,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     )?;
     let stdout = String::from_utf8(output.stdout)?;
 
-    assert_contains(&stdout, "unsafe-review first-pr");
+    assert!(
+        stdout.starts_with("unsafe-review first-pr\n"),
+        "first-pr stdout must start with the invoked command label: {stdout}"
+    );
     assert_contains(&stdout, "unsafe-review wrote an advisory PR bundle.");
     // Artifact paths in console output are normalised to forward slashes on all
     // platforms; compare against the normalised form.
@@ -166,8 +169,12 @@ fn pr_alias_with_explicit_flags_produces_same_bundle_as_first_pr() -> Result<(),
     )?;
     let stdout = String::from_utf8(output.stdout)?;
 
-    // `pr` must produce the same advisory bundle header as `first-pr`.
-    assert_contains(&stdout, "unsafe-review first-pr");
+    // `pr` produces the same advisory bundle while presenting the command the
+    // user typed in the terminal handoff.
+    assert!(
+        stdout.starts_with("unsafe-review pr\n"),
+        "pr stdout must start with the invoked command label: {stdout}"
+    );
     assert_contains(&stdout, "unsafe-review wrote an advisory PR bundle.");
     assert_contains(&stdout, "Top card:");
     assert_contains(&stdout, "Class: `guard_missing`");
@@ -235,12 +242,12 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(output.stdout)?;
 
     assert!(
-        stdout.contains("  pr      zero-config"),
-        "help must mention the `pr` zero-config entry point: {stdout}"
+        stdout.contains("  pr      first-run PR review bundle"),
+        "help must mention the `pr` first-run entry point: {stdout}"
     );
     assert!(
-        stdout.contains("alias for first-pr"),
-        "help must say pr is an alias for first-pr: {stdout}"
+        stdout.contains("auto-detects root and base ref"),
+        "help must say pr auto-detects first-run inputs: {stdout}"
     );
 
     Ok(())

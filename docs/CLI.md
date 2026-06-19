@@ -96,10 +96,12 @@ broad suppression authority.
 For a first local review pass, write the standard advisory artifact bundle:
 
 ```bash
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 ```
 
-`review` is an alias for `first-pr`.
+`pr` auto-detects the repository root and default base ref. `first-pr` and
+`review` remain compatibility aliases for the same advisory bundle; use
+`unsafe-review pr --base origin/main` when the base ref must be explicit.
 
 By default this writes:
 
@@ -127,14 +129,14 @@ The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
 comments, edit source, or enforce blocking policy.
 
-For the full maintainer workflow that starts with `first-pr` and continues
+For the full maintainer workflow that starts with `pr` and continues
 through `pr-summary.md`, `explain`, `context --json`, `witness-plan.md`,
 receipt audit, and `outcome`, see
 [Find and fix UB-risk review seams](FIND_AND_FIX_UB.md).
 
 The bundle also includes `receipt-audit.md`, and the terminal handoff prints the
 matching `unsafe-review receipt audit` command so reviewers can check whether
-saved witness receipt metadata still matches the current first-pr cards. The
+saved witness receipt metadata still matches the current PR cards. The
 audit is metadata-only and does not run the witness.
 When a top ReviewCard is present, the terminal handoff also prints its
 hypothesis, build/run-this-first cue, minimal repro cue, and confirmation step.

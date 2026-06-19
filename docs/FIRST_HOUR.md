@@ -62,10 +62,12 @@ directory writability, and witness-tool hints. Missing witness tools (Miri,
 From the branch you want to review, against your main branch:
 
 ```bash
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 ```
 
-This writes the advisory PR bundle:
+This auto-detects the repository root and default base ref, then writes the
+advisory PR bundle. If your base ref cannot be detected, pass it explicitly
+with `unsafe-review pr --base origin/main`.
 
 ```text
 target/unsafe-review/review-kit.json
@@ -84,7 +86,7 @@ target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/repair-queue.json
 ```
 
-`first-pr` is artifact-only: it does not run witness tools, post comments, edit
+`pr` is artifact-only: it does not run witness tools, post comments, edit
 source, or enforce a blocking policy. It is safe to run on any branch.
 
 ## Step 4 — Open the PR summary
@@ -150,7 +152,7 @@ trust boundary. The packet is copy-only; `unsafe-review` does not edit source.
 
 ## Step 9 — Optional: preview editor data
 
-The first-pr bundle includes a saved editor projection:
+The PR bundle includes a saved editor projection:
 
 ```text
 target/unsafe-review/lsp.json
@@ -168,7 +170,7 @@ From a local checkout of `EffortlessMetrics/unsafe-review`, you can run the
 bundled smoke fixture to see one `guard_missing` raw pointer alignment card:
 
 ```bash
-unsafe-review first-pr \
+unsafe-review pr \
   --root fixtures/raw_pointer_alignment \
   --diff fixtures/raw_pointer_alignment/change.diff \
   --out-dir target/unsafe-review-fixture
@@ -189,7 +191,7 @@ unsafe-review pr --root /path/to/external/repo
 Or, to diff against a specific base commit:
 
 ```bash
-unsafe-review first-pr \
+unsafe-review pr \
   --root /path/to/external/repo \
   --base HEAD~20
 ```

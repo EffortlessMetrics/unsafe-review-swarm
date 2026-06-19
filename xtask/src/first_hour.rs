@@ -10,7 +10,7 @@ const DOCS_MAP: &str = "docs/README.md";
 const REQUIRED_COMMANDS: &[&str] = &[
     "cargo install unsafe-review --locked",
     "unsafe-review doctor",
-    "unsafe-review first-pr --base origin/main",
+    "unsafe-review pr",
     "unsafe-review explain <card-id>",
     "unsafe-review support",
 ];
@@ -74,7 +74,7 @@ fn require_artifact_paths_present(text: &str) -> Result<(), String> {
     for needle in REQUIRED_ARTIFACT_PATHS {
         if !text.contains(needle) {
             return Err(format!(
-                "{FIRST_HOUR_DOC} is missing first-pr bundle path `{needle}`"
+                "{FIRST_HOUR_DOC} is missing PR bundle path `{needle}`"
             ));
         }
     }

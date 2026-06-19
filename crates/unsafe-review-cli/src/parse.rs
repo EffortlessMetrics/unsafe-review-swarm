@@ -1,8 +1,8 @@
 use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
-    Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrEntrypoint,
+    FirstPrOptions, Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
 };
 use std::path::PathBuf;
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
@@ -47,15 +47,17 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
-        "pr" => parse_first_pr(rest).map(|mut options| {
-            // `pr` is a pure alias for `first-pr`; the only difference is that
-            // execute auto-detects the git root and base ref when the user did
-            // not supply explicit --root/--base/--diff arguments.
-            options.auto_detect = options.check.root == std::path::Path::new(".")
-                && options.check.base.as_deref() == Some("origin/main")
-                && options.check.diff.is_none();
-            Command::FirstPr(options)
-        }),
+        "pr" => {
+            let auto_detect = !has_explicit_pr_input(&rest);
+            parse_first_pr(rest).map(|mut options| {
+                // `pr` runs the same advisory bundle as `first-pr`; execute
+                // auto-detects the git root and base ref when the user did not
+                // supply explicit --root/--base/--diff arguments.
+                options.entrypoint = FirstPrEntrypoint::Pr;
+                options.auto_detect = auto_detect;
+                Command::FirstPr(options)
+            })
+        }
         "repo" => parse_repo(rest).map(Command::Repo),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
@@ -76,6 +78,15 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
     }
+}
+
+fn has_explicit_pr_input(args: &[String]) -> bool {
+    args.iter().any(|arg| {
+        matches!(arg.as_str(), "--root" | "--base" | "--diff")
+            || arg.starts_with("--root=")
+            || arg.starts_with("--base=")
+            || arg.starts_with("--diff=")
+    })
 }
 
 fn parse_candidate(args: Vec<String>) -> Result<CandidateCommand, String> {
@@ -1623,8 +1634,7 @@ mod tests {
 
     #[test]
     fn parse_pr_alias_maps_to_first_pr() -> Result<(), String> {
-        // `pr` is a pure parse-time alias for `first-pr`; it must map to
-        // Command::FirstPr with the same defaults as `first-pr`.
+        // `pr` maps to Command::FirstPr with the same defaults as `first-pr`.
         let command = parse(args(["unsafe-review", "pr"]))?;
         let Command::FirstPr(options) = command else {
             return Err("expected first-pr command from `pr` alias".to_string());
@@ -1642,6 +1652,40 @@ mod tests {
             options.auto_detect,
             "`pr` with no args must set auto_detect = true"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_pr_alias_explicit_default_inputs_disable_auto_detect() -> Result<(), String> {
+        let cases = [
+            (
+                args(["unsafe-review", "pr", "--root", "."]),
+                "explicit --root .",
+            ),
+            (
+                args(["unsafe-review", "pr", "--root=."]),
+                "explicit --root=.",
+            ),
+            (
+                args(["unsafe-review", "pr", "--base", "origin/main"]),
+                "explicit --base origin/main",
+            ),
+            (
+                args(["unsafe-review", "pr", "--base=origin/main"]),
+                "explicit --base=origin/main",
+            ),
+        ];
+
+        for (argv, label) in cases {
+            let command = parse(argv)?;
+            let Command::FirstPr(options) = command else {
+                return Err(format!("expected first-pr command from {label}"));
+            };
+            assert!(
+                !options.auto_detect,
+                "`pr` with {label} must not set auto_detect"
+            );
+        }
         Ok(())
     }
 

@@ -40,7 +40,7 @@ Run the first-use PR cockpit from a repository checkout:
 
 ```bash
 unsafe-review doctor
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 ```
 
 Then open the summary and inspect the top card:
@@ -67,7 +67,7 @@ outcome comparison, see
 
 ## Artifact Bundle
 
-`first-pr` writes a standard advisory bundle under `target/unsafe-review/`:
+`pr` writes a standard advisory bundle under `target/unsafe-review/`:
 
 ```text
 cards.json
@@ -140,7 +140,7 @@ artifacts.
 | Need | Command |
 |---|---|
 | Check first-run readiness | `unsafe-review doctor` |
-| Build a PR review bundle | `unsafe-review first-pr --base origin/main` |
+| Build a PR review bundle | `unsafe-review pr` |
 | Explain a card | `unsafe-review explain <card-id>` |
 | Show support posture | `unsafe-review support` |
 | Print a bounded agent packet | `unsafe-review context <card-id> --json` |
