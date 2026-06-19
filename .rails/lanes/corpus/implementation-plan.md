@@ -17,6 +17,13 @@ real-repo corpus   : does the tool behave on real unsafe-heavy code?         (in
 real-PR corpus     : does the PR experience stay useful and low-noise?       (movement)
 ```
 
+After the 0.3.8 release, this lane also owns the generalization overlay:
+partition the corpus into conformance, regression, and holdout use; add
+evidence-loss challenge cases for known missed-seam transformations; and run
+external read-only pilots that record human usefulness judgments. That overlay
+does not create a fifth corpus layer or a duplicate ledger. It annotates and
+checks the existing fixture, dogfood, and PR-corpus sources of truth.
+
 Evidence-grounded scope (2026-06-15): a fresh-crate dogfood (nix / simdutf8 /
 zerocopy, 2492 cards) found **zero hard false positives** in the hardened
 families — the detectors hold on unseen code. So this lane **locks validated-good
@@ -84,6 +91,34 @@ PR (zerocopy alone scanned in 282s). Only the deterministic exact-golden checks
   `fixtures` / `dogfood_targets` / `surfaces` links; add `check-stance-coverage`
   (every stance has ≥1 fixture + evidence); optionally a surface-projection audit
   in `spec-coverage.toml`. Ties spec → stance → corpus → surfaces → check.
+
+## Post-0.3.8 generalization sequence
+
+The 0.3.8 bundle shipped the corpus and control-plane rails. The next lane
+should measure whether the tool generalizes beyond the repo's own development
+loop without overclaiming precision or safety. Keep each step review-forward:
+
+- **GPR-1 — partition contract.** Add partition metadata/checks for
+  conformance, regression, and holdout use without duplicating
+  `calibration.toml`, `docs/dogfood/corpus.toml`, or `policy/pr-corpus.toml`.
+  Acceptance: every corpus case has one partition owner, holdout cases can be
+  excluded from every-PR tuning runs, and the checker rejects floating refs.
+- **GPR-2 — initial holdout report.** Add a small release-readiness holdout set
+  or report format. Acceptance: exact SHAs/diffs, first result recorded before
+  tuning, and clear promotion path from holdout to regression after follow-up.
+- **GPR-3 — evidence-loss challenge harness.** Apply bounded transformations
+  such as removing `# Safety`, weakening a guard, removing a receipt, or adding
+  an unsafe declaration, then assert the expected movement and surface
+  invariants. Acceptance: shows known evidence-loss transformations on
+  realistic inputs are detected; no global recall claim.
+- **GPR-4 — external pilot receipts.** Run the public Action or equivalent
+  artifact bundle read-only on real external PRs. Acceptance: setup friction,
+  selected/omitted comments, runtime/artifact size, and human usefulness
+  judgments are recorded in `docs/dogfood/`.
+- **GPR-5 — validation closeout.** Summarize conformance, regression, holdout,
+  challenge, and pilot evidence. Acceptance: names what generalized, what
+  failed, what was missed, what was noisy, and which next analyzer bucket is
+  justified by evidence.
 
 ## Proof commands (per PR; this anchor PR runs the goals/pr subset)
 
