@@ -131,10 +131,12 @@ loop without overclaiming precision or safety. Keep each step review-forward:
   judgment rows. Acceptance remains broader than one sample: setup friction,
   selected/omitted comments, runtime/artifact size, and human usefulness
   judgments are recorded in `docs/dogfood/` for future pilots.
-- **GPR-5 — validation closeout.** Summarize conformance, regression, holdout,
-  challenge, and pilot evidence. Acceptance: names what generalized, what
-  failed, what was missed, what was noisy, and which next analyzer bucket is
-  justified by evidence.
+- **GPR-5 — validation closeout (landed).** Summarize conformance, regression,
+  holdout, challenge, and pilot evidence in
+  `docs/dogfood/reports/2026-06-19-generalization-validation-closeout.md`.
+  Acceptance: names what generalized, what failed or remains thin, what was
+  noisy, and why the next lane is first-use friction rather than an analyzer
+  family.
 
 ## Proof commands (per PR; this anchor PR runs the goals/pr subset)
 
