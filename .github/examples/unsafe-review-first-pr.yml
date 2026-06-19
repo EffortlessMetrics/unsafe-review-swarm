@@ -76,9 +76,13 @@ jobs:
             comment-plan.json \
             witness-plan.md \
             receipt-audit.md \
+            receipt-audit.json \
+            policy-report.json \
+            policy-report.md \
             manual-candidates.json \
             manual-repair-queue.json \
             tokmd-packets.json \
+            usefulness-telemetry.json \
             lsp.json \
             repair-queue.json \
             unsafe-review-gate.json
@@ -88,16 +92,6 @@ jobs:
               exit 1
             fi
           done
-          # Optional: added in newer releases — verified only if present.
-          for optional in \
-            usefulness-telemetry.json
-          do
-            if [ -e "${BUNDLE_DIR}/${optional}" ] && [ ! -s "${BUNDLE_DIR}/${optional}" ]; then
-              echo "::error::unsafe-review bundle has present-but-empty ${optional}"
-              exit 1
-            fi
-          done
-
       - name: Write bounded GitHub job summary
         run: cat "${BUNDLE_DIR}/github-summary.md" >> "${GITHUB_STEP_SUMMARY}"
 
@@ -115,6 +109,9 @@ jobs:
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
             target/unsafe-review/receipt-audit.md
+            target/unsafe-review/receipt-audit.json
+            target/unsafe-review/policy-report.json
+            target/unsafe-review/policy-report.md
             target/unsafe-review/manual-candidates.json
             target/unsafe-review/manual-repair-queue.json
             target/unsafe-review/tokmd-packets.json

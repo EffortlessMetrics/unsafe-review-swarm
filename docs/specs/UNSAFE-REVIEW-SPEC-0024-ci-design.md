@@ -367,12 +367,16 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/receipt-audit.json
+target/unsafe-review/policy-report.json
+target/unsafe-review/policy-report.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/tokmd-packets.json
 target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
+target/unsafe-review/unsafe-review-gate.json
 ```
 
 The drop-in example workflow follows this shape. The live swarm advisory
@@ -946,6 +950,10 @@ Open:
 - `target/unsafe-review/pr-summary.md`
 - `target/unsafe-review/witness-plan.md`
 - `target/unsafe-review/receipt-audit.md`
+- `target/unsafe-review/receipt-audit.json`
+- `target/unsafe-review/policy-report.json`
+- `target/unsafe-review/policy-report.md`
+- `target/unsafe-review/unsafe-review-gate.json`
 
 Trust boundary:
 Static unsafe contract review only. Not memory-safety proof, not UB-free status,
@@ -1293,12 +1301,16 @@ jobs:
             target/unsafe-review/comment-plan.json
             target/unsafe-review/witness-plan.md
             target/unsafe-review/receipt-audit.md
+            target/unsafe-review/receipt-audit.json
+            target/unsafe-review/policy-report.json
+            target/unsafe-review/policy-report.md
             target/unsafe-review/manual-candidates.json
             target/unsafe-review/manual-repair-queue.json
             target/unsafe-review/tokmd-packets.json
             target/unsafe-review/usefulness-telemetry.json
             target/unsafe-review/lsp.json
             target/unsafe-review/repair-queue.json
+            target/unsafe-review/unsafe-review-gate.json
           if-no-files-found: error
 ```
 

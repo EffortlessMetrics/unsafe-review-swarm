@@ -78,12 +78,16 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/receipt-audit.json
+target/unsafe-review/policy-report.json
+target/unsafe-review/policy-report.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/lsp.json
 target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/tokmd-packets.json
 target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/repair-queue.json
+target/unsafe-review/unsafe-review-gate.json
 ```
 
 `pr` is artifact-only: it does not run witness tools, post comments, edit
@@ -199,6 +203,20 @@ unsafe-review pr \
 This writes the advisory bundle under
 `/path/to/external/repo/target/unsafe-review/` (or use `--out-dir` to redirect
 it). The output is advisory findings — not proof of unsafety.
+
+For a public GitHub PR that is not checked out as the current branch, capture a
+raw patch and feed it directly to `--diff -`:
+
+```bash
+gh pr diff 827 --repo tokio-rs/bytes --patch \
+  | unsafe-review pr --root /path/to/external/repo --diff - \
+      --out-dir target/unsafe-review
+```
+
+If you save the patch to a file first on Windows, write it as UTF-8 no-BOM and
+verify it still contains `diff --git`, `---`, `+++`, and `@@` lines. A display
+diff or UTF-16 PowerShell redirection can look readable while failing unified
+diff parsing.
 
 **Step 2 — understand the advisory boundary:**
 
