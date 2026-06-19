@@ -133,7 +133,7 @@ commands = [
 
 [[work_item]]
 id = "pr-alias-zero-config-entry-point"
-status = "active"
+status = "done"
 spec = "UNSAFE-REVIEW-SPEC-0023"
 plan = ".rails/goals/active.toml"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1622"
