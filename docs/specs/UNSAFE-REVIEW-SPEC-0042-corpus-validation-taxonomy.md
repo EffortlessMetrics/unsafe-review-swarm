@@ -18,7 +18,7 @@ pilots feed the backlog without becoming accuracy claims.
 
 Most layers already exist. This taxonomy formalizes and extends them. It is not
 a second source of truth: the authoritative artifacts remain
-`policy/detector-contracts.toml`, `policy/calibration.toml`,
+`policy/detector-contracts.toml`, `fixtures/calibration.toml`,
 `docs/dogfood/corpus.toml`, and `policy/spec-coverage.toml`. This spec is an
 index and a discipline document, not a replacement for those ledgers.
 
@@ -43,11 +43,30 @@ Corpus partitions are an overlay on the four validation layers, not a fifth
 layer and not a duplicate manifest. Partition metadata belongs next to the
 existing source of truth for the case it classifies:
 
-- fixture and pure-example cases: `policy/calibration.toml` and fixture
+- fixture and pure-example cases: `fixtures/calibration.toml` and fixture
   goldens;
 - real-repo cases: `docs/dogfood/corpus.toml`;
 - real-PR cases: `policy/pr-corpus.toml` or the future external PR manifest
   when those cases are promoted from pilot evidence.
+
+The enforced partition metadata is intentionally small and lives in those
+ledgers:
+
+```toml
+# fixtures/calibration.toml
+partition_default = "conformance"
+
+# docs/dogfood/corpus.toml
+partition_by_kind = { "fixture-control" = "conformance", "repo-snapshot" = "regression", "pr-diff" = "regression" }
+
+# policy/pr-corpus.toml
+partition_by_kind = { "synthetic-fixture" = "conformance" }
+```
+
+`xtask check-corpus-partitions` resolves each case to exactly one owner from
+these defaults or a future per-case `partition` override, rejects unknown
+partition names, rejects branch/ref-shaped floating inputs, and rejects holdout
+cases that opt into an every-PR cadence.
 
 The partitions are:
 
@@ -88,7 +107,7 @@ must remain visible before the repo adapts to that input.
 ## Layer 1: Detector-control corpus
 
 **Already exists** as `policy/detector-contracts.toml` and
-`policy/calibration.toml`.
+`fixtures/calibration.toml`.
 
 ### Purpose
 
@@ -108,7 +127,7 @@ operation families it covers.
   negative control for each discipline check it must satisfy.
 
 The 616 fixtures and 300+ negative controls (`_not_guard` / `_no_cards` suffix
-naming) are enumerated in `policy/calibration.toml`. The per-family D1-D5
+naming) are enumerated in `fixtures/calibration.toml`. The per-family D1-D5
 discipline contract entries live in `policy/detector-contracts.toml`.
 
 ### What it is blind to
@@ -125,7 +144,7 @@ Every PR. Gates: `check-fixtures`, `check-calibration`, `check-detector-contract
 
 ### Artifacts
 
-`policy/calibration.toml` — fixture-to-expected-cards map with class, operation
+`fixtures/calibration.toml` — fixture-to-expected-cards map with class, operation
 family, hazard, and support tier.
 `policy/detector-contracts.toml` — per-family D1-D5 discipline contract with
 negative-fixture coverage gaps tracked as documented exceptions.
@@ -406,7 +425,7 @@ spec obligation (SPEC-XXXX clause)
     -> docs/dogfood/corpus.toml target (real-repo layer)
     -> policy/pr-corpus.toml case (real-PR layer)
       -> output surface (cards.json / comment-plan.json / lsp.json / ...)
-        -> xtask gate (check-pr / check-fixture-surface-parity / check-surface-determinism / check-real-pr-corpus)
+        -> xtask gate (check-pr / check-fixture-surface-parity / check-surface-determinism / check-real-pr-corpus / check-corpus-partitions)
           -> documented exception (if coverage is partial)
 ```
 
@@ -434,7 +453,7 @@ These constraints apply to every layer and every output surface:
   corpus manifests.
 - **No automatic third-party issue filing.** Corpus runs are read-only; any
   issue-filing from corpus results is a manual, deliberate action.
-- **Single truth.** Extend `calibration.toml` / `corpus.toml` /
+- **Single truth.** Extend `fixtures/calibration.toml` / `corpus.toml` /
   `stance-decisions.toml` / `spec-coverage.toml` / `detector-contracts.toml`.
   Do not duplicate them or create a parallel ledger.
 - The default analysis path remains syntax-first and build-free. No corpus run
@@ -466,8 +485,9 @@ This spec is implemented by the corpus-validation-system lane. The PR sequence i
 
 Post-0.3.8 generalization work continues in review-forward slices:
 
-- GPR-1: define partition metadata and checks without duplicating existing
-  corpus ledgers.
+- GPR-1: partition defaults/checks landed via `partition_default`,
+  `partition_by_kind`, and `xtask check-corpus-partitions`; no duplicate corpus
+  ledger.
 - GPR-2: add the first small holdout set and a release-readiness report format.
 - GPR-3: add an evidence-loss challenge harness over a bounded canonical subset.
 - GPR-4: run read-only external Action pilots and record human usefulness

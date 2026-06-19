@@ -1,5 +1,6 @@
 schema_version = "0.1"
 status = "experimental"
+partition_default = "conformance"
 
 required_core_fixtures = [
   "raw_pointer_alignment",

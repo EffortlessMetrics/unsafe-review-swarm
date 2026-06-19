@@ -9,6 +9,10 @@ pub const CALIBRATION_CASE_FIELDS: &[&str] = &[
     "expected_operation_family",
     "expected_hazard",
     "surface_goldens",
+    "partition",
+    "cadence",
+    "run_cadence",
+    "tuning_cadence",
 ];
 pub const OPERATION_FAMILY_REGISTRY: &str =
     "docs/specs/appendices/UNSAFE-REVIEW-SPEC-0005-appendix-operation-family-registry.md";

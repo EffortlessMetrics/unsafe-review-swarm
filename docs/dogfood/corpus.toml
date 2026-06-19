@@ -1,6 +1,7 @@
 schema_version = "0.1"
 status = "experimental"
 artifact_root = "target/dogfood-work"
+partition_by_kind = { "fixture-control" = "conformance", "repo-snapshot" = "regression", "pr-diff" = "regression" }
 trust_boundary = "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached."
 
 [[targets]]
