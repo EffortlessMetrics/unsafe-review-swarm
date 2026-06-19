@@ -122,10 +122,15 @@ loop without overclaiming precision or safety. Keep each step review-forward:
   removing a receipt, or adding an unsafe declaration can extend the same
   ledger. Acceptance: shows known evidence-loss transformations on realistic
   inputs are detected; no global recall claim.
-- **GPR-4 — external pilot receipts.** Run the public Action or equivalent
-  artifact bundle read-only on real external PRs. Acceptance: setup friction,
+- **GPR-4 — external pilot receipts (initial rail landed).** Run the public
+  Action or equivalent artifact bundle read-only on real external PRs. The
+  initial receipt rail lives in `docs/dogfood/pilots/` and is enforced by
+  `xtask check-external-pilots`; the first recorded pilot is
+  `tokio-rs/bytes#827`, with exact base/head SHAs, local-equivalent first-pr
+  artifact metrics, selected/omitted comment counts, and setup-friction
+  judgment rows. Acceptance remains broader than one sample: setup friction,
   selected/omitted comments, runtime/artifact size, and human usefulness
-  judgments are recorded in `docs/dogfood/`.
+  judgments are recorded in `docs/dogfood/` for future pilots.
 - **GPR-5 — validation closeout.** Summarize conformance, regression, holdout,
   challenge, and pilot evidence. Acceptance: names what generalized, what
   failed, what was missed, what was noisy, and which next analyzer bucket is
@@ -137,6 +142,7 @@ loop without overclaiming precision or safety. Keep each step review-forward:
 cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- check-evidence-loss-challenges
+cargo run --locked -p xtask -- check-external-pilots
 cargo run --locked -p xtask -- source-divergence
 git diff --check
 ```
