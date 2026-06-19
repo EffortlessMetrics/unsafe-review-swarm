@@ -204,19 +204,33 @@ This writes the advisory bundle under
 `/path/to/external/repo/target/unsafe-review/` (or use `--out-dir` to redirect
 it). The output is advisory findings — not proof of unsafety.
 
-For a public GitHub PR that is not checked out as the current branch, capture a
-raw patch and feed it directly to `--diff -`:
+For a public GitHub PR that is not checked out as the current branch, prefer an
+exact local diff over a display diff. First capture the immutable base and head
+SHAs:
 
 ```bash
-gh pr diff 827 --repo tokio-rs/bytes --patch \
-  | unsafe-review pr --root /path/to/external/repo --diff - \
-      --out-dir target/unsafe-review
+gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
 ```
 
-If you save the patch to a file first on Windows, write it as UTF-8 no-BOM and
-verify it still contains `diff --git`, `---`, `+++`, and `@@` lines. A display
-diff or UTF-16 PowerShell redirection can look readable while failing unified
-diff parsing.
+Then fetch those SHAs into a local checkout and let Git write the patch file:
+
+```bash
+git -C /path/to/external/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/external/repo checkout --detach <head-sha>
+git -C /path/to/external/repo diff --no-ext-diff --binary \
+  --output=/absolute/path/to/unsafe-review-pr827.diff \
+  <base-sha> <head-sha>
+unsafe-review pr \
+  --root /path/to/external/repo \
+  --diff /absolute/path/to/unsafe-review-pr827.diff \
+  --out-dir target/unsafe-review
+```
+
+Use an absolute path for `--output` when `git -C` changes directories. Avoid
+copying from rendered GitHub diff views, and avoid shell redirection for saved
+patches on older Windows PowerShell: it can re-encode the file while leaving it
+readable to humans. A valid saved patch still contains `diff --git`, `---`,
+`+++`, and `@@` lines.
 
 **Step 2 — understand the advisory boundary:**
 

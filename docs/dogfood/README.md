@@ -108,10 +108,16 @@ cards, record it as a named limitation in the dogfood handoff or objective audit
 instead of counting it as an active corpus target. A zero-card result is not
 evidence that the PR is safe.
 
-When capturing a raw GitHub PR diff, use `rtk proxy` so the saved file keeps the
-full patch shape:
+When capturing a raw GitHub PR diff for product input, fetch the exact base/head
+SHAs into a local checkout and use `git diff --output=<path>` so the saved file
+is not shaped by the shell:
 
 ```bash
-rtk proxy gh pr diff 681 -R rust-lang/hashbrown --patch \
-  > target/dogfood-work/hashbrown-pr681.raw.diff
+rtk proxy git -C target/dogfood-work/hashbrown diff --no-ext-diff --binary \
+  --output=/absolute/path/to/target/dogfood-work/hashbrown-pr681.raw.diff \
+  <base-sha> <head-sha>
 ```
+
+If a dogfood run must stream `gh pr diff`, use `rtk proxy` and feed the stream
+directly to `unsafe-review pr --diff -`; do not save product-input patches
+through PowerShell redirection.
