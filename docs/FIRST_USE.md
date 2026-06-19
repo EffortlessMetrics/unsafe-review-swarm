@@ -51,6 +51,9 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/receipt-audit.json
+target/unsafe-review/policy-report.json
+target/unsafe-review/policy-report.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/lsp.json
 target/unsafe-review/manual-repair-queue.json
@@ -72,6 +75,9 @@ target/unsafe-review/unsafe-review-gate.json
 | `comment-plan.json` | Bounded comment plan (advisory; not posted) | ub-review / downstream comment poster |
 | `witness-plan.md` | External witness routes per card (Miri, cargo-careful, sanitizers, Loom, …) | Reviewer / witness operator |
 | `receipt-audit.md` | Saved receipt metadata summary matched against current cards | Reviewer checking prior witness records |
+| `receipt-audit.json` | Machine-readable saved receipt metadata audit | ub-review / receipt tooling |
+| `policy-report.json` | Machine-readable advisory no-new-debt simulation | CI / policy tooling |
+| `policy-report.md` | Reviewer-facing advisory no-new-debt simulation | Human reviewer |
 | `manual-candidates.json` | Cards recommended for manual review | Reviewer / triager |
 | `manual-repair-queue.json` | Manual repair queue sidecar | Agent / repair workflow |
 | `tokmd-packets.json` | Formatting input sidecar for comment rendering | ub-review / comment formatter |

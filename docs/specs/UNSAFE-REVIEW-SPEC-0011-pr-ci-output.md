@@ -106,12 +106,16 @@ target/unsafe-review/cards.sarif
 target/unsafe-review/comment-plan.json
 target/unsafe-review/witness-plan.md
 target/unsafe-review/receipt-audit.md
+target/unsafe-review/receipt-audit.json
+target/unsafe-review/policy-report.json
+target/unsafe-review/policy-report.md
 target/unsafe-review/manual-candidates.json
 target/unsafe-review/manual-repair-queue.json
 target/unsafe-review/tokmd-packets.json
 target/unsafe-review/usefulness-telemetry.json
 target/unsafe-review/lsp.json
 target/unsafe-review/repair-queue.json
+target/unsafe-review/unsafe-review-gate.json
 ```
 
 The existing first-run lane already identifies this bundle and verifier as the public first-run cockpit surface.
@@ -876,11 +880,15 @@ Open:
 - `target/unsafe-review/github-summary.md`
 - `target/unsafe-review/witness-plan.md`
 - `target/unsafe-review/receipt-audit.md` (saved receipt metadata only; no witness was run)
+- `target/unsafe-review/receipt-audit.json` (machine-readable saved receipt metadata only)
+- `target/unsafe-review/policy-report.json` (advisory no-new-debt simulation)
+- `target/unsafe-review/policy-report.md` (reviewer-facing advisory policy simulation)
 - `target/unsafe-review/manual-candidates.json` (manual/advisory candidates, separate from ReviewCards)
 - `target/unsafe-review/manual-repair-queue.json` (copy-only manual candidate handoff; no agent was run)
 - `target/unsafe-review/tokmd-packets.json` (formatting input only; tokmd was not run)
 - `target/unsafe-review/usefulness-telemetry.json` (operational diagnostic usefulness only; not calibrated precision/recall)
 - `target/unsafe-review/repair-queue.json` (copy-only; no agent was run)
+- `target/unsafe-review/unsafe-review-gate.json` (advisory movement manifest; not a merge verdict)
 
 Trust boundary:
 Static unsafe contract review only. Not memory-safety proof, not UB-free status,
@@ -945,9 +953,10 @@ This is not Miri-clean status.
 The first-pr artifact verifier scans every required bundle artifact for positive
 overclaim wording, including `review-kit.json`, `cards.json`, `pr-summary.md`,
 `github-summary.md`, `cards.sarif`, `comment-plan.json`, `witness-plan.md`,
-`receipt-audit.md`, `manual-candidates.json`, `manual-repair-queue.json`,
-`tokmd-packets.json`,
-`usefulness-telemetry.json`, `lsp.json`, and `repair-queue.json`.
+`receipt-audit.md`, `receipt-audit.json`, `policy-report.json`,
+`policy-report.md`, `manual-candidates.json`, `manual-repair-queue.json`,
+`tokmd-packets.json`, `usefulness-telemetry.json`, `lsp.json`,
+`repair-queue.json`, and `unsafe-review-gate.json`.
 
 ### 8. Policy report relationship
 
