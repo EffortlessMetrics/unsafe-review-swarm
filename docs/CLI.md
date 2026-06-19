@@ -129,15 +129,26 @@ target/unsafe-review/unsafe-review-gate.json
 Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
 to review a supplied diff.
 
-For an external GitHub PR, prefer piping a raw patch into `--diff -` or writing
-the patch with UTF-8 no-BOM encoding. This avoids shell-redirection encoding
-surprises on Windows and keeps the `diff --git` headers that `unsafe-review`
-uses to scope the review:
+For an external GitHub PR, prefer a local diff from exact base/head SHAs instead
+of a rendered display diff. Let Git write the patch file itself so shell
+redirection cannot re-encode the file on Windows:
 
 ```bash
-gh pr diff 827 --repo tokio-rs/bytes --patch \
-  | unsafe-review pr --root /path/to/bytes --diff - --out-dir target/unsafe-review
+gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
+git -C /path/to/bytes fetch origin <base-sha> <head-sha>
+git -C /path/to/bytes checkout --detach <head-sha>
+git -C /path/to/bytes diff --no-ext-diff --binary \
+  --output=/absolute/path/to/unsafe-review-pr827.diff \
+  <base-sha> <head-sha>
+unsafe-review pr \
+  --root /path/to/bytes \
+  --diff /absolute/path/to/unsafe-review-pr827.diff \
+  --out-dir target/unsafe-review
 ```
+
+Use an absolute `--output` path when `git -C` changes directories. The saved
+patch must keep the `diff --git`, `---`, `+++`, and `@@` unified-diff lines that
+`unsafe-review` uses to scope the review.
 
 The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
