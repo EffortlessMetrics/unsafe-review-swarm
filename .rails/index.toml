@@ -203,7 +203,7 @@ owner = "product / cli"
 id = "pr-alias-zero-config-entry-point"
 name = "pr alias zero-config entry point"
 path = ".rails/goals/active.toml"
-status = "active"
+status = "done"
 owner = "product / cli"
 
 [[lane]]
