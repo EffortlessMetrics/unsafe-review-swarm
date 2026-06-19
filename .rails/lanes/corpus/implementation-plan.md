@@ -42,7 +42,7 @@ only the genuine gaps; do **not** create a ledger that duplicates an existing
 source of truth.
 
 - **Detector controls already exist**: `policy/detector-contracts.toml` +
-  `policy/calibration.toml` (616 fixtures, 300+ negative controls). Gap:
+  `fixtures/calibration.toml` (616 fixtures, 300+ negative controls). Gap:
   goldens are cards-only.
 - **Real-repo corpus already exists**: `docs/dogfood/corpus.toml` pins 12 repos
   at **exact commit SHAs** (37 targets); `check-dogfood` validates the manifest.
@@ -98,11 +98,13 @@ The 0.3.8 bundle shipped the corpus and control-plane rails. The next lane
 should measure whether the tool generalizes beyond the repo's own development
 loop without overclaiming precision or safety. Keep each step review-forward:
 
-- **GPR-1 — partition contract.** Add partition metadata/checks for
-  conformance, regression, and holdout use without duplicating
-  `calibration.toml`, `docs/dogfood/corpus.toml`, or `policy/pr-corpus.toml`.
-  Acceptance: every corpus case has one partition owner, holdout cases can be
-  excluded from every-PR tuning runs, and the checker rejects floating refs.
+- **GPR-1 — partition contract (landed).** Partition metadata/checks for
+  conformance, regression, and holdout use live in the existing ledgers via
+  `partition_default`, `partition_by_kind`, and `xtask check-corpus-partitions`;
+  no duplicate `fixtures/calibration.toml`, `docs/dogfood/corpus.toml`, or
+  `policy/pr-corpus.toml` ledger. Acceptance: every corpus case has one
+  partition owner, holdout cases are rejected if they opt into every-PR cadence,
+  and the checker rejects branch/ref-shaped floating refs.
 - **GPR-2 — initial holdout report.** Add a small release-readiness holdout set
   or report format. Acceptance: exact SHAs/diffs, first result recorded before
   tuning, and clear promotion path from holdout to regression after follow-up.

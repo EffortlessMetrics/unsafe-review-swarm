@@ -2,6 +2,7 @@ schema_version = "1.0"
 policy = "unsafe-review-pr-corpus"
 status = "active"
 owner = "repo-infra"
+partition_by_kind = { "synthetic-fixture" = "conformance" }
 
 # Trust boundary: this ledger records expected outcome_movement counts and
 # comment-plan selection counts for synthetic movement fixtures. It does NOT
