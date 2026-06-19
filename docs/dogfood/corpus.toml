@@ -555,3 +555,17 @@ purpose = "capped repo snapshot for raw pointer dereference, transmute, and byte
 command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/zerocopy --format json --max-cards 50 --out target/dogfood-work/zerocopy-capped.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/zerocopy-capped.unsafe-review.json"]
+
+[[targets]]
+id = "getrandom-holdout"
+crate = "getrandom"
+repository = "rust-random/getrandom"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "5e7cd5733536844a9856dc7259bd4696bbe5e3ae"
+root = "target/dogfood-work/getrandom-holdout"
+purpose = "release-readiness holdout repo snapshot for platform RNG unsafe declarations, FFI-style bindings, and raw pointer cards; first result is recorded before tuning"
+command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/getrandom-holdout --format json --max-cards 50 --out target/dogfood-work/getrandom-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/getrandom-holdout.unsafe-review.json"]

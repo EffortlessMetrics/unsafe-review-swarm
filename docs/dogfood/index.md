@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-06-15
+Date: 2026-06-19
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -27,11 +27,12 @@ local artifact is needed.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 15 |
-| Total targets | 40 |
-| Capped repo snapshots | 15 |
+| Repositories | 16 |
+| Total targets | 41 |
+| Capped repo snapshots | 16 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
+| Holdout targets | 1 |
 | Checked-in scan outputs | 0 |
 
 ## Selected Judgment Sample
@@ -87,6 +88,7 @@ Selected real-crate targets:
 | `nix-rust/nix` | 1 | 0 | FFI/extern unsafe fn call and cfg-gated platform-branch cards; control-plane validation |
 | `rusticstuff/simdutf8` | 1 | 0 | SIMD `target_feature` unsafe fn call and intrinsic cards; control-plane validation |
 | `google/zerocopy` | 1 | 0 | Raw pointer dereference, `transmute`, and byte-cast cards; control-plane validation |
+| `rust-random/getrandom` | 1 | 0 | Release-readiness holdout for platform RNG unsafe declarations, FFI-style bindings, and raw pointer cards; recorded before tuning |
 
 ## Recorded Outcome Movement
 
@@ -113,6 +115,7 @@ Selected real-crate targets:
 - `nix-capped`
 - `simdutf8-capped`
 - `zerocopy-capped`
+- `getrandom-holdout` (holdout; run only with explicit release-readiness opt-in)
 
 ### PR Diffs
 
@@ -168,6 +171,14 @@ rtk cargo run --locked -p unsafe-review -- outcome \
   --after target/dogfood-work/after.json \
   --format markdown \
   --out target/dogfood-work/outcome.md
+```
+
+Holdout repo snapshots are release-readiness diagnostics. `dogfood-exec` skips
+them by default; run a holdout target only with an explicit opt-in:
+
+```bash
+rtk cargo run --locked -p xtask -- dogfood-exec \
+  --target getrandom-holdout --include-holdout --strict
 ```
 
 Update this index only when the corpus manifest or recorded outcome evidence

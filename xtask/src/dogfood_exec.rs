@@ -23,6 +23,8 @@ const TIMEOUT_POLL_INTERVAL: Duration = Duration::from_millis(200);
 pub(crate) struct DogfoodExecArgs {
     /// Only run the target with this id (None = run all repo-snapshot targets).
     pub(crate) target: Option<String>,
+    /// Include targets partitioned as holdout. Holdout runs require an explicit opt-in.
+    pub(crate) include_holdout: bool,
     /// Base directory for per-target clone work dirs.
     pub(crate) work_dir: PathBuf,
     /// `--max-cards N` forwarded to `unsafe-review repo`.
@@ -37,13 +39,14 @@ pub(crate) struct DogfoodExecArgs {
 }
 
 impl DogfoodExecArgs {
-    /// Parse `dogfood-exec [--target <id>] [--work-dir <path>] [--max-cards <N>]
-    ///                      [--strict] [--clean] [--timeout <secs>]`
+    /// Parse `dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>]
+    ///                      [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]`
     /// from the xtask args slice.
     ///
     /// `args[0]` is the xtask binary name and `args[1]` is "dogfood-exec".
     pub(crate) fn parse(args: &[String]) -> Result<Self, String> {
         let mut target: Option<String> = None;
+        let mut include_holdout = false;
         let mut work_dir: Option<PathBuf> = None;
         let mut max_cards: u32 = DEFAULT_MAX_CARDS;
         let mut strict = false;
@@ -57,6 +60,9 @@ impl DogfoodExecArgs {
                     i += 1;
                     let val = args.get(i).ok_or("--target requires a value")?;
                     target = Some(val.clone());
+                }
+                "--include-holdout" => {
+                    include_holdout = true;
                 }
                 "--work-dir" => {
                     i += 1;
@@ -93,6 +99,7 @@ impl DogfoodExecArgs {
 
         Ok(Self {
             target,
+            include_holdout,
             work_dir: work_dir.unwrap_or_else(|| PathBuf::from(DEFAULT_WORK_DIR)),
             max_cards,
             strict,
@@ -107,6 +114,7 @@ pub(crate) struct TargetSpec {
     pub(crate) id: String,
     pub(crate) repository: String,
     pub(crate) commit: String,
+    pub(crate) partition: String,
 }
 
 /// Diagnostics recorded after a successful scan.
@@ -185,10 +193,36 @@ pub(crate) fn select_repo_snapshot_targets(
             .ok_or_else(|| format!("{CORPUS_SOURCE}: targets[{idx}] ({id}) missing commit"))?
             .to_string();
 
+        let partition = table
+            .get("partition")
+            .and_then(|v| v.as_str())
+            .or_else(|| {
+                corpus
+                    .get("partition_by_kind")
+                    .and_then(toml::Value::as_table)
+                    .and_then(|by_kind| by_kind.get(kind))
+                    .and_then(toml::Value::as_str)
+            })
+            .ok_or_else(|| {
+                format!(
+                    "{CORPUS_SOURCE}: targets[{idx}] ({id}) has no partition owner; add `partition` or partition_by_kind.{kind}"
+                )
+            })?
+            .to_string();
+        match partition.as_str() {
+            "conformance" | "regression" | "holdout" => {}
+            other => {
+                return Err(format!(
+                    "{CORPUS_SOURCE}: targets[{idx}] ({id}) uses unknown partition `{other}`"
+                ));
+            }
+        }
+
         result.push(TargetSpec {
             id,
             repository,
             commit,
+            partition,
         });
     }
 
@@ -266,21 +300,7 @@ pub(crate) fn run(args: &DogfoodExecArgs) -> Result<(), String> {
 
     let all_targets = select_repo_snapshot_targets(&corpus)?;
 
-    // Filter by --target if specified.
-    let targets: Vec<TargetSpec> = if let Some(ref filter_id) = args.target {
-        let filtered: Vec<TargetSpec> = all_targets
-            .into_iter()
-            .filter(|t| &t.id == filter_id)
-            .collect();
-        if filtered.is_empty() {
-            return Err(format!(
-                "no repo-snapshot target with id `{filter_id}` in {CORPUS_SOURCE}"
-            ));
-        }
-        filtered
-    } else {
-        all_targets
-    };
+    let targets = targets_for_args(all_targets, args)?;
 
     let mut results: Vec<TargetResult> = Vec::new();
 
@@ -371,6 +391,51 @@ pub(crate) fn run(args: &DogfoodExecArgs) -> Result<(), String> {
     }
 
     Ok(())
+}
+
+fn targets_for_args(
+    all_targets: Vec<TargetSpec>,
+    args: &DogfoodExecArgs,
+) -> Result<Vec<TargetSpec>, String> {
+    // Filter by --target if specified.
+    let mut targets: Vec<TargetSpec> = if let Some(ref filter_id) = args.target {
+        let filtered: Vec<TargetSpec> = all_targets
+            .into_iter()
+            .filter(|t| &t.id == filter_id)
+            .collect();
+        if filtered.is_empty() {
+            return Err(format!(
+                "no repo-snapshot target with id `{filter_id}` in {CORPUS_SOURCE}"
+            ));
+        }
+        filtered
+    } else {
+        all_targets
+    };
+
+    if !args.include_holdout {
+        if let (Some(_), Some(holdout)) = (
+            args.target.as_ref(),
+            targets.iter().find(|target| target.partition == "holdout"),
+        ) {
+            return Err(format!(
+                "repo-snapshot target `{}` is partitioned as holdout; rerun with --include-holdout to run release-readiness holdout cases",
+                holdout.id
+            ));
+        }
+        let skipped = targets
+            .iter()
+            .filter(|target| target.partition == "holdout")
+            .count();
+        targets.retain(|target| target.partition != "holdout");
+        if skipped > 0 {
+            eprintln!(
+                "dogfood-exec: skipped {skipped} holdout target(s); pass --include-holdout to run release-readiness holdout cases"
+            );
+        }
+    }
+
+    Ok(targets)
 }
 
 /// Clone, scan, and evaluate a single repo-snapshot target.
@@ -926,6 +991,7 @@ mod tests {
     fn dogfood_exec_select_repo_snapshot_filters_by_kind() -> Result<(), String> {
         let corpus: toml::Value = r#"
 schema_version = "0.1"
+partition_by_kind = { "fixture-control" = "conformance", "repo-snapshot" = "regression", "pr-diff" = "regression" }
 
 [[targets]]
 id = "fixture-one"
@@ -987,7 +1053,101 @@ artifacts = []
             targets[0].commit,
             "abcdef1234567890abcdef1234567890abcdef12"
         );
+        assert_eq!(targets[0].partition, "regression");
         assert_eq!(targets[1].id, "repo-two");
+        Ok(())
+    }
+
+    /// Explicit per-target partition overrides the repo-snapshot default.
+    #[test]
+    fn dogfood_exec_select_repo_snapshot_resolves_holdout_override() -> Result<(), String> {
+        let corpus: toml::Value = r#"
+schema_version = "0.1"
+partition_by_kind = { "fixture-control" = "conformance", "repo-snapshot" = "regression", "pr-diff" = "regression" }
+
+[[targets]]
+id = "repo-holdout"
+crate = "baz"
+repository = "owner/baz"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "abcdef1234567890abcdef1234567890abcdef12"
+root = "target/dogfood-work/baz"
+purpose = "test repo snapshot target"
+command = "cargo run"
+artifact_status = "local_untracked"
+artifacts = []
+"#
+        .parse::<toml::Table>()
+        .map_err(|e| e.to_string())
+        .map(toml::Value::Table)?;
+
+        let targets = select_repo_snapshot_targets(&corpus)?;
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].id, "repo-holdout");
+        assert_eq!(targets[0].partition, "holdout");
+        Ok(())
+    }
+
+    fn target_spec(id: &str, partition: &str) -> TargetSpec {
+        TargetSpec {
+            id: id.to_string(),
+            repository: "owner/repo".to_string(),
+            commit: "abcdef1234567890abcdef1234567890abcdef12".to_string(),
+            partition: partition.to_string(),
+        }
+    }
+
+    #[test]
+    fn dogfood_exec_targets_for_args_skips_holdout_by_default() -> Result<(), String> {
+        let args: Vec<String> = vec!["xtask".to_string(), "dogfood-exec".to_string()];
+        let parsed = DogfoodExecArgs::parse(&args)?;
+        let targets = targets_for_args(
+            vec![
+                target_spec("repo-regression", "regression"),
+                target_spec("repo-holdout", "holdout"),
+            ],
+            &parsed,
+        )?;
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].id, "repo-regression");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_exec_targets_for_args_requires_holdout_opt_in_for_target() -> Result<(), String> {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--target".to_string(),
+            "repo-holdout".to_string(),
+        ];
+        let parsed = DogfoodExecArgs::parse(&args)?;
+        let result = targets_for_args(vec![target_spec("repo-holdout", "holdout")], &parsed);
+
+        assert!(result.is_err(), "expected holdout target to require opt-in");
+        let err = result.err().unwrap_or_default();
+        assert!(err.contains("--include-holdout"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_exec_targets_for_args_includes_holdout_with_opt_in() -> Result<(), String> {
+        let args: Vec<String> = vec![
+            "xtask".to_string(),
+            "dogfood-exec".to_string(),
+            "--target".to_string(),
+            "repo-holdout".to_string(),
+            "--include-holdout".to_string(),
+        ];
+        let parsed = DogfoodExecArgs::parse(&args)?;
+        let targets = targets_for_args(vec![target_spec("repo-holdout", "holdout")], &parsed)?;
+
+        assert_eq!(targets.len(), 1);
+        assert_eq!(targets[0].id, "repo-holdout");
         Ok(())
     }
 
@@ -1011,6 +1171,7 @@ artifacts = []
             "dogfood-exec".to_string(),
             "--target".to_string(),
             "smallvec-capped".to_string(),
+            "--include-holdout".to_string(),
             "--work-dir".to_string(),
             "target/my-work".to_string(),
             "--max-cards".to_string(),
@@ -1022,6 +1183,7 @@ artifacts = []
         let parsed = DogfoodExecArgs::parse(&args)?;
 
         assert_eq!(parsed.target.as_deref(), Some("smallvec-capped"));
+        assert!(parsed.include_holdout);
         assert_eq!(parsed.work_dir, PathBuf::from("target/my-work"));
         assert_eq!(parsed.max_cards, 20);
         assert!(parsed.strict);
@@ -1037,6 +1199,7 @@ artifacts = []
         let parsed = DogfoodExecArgs::parse(&args)?;
 
         assert!(parsed.target.is_none());
+        assert!(!parsed.include_holdout);
         assert_eq!(parsed.work_dir, PathBuf::from(DEFAULT_WORK_DIR));
         assert_eq!(parsed.max_cards, DEFAULT_MAX_CARDS);
         assert!(!parsed.strict);
