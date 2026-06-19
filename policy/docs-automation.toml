@@ -123,7 +123,7 @@ sources = [
 must_include = [
   "Advisory unsafe-contract review",
   "cargo install unsafe-review --locked",
-  "unsafe-review first-pr --base origin/main",
+  "unsafe-review pr",
   "Trust boundary",
   "proof of memory safety",
   "UB-free claim",
