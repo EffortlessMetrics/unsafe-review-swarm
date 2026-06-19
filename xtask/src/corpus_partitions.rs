@@ -178,6 +178,7 @@ fn check_evidence_loss_challenges_manifest(
             ));
         }
         let partition = resolve_partition(table, &by_kind, None, kind, &context)?;
+        require_partition_value(partition, "conformance", &format!("{context} partition"))?;
         reject_floating_ref_keys(table, &context)?;
         validate_sha_fields(table, &context)?;
         reject_every_pr_holdout(table, &context, partition)?;
@@ -515,6 +516,30 @@ source_fixture = "fixtures/raw_pointer_deref_coverage_improved"
 
         assert_eq!(stats.total, 1);
         assert_eq!(stats.conformance, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_loss_challenges_reject_partition_override() -> Result<(), String> {
+        let manifest = parse(
+            r#"
+schema_version = "1.0"
+partition_by_kind = { "fixture-transform" = "conformance" }
+
+[[challenge]]
+id = "remove-safety-section"
+kind = "fixture-transform"
+source_fixture = "fixtures/raw_pointer_deref_coverage_improved"
+partition = "regression"
+"#,
+        )?;
+        let mut stats = PartitionStats::default();
+
+        let err = check_evidence_loss_challenges_manifest(&manifest, &mut stats)
+            .err()
+            .ok_or_else(|| "expected partition override to fail".to_string())?;
+
+        assert!(err.contains("must be `conformance`"), "{err}");
         Ok(())
     }
 }

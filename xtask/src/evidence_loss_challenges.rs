@@ -10,7 +10,7 @@
 //! memory-safety proof, UB-free claims, Miri-clean claims, site-execution
 //! results, or policy-readiness claims.
 
-use std::ffi::OsString;
+use std::ffi::{OsStr, OsString};
 use std::fs;
 use std::path::Path;
 use std::process::Command;
@@ -200,6 +200,7 @@ fn apply_transformation(case: &ChallengeCase, root: &Path) -> Result<(), String>
     let src = root.join("src").join("lib.rs");
     let text =
         fs::read_to_string(&src).map_err(|err| format!("read {} failed: {err}", src.display()))?;
+    let text = normalize_lf(&text);
     let text = remove_safety_doc_section(
         &text,
         REMOVE_SAFETY_DOC_REPLACEMENT,
@@ -549,6 +550,12 @@ fn copy_dir_all(src: &Path, dst: &Path) -> Result<(), String> {
                     target.display()
                 )
             })?;
+        } else if ty.is_symlink() {
+            return Err(format!(
+                "fixture setup refuses to copy symlink {} to {}",
+                entry.path().display(),
+                target.display()
+            ));
         }
     }
     Ok(())
@@ -586,6 +593,10 @@ fn remove_safety_doc_section(
     Ok(out)
 }
 
+fn normalize_lf(text: &str) -> String {
+    text.replace("\r\n", "\n").replace('\r', "\n")
+}
+
 fn run_unsafe_review_capture(args: impl IntoIterator<Item = OsString>) -> Result<String, String> {
     let output = run_unsafe_review(args)?;
     let exit_code = output.status.code().unwrap_or(-1);
@@ -621,7 +632,7 @@ fn run_unsafe_review(
     args: impl IntoIterator<Item = OsString>,
 ) -> Result<std::process::Output, String> {
     let args: Vec<OsString> = args.into_iter().collect();
-    Command::new("cargo")
+    Command::new(cargo_program())
         .args(["run", "--locked", "-p", "unsafe-review", "--"])
         .args(&args)
         .output()
@@ -630,6 +641,10 @@ fn run_unsafe_review(
 
 fn os(value: &str) -> OsString {
     OsString::from(value)
+}
+
+fn cargo_program() -> OsString {
+    std::env::var_os("CARGO").unwrap_or_else(|| OsStr::new("cargo").to_os_string())
 }
 
 #[cfg(test)]
@@ -642,5 +657,10 @@ mod tests {
             .err()
             .unwrap_or_default();
         assert!(err.contains("expected text block"));
+    }
+
+    #[test]
+    fn normalize_lf_converts_windows_newlines() {
+        assert_eq!(normalize_lf("a\r\nb\rc\n"), "a\nb\nc\n");
     }
 }
