@@ -40,7 +40,7 @@ A successful first hour supports this path:
 ```bash
 cargo install unsafe-review --locked
 unsafe-review doctor
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 open target/unsafe-review/pr-summary.md
 unsafe-review explain <card-id>
 unsafe-review support
@@ -75,7 +75,7 @@ what unsafe-review is not claiming
 The public repair loop is:
 
 ```text
-first-pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome
+pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outcome
 ```
 
 Every first-hour surface must project from `ReviewCard`. No first-hour surface
@@ -99,7 +99,7 @@ may reclassify findings independently or invent a second analyzer truth.
 - keeps witness tools informational by default
 - states the advisory trust boundary
 
-`first-pr`:
+`pr`:
 
 - writes the standard advisory bundle
 - prints the summary path and top-card `explain` command
@@ -139,7 +139,7 @@ may reclassify findings independently or invent a second analyzer truth.
 ## 6. CI proof
 
 ```bash
-cargo run --locked -p unsafe-review -- first-pr \
+cargo run --locked -p unsafe-review -- pr \
   --root fixtures/raw_pointer_alignment \
   --diff fixtures/raw_pointer_alignment/change.diff \
   --out-dir target/unsafe-review-first-pr-smoke
@@ -170,8 +170,9 @@ packet examples all align with this spec.
 
 ## 9. Zero-arg convenience entry point (`unsafe-review pr`)
 
-`unsafe-review pr` is a pure parse-time alias for `first-pr`. It maps to the
-same `FirstPr` command and produces the same advisory output bundle. No new
+`unsafe-review pr` is the preferred first-run entry point. It maps to the same
+`FirstPr` command as `first-pr` and produces the same advisory output bundle.
+Only the terminal handoff label reflects the command the user invoked. No new
 output surface or second analyzer truth is introduced.
 
 ### 9.1 Auto-detection behavior
@@ -208,7 +209,7 @@ explicit flags too:
 
 ```text
 could not detect a git repository in the current directory (<git stderr>).
-Run `unsafe-review first-pr --root <repo> --base <ref>` to supply them explicitly.
+Run `unsafe-review pr --root <repo> --base <ref>` to supply them explicitly.
 ```
 
 ### 9.3 Advisory posture
@@ -227,7 +228,7 @@ The top-level help output includes a one-line hint pointing users at
 `unsafe-review pr`:
 
 ```text
-  pr      zero-config entry point: auto-detects root and base ref; alias for first-pr
+  pr      first-run PR review bundle: auto-detects root and base ref
 ```
 
 `unsafe-review pr --help` routes to the `first-pr` subcommand help page.

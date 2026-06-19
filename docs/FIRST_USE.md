@@ -35,10 +35,12 @@ decisions.
 Run against the current branch diff:
 
 ```bash
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 ```
 
-This writes the standard local review bundle:
+This auto-detects the repository root and default base ref, then writes the
+standard local review bundle. If your base ref cannot be detected, pass it
+explicitly with `unsafe-review pr --base origin/main`.
 
 ```text
 target/unsafe-review/review-kit.json
@@ -116,7 +118,7 @@ That fixture should emit one `guard_missing` raw pointer alignment card.
 For the normal first-run path, prefer the bundle command:
 
 ```bash
-unsafe-review first-pr --base origin/main
+unsafe-review pr
 ```
 
 The lower-level `check` formats remain useful when you only need one artifact.
@@ -150,7 +152,7 @@ artifact only; `unsafe-review` does not post comments by default.
 
 ## Inspect One Card
 
-`first-pr` prints a top-card hypothesis, build/run-this-first cue, minimal
+`pr` prints a top-card hypothesis, build/run-this-first cue, minimal
 repro cue, `Explain top card`, and `Agent packet` commands for the
 highest-priority card. The cue is a confirmation recipe only; unsafe-review did
 not run it or observe runtime behavior.
@@ -164,7 +166,7 @@ unsafe-review explain <card-id>
 
 It also writes `receipt-audit.md` and prints the matching
 `unsafe-review receipt audit` command for checking saved witness receipt metadata
-against the current first-pr cards. That audit does not run Miri, cargo-careful,
+against the current PR cards. That audit does not run Miri, cargo-careful,
 sanitizers, Loom, Shuttle, Kani, or Crux.
 
 Run the `context --json` command when handing the bounded card packet to an
@@ -201,7 +203,7 @@ other. `--lines` requires `--file`; the format is always `--lines A-B`.
 
 ## Preview Editor Data
 
-The first-pr bundle also writes a saved editor projection:
+The PR bundle also writes a saved editor projection:
 
 ```text
 target/unsafe-review/lsp.json

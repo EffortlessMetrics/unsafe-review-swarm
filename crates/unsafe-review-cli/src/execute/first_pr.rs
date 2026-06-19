@@ -80,6 +80,7 @@ struct StableByteSeedLedger {
 }
 
 pub(super) struct FirstPrReport<'a> {
+    pub(super) terminal_command: &'static str,
     pub(super) output: &'a AnalyzeOutput,
     pub(super) out_dir: &'a Path,
     pub(super) root: &'a Path,
@@ -95,7 +96,12 @@ pub(super) struct FirstPrReport<'a> {
 }
 
 pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
-    print_first_pr_overview(report.output, report.out_dir, report.output_bytes);
+    print_first_pr_overview(
+        report.terminal_command,
+        report.output,
+        report.out_dir,
+        report.output_bytes,
+    );
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
@@ -253,8 +259,13 @@ fn shell_arg(value: &str) -> String {
     }
 }
 
-fn print_first_pr_overview(output: &AnalyzeOutput, out_dir: &Path, output_bytes: u64) {
-    println!("unsafe-review first-pr");
+fn print_first_pr_overview(
+    terminal_command: &str,
+    output: &AnalyzeOutput,
+    out_dir: &Path,
+    output_bytes: u64,
+) {
+    println!("unsafe-review {terminal_command}");
     println!("unsafe-review wrote an advisory PR bundle.");
     println!("- Artifact directory: {}", card_path_display(out_dir));
     println!("- Review cards: {}", output.summary.cards);

@@ -1352,14 +1352,14 @@ fn detect_git_root(start_dir: &Path) -> Result<PathBuf, String> {
         .map_err(|err| {
             format!(
                 "failed to run git: {err}. \
-                 Run `unsafe-review first-pr --root <repo> --base <ref>` to supply the paths explicitly."
+                 Run `unsafe-review pr --root <repo> --base <ref>` to supply the paths explicitly."
             )
         })?;
     if !output.status.success() {
         let stderr = String::from_utf8_lossy(&output.stderr);
         return Err(format!(
             "could not detect a git repository in the current directory ({}).\n\
-             Run `unsafe-review first-pr --root <repo> --base <ref>` to supply them explicitly.",
+             Run `unsafe-review pr --root <repo> --base <ref>` to supply them explicitly.",
             stderr.trim()
         ));
     }
@@ -1417,6 +1417,7 @@ fn detect_default_base(repo_root: &Path) -> Result<String, String> {
 }
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
+    let terminal_command = options.entrypoint.terminal_command();
     let mut check = options.check;
     check.policy = PolicyMode::Advisory;
     // When the caller requested auto-detection (i.e. `unsafe-review pr` with no
@@ -1547,6 +1548,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     )?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {
+        terminal_command,
         output: &output,
         out_dir: &options.out_dir,
         root: &root,
@@ -2851,6 +2853,7 @@ fn print_first_pr_help() {
          [--out-dir target/unsafe-review] [--max-cards <N>]"
     );
     println!();
+    println!("  pr       preferred first-run entry point for the same advisory bundle");
     println!("  review   alias for first-pr");
     println!();
     println!("What first-pr writes:");
@@ -2871,8 +2874,8 @@ fn print_first_pr_help() {
     println!("- --max-cards <N> stop collecting after N cards");
     println!();
     println!("Examples:");
-    println!("  unsafe-review first-pr");
-    println!("  unsafe-review first-pr --diff change.diff --out-dir target/review");
+    println!("  unsafe-review pr");
+    println!("  unsafe-review pr --diff change.diff --out-dir target/review");
     println!("  unsafe-review review --base origin/main --max-cards 20");
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
@@ -3224,11 +3227,9 @@ fn print_help() {
     println!(
         "  repo    [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
+    println!("  pr      first-run PR review bundle: auto-detects root and base ref");
     println!(
-        "  pr      zero-config entry point: auto-detects root and base ref; alias for first-pr"
-    );
-    println!(
-        "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]"
+        "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
     );
     println!("  review  alias for first-pr");
     println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");

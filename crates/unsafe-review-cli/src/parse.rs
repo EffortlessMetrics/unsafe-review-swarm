@@ -1,8 +1,8 @@
 use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
-    Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrEntrypoint,
+    FirstPrOptions, Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
 };
 use std::path::PathBuf;
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
@@ -48,9 +48,10 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
         "pr" => parse_first_pr(rest).map(|mut options| {
-            // `pr` is a pure alias for `first-pr`; the only difference is that
-            // execute auto-detects the git root and base ref when the user did
-            // not supply explicit --root/--base/--diff arguments.
+            // `pr` runs the same advisory bundle as `first-pr`; execute
+            // auto-detects the git root and base ref when the user did not
+            // supply explicit --root/--base/--diff arguments.
+            options.entrypoint = FirstPrEntrypoint::Pr;
             options.auto_detect = options.check.root == std::path::Path::new(".")
                 && options.check.base.as_deref() == Some("origin/main")
                 && options.check.diff.is_none();
