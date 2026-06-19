@@ -11,6 +11,11 @@ It records what each validation layer proves, what it is blind to, when it runs,
 and what artifacts it produces. It also establishes the claim boundaries that
 apply to every layer.
 
+This spec also defines the post-0.3.8 generalization overlay: how the same
+corpus layers are partitioned into conformance, regression, and holdout use;
+how evidence-loss challenge cases are recorded; and how external usefulness
+pilots feed the backlog without becoming accuracy claims.
+
 Most layers already exist. This taxonomy formalizes and extends them. It is not
 a second source of truth: the authoritative artifacts remain
 `policy/detector-contracts.toml`, `policy/calibration.toml`,
@@ -31,6 +36,54 @@ real-PR corpus     : does the PR experience stay useful and low-noise?       (mo
 A gap analysis (2026-06-15) confirmed that the first and third layers already
 exist in the repository. The second layer is partial. The fourth layer is the
 genuine new addition this lane delivers.
+
+## Generalization partitions
+
+Corpus partitions are an overlay on the four validation layers, not a fifth
+layer and not a duplicate manifest. Partition metadata belongs next to the
+existing source of truth for the case it classifies:
+
+- fixture and pure-example cases: `policy/calibration.toml` and fixture
+  goldens;
+- real-repo cases: `docs/dogfood/corpus.toml`;
+- real-PR cases: `policy/pr-corpus.toml` or the future external PR manifest
+  when those cases are promoted from pilot evidence.
+
+The partitions are:
+
+```text
+conformance:
+  exact fixtures and committed surface goldens
+  every-PR where cheap enough
+  tuned directly by normal development
+
+regression:
+  known real repos and PRs
+  nightly, release-readiness, or manual
+  used to prevent known real-code behavior from drifting
+
+holdout:
+  unseen, fresh, or embargoed repos and PRs
+  release-readiness or scheduled evaluation only
+  result recorded before tuning or detector changes
+```
+
+The holdout partition is diagnostic evidence, not a claim of general accuracy.
+Holdout failures may create follow-up work, but the first recorded holdout run
+must remain visible before the repo adapts to that input.
+
+### Refresh policy
+
+- Pin exact SHAs or checked-in diffs; floating branches are not valid corpus
+  entries.
+- Rotate part of the holdout set each release cycle when fresh suitable inputs
+  are available.
+- Retain historic snapshots or reports for trend comparison.
+- Do not tune directly against holdout findings before recording the result.
+- Promote a holdout case into regression only after the initial result and
+  follow-up decision are recorded.
+- Keep every partition advisory: no precision, recall, UB-free, Miri-clean,
+  site-execution, or memory-safety proof claim is created by partitioning.
 
 ## Layer 1: Detector-control corpus
 
@@ -258,11 +311,74 @@ precision or recall claim. No UB-free, Miri-clean, or site-execution claim.
 ## External validation (informational, not a gate)
 
 Running the tool on a real external PR read-only and classifying the output
-provides adoption proof and surfaces friction the corpus layers cannot. This is
+provides adoption evidence and surfaces friction the corpus layers cannot. This is
 not an automated gate. No automatic third-party issue filing. Results are
 recorded in `docs/dogfood/` as evidence entries. Output is classified into:
 actionable, inherited, noisy, missed, agent-ready, human-only, cost, and
 artifact-friction categories.
+
+External pilots should use the public Action or the same artifact bundle shape
+that a new adopter would see. Each pilot records:
+
+- setup friction and acquisition method;
+- selected comments and intentionally omitted cards;
+- one-screen summary usefulness;
+- terminology that confused the maintainer or reviewer;
+- runtime and artifact-size observations;
+- whether the result was agent-ready or human-only.
+
+Human usefulness judgments use this vocabulary:
+
+```text
+actionable
+correct_but_not_worth_surfacing
+inherited
+duplicate
+human_only
+agent_ready
+unclear
+incorrect
+missed_expected_seam
+setup_friction
+artifact_friction
+```
+
+Those judgments are product evidence. They are not calibrated precision or
+recall unless a separate labeled evaluation protocol is approved under
+SPEC-0026.
+
+---
+
+## Evidence-loss challenge corpus
+
+False negatives are harder to observe than noisy cards. A challenge corpus
+records controlled evidence-loss transformations against fixture, real-repo, or
+real-PR inputs and checks that the expected ReviewCard movement occurs.
+
+Examples of valid transformations:
+
+- remove a `# Safety` section;
+- replace `assert!` with `debug_assert!` where that weakens the guard;
+- remove a same-receiver guard;
+- change a test call into a bare mention;
+- introduce a wrong-receiver guard;
+- remove a witness receipt;
+- add an unsafe declaration;
+- move an unsafe call outside the expected scope.
+
+Expected results are movement-shaped, not proof-shaped:
+
+```text
+new gap appears
+class changes
+comment eligibility changes only when surfacing policy says so
+repair route remains correct
+artifact bundle stays schema-valid
+```
+
+This establishes that known evidence-loss transformations are detected on the
+selected inputs. It does not establish global recall, source execution, or
+memory-safety proof.
 
 ---
 
@@ -347,6 +463,17 @@ This spec is implemented by the corpus-validation-system lane. The PR sequence i
   base/head SHAs + checked-in diffs + expected outcome_movement counts.
 - PR-5: coverage-map index. Extends `stance-decisions.toml` with fixture /
   dogfood-target / surface links; adds `check-stance-coverage`.
+
+Post-0.3.8 generalization work continues in review-forward slices:
+
+- GPR-1: define partition metadata and checks without duplicating existing
+  corpus ledgers.
+- GPR-2: add the first small holdout set and a release-readiness report format.
+- GPR-3: add an evidence-loss challenge harness over a bounded canonical subset.
+- GPR-4: run read-only external Action pilots and record human usefulness
+  judgments.
+- GPR-5: publish a validation closeout that separates conformance, regression,
+  holdout, challenge, and pilot evidence.
 
 See `.rails/lanes/corpus/implementation-plan.md` for the full sequence and
 evidence grounding.
