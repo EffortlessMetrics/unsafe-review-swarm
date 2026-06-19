@@ -1,0 +1,44 @@
+schema_version = "1.0"
+policy = "unsafe-review-evidence-loss-challenges"
+status = "active"
+owner = "repo-infra"
+partition_by_kind = { "fixture-transform" = "conformance" }
+
+# Trust boundary: this ledger records bounded evidence-loss transformations over
+# deterministic in-repo fixtures. It checks that the named transformation still
+# produces the expected ReviewCard movement and surfacing shape for that input.
+# It does NOT establish global recall, memory-safety proof, UB-free status,
+# Miri-clean status, site execution, policy readiness, or calibrated precision.
+
+# Schema: each [[challenge]] entry declares:
+#   id           - unique lowercase hyphen-separated identifier
+#   kind         - currently "fixture-transform"
+#   source_fixture - fixture copied to target/evidence-loss-challenges/<id>/root
+#   diff         - diff filename, relative to the generated root
+#   transformation - deterministic transform applied before scanning
+#   baseline_contract_coverage - optional snapshot override before scanning
+#   no_new_debt_exit_code - expected --policy no-new-debt process exit
+#   [challenge.expected] - expected summary, first-card, and comment-plan fields
+
+[[challenge]]
+id = "remove-safety-section-raw-pointer-deref"
+kind = "fixture-transform"
+source_fixture = "fixtures/raw_pointer_deref_coverage_improved"
+diff = "change.diff"
+transformation = "remove-safety-section"
+baseline_contract_coverage = "present"
+no_new_debt_exit_code = 1
+
+[challenge.expected]
+cards = 1
+new_gaps = 0
+worsened_gaps = 1
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 1
+selected_count = 0
+not_selected_count = 1
+operation_family = "raw_pointer_deref"
+class = "baseline_known"
+baseline_state = "worsened"
+outcome_movement = "regressed"

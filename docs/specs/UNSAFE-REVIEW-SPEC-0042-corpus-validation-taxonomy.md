@@ -19,8 +19,9 @@ pilots feed the backlog without becoming accuracy claims.
 Most layers already exist. This taxonomy formalizes and extends them. It is not
 a second source of truth: the authoritative artifacts remain
 `policy/detector-contracts.toml`, `fixtures/calibration.toml`,
-`docs/dogfood/corpus.toml`, and `policy/spec-coverage.toml`. This spec is an
-index and a discipline document, not a replacement for those ledgers.
+`docs/dogfood/corpus.toml`, `policy/pr-corpus.toml`,
+`policy/evidence-loss-challenges.toml`, and `policy/spec-coverage.toml`. This
+spec is an index and a discipline document, not a replacement for those ledgers.
 
 ## Taxonomy overview
 
@@ -48,6 +49,7 @@ existing source of truth for the case it classifies:
 - real-repo cases: `docs/dogfood/corpus.toml`;
 - real-PR cases: `policy/pr-corpus.toml` or the future external PR manifest
   when those cases are promoted from pilot evidence.
+- evidence-loss challenge cases: `policy/evidence-loss-challenges.toml`.
 
 The enforced partition metadata is intentionally small and lives in those
 ledgers:
@@ -61,6 +63,9 @@ partition_by_kind = { "fixture-control" = "conformance", "repo-snapshot" = "regr
 
 # policy/pr-corpus.toml
 partition_by_kind = { "synthetic-fixture" = "conformance" }
+
+# policy/evidence-loss-challenges.toml
+partition_by_kind = { "fixture-transform" = "conformance" }
 ```
 
 `xtask check-corpus-partitions` resolves each case to exactly one owner from
@@ -403,6 +408,21 @@ This establishes that known evidence-loss transformations are detected on the
 selected inputs. It does not establish global recall, source execution, or
 memory-safety proof.
 
+The initial enforced rail is `xtask check-evidence-loss-challenges`. It reads
+`policy/evidence-loss-challenges.toml`, generates transformed fixture roots
+under `target/evidence-loss-challenges/`, runs the standard advisory PR
+surfaces, and asserts:
+
+- ReviewCard movement counts;
+- first-card classification and coverage movement fields;
+- comment-plan selected/not-selected counts;
+- `--policy no-new-debt` exit code where declared.
+
+The first challenge removes the `# Safety` section and SAFETY comment from the
+raw-pointer dereference coverage-improvement fixture while preserving the
+current low-noise comment-plan stance. The result is diagnostic evidence for
+that named transformation only; it is not a recall metric.
+
 ---
 
 ## Coverage map
@@ -458,8 +478,9 @@ These constraints apply to every layer and every output surface:
 - **No automatic third-party issue filing.** Corpus runs are read-only; any
   issue-filing from corpus results is a manual, deliberate action.
 - **Single truth.** Extend `fixtures/calibration.toml` / `corpus.toml` /
-  `stance-decisions.toml` / `spec-coverage.toml` / `detector-contracts.toml`.
-  Do not duplicate them or create a parallel ledger.
+  `pr-corpus.toml` / `evidence-loss-challenges.toml` /
+  `stance-decisions.toml` / `spec-coverage.toml` /
+  `detector-contracts.toml`. Do not duplicate them or create a parallel ledger.
 - The default analysis path remains syntax-first and build-free. No corpus run
   requires the analyzed repository to build successfully.
 - No corpus result **blocks** merges or posts comments by default. Corpus
@@ -495,7 +516,10 @@ Post-0.3.8 generalization work continues in review-forward slices:
 - GPR-2: initial holdout target/report landed with `getrandom-holdout`, exact
   SHA pinning, first result recorded before tuning, and `dogfood-exec`
   `--include-holdout` opt-in.
-- GPR-3: add an evidence-loss challenge harness over a bounded canonical subset.
+- GPR-3: initial evidence-loss challenge harness landed with
+  `policy/evidence-loss-challenges.toml`,
+  `xtask check-evidence-loss-challenges`, and conformance partition ownership
+  through `xtask check-corpus-partitions`.
 - GPR-4: run read-only external Action pilots and record human usefulness
   judgments.
 - GPR-5: publish a validation closeout that separates conformance, regression,

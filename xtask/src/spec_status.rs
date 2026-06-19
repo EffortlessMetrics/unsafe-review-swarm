@@ -27,6 +27,7 @@ const XTASK_COMMANDS: &[&str] = &[
     "check-docs",
     "check-docs-automation",
     "check-dogfood",
+    "check-evidence-loss-challenges",
     "check-first-hour",
     "check-first-pr-artifacts",
     "check-goals",
