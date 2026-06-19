@@ -1,0 +1,181 @@
+schema_version = "external-pilot/v1"
+id = "bytes-pr827-2026-06-19"
+status = "recorded"
+date = "2026-06-19"
+reviewer = "codex"
+repository = "tokio-rs/bytes"
+pr = 827
+url = "https://github.com/tokio-rs/bytes/pull/827"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "repo-local cargo run after read-only clone and pinned local git diff"
+tool_version = "0.3.8"
+base_sha = "245adff079eb0cb1a706d35bab5f68b2d51919f6"
+head_sha = "2f6852ec5295160bc4f1e687ea19847f9cd4e665"
+diff_path = "target/external-pilots/bytes-pr827/bytes-pr827.diff"
+diff_sha256 = "e3e607961917fa8c16a7d8d749d9f6359d67f7effcef96cc1d524303f1e3d656"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 4
+agent_ready = 0
+human_only = 4
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 1
+not_selected_count = 3
+selection_reason = "bounded reviewer noise; one top actionable card selected and three same-family or same-obligation cards omitted"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 4
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+
+[run]
+exit_code = 0
+elapsed_seconds = 2.156
+diff_bytes = 3764
+artifact_count = 18
+artifact_total_bytes = 201402
+rust_files_changed = 3
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/bytes-pr827/first-pr/cards.json"
+bytes = 23178
+sha256 = "f2e8f1b4af53ea9b0ac98b41c4c1ac8c67c622c01fbd30aae54666ac17b64da0"
+
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/bytes-pr827/first-pr/cards.sarif"
+bytes = 10553
+sha256 = "f22076e950015168f207f8ceb97782234ee950b92af87237f458b2085085c0db"
+
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/bytes-pr827/first-pr/comment-plan.json"
+bytes = 11059
+sha256 = "718eb87312aacbfdb77a46a5f0cd19f7acf6fe3b05d113701b6791175c9dc035"
+
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/bytes-pr827/first-pr/github-summary.md"
+bytes = 4114
+sha256 = "dcc522b08bfd9e24bd591e4c9277aafc77733466deb7ddf6189915af85c08b77"
+
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/bytes-pr827/first-pr/lsp.json"
+bytes = 40396
+sha256 = "f10e8004fcc3641fc0e5e0d62a2b4629353c7c592920e1565996928629ad9a0f"
+
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/bytes-pr827/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/bytes-pr827/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/bytes-pr827/first-pr/policy-report.json"
+bytes = 5622
+sha256 = "4616bfa0dd0029b1ba03c51bfcc642ff056a590c6b0d791302d51ff7e48f65e5"
+
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/bytes-pr827/first-pr/policy-report.md"
+bytes = 5103
+sha256 = "cc0af3ca80ed51db24493b94de362d6dd57dae4e07bcfff1c2fdc004cf4c4a71"
+
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/bytes-pr827/first-pr/pr-summary.md"
+bytes = 14596
+sha256 = "0b806c4863a9ed6502aaaa7e6c1f1efc66091a9b42a6b134d4da043d8e7fb5ab"
+
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/bytes-pr827/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "49b34075168affdb78929dd575c761e6e9c9560478e38a921920b783bcb2e82b"
+
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/bytes-pr827/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "b2d353e2d3a5f025bc1688e3d53b49822de5be1e8e875f7a449b7b056dea389a"
+
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/bytes-pr827/first-pr/repair-queue.json"
+bytes = 41566
+sha256 = "1b34146eb501a5d53edcd385f29237bc820a56dec8d43e5d213f59a26fd0fb74"
+
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/bytes-pr827/first-pr/review-kit.json"
+bytes = 21352
+sha256 = "b935147e61c2c3a56c990de03b1b95eccf7dde32b0899e43b9489826f1924c53"
+
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/bytes-pr827/first-pr/tokmd-packets.json"
+bytes = 3382
+sha256 = "cc47e7c9df93087f640be2ac72fa05cf54bac43a07390f7ede4fbff5ea4c3193"
+
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/bytes-pr827/first-pr/unsafe-review-gate.json"
+bytes = 781
+sha256 = "c5e4cbf896476bc46346ed04925da0f2cd449b4f9ce1363514121f590c806ce0"
+
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/bytes-pr827/first-pr/usefulness-telemetry.json"
+bytes = 1464
+sha256 = "99dc32f2f71f429a762cca40fe805b40ce7174e428f19bd806dda1d735b4a655"
+
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/bytes-pr827/first-pr/witness-plan.md"
+bytes = 9572
+sha256 = "c706574998d4e4631ab154425c24fa927e7e77f4b47f075ade85280106e339c6"
+
+[[judgments]]
+surface = "github_summary"
+label = "actionable"
+reason = "The one-screen summary named the diff scope, four new guard gaps, the top card, the human-review route, and the no-posting/no-witness boundary."
+next_step = "Keep this as a first-screen usefulness sample; do not promote it to accuracy or safety evidence."
+
+[[judgments]]
+surface = "comment_plan"
+label = "correct_but_not_worth_surfacing"
+reason = "The plan selected one top unsafe_fn_call card and omitted three same-family or same-obligation cards, preserving low-noise PR surfacing."
+next_step = "Use future pilots to see whether this bounded selection remains tolerable on less familiar repos."
+
+[[judgments]]
+surface = "agent_packet"
+label = "human_only"
+reason = "All four cards route to human deep review with no verify command, so the bundle is useful context but not an agent-ready repair task."
+next_step = "Do not turn this into automatic repair; use similar pilots to identify genuinely agent-ready packets."
+
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "PowerShell redirection produced a non-UTF-8 diff, and the default gh diff display omitted unified diff headers; the successful path required rtk proxy git diff over exact SHAs."
+next_step = "Document or automate raw diff capture in first-use guidance before treating external pilots as effortless."

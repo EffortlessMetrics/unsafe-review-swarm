@@ -22,6 +22,8 @@ inventory requirements for `ripr` are tracked in
 Bun packet preset requirements for `tokmd` are tracked in
 [`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md).
 Reviewer judgment files follow the [`dogfood judgment schema`](judgments/README.md).
+External read-only pilot receipts follow the
+[`external pilot receipt schema`](pilots/README.md).
 The generated per-label usefulness count rollup lives in
 [`USEFULNESS.md`](USEFULNESS.md); regenerate it with
 `cargo run --locked -p xtask -- dogfood-usefulness`.
@@ -69,6 +71,11 @@ Report requirements:
   precision/recall, policy readiness, witness adequacy, or safety evidence.
   Committed judgment files must reference known targets, linked reports, known
   card families or review-kit surfaces, and the advisory trust boundary.
+- External pilots record read-only public Action or equivalent first-pr bundle
+  runs against real external PRs. They are product-usefulness evidence only:
+  setup friction, runtime, artifact size, comment selection/omission, and human
+  judgments. They do not authorize source edits, witness execution, comments,
+  reviews, or issue filing in third-party repositories.
 - Agent repair experiments measure whether one ReviewCard context packet and one
   repair-queue item produce a bounded, reviewable dry run. They are manual
   experiments only; `unsafe-review` does not run an agent, execute witnesses,

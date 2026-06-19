@@ -341,9 +341,11 @@ precision or recall claim. No UB-free, Miri-clean, or site-execution claim.
 Running the tool on a real external PR read-only and classifying the output
 provides adoption evidence and surfaces friction the corpus layers cannot. This is
 not an automated gate. No automatic third-party issue filing. Results are
-recorded in `docs/dogfood/` as evidence entries. Output is classified into:
-actionable, inherited, noisy, missed, agent-ready, human-only, cost, and
-artifact-friction categories.
+recorded in `docs/dogfood/pilots/` as evidence entries. The manifest-only
+receipt check, `xtask check-external-pilots`, is allowed in `check-pr` because
+it validates committed receipt shape only; it does not run third-party scans.
+Output is classified into: actionable, inherited, duplicate/noisy, missed,
+agent-ready, human-only, setup-friction, and artifact-friction categories.
 
 External pilots should use the public Action or the same artifact bundle shape
 that a new adopter would see. Each pilot records:
@@ -374,6 +376,12 @@ artifact_friction
 Those judgments are product evidence. They are not calibrated precision or
 recall unless a separate labeled evaluation protocol is approved under
 SPEC-0026.
+
+The receipt schema requires exact base/head SHAs, read-only posture, acquisition
+method, selected and omitted comment counts, runtime and artifact-size metrics,
+required first-pr artifact hashes, and at least one setup or artifact friction
+row. The referenced artifacts may remain under `target/`; the committed receipt
+records their byte sizes and hashes instead of checking in third-party output.
 
 ---
 
@@ -521,7 +529,8 @@ Post-0.3.8 generalization work continues in review-forward slices:
   `xtask check-evidence-loss-challenges`, and conformance partition ownership
   through `xtask check-corpus-partitions`.
 - GPR-4: run read-only external Action pilots and record human usefulness
-  judgments.
+  judgments in `docs/dogfood/pilots/`; the initial receipt rail is enforced by
+  `xtask check-external-pilots`.
 - GPR-5: publish a validation closeout that separates conformance, regression,
   holdout, challenge, and pilot evidence.
 
