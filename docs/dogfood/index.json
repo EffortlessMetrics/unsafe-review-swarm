@@ -1,18 +1,23 @@
 {
   "schema_version": "0.1",
   "status": "experimental",
-  "updated": "2026-06-15",
+  "updated": "2026-06-19",
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 15,
-    "targets": 40,
-    "repo_snapshots": 15,
+    "repositories": 16,
+    "targets": 41,
+    "repo_snapshots": 16,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
+    "partitions": {
+      "conformance": 2,
+      "regression": 38,
+      "holdout": 1
+    },
     "artifact_statuses": {
-      "local_untracked": 40
+      "local_untracked": 41
     }
   },
   "repositories": [
@@ -105,6 +110,12 @@
       "snapshot_targets": ["zerocopy-capped"],
       "pr_diff_targets": [],
       "primary_exercise": "Raw pointer dereference, transmute, and byte-cast review cards; control-plane validation"
+    },
+    {
+      "repository": "rust-random/getrandom",
+      "snapshot_targets": ["getrandom-holdout"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Release-readiness holdout for platform RNG unsafe declarations, FFI-style bindings, and raw pointer review cards; recorded before tuning"
     }
   ],
   "recorded_outcomes": [
@@ -171,6 +182,7 @@
     "Fixture controls are indexed separately from real-crate repository coverage.",
     "Saved-output artifacts are local_untracked under target/dogfood-work.",
     "Outcome comparison reads saved snapshots only and does not rerun analysis.",
+    "Holdout targets require explicit release-readiness opt-in and are not ordinary tuning inputs.",
     "Dogfood records do not execute witness tools or make policy decisions."
   ]
 }

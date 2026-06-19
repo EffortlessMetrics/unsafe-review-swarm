@@ -105,9 +105,12 @@ loop without overclaiming precision or safety. Keep each step review-forward:
   `policy/pr-corpus.toml` ledger. Acceptance: every corpus case has one
   partition owner, holdout cases are rejected if they opt into every-PR cadence,
   and the checker rejects branch/ref-shaped floating refs.
-- **GPR-2 — initial holdout report.** Add a small release-readiness holdout set
-  or report format. Acceptance: exact SHAs/diffs, first result recorded before
-  tuning, and clear promotion path from holdout to regression after follow-up.
+- **GPR-2 — initial holdout report (landed).** `getrandom-holdout` is pinned
+  to an exact SHA in the existing dogfood ledger, the first capped result is
+  recorded in `docs/dogfood/reports/2026-06-19-initial-holdout-report.md`
+  before tuning, and `dogfood-exec --include-holdout` makes holdout execution
+  explicit. Promotion from holdout to regression requires a follow-up
+  release-readiness decision.
 - **GPR-3 — evidence-loss challenge harness.** Apply bounded transformations
   such as removing `# Safety`, weakening a guard, removing a receipt, or adding
   an unsafe declaration, then assert the expected movement and surface

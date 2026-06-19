@@ -91,6 +91,10 @@ The holdout partition is diagnostic evidence, not a claim of general accuracy.
 Holdout failures may create follow-up work, but the first recorded holdout run
 must remain visible before the repo adapts to that input.
 
+`xtask dogfood-exec` must not run holdout repo snapshots by default. Holdout
+execution requires `--include-holdout`, including targeted runs, so
+release-readiness inputs do not silently become ordinary tuning inputs.
+
 ### Refresh policy
 
 - Pin exact SHAs or checked-in diffs; floating branches are not valid corpus
@@ -488,7 +492,9 @@ Post-0.3.8 generalization work continues in review-forward slices:
 - GPR-1: partition defaults/checks landed via `partition_default`,
   `partition_by_kind`, and `xtask check-corpus-partitions`; no duplicate corpus
   ledger.
-- GPR-2: add the first small holdout set and a release-readiness report format.
+- GPR-2: initial holdout target/report landed with `getrandom-holdout`, exact
+  SHA pinning, first result recorded before tuning, and `dogfood-exec`
+  `--include-holdout` opt-in.
 - GPR-3: add an evidence-loss challenge harness over a bounded canonical subset.
 - GPR-4: run read-only external Action pilots and record human usefulness
   judgments.
