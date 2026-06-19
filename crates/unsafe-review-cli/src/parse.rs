@@ -82,9 +82,13 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
 
 fn has_explicit_pr_input(args: &[String]) -> bool {
     args.iter().any(|arg| {
-        matches!(arg.as_str(), "--root" | "--base" | "--diff")
-            || arg.starts_with("--root=")
+        matches!(
+            arg.as_str(),
+            "--root" | "--base" | "--base-sha" | "--head-sha" | "--diff"
+        ) || arg.starts_with("--root=")
             || arg.starts_with("--base=")
+            || arg.starts_with("--base-sha=")
+            || arg.starts_with("--head-sha=")
             || arg.starts_with("--diff=")
     })
 }
@@ -485,11 +489,16 @@ fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
 
 fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
+    let mut saw_base_ref = false;
+    let mut saw_base_sha = false;
     let mut idx = 0usize;
     while idx < args.len() {
         // `--out` belongs to `check`/`repo`; `first-pr` uses `--out-dir`.
         // Intercept before try_apply_check_arg silently consumes it.
         let arg = args[idx].as_str();
+        if arg == "--base" || arg.starts_with("--base=") {
+            saw_base_ref = true;
+        }
         if arg == "--out" || arg.starts_with("--out=") {
             return Err(format!(
                 "unknown first-pr argument `{arg}`; did you mean `--out-dir`?"
@@ -512,6 +521,51 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
                  bundle to `--out-dir`"
             ));
         }
+        match arg {
+            "--base-sha" => {
+                idx += 1;
+                if options.check.base.is_some() {
+                    return Err("choose only one of --base or --base-sha".to_string());
+                }
+                options.check.base = Some(parse_commit_sha(
+                    value(&args, idx, "--base-sha")?,
+                    "--base-sha",
+                )?);
+                saw_base_sha = true;
+                idx += 1;
+                continue;
+            }
+            value if value.starts_with("--base-sha=") => {
+                if options.check.base.is_some() {
+                    return Err("choose only one of --base or --base-sha".to_string());
+                }
+                options.check.base = Some(parse_commit_sha(
+                    inline_value(value, "--base-sha")?,
+                    "--base-sha",
+                )?);
+                saw_base_sha = true;
+                idx += 1;
+                continue;
+            }
+            "--head-sha" => {
+                idx += 1;
+                options.expected_head_sha = Some(parse_commit_sha(
+                    value(&args, idx, "--head-sha")?,
+                    "--head-sha",
+                )?);
+                idx += 1;
+                continue;
+            }
+            value if value.starts_with("--head-sha=") => {
+                options.expected_head_sha = Some(parse_commit_sha(
+                    inline_value(value, "--head-sha")?,
+                    "--head-sha",
+                )?);
+                idx += 1;
+                continue;
+            }
+            _ => {}
+        }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
             idx += consumed;
             continue;
@@ -532,6 +586,7 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
         options.check.base = Some("origin/main".to_string());
     }
     validate_check_options(&options.check)?;
+    validate_first_pr_exact_sha_options(&options, saw_base_ref, saw_base_sha)?;
     Ok(options)
 }
 
@@ -925,6 +980,35 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
         return Err("choose only one of --base or --diff".to_string());
     }
     Ok(())
+}
+
+fn validate_first_pr_exact_sha_options(
+    options: &FirstPrOptions,
+    saw_base_ref: bool,
+    saw_base_sha: bool,
+) -> Result<(), String> {
+    if saw_base_ref && saw_base_sha {
+        return Err("choose only one of --base or --base-sha".to_string());
+    }
+    if options.expected_head_sha.is_some() && options.check.diff.is_some() {
+        return Err("choose only one of --head-sha or --diff".to_string());
+    }
+    if options.expected_head_sha.is_some() && !saw_base_sha {
+        return Err(
+            "--head-sha requires --base-sha so exact external PR inputs stay paired".to_string(),
+        );
+    }
+    Ok(())
+}
+
+fn parse_commit_sha(raw: &str, flag: &str) -> Result<String, String> {
+    if raw.len() == 40 && raw.chars().all(|ch| ch.is_ascii_hexdigit()) {
+        Ok(raw.to_ascii_lowercase())
+    } else {
+        Err(format!(
+            "invalid {flag} `{raw}`: expected a 40-character hex commit SHA"
+        ))
+    }
 }
 
 fn validate_required_cli_value(value: &str, flag: &str) -> Result<(), String> {
@@ -1718,6 +1802,84 @@ mod tests {
             "`pr` with explicit --diff must not set auto_detect"
         );
         Ok(())
+    }
+
+    #[test]
+    fn parse_pr_alias_accepts_exact_external_pr_shas() -> Result<(), String> {
+        let base = "245adff079eb0cb1a706d35bab5f68b2d51919f6";
+        let head = "2f6852ec5295160bc4f1e687ea19847f9cd4e665";
+        let command = parse(args([
+            "unsafe-review",
+            "pr",
+            "--root=fixtures/raw_pointer_alignment",
+            "--base-sha",
+            base,
+            "--head-sha",
+            head,
+        ]))?;
+        let Command::FirstPr(options) = command else {
+            return Err("expected first-pr command from `pr` alias".to_string());
+        };
+        assert_eq!(
+            options.check.root,
+            PathBuf::from("fixtures/raw_pointer_alignment")
+        );
+        assert_eq!(options.check.base, Some(base.to_string()));
+        assert_eq!(options.expected_head_sha, Some(head.to_string()));
+        assert!(
+            !options.auto_detect,
+            "`pr` with explicit external PR SHAs must not auto-detect"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_rejects_head_sha_without_base_sha() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--head-sha",
+            "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert!(
+            err.contains("--head-sha requires --base-sha"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn first_pr_rejects_head_sha_with_diff() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--head-sha",
+            "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            "--diff=change.diff",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert_eq!(err, "choose only one of --head-sha or --diff");
+    }
+
+    #[test]
+    fn first_pr_rejects_invalid_exact_sha() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--base-sha",
+            "origin/main",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert!(
+            err.contains("invalid --base-sha `origin/main`"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
