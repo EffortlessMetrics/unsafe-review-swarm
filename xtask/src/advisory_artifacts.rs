@@ -3,11 +3,15 @@ use std::path::{Component, Path};
 
 use unsafe_review_core::COMMENT_BODY_WORD_LIMIT as COMMENT_PLAN_BODY_WORD_LIMIT;
 
+const GATE_MANIFEST_TRUST_BOUNDARY: &str =
+    "static unsafe-review coverage evidence; not proof, not a merge verdict";
+
 struct AdvisoryArtifactSummary {
     card_ids: BTreeSet<String>,
     card_order: Vec<String>,
     card_projections: BTreeMap<String, CardProjection>,
     repair_queue_projections: BTreeMap<String, RepairQueueProjection>,
+    movement: GateMovementProjection,
     scope: String,
     changed_files: usize,
     changed_rust_files: usize,
@@ -21,6 +25,7 @@ struct AdvisoryArtifactManifest {
     card_ids: BTreeSet<String>,
     card_order: Vec<String>,
     card_projections: BTreeMap<String, CardProjection>,
+    movement: GateMovementProjection,
     scope: String,
     changed_files: usize,
     changed_rust_files: usize,
@@ -60,6 +65,14 @@ struct CardProjection {
     guard_coverage: String,
     test_reach_coverage: String,
     witness_receipt_coverage: String,
+}
+
+struct GateMovementProjection {
+    new_gaps: usize,
+    worsened_gaps: usize,
+    improved_gaps: usize,
+    resolved_gaps: usize,
+    inherited_gaps: usize,
 }
 
 struct WitnessRouteProjection {
@@ -334,6 +347,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_receipt_audit_artifact(dir)?;
     check_receipt_audit_json_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
+    check_gate_manifest_artifact(dir, &summary)?;
     let manual_repair_queue = check_manual_repair_queue_artifact(dir, &manual_candidates)?;
     check_tokmd_packets_artifact(dir, &manual_candidates, &manual_repair_queue)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
@@ -1139,6 +1153,136 @@ fn check_policy_report_artifacts(
     )?;
 
     Ok(())
+}
+
+fn check_gate_manifest_artifact(
+    dir: &Path,
+    summary: &AdvisoryArtifactSummary,
+) -> Result<(), String> {
+    let path = dir.join("unsafe-review-gate.json");
+    let manifest = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &manifest,
+        "schema_version",
+        "unsafe-review-gate/v1",
+        "unsafe-review-gate.json",
+    )?;
+    super::require_json_str(
+        &manifest,
+        "dialect",
+        "unsafe-review",
+        "unsafe-review-gate.json",
+    )?;
+    super::require_json_str(&manifest, "status", "advisory", "unsafe-review-gate.json")?;
+    super::require_json_str(
+        &manifest,
+        "tool",
+        "unsafe-review",
+        "unsafe-review-gate.json",
+    )?;
+    super::require_non_empty_json_str(&manifest, "tool_version", "unsafe-review-gate.json")?;
+    let boundary =
+        super::require_non_empty_json_str(&manifest, "trust_boundary", "unsafe-review-gate.json")?;
+    if boundary != GATE_MANIFEST_TRUST_BOUNDARY {
+        return Err(format!(
+            "unsafe-review-gate.json trust_boundary must be `{GATE_MANIFEST_TRUST_BOUNDARY}`; got `{boundary}`"
+        ));
+    }
+    for volatile in ["generated_at", "wall_seconds"] {
+        if manifest.get(volatile).is_some() {
+            return Err(format!(
+                "unsafe-review-gate.json must not contain volatile `{volatile}`"
+            ));
+        }
+    }
+
+    require_gate_movement_count(
+        &manifest,
+        "new_gaps",
+        summary.movement.new_gaps,
+        "cards.json summary.new_gaps",
+    )?;
+    require_gate_movement_count(
+        &manifest,
+        "worsened_gaps",
+        summary.movement.worsened_gaps,
+        "cards.json summary.worsened_gaps",
+    )?;
+    require_gate_movement_count(
+        &manifest,
+        "improved_gaps",
+        summary.movement.improved_gaps,
+        "cards.json summary.improved_gaps",
+    )?;
+    require_gate_movement_count(
+        &manifest,
+        "resolved_gaps",
+        summary.movement.resolved_gaps,
+        "cards.json summary.resolved_gaps",
+    )?;
+    require_gate_movement_count(
+        &manifest,
+        "inherited_gaps",
+        summary.movement.inherited_gaps,
+        "cards.json summary.inherited_gaps",
+    )?;
+
+    let artifacts = manifest
+        .get("artifacts")
+        .ok_or_else(|| "unsafe-review-gate.json is missing artifacts".to_string())?;
+    if !artifacts.is_object() {
+        return Err("unsafe-review-gate.json artifacts must be an object".to_string());
+    }
+    for (key, expected) in [
+        ("cards", "cards.json"),
+        ("comment_plan", "comment-plan.json"),
+        ("repair_queue", "repair-queue.json"),
+        ("receipt_audit", "receipt-audit.json"),
+        ("review_kit", "review-kit.json"),
+        ("pr_summary", "pr-summary.md"),
+        ("sarif", "cards.sarif"),
+        ("lsp", "lsp.json"),
+        ("policy_report", "policy-report.json"),
+        ("usefulness_telemetry", "usefulness-telemetry.json"),
+    ] {
+        require_gate_artifact_pointer(artifacts, key, expected)?;
+    }
+
+    Ok(())
+}
+
+fn require_gate_movement_count(
+    manifest: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    let actual = super::json_usize_at(
+        manifest,
+        &format!("/summary/{field}"),
+        "unsafe-review-gate.json",
+    )?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "unsafe-review-gate.json summary.{field} must project {source} `{expected}`; got `{actual}`"
+        ))
+    }
+}
+
+fn require_gate_artifact_pointer(
+    artifacts: &serde_json::Value,
+    key: &str,
+    expected: &str,
+) -> Result<(), String> {
+    let actual =
+        super::require_non_empty_json_str(artifacts, key, "unsafe-review-gate.json artifacts")?;
+    require_expected_value(
+        actual,
+        expected,
+        &format!("unsafe-review-gate.json artifacts.{key}"),
+    )
 }
 
 fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexProjection, String> {
@@ -5745,6 +5889,7 @@ fn check_advisory_artifact_set(dir: &Path) -> Result<AdvisoryArtifactSummary, St
         card_order: manifest.card_order,
         card_projections: manifest.card_projections,
         repair_queue_projections,
+        movement: manifest.movement,
         scope: manifest.scope,
         changed_files: manifest.changed_files,
         changed_rust_files: manifest.changed_rust_files,
@@ -5788,6 +5933,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
     let summary_cards = super::json_usize_at(&cards, "/summary/cards", "cards.json")?;
     let open_actionable_gaps =
         super::json_usize_at(&cards, "/summary/open_actionable_gaps", "cards.json")?;
+    let movement = gate_movement_from_cards_summary(&cards)?;
     if summary_cards != card_count {
         return Err(format!(
             "cards.json summary.cards is {summary_cards}, but cards array has {card_count}"
@@ -5802,6 +5948,7 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
         card_ids,
         card_order,
         card_projections,
+        movement,
         scope,
         changed_files,
         changed_rust_files,
@@ -5809,6 +5956,18 @@ fn check_cards_json_artifact(dir: &Path) -> Result<AdvisoryArtifactManifest, Str
         card_count,
         open_actionable_gaps,
         high_priority_cards,
+    })
+}
+
+fn gate_movement_from_cards_summary(
+    cards: &serde_json::Value,
+) -> Result<GateMovementProjection, String> {
+    Ok(GateMovementProjection {
+        new_gaps: super::json_usize_at(cards, "/summary/new_gaps", "cards.json")?,
+        worsened_gaps: super::json_usize_at(cards, "/summary/worsened_gaps", "cards.json")?,
+        improved_gaps: super::json_usize_at(cards, "/summary/improved_gaps", "cards.json")?,
+        resolved_gaps: super::json_usize_at(cards, "/summary/resolved_gaps", "cards.json")?,
+        inherited_gaps: super::json_usize_at(cards, "/summary/inherited_gaps", "cards.json")?,
     })
 }
 

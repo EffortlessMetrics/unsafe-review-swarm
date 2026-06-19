@@ -136,6 +136,10 @@ merge or posts a comment is `ub-review`, never the manifest.
   files; fixed advisory `trust_boundary` and `status`.
 - `cargo test -p unsafe-review` — `first-pr`/`repo` emits exactly one
   `unsafe-review-gate.json` whose pointers resolve to the run's artifacts.
+- `cargo test -p xtask first_pr_artifact_checker_rejects_gate_manifest` —
+  first-pr bundle verification fails if the gate manifest drifts from
+  `cards.json` movement, advisory status, required artifact pointers, or the
+  deterministic no-volatile-fields contract.
 - schema-alignment fixture checked in `check-pr` — `schema_version` form and
   `dialect` marker match the shapes recorded in `docs/interop/sibling-tools.md`.
 - `cargo run --locked -p xtask -- check-pr`.
