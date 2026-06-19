@@ -12,6 +12,7 @@ use crate::{parse_toml_file, workspace_path};
 const CALIBRATION_MANIFEST: &str = "fixtures/calibration.toml";
 const DOGFOOD_MANIFEST: &str = "docs/dogfood/corpus.toml";
 const PR_CORPUS_LEDGER: &str = "policy/pr-corpus.toml";
+const EVIDENCE_LOSS_CHALLENGES_LEDGER: &str = "policy/evidence-loss-challenges.toml";
 
 const PARTITIONS: &[&str] = &["conformance", "regression", "holdout"];
 const FLOATING_REF_KEYS: &[&str] = &[
@@ -52,6 +53,10 @@ pub(crate) fn check() -> Result<(), String> {
     check_calibration_manifest(&parse_manifest(CALIBRATION_MANIFEST)?, &mut stats)?;
     check_dogfood_manifest(&parse_manifest(DOGFOOD_MANIFEST)?, &mut stats)?;
     check_pr_corpus_manifest(&parse_manifest(PR_CORPUS_LEDGER)?, &mut stats)?;
+    check_evidence_loss_challenges_manifest(
+        &parse_manifest(EVIDENCE_LOSS_CHALLENGES_LEDGER)?,
+        &mut stats,
+    )?;
 
     if stats.total == 0 {
         return Err("corpus partition check found no corpus cases".to_string());
@@ -130,6 +135,50 @@ fn check_pr_corpus_manifest(
         let kind = required_table_string(table, PR_CORPUS_LEDGER, "pr", idx, "kind")?;
         let context = format!("{PR_CORPUS_LEDGER} pr[{idx}] ({kind})");
         let partition = resolve_partition(table, &by_kind, None, kind, &context)?;
+        reject_floating_ref_keys(table, &context)?;
+        validate_sha_fields(table, &context)?;
+        reject_every_pr_holdout(table, &context, partition)?;
+        stats.record(partition);
+    }
+    Ok(())
+}
+
+fn check_evidence_loss_challenges_manifest(
+    manifest: &toml::Value,
+    stats: &mut PartitionStats,
+) -> Result<(), String> {
+    let by_kind = partition_by_kind(manifest, EVIDENCE_LOSS_CHALLENGES_LEDGER)?;
+    require_kind_partition(
+        &by_kind,
+        EVIDENCE_LOSS_CHALLENGES_LEDGER,
+        "fixture-transform",
+        "conformance",
+    )?;
+    let cases = array_at(manifest, EVIDENCE_LOSS_CHALLENGES_LEDGER, "challenge")?;
+    for (idx, case) in cases.iter().enumerate() {
+        let table = table_at(case, EVIDENCE_LOSS_CHALLENGES_LEDGER, "challenge", idx)?;
+        let kind = required_table_string(
+            table,
+            EVIDENCE_LOSS_CHALLENGES_LEDGER,
+            "challenge",
+            idx,
+            "kind",
+        )?;
+        let context = format!("{EVIDENCE_LOSS_CHALLENGES_LEDGER} challenge[{idx}] ({kind})");
+        let source_fixture = required_table_string(
+            table,
+            EVIDENCE_LOSS_CHALLENGES_LEDGER,
+            "challenge",
+            idx,
+            "source_fixture",
+        )?;
+        if !source_fixture.starts_with("fixtures/") {
+            return Err(format!(
+                "{context} source_fixture must live under fixtures/"
+            ));
+        }
+        let partition = resolve_partition(table, &by_kind, None, kind, &context)?;
+        require_partition_value(partition, "conformance", &format!("{context} partition"))?;
         reject_floating_ref_keys(table, &context)?;
         validate_sha_fields(table, &context)?;
         reject_every_pr_holdout(table, &context, partition)?;
@@ -445,6 +494,52 @@ tuning_cadence = "every-pr"
             .ok_or_else(|| "expected every-pr holdout to fail".to_string())?;
 
         assert!(err.contains("partitioned as holdout"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_loss_challenges_by_kind_defaults_assign_conformance() -> Result<(), String> {
+        let manifest = parse(
+            r#"
+schema_version = "1.0"
+partition_by_kind = { "fixture-transform" = "conformance" }
+
+[[challenge]]
+id = "remove-safety-section"
+kind = "fixture-transform"
+source_fixture = "fixtures/raw_pointer_deref_coverage_improved"
+"#,
+        )?;
+        let mut stats = PartitionStats::default();
+
+        check_evidence_loss_challenges_manifest(&manifest, &mut stats)?;
+
+        assert_eq!(stats.total, 1);
+        assert_eq!(stats.conformance, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn evidence_loss_challenges_reject_partition_override() -> Result<(), String> {
+        let manifest = parse(
+            r#"
+schema_version = "1.0"
+partition_by_kind = { "fixture-transform" = "conformance" }
+
+[[challenge]]
+id = "remove-safety-section"
+kind = "fixture-transform"
+source_fixture = "fixtures/raw_pointer_deref_coverage_improved"
+partition = "regression"
+"#,
+        )?;
+        let mut stats = PartitionStats::default();
+
+        let err = check_evidence_loss_challenges_manifest(&manifest, &mut stats)
+            .err()
+            .ok_or_else(|| "expected partition override to fail".to_string())?;
+
+        assert!(err.contains("must be `conformance`"), "{err}");
         Ok(())
     }
 }

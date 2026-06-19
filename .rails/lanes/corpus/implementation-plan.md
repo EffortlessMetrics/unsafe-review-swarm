@@ -111,11 +111,17 @@ loop without overclaiming precision or safety. Keep each step review-forward:
   before tuning, and `dogfood-exec --include-holdout` makes holdout execution
   explicit. Promotion from holdout to regression requires a follow-up
   release-readiness decision.
-- **GPR-3 — evidence-loss challenge harness.** Apply bounded transformations
-  such as removing `# Safety`, weakening a guard, removing a receipt, or adding
-  an unsafe declaration, then assert the expected movement and surface
-  invariants. Acceptance: shows known evidence-loss transformations on
-  realistic inputs are detected; no global recall claim.
+- **GPR-3 — evidence-loss challenge harness (landed initial rail).**
+  `policy/evidence-loss-challenges.toml` records canonical bounded fixture
+  transformations, and `xtask check-evidence-loss-challenges` generates the
+  transformed input under `target/evidence-loss-challenges/`, then asserts the
+  expected movement, first-card, comment-plan, and no-new-debt invariants. The
+  first case removes a `# Safety` section and SAFETY comment from a raw-pointer
+  deref fixture and must regress `contract_coverage` without changing the
+  low-noise comment stance. Future transformations such as weakening a guard,
+  removing a receipt, or adding an unsafe declaration can extend the same
+  ledger. Acceptance: shows known evidence-loss transformations on realistic
+  inputs are detected; no global recall claim.
 - **GPR-4 — external pilot receipts.** Run the public Action or equivalent
   artifact bundle read-only on real external PRs. Acceptance: setup friction,
   selected/omitted comments, runtime/artifact size, and human usefulness
@@ -130,6 +136,7 @@ loop without overclaiming precision or safety. Keep each step review-forward:
 ```
 cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- check-evidence-loss-challenges
 cargo run --locked -p xtask -- source-divergence
 git diff --check
 ```

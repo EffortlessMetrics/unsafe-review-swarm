@@ -38,6 +38,7 @@ pub(crate) enum XtaskCommand {
     CheckSurfaceDeterminism,
     CheckRealPrCorpus,
     CheckCorpusPartitions,
+    CheckEvidenceLossChallenges,
     DogfoodExec(Vec<String>),
 }
 
@@ -144,6 +145,11 @@ impl XtaskCommand {
             Some("check-corpus-partitions") => {
                 parse_no_extra(args, "check-corpus-partitions", Self::CheckCorpusPartitions)
             }
+            Some("check-evidence-loss-challenges") => parse_no_extra(
+                args,
+                "check-evidence-loss-challenges",
+                Self::CheckEvidenceLossChallenges,
+            ),
             Some("dogfood-exec") => {
                 // All trailing args are forwarded to the DogfoodExec arg parser.
                 Ok(Self::DogfoodExec(args.to_vec()))
