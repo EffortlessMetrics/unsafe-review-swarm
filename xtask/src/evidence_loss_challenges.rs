@@ -12,7 +12,7 @@
 
 use std::ffi::{OsStr, OsString};
 use std::fs;
-use std::path::Path;
+use std::path::{Component, Path};
 use std::process::Command;
 
 const LEDGER: &str = "policy/evidence-loss-challenges.toml";
@@ -414,7 +414,15 @@ fn parse_ledger(path: &Path) -> Result<Vec<ChallengeCase>, String> {
                 "{ledger_path} challenge[{idx}] ({id}) source_fixture must live under fixtures/"
             ));
         }
+        validate_relative_path(
+            &source_fixture,
+            &format!("{ledger_path} challenge[{idx}] ({id}) source_fixture"),
+        )?;
         let diff = required_str(table, "diff", &ledger_path, idx)?;
+        validate_relative_path(
+            &diff,
+            &format!("{ledger_path} challenge[{idx}] ({id}) diff"),
+        )?;
         let transformation = required_str(table, "transformation", &ledger_path, idx)?;
         let baseline_contract_coverage = table
             .get("baseline_contract_coverage")
@@ -528,6 +536,24 @@ fn validate_id(id: &str) -> Result<(), &'static str> {
         .all(|ch| ch.is_ascii_lowercase() || ch.is_ascii_digit() || ch == '-')
     {
         return Err("id must contain only lowercase ASCII letters, digits, and `-`");
+    }
+    Ok(())
+}
+
+fn validate_relative_path(value: &str, context: &str) -> Result<(), String> {
+    let path = Path::new(value);
+    if path.is_absolute() {
+        return Err(format!("{context} must be relative, got `{value}`"));
+    }
+    for component in path.components() {
+        match component {
+            Component::ParentDir | Component::RootDir | Component::Prefix(_) => {
+                return Err(format!(
+                    "{context} must stay inside the generated challenge root, got `{value}`"
+                ));
+            }
+            Component::CurDir | Component::Normal(_) => {}
+        }
     }
     Ok(())
 }
@@ -662,5 +688,13 @@ mod tests {
     #[test]
     fn normalize_lf_converts_windows_newlines() {
         assert_eq!(normalize_lf("a\r\nb\rc\n"), "a\nb\nc\n");
+    }
+
+    #[test]
+    fn relative_path_validation_rejects_parent_escape() {
+        let err = validate_relative_path("../change.diff", "test")
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("generated challenge root"), "{err}");
     }
 }
