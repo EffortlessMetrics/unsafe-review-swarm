@@ -528,11 +528,12 @@ Post-0.3.8 generalization work continues in review-forward slices:
   `policy/evidence-loss-challenges.toml`,
   `xtask check-evidence-loss-challenges`, and conformance partition ownership
   through `xtask check-corpus-partitions`.
-- GPR-4: run read-only external Action pilots and record human usefulness
-  judgments in `docs/dogfood/pilots/`; the initial receipt rail is enforced by
-  `xtask check-external-pilots`.
-- GPR-5: publish a validation closeout that separates conformance, regression,
-  holdout, challenge, and pilot evidence.
+- GPR-4: initial read-only external pilot receipt rail landed in
+  `docs/dogfood/pilots/`, enforced by `xtask check-external-pilots`.
+- GPR-5: validation closeout landed in
+  `docs/dogfood/reports/2026-06-19-generalization-validation-closeout.md`,
+  separating conformance, regression, holdout, challenge, and pilot evidence and
+  recommending first-use friction as the next lane.
 
 See `.rails/lanes/corpus/implementation-plan.md` for the full sequence and
 evidence grounding.
