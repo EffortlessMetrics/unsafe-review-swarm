@@ -1,4 +1,8 @@
-use unsafe_review_core::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
+use std::time::{Duration, Instant};
+
+use unsafe_review_core::{
+    AnalysisMode, AnalyzeInput, DiffSource, DiscoveryOptions, PolicyMode, RepoScanStatus, Scope,
+};
 
 const ENDPOINTS: &[(&str, &str)] = &[
     ("badges/unsafe-review.json", "unsafe-review"),
@@ -7,6 +11,9 @@ const ENDPOINTS: &[(&str, &str)] = &[
 
 const ENDPOINT_PREFIX: &str = "https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FEffortlessMetrics%2Funsafe-review%2Fmain%2Fbadges%2F";
 const FORBIDDEN_MESSAGE_TERMS: &[&str] = &["safe", "sound", "ub-free", "miri-clean", "proof"];
+// This validator regenerates the full repo badge projection.  The bound is a
+// hard stop for stale or pathological scans, not a cheap-smoke-test budget.
+const GENERATED_PROJECTION_TIMEOUT_SECS: u64 = 900;
 const SHIELDS_ENDPOINT_FIELDS: &[&str] = &[
     "schemaVersion",
     "label",
@@ -42,15 +49,29 @@ pub(crate) fn check_endpoints() -> Result<(), String> {
 }
 
 pub(crate) fn check_generated_projection() -> Result<(), String> {
-    let output = unsafe_review_core::analyze(AnalyzeInput {
-        root: crate::repo_path("."),
-        scope: Scope::Repo,
-        diff: DiffSource::NoneRepoScan,
-        mode: AnalysisMode::Repo,
-        policy: PolicyMode::Advisory,
-        include_unchanged_tests: true,
-        max_cards: None,
-    })?;
+    check_generated_projection_with_timeout(Duration::from_secs(GENERATED_PROJECTION_TIMEOUT_SECS))
+}
+
+fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), String> {
+    let started = Instant::now();
+    let output = unsafe_review_core::analyze_with_discovery_and_repo_events(
+        AnalyzeInput {
+            root: crate::repo_path("."),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        },
+        DiscoveryOptions::repo_defaults(),
+        |event| {
+            if generated_projection_timeout_elapsed(started, timeout) {
+                return Err(generated_projection_timeout_message(timeout, &event.status));
+            }
+            Ok(())
+        },
+    )?;
     let (main, plus) = unsafe_review_core::render_badge_jsons(&output);
     for (path, expected_text) in [
         ("badges/unsafe-review.json", main),
@@ -59,6 +80,33 @@ pub(crate) fn check_generated_projection() -> Result<(), String> {
         check_generated_endpoint_json(path, &expected_text)?;
     }
     Ok(())
+}
+
+fn generated_projection_timeout_elapsed(started: Instant, timeout: Duration) -> bool {
+    started.elapsed() >= timeout
+}
+
+fn generated_projection_timeout_message(timeout: Duration, status: &RepoScanStatus) -> String {
+    let timeout_secs = timeout.as_secs();
+    let remaining = status.files_discovered.saturating_sub(status.files_scanned);
+    let last_path = status
+        .last_path
+        .as_ref()
+        .map(|path| path.to_string_lossy().replace('\\', "/"))
+        .unwrap_or_else(|| "-".to_string());
+    format!(
+        "public badge projection exceeded {timeout_secs}s while {phase}; \
+         files_discovered={files_discovered} files_scanned={files_scanned} \
+         files_remaining={remaining} cards_found={cards_found} last_path={last_path}; \
+         badge staleness was not revalidated. Run \
+         `unsafe-review repo --format json --out target/unsafe-review-badge-projection.json \
+         --progress --timeout-seconds {timeout_secs}` to diagnose, then run \
+         `unsafe-review badges --out badges/` after the full repo projection completes.",
+        phase = status.phase.as_str(),
+        files_discovered = status.files_discovered,
+        files_scanned = status.files_scanned,
+        cards_found = status.cards_found,
+    )
 }
 
 pub(crate) fn is_public_endpoint(path: &str) -> bool {
@@ -250,5 +298,46 @@ mod tests {
 
         assert!(message.contains("checked-in message 1"));
         assert!(message.contains("generated message 2"));
+    }
+
+    #[test]
+    fn generated_projection_timeout_message_reports_progress() {
+        let status = RepoScanStatus {
+            schema_version: "repo-scan-status/v1".to_string(),
+            phase: unsafe_review_core::RepoScanPhase::Scanning,
+            elapsed_ms: 7_001,
+            files_discovered: 42,
+            files_scanned: 12,
+            cards_found: 3,
+            last_path: Some("fixtures/slow/src/lib.rs".into()),
+            completed: false,
+            partial: false,
+            stop_reason: unsafe_review_core::RepoStopReason::None,
+            cap: None,
+            file_timings: None,
+            output_bytes: None,
+        };
+
+        let message = generated_projection_timeout_message(Duration::from_secs(7), &status);
+
+        assert!(message.contains("exceeded 7s"));
+        assert!(message.contains("while scanning"));
+        assert!(message.contains("files_discovered=42"));
+        assert!(message.contains("files_scanned=12"));
+        assert!(message.contains("files_remaining=30"));
+        assert!(message.contains("cards_found=3"));
+        assert!(message.contains("last_path=fixtures/slow/src/lib.rs"));
+        assert!(message.contains("unsafe-review repo --format json"));
+        assert!(message.contains("unsafe-review badges --out badges/"));
+    }
+
+    #[test]
+    fn generated_projection_timeout_elapsed_trips_after_deadline() {
+        let started = Instant::now() - Duration::from_secs(8);
+
+        assert!(generated_projection_timeout_elapsed(
+            started,
+            Duration::from_secs(7)
+        ));
     }
 }
