@@ -31,6 +31,7 @@ const FIRST_PR_ARTIFACT_LIST_SURFACES: &[&str] = &[
 ];
 const FIRST_PR_ARTIFACT_NAME_SURFACES: &[&str] = &[
     ".github/actions/unsafe-review-first-pr/action.yml",
+    "docs/ci/github-action.md",
     "docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md",
 ];
 pub(crate) const FIRST_PR_BUNDLE_ARTIFACT_PATHS: &[&str] = &[
