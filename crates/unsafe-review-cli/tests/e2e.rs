@@ -385,6 +385,45 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("first-pr")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    for artifact in [
+        "review-kit.json",
+        "unsafe-review-gate.json",
+        "cards.json",
+        "pr-summary.md",
+        "github-summary.md",
+        "cards.sarif",
+        "comment-plan.json",
+        "witness-plan.md",
+        "receipt-audit.md",
+        "receipt-audit.json",
+        "policy-report.json",
+        "policy-report.md",
+        "manual-candidates.json",
+        "manual-repair-queue.json",
+        "tokmd-packets.json",
+        "usefulness-telemetry.json",
+        "lsp.json",
+        "repair-queue.json",
+    ] {
+        assert!(
+            stdout.contains(artifact),
+            "first-pr help must list bundle artifact `{artifact}`\nstdout:\n{stdout}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn candidate_help_is_command_specific() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
