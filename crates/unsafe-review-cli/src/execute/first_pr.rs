@@ -102,15 +102,15 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.out_dir,
         report.output_bytes,
     );
-    print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
-    print_receipt_audit_handoff(report.check);
-    print_policy_report_handoff(report.out_dir);
     print_top_card_summary(
         report.output,
         report.root,
         report.no_changed_gaps_message,
         report.no_changed_gaps_limitation,
     );
+    print_receipt_audit_handoff(report.check);
+    print_policy_report_handoff(report.out_dir);
+    print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
 }
@@ -132,8 +132,24 @@ fn print_manual_candidate_handoff(
     root: &Path,
     manual_candidates: &[ManualCandidate],
 ) {
-    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     println!("Manual candidates:");
+    if manual_candidates.is_empty() {
+        println!(
+            "  {} (0; manual/advisory sidecar, not analyzer ReviewCards)",
+            artifact_path_display(out_dir, "manual-candidates.json")
+        );
+        println!(
+            "  Manual repair queue: {} (empty copy-only sidecar; unsafe-review did not run an agent)",
+            artifact_path_display(out_dir, "manual-repair-queue.json")
+        );
+        println!(
+            "  Tokmd packet export: {} (empty formatting sidecar; tokmd was not run)",
+            artifact_path_display(out_dir, "tokmd-packets.json")
+        );
+        return;
+    }
+
+    let stable_byte_seed_ledger = load_stable_byte_seed_ledger(root);
     println!(
         "  {} (manual/advisory; not analyzer ReviewCards)",
         artifact_path_display(out_dir, "manual-candidates.json")
