@@ -11241,29 +11241,58 @@ jobs:
     }
 
     #[test]
-    fn first_pr_artifact_name_list_rejects_missing_policy_report() -> Result<(), String> {
-        let text = public_surfaces::FIRST_PR_BUNDLE_ARTIFACT_PATHS
-            .iter()
-            .copied()
-            .filter(|artifact| *artifact != "target/unsafe-review/policy-report.json")
-            .map(|artifact| {
-                Path::new(artifact)
-                    .file_name()
-                    .and_then(|name| name.to_str())
-                    .ok_or_else(|| format!("test artifact `{artifact}` has no file name"))
-            })
-            .collect::<Result<Vec<_>, _>>()?
-            .join("\n");
+    fn first_pr_artifact_name_list_rejects_missing_new_action_artifacts() -> Result<(), String> {
+        for missing in [
+            "target/unsafe-review/receipt-audit.json",
+            "target/unsafe-review/policy-report.json",
+            "target/unsafe-review/policy-report.md",
+        ] {
+            let text = first_pr_artifact_names_except(missing)?;
+
+            let Err(err) = public_surfaces::require_first_pr_artifact_names(
+                ".github/actions/example.yml",
+                &text,
+            ) else {
+                return Err(format!("missing artifact name `{missing}` should fail"));
+            };
+
+            let missing_name = artifact_file_name(missing)?;
+            assert!(err.contains(".github/actions/example.yml"));
+            assert!(err.contains(missing_name));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_name_list_requires_standalone_repair_queue() -> Result<(), String> {
+        let text = first_pr_artifact_names_except("target/unsafe-review/repair-queue.json")?;
 
         let Err(err) =
             public_surfaces::require_first_pr_artifact_names(".github/actions/example.yml", &text)
         else {
-            return Err("missing policy-report artifact name should fail".to_string());
+            return Err("missing standalone repair-queue artifact name should fail".to_string());
         };
 
-        assert!(err.contains(".github/actions/example.yml"));
-        assert!(err.contains("policy-report.json"));
+        assert!(text.contains("manual-repair-queue.json"));
+        assert!(err.contains("repair-queue.json"));
         Ok(())
+    }
+
+    fn first_pr_artifact_names_except(missing: &str) -> Result<String, String> {
+        public_surfaces::FIRST_PR_BUNDLE_ARTIFACT_PATHS
+            .iter()
+            .copied()
+            .filter(|artifact| *artifact != missing)
+            .map(artifact_file_name)
+            .collect::<Result<Vec<_>, _>>()
+            .map(|names| names.join("\n"))
+    }
+
+    fn artifact_file_name(artifact: &str) -> Result<&str, String> {
+        Path::new(artifact)
+            .file_name()
+            .and_then(|name| name.to_str())
+            .ok_or_else(|| format!("test artifact `{artifact}` has no file name"))
     }
 
     #[test]

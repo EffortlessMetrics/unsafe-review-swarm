@@ -164,13 +164,18 @@ pub(crate) fn require_first_pr_artifact_names(path: &str, text: &str) -> Result<
             .file_name()
             .and_then(|name| name.to_str())
             .ok_or_else(|| format!("internal artifact path `{artifact}` has no file name"))?;
-        if !text.contains(artifact_name) {
+        if !contains_artifact_name(text, artifact_name) {
             return Err(format!(
                 "{path} must list first-pr artifact `{artifact_name}`"
             ));
         }
     }
     Ok(())
+}
+
+fn contains_artifact_name(text: &str, artifact_name: &str) -> bool {
+    text.split(|ch: char| !(ch.is_ascii_alphanumeric() || matches!(ch, '.' | '-' | '_')))
+        .any(|token| token == artifact_name)
 }
 
 pub(crate) fn require_matching_downstream_workflow_version(
