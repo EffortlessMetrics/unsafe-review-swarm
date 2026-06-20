@@ -123,6 +123,23 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &stdout,
         "saved receipt metadata only; unsafe-review did not run a witness",
     );
+    assert_contains(&stdout, "Brownfield baseline (optional):");
+    assert_contains(
+        &stdout,
+        "run from a clean base/default branch before feature changes",
+    );
+    assert_contains(
+        &stdout,
+        &format!("unsafe-review baseline init --root {}", fixture.display()),
+    );
+    assert_contains(
+        &stdout,
+        "records current open actionable gaps as pre-existing debt",
+    );
+    assert_contains(
+        &stdout,
+        "not a safety record, not UB-free status, and not a witness result",
+    );
     assert_contains(&stdout, "Manual candidates:");
     assert_contains(
         &stdout,
@@ -137,7 +154,12 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_order(&stdout, "Top card:", "Audit saved receipts:");
     assert_order(&stdout, "Audit saved receipts:", "Policy report:");
-    assert_order(&stdout, "Policy report:", "Manual candidates:");
+    assert_order(&stdout, "Policy report:", "Brownfield baseline (optional):");
+    assert_order(
+        &stdout,
+        "Brownfield baseline (optional):",
+        "Manual candidates:",
+    );
     assert_order(&stdout, "Manual candidates:", "Artifacts:");
     assert_contains(&stdout, "Artifacts:");
     assert_contains(&stdout, &path_display_fwd(&out_dir.join("review-kit.json")));

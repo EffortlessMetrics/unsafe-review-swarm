@@ -93,6 +93,19 @@ target/unsafe-review/unsafe-review-gate.json
 `pr` is artifact-only: it does not run witness tools, post comments, edit
 source, or enforce a blocking policy. It is safe to run on any branch.
 
+For brownfield adoption, from the intended clean base/default branch before
+feature changes, you can record the current open actionable gaps as a debt floor
+before opting into a no-new-debt policy:
+
+```bash
+unsafe-review baseline init --root .
+```
+
+This writes `policy/unsafe-review-baseline.toml` and
+`policy/unsafe-review-baseline-snapshot.toml`. Review those files before
+committing them. Baseline entries are debt records, not safety records, witness
+results, or UB-free status.
+
 ## Step 4 — Open the PR summary
 
 ```bash

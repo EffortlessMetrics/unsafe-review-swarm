@@ -110,6 +110,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     );
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
+    print_baseline_onboarding_handoff(report.root);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
@@ -125,6 +126,16 @@ fn print_policy_report_handoff(out_dir: &Path) {
     println!("Policy report:");
     println!("  {}", artifact_path_display(out_dir, "policy-report.md"));
     println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
+}
+
+fn print_baseline_onboarding_handoff(root: &Path) {
+    println!("Brownfield baseline (optional):");
+    println!("  run from a clean base/default branch before feature changes");
+    println!("  {}", baseline_init_command(root));
+    println!(
+        "  records current open actionable gaps as pre-existing debt; review generated policy files before committing"
+    );
+    println!("  not a safety record, not UB-free status, and not a witness result");
 }
 
 fn print_manual_candidate_handoff(
@@ -273,6 +284,13 @@ fn shell_arg(value: &str) -> String {
     } else {
         value.to_string()
     }
+}
+
+fn baseline_init_command(root: &Path) -> String {
+    format!(
+        "unsafe-review baseline init --root {}",
+        shell_arg(&root.display().to_string())
+    )
 }
 
 fn print_first_pr_overview(
