@@ -6551,6 +6551,11 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
+        if matches!(kind, "repo-snapshot" | "pr-diff") && artifact_status != "local_untracked" {
+            return Err(format!(
+                "{DOGFOOD_MANIFEST} targets[{idx}] kind `{kind}` must use artifact_status `local_untracked` so external snapshots and diffs are never checked into the swarm repo, got `{artifact_status}`"
+            ));
+        }
         validate_artifacts(target, idx, id, artifact_status)?;
         let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
         let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
@@ -14421,6 +14426,64 @@ artifacts = [
 
         assert!(err.contains("manual-repair-queue.json"), "{err}");
         assert!(err.contains("Bun manual-candidate smoke artifact"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_manifest_rejects_checked_in_external_snapshot() -> Result<(), String> {
+        let target = toml::from_str::<toml::Value>(
+            r#"
+id = "external-snapshot-checked-in"
+repository = "example/repo"
+crate = "example"
+kind = "repo-snapshot"
+status = "active"
+commit = "0123456789abcdef0123456789abcdef01234567"
+root = "fixtures/raw_pointer_alignment"
+purpose = "external repo snapshot dogfood target that must stay local_untracked"
+command = "rtk cargo run --locked -p unsafe-review -- first-pr --format json"
+artifact_status = "checked_in"
+artifacts = [
+  "target/unsafe-review-external-snapshot/cards.json",
+]
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let mut ids = BTreeSet::new();
+        let err = err_text(dogfood_checks::validate_target(&target, 0, &mut ids))?;
+
+        assert!(err.contains("local_untracked"), "{err}");
+        assert!(err.contains("repo-snapshot"), "{err}");
+        assert!(err.contains("checked_in"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn dogfood_manifest_rejects_remote_manual_pr_diff() -> Result<(), String> {
+        let target = toml::from_str::<toml::Value>(
+            r#"
+id = "external-pr-diff-remote-manual"
+repository = "example/repo"
+crate = "example"
+kind = "pr-diff"
+status = "active"
+pr = 42
+root = "fixtures/raw_pointer_alignment"
+diff = "fixtures/raw_pointer_alignment/change.diff"
+purpose = "external pr-diff dogfood target that must stay local_untracked"
+command = "rtk cargo run --locked -p unsafe-review -- first-pr --format json"
+artifact_status = "remote_manual"
+artifacts = [
+  "target/unsafe-review-external-pr/cards.json",
+]
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let mut ids = BTreeSet::new();
+        let err = err_text(dogfood_checks::validate_target(&target, 0, &mut ids))?;
+
+        assert!(err.contains("local_untracked"), "{err}");
+        assert!(err.contains("pr-diff"), "{err}");
         Ok(())
     }
 
