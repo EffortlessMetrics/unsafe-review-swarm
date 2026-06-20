@@ -1434,7 +1434,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         check.base = Some(detected_base);
     }
     if let Some(expected_head_sha) = &expected_head_sha {
-        validate_expected_head_sha(&check.root, expected_head_sha)?;
+        validate_expected_head_sha(&check.root, expected_head_sha, terminal_command)?;
     }
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
@@ -1652,7 +1652,11 @@ fn git_ref_error(base: &str, git_stderr: &str) -> String {
     }
 }
 
-fn validate_expected_head_sha(root: &Path, expected_head_sha: &str) -> Result<(), String> {
+fn validate_expected_head_sha(
+    root: &Path,
+    expected_head_sha: &str,
+    terminal_command: &str,
+) -> Result<(), String> {
     let actual = git_rev_parse(root, "HEAD").ok_or_else(|| {
         format!(
             "could not resolve HEAD in `{}` for --head-sha validation. \
@@ -1665,7 +1669,7 @@ fn validate_expected_head_sha(root: &Path, expected_head_sha: &str) -> Result<()
     } else {
         Err(format!(
             "current HEAD in `{}` is {actual}, but --head-sha expected {expected_head_sha}. \
-             Check out the exact external PR head SHA before running unsafe-review pr.",
+             Check out the exact external PR head SHA before running {terminal_command}.",
             root.display()
         ))
     }

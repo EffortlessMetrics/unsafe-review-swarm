@@ -271,6 +271,10 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
         "stderr must name the expected head SHA mismatch: {stderr}"
     );
     assert!(
+        stderr.contains("before running pr"),
+        "stderr must name the command the user ran: {stderr}"
+    );
+    assert!(
         !out_dir.join("cards.json").exists(),
         "stale exact-head input must not write PR artifacts"
     );

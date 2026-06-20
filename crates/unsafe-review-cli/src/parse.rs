@@ -525,6 +525,9 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
         match arg {
             "--base-sha" => {
                 idx += 1;
+                if saw_base_sha {
+                    return Err("duplicate --base-sha".to_string());
+                }
                 if options.check.base.is_some() {
                     return Err("choose only one of --base or --base-sha".to_string());
                 }
@@ -537,6 +540,9 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
                 continue;
             }
             value if value.starts_with("--base-sha=") => {
+                if saw_base_sha {
+                    return Err("duplicate --base-sha".to_string());
+                }
                 if options.check.base.is_some() {
                     return Err("choose only one of --base or --base-sha".to_string());
                 }
@@ -1924,6 +1930,21 @@ mod tests {
         .unwrap_or_default();
 
         assert_eq!(err, "duplicate --head-sha");
+    }
+
+    #[test]
+    fn first_pr_rejects_duplicate_base_sha() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--base-sha",
+            "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+            "--base-sha=2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert_eq!(err, "duplicate --base-sha");
     }
 
     #[test]
