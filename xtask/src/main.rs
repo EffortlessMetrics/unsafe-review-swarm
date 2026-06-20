@@ -6551,6 +6551,11 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
+        if matches!(kind, "repo-snapshot" | "pr-diff") && artifact_status != "local_untracked" {
+            return Err(format!(
+                "{DOGFOOD_MANIFEST} targets[{idx}] kind `{kind}` must use artifact_status `local_untracked`, got `{artifact_status}`; external snapshots and PR diffs are never checked into the swarm"
+            ));
+        }
         validate_artifacts(target, idx, id, artifact_status)?;
         let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
         let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
@@ -14388,6 +14393,35 @@ impl WitnessKind {
     #[test]
     fn dogfood_manifest_validates_current_corpus_contract() -> Result<(), String> {
         check_dogfood()
+    }
+
+    #[test]
+    fn dogfood_manifest_rejects_checked_in_external_snapshot() -> Result<(), String> {
+        let target = toml::from_str::<toml::Value>(
+            r#"
+id = "external-repo-snapshot-checked-in"
+repository = "example/repo"
+crate = "example"
+kind = "repo-snapshot"
+status = "active"
+commit = "0123456789abcdef0123456789abcdef01234567"
+root = "vendor/example"
+purpose = "external repo snapshot wrongly marked as checked into the swarm tree"
+command = "rtk cargo run --locked -p unsafe-review -- first-pr --format json"
+artifact_status = "checked_in"
+artifacts = [
+  "target/example/cards.json",
+]
+"#,
+        )
+        .map_err(|err| err.to_string())?;
+        let mut ids = BTreeSet::new();
+        let err = err_text(dogfood_checks::validate_target(&target, 0, &mut ids))?;
+
+        assert!(err.contains("repo-snapshot"), "{err}");
+        assert!(err.contains("local_untracked"), "{err}");
+        assert!(err.contains("never checked into the swarm"), "{err}");
+        Ok(())
     }
 
     #[test]
