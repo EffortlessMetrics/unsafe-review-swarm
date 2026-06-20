@@ -2872,7 +2872,7 @@ fn print_first_pr_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review first-pr [--root .] [--base origin/main | --base-sha <sha> --head-sha <sha> | --diff <file|->] \
+        "  unsafe-review first-pr [--root .] [--base origin/main | --base-sha <sha> [--head-sha <sha>] | --diff <file|->] \
          [--out-dir target/unsafe-review] [--max-cards <N>]"
     );
     println!();
@@ -3258,7 +3258,7 @@ fn print_help() {
     );
     println!("  pr      first-run PR review bundle: auto-detects root and base ref");
     println!(
-        "  first-pr [--root .] [--base origin/main|--base-sha SHA --head-sha SHA|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
+        "  first-pr [--root .] [--base origin/main|--base-sha SHA [--head-sha SHA]|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
     );
     println!("  review  alias for first-pr");
     println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");

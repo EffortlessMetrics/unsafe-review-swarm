@@ -491,6 +491,7 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
     let mut saw_base_ref = false;
     let mut saw_base_sha = false;
+    let mut saw_head_sha = false;
     let mut idx = 0usize;
     while idx < args.len() {
         // `--out` belongs to `check`/`repo`; `first-pr` uses `--out-dir`.
@@ -549,18 +550,26 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             }
             "--head-sha" => {
                 idx += 1;
+                if saw_head_sha {
+                    return Err("duplicate --head-sha".to_string());
+                }
                 options.expected_head_sha = Some(parse_commit_sha(
                     value(&args, idx, "--head-sha")?,
                     "--head-sha",
                 )?);
+                saw_head_sha = true;
                 idx += 1;
                 continue;
             }
             value if value.starts_with("--head-sha=") => {
+                if saw_head_sha {
+                    return Err("duplicate --head-sha".to_string());
+                }
                 options.expected_head_sha = Some(parse_commit_sha(
                     inline_value(value, "--head-sha")?,
                     "--head-sha",
                 )?);
+                saw_head_sha = true;
                 idx += 1;
                 continue;
             }
@@ -1898,6 +1907,23 @@ mod tests {
             err.contains("invalid --base-sha `origin/main`"),
             "unexpected error: {err}"
         );
+    }
+
+    #[test]
+    fn first_pr_rejects_duplicate_head_sha() {
+        let err = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--base-sha",
+            "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+            "--head-sha",
+            "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            "--head-sha=3f6852ec5295160bc4f1e687ea19847f9cd4e665",
+        ]))
+        .err()
+        .unwrap_or_default();
+
+        assert_eq!(err, "duplicate --head-sha");
     }
 
     #[test]
