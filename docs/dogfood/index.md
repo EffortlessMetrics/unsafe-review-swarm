@@ -21,7 +21,9 @@ calibrated precision or recall.
 
 Generated scan outputs are intentionally recorded as `local_untracked` artifacts
 under `target/dogfood-work/`. Re-run the command in `corpus.toml` when a fresh
-local artifact is needed.
+local artifact is needed. `check-dogfood` enforces this: every `repo-snapshot`
+and `pr-diff` target must declare `artifact_status = "local_untracked"`, so
+external snapshots and diffs are never checked into the swarm repo.
 
 ## Corpus Summary
 
