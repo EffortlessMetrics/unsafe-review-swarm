@@ -126,8 +126,9 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "Brownfield baseline (optional):");
     assert_contains(
         &stdout,
-        "run from a clean base/default branch before feature changes",
+        "run only from a clean base/default branch before feature changes",
     );
+    assert_contains(&stdout, "do not run it from the PR branch being reviewed");
     assert_contains(
         &stdout,
         &format!("unsafe-review baseline init --root {}", fixture.display()),

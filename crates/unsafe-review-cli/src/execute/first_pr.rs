@@ -130,7 +130,8 @@ fn print_policy_report_handoff(out_dir: &Path) {
 
 fn print_baseline_onboarding_handoff(root: &Path) {
     println!("Brownfield baseline (optional):");
-    println!("  run from a clean base/default branch before feature changes");
+    println!("  run only from a clean base/default branch before feature changes");
+    println!("  do not run it from the PR branch being reviewed");
     println!("  {}", baseline_init_command(root));
     println!(
         "  records current open actionable gaps as pre-existing debt; review generated policy files before committing"

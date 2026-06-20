@@ -95,7 +95,8 @@ source, or enforce a blocking policy. It is safe to run on any branch.
 
 For brownfield adoption, from the intended clean base/default branch before
 feature changes, you can record the current open actionable gaps as a debt floor
-before opting into a no-new-debt policy:
+before opting into a no-new-debt policy. Do not run this from the PR branch
+being reviewed; otherwise new branch gaps can become baseline debt:
 
 ```bash
 unsafe-review baseline init --root .
