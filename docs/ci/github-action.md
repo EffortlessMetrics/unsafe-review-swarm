@@ -83,6 +83,9 @@ cards.sarif                — SARIF projection for GitHub code scanning
 comment-plan.json          — plan-only comment budget (not posted)
 witness-plan.md            — external witness routes per card
 receipt-audit.md           — saved receipt metadata summary
+receipt-audit.json         — machine-readable saved receipt metadata audit
+policy-report.json         — machine-readable advisory policy simulation
+policy-report.md           — reviewer-facing advisory policy simulation
 manual-candidates.json     — manual review candidates
 manual-repair-queue.json   — manual repair queue sidecar
 tokmd-packets.json         — formatting input sidecar
