@@ -17137,6 +17137,92 @@ Snapshot reports:
     }
 
     #[test]
+    fn first_pr_artifact_checker_rejects_usefulness_telemetry_card_inventory_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-usefulness-inventory-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("usefulness-telemetry.json");
+        let mut telemetry = parse_json_file(&path)?;
+        telemetry["card_inventory"]["new_cards"] = serde_json::json!(99);
+        fs::write(&path, telemetry.to_string())
+            .map_err(|err| format!("write usefulness telemetry failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("usefulness telemetry inventory drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "usefulness-telemetry.json card_inventory.new_cards must project cards.json summary.new_gaps `1`; got `99`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_usefulness_telemetry_comment_selection_drift()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-usefulness-comment-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("usefulness-telemetry.json");
+        let mut telemetry = parse_json_file(&path)?;
+        telemetry["comment_selection"]["selected_count"] = serde_json::json!(0);
+        fs::write(&path, telemetry.to_string())
+            .map_err(|err| format!("write usefulness telemetry failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => {
+                return Err("usefulness telemetry comment selection drift should fail".to_string());
+            }
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "usefulness-telemetry.json comment_selection.selected_count must project comment-plan.json summary.selected_count `1`; got `0`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_usefulness_telemetry_readiness_drift() -> Result<(), String>
+    {
+        let dir = unique_temp_dir("unsafe-review-first-pr-usefulness-readiness-drift")?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let path = dir.join("usefulness-telemetry.json");
+        let mut telemetry = parse_json_file(&path)?;
+        telemetry["agent_readiness"]["ready"] = serde_json::json!(0);
+        fs::write(&path, telemetry.to_string())
+            .map_err(|err| format!("write usefulness telemetry failed: {err}"))?;
+
+        let result = check_first_pr_artifacts(&dir);
+
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let err = match result {
+            Ok(()) => return Err("usefulness telemetry readiness drift should fail".to_string()),
+            Err(err) => err,
+        };
+        assert!(
+            err.contains(
+                "usefulness-telemetry.json agent_readiness.ready must project repair-queue.json agent_readiness `1`; got `0`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_checker_rejects_cards_json_missing_confirmation_cue() -> Result<(), String>
     {
         let dir = unique_temp_dir("unsafe-review-first-pr-cards-missing-confirmation-cue")?;
@@ -23642,48 +23728,202 @@ review_after = "2026-08-01"
     }
 
     fn write_usefulness_telemetry_artifact(dir: &Path) -> Result<(), String> {
+        let cards = parse_json_file(&dir.join("cards.json"))?;
+        let comment_plan = parse_json_file(&dir.join("comment-plan.json"))?;
+        let card_array = cards
+            .get("cards")
+            .and_then(serde_json::Value::as_array)
+            .ok_or_else(|| "cards.json fixture must have cards array".to_string())?;
+        let mut coverage_slots = BTreeMap::from([
+            ("contract_missing", 0usize),
+            ("contract_weak", 0usize),
+            ("guard_missing", 0usize),
+            ("guard_weak", 0usize),
+            ("test_reach_missing", 0usize),
+            ("test_reach_weak", 0usize),
+            ("witness_receipt_missing", 0usize),
+        ]);
+        let mut confidence_distribution = BTreeMap::from([
+            ("high", 0usize),
+            ("medium", 0usize),
+            ("low", 0usize),
+            ("unknown", 0usize),
+        ]);
+        let mut actionability_distribution = BTreeMap::<&str, usize>::new();
+        let mut unfulfilled_obligation_count = 0usize;
+        for card in card_array {
+            let class = card
+                .get("class")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("static_unknown");
+            match class {
+                "contract_missing" => {
+                    *coverage_slots.entry("contract_missing").or_insert(0) += 1;
+                    *actionability_distribution
+                        .entry("specific_contract_missing")
+                        .or_insert(0) += 1;
+                }
+                "guard_missing" => {
+                    *coverage_slots.entry("guard_missing").or_insert(0) += 1;
+                    *actionability_distribution
+                        .entry("specific_guard_missing")
+                        .or_insert(0) += 1;
+                }
+                "unsafe_unreached" => {
+                    *coverage_slots.entry("test_reach_missing").or_insert(0) += 1;
+                    *actionability_distribution
+                        .entry("specific_reach_missing")
+                        .or_insert(0) += 1;
+                }
+                _ => {
+                    *actionability_distribution
+                        .entry("not_actionable")
+                        .or_insert(0) += 1;
+                }
+            }
+            if card
+                .get("witness")
+                .and_then(serde_json::Value::as_str)
+                .is_some_and(|witness| witness.contains("No imported witness receipt"))
+            {
+                *coverage_slots.entry("witness_receipt_missing").or_insert(0) += 1;
+            }
+            let confidence = card
+                .get("confidence")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or("unknown");
+            if let Some(count) = confidence_distribution.get_mut(confidence) {
+                *count += 1;
+            }
+            if let Some(obligations) = card
+                .get("obligation_evidence")
+                .and_then(serde_json::Value::as_array)
+            {
+                for obligation in obligations {
+                    for field in ["contract", "discharge", "reach", "witness"] {
+                        if obligation
+                            .get(field)
+                            .and_then(|value| value.get("present"))
+                            .and_then(serde_json::Value::as_bool)
+                            == Some(false)
+                        {
+                            unfulfilled_obligation_count += 1;
+                        }
+                    }
+                }
+            }
+        }
+        let readiness_counts = usefulness_fixture_readiness_counts(dir)?;
         let value = serde_json::json!({
             "schema_version": "usefulness-telemetry/v1",
             "trust_boundary": "operational diagnostic usefulness only — not calibrated, not a measurement of detection accuracy, not a memory guarantee, not a soundness guarantee, not a gate, and not a merge verdict; all telemetry is projected from ReviewCard/Summary/CoverageBlock/CommentPlan fields deterministically",
             "card_inventory": {
-                "total_cards": 1,
-                "actionable_cards": 1,
-                "new_cards": 1,
-                "worsened_cards": 0,
-                "resolved_cards": 0,
-                "inherited_cards": 0
+                "total_cards": json_usize_at(&cards, "/summary/cards", "cards.json")?,
+                "actionable_cards": json_usize_at(&cards, "/summary/open_actionable_gaps", "cards.json")?,
+                "new_cards": json_usize_at(&cards, "/summary/new_gaps", "cards.json")?,
+                "worsened_cards": json_usize_at(&cards, "/summary/worsened_gaps", "cards.json")?,
+                "improved_cards": json_usize_at(&cards, "/summary/improved_gaps", "cards.json")?,
+                "resolved_cards": json_usize_at(&cards, "/summary/resolved_gaps", "cards.json")?,
+                "inherited_cards": json_usize_at(&cards, "/summary/inherited_gaps", "cards.json")?
             },
             "coverage_slots": {
-                "contract_missing": 0,
-                "contract_weak": 0,
-                "guard_missing": 1,
-                "guard_weak": 0,
-                "test_reach_missing": 0,
-                "test_reach_weak": 0,
-                "witness_receipt_missing": 1
+                "contract_missing": fixture_count(&coverage_slots, "contract_missing")?,
+                "contract_weak": fixture_count(&coverage_slots, "contract_weak")?,
+                "guard_missing": fixture_count(&coverage_slots, "guard_missing")?,
+                "guard_weak": fixture_count(&coverage_slots, "guard_weak")?,
+                "test_reach_missing": fixture_count(&coverage_slots, "test_reach_missing")?,
+                "test_reach_weak": fixture_count(&coverage_slots, "test_reach_weak")?,
+                "witness_receipt_missing": fixture_count(&coverage_slots, "witness_receipt_missing")?
             },
             "agent_readiness": {
-                "ready": 1,
-                "needs_human": 0,
-                "unsupported": 0
+                "ready": fixture_count(&readiness_counts, "ready")?,
+                "requires_witness_receipt": fixture_count(&readiness_counts, "requires_witness_receipt")?,
+                "needs_human": fixture_count(&readiness_counts, "needs_human")?,
+                "unsupported": fixture_count(&readiness_counts, "unsupported")?
             },
             "comment_selection": {
-                "selected_count": 1,
-                "not_selected_count": 0,
+                "selected_count": json_usize_at(&comment_plan, "/summary/selected_count", "comment-plan.json")?,
+                "not_selected_count": json_usize_at(&comment_plan, "/summary/not_selected_count", "comment-plan.json")?,
                 "not_selected_reason_histogram": {}
             },
             "confidence_distribution": {
-                "high": 0,
-                "medium": 1,
-                "low": 0,
-                "unknown": 0
+                "high": fixture_count(&confidence_distribution, "high")?,
+                "medium": fixture_count(&confidence_distribution, "medium")?,
+                "low": fixture_count(&confidence_distribution, "low")?,
+                "unknown": fixture_count(&confidence_distribution, "unknown")?
             },
-            "actionability_distribution": {
-                "specific_guard_missing": 1
-            }
+            "actionability_distribution": actionability_distribution,
+            "unfulfilled_obligation_count": unfulfilled_obligation_count
         });
         fs::write(dir.join("usefulness-telemetry.json"), value.to_string())
             .map_err(|err| format!("write usefulness telemetry failed: {err}"))
+    }
+
+    fn fixture_count(
+        counts: &BTreeMap<&'static str, usize>,
+        key: &'static str,
+    ) -> Result<usize, String> {
+        counts
+            .get(key)
+            .copied()
+            .ok_or_else(|| format!("fixture count map is missing `{key}`"))
+    }
+
+    fn usefulness_fixture_readiness_counts(
+        dir: &Path,
+    ) -> Result<BTreeMap<&'static str, usize>, String> {
+        let repair_queue = parse_json_file(&dir.join("repair-queue.json"))?;
+        let mut readiness_by_card = BTreeMap::<String, String>::new();
+        let buckets = repair_queue
+            .get("buckets")
+            .and_then(serde_json::Value::as_object)
+            .ok_or_else(|| "repair-queue.json fixture must have buckets object".to_string())?;
+        for entries in buckets.values() {
+            let entries = entries
+                .as_array()
+                .ok_or_else(|| "repair-queue.json fixture bucket must be an array".to_string())?;
+            for entry in entries {
+                let card_id = entry
+                    .get("card_id")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        "repair-queue.json fixture entry must have card_id".to_string()
+                    })?;
+                let state = entry
+                    .pointer("/agent_readiness/state")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        "repair-queue.json fixture entry must have agent_readiness.state"
+                            .to_string()
+                    })?;
+                readiness_by_card
+                    .entry(card_id.to_string())
+                    .or_insert_with(|| state.to_string());
+            }
+        }
+        let mut counts = BTreeMap::from([
+            ("ready", 0usize),
+            ("requires_witness_receipt", 0usize),
+            ("needs_human", 0usize),
+            ("unsupported", 0usize),
+        ]);
+        for state in readiness_by_card.values() {
+            let field = match state.as_str() {
+                "ready_for_agent" => "ready",
+                "requires_witness_receipt" => "requires_witness_receipt",
+                "requires_human_review" => "needs_human",
+                "unsupported" => "unsupported",
+                other => {
+                    return Err(format!(
+                        "repair-queue.json fixture has unknown agent_readiness.state `{other}`"
+                    ));
+                }
+            };
+            if let Some(count) = counts.get_mut(field) {
+                *count += 1;
+            }
+        }
+        Ok(counts)
     }
 
     fn write_empty_manual_candidates_artifact(dir: &Path) -> Result<(), String> {

@@ -348,6 +348,7 @@ pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
     check_receipt_audit_json_artifact(dir)?;
     check_policy_report_artifacts(dir, &summary)?;
     check_gate_manifest_artifact(dir, &summary)?;
+    check_usefulness_telemetry_artifact(dir, &summary, &summary.repair_queue_projections)?;
     let manual_repair_queue = check_manual_repair_queue_artifact(dir, &manual_candidates)?;
     check_tokmd_packets_artifact(dir, &manual_candidates, &manual_repair_queue)?;
     check_manual_candidate_front_door_artifacts(dir, &manual_candidates)?;
@@ -1283,6 +1284,190 @@ fn require_gate_artifact_pointer(
         expected,
         &format!("unsafe-review-gate.json artifacts.{key}"),
     )
+}
+
+fn check_usefulness_telemetry_artifact(
+    dir: &Path,
+    summary: &AdvisoryArtifactSummary,
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+) -> Result<(), String> {
+    let path = dir.join("usefulness-telemetry.json");
+    let telemetry = super::parse_json_file(&path)?;
+    super::require_json_str(
+        &telemetry,
+        "schema_version",
+        "usefulness-telemetry/v1",
+        "usefulness-telemetry.json",
+    )?;
+    let boundary = super::require_non_empty_json_str(
+        &telemetry,
+        "trust_boundary",
+        "usefulness-telemetry.json",
+    )?;
+    if !super::text_contains_ignore_ascii_case(boundary, "not calibrated") {
+        return Err(
+            "usefulness-telemetry.json trust_boundary must include `not calibrated`".to_string(),
+        );
+    }
+
+    for (field, expected, source) in [
+        (
+            "total_cards",
+            summary.card_count,
+            "cards.json summary.cards",
+        ),
+        (
+            "actionable_cards",
+            summary.open_actionable_gaps,
+            "cards.json summary.open_actionable_gaps",
+        ),
+        (
+            "new_cards",
+            summary.movement.new_gaps,
+            "cards.json summary.new_gaps",
+        ),
+        (
+            "worsened_cards",
+            summary.movement.worsened_gaps,
+            "cards.json summary.worsened_gaps",
+        ),
+        (
+            "improved_cards",
+            summary.movement.improved_gaps,
+            "cards.json summary.improved_gaps",
+        ),
+        (
+            "resolved_cards",
+            summary.movement.resolved_gaps,
+            "cards.json summary.resolved_gaps",
+        ),
+        (
+            "inherited_cards",
+            summary.movement.inherited_gaps,
+            "cards.json summary.inherited_gaps",
+        ),
+    ] {
+        require_usefulness_card_inventory_count(&telemetry, field, expected, source)?;
+    }
+
+    let comment_plan = super::parse_json_file(&dir.join("comment-plan.json"))?;
+    for (field, pointer, source) in [
+        (
+            "selected_count",
+            "/summary/selected_count",
+            "comment-plan.json summary.selected_count",
+        ),
+        (
+            "not_selected_count",
+            "/summary/not_selected_count",
+            "comment-plan.json summary.not_selected_count",
+        ),
+    ] {
+        let expected = super::json_usize_at(&comment_plan, pointer, "comment-plan.json")?;
+        require_usefulness_comment_selection_count(&telemetry, field, expected, source)?;
+    }
+
+    let readiness_counts = usefulness_readiness_counts(repair_queue_projections)?;
+    for (field, expected) in readiness_counts {
+        require_usefulness_agent_readiness_count(
+            &telemetry,
+            field,
+            expected,
+            "repair-queue.json agent_readiness",
+        )?;
+    }
+
+    Ok(())
+}
+
+fn require_usefulness_card_inventory_count(
+    telemetry: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    require_usefulness_count(
+        telemetry,
+        &format!("/card_inventory/{field}"),
+        &format!("usefulness-telemetry.json card_inventory.{field}"),
+        expected,
+        source,
+    )
+}
+
+fn require_usefulness_comment_selection_count(
+    telemetry: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    require_usefulness_count(
+        telemetry,
+        &format!("/comment_selection/{field}"),
+        &format!("usefulness-telemetry.json comment_selection.{field}"),
+        expected,
+        source,
+    )
+}
+
+fn require_usefulness_agent_readiness_count(
+    telemetry: &serde_json::Value,
+    field: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    require_usefulness_count(
+        telemetry,
+        &format!("/agent_readiness/{field}"),
+        &format!("usefulness-telemetry.json agent_readiness.{field}"),
+        expected,
+        source,
+    )
+}
+
+fn require_usefulness_count(
+    telemetry: &serde_json::Value,
+    pointer: &str,
+    context: &str,
+    expected: usize,
+    source: &str,
+) -> Result<(), String> {
+    let actual = super::json_usize_at(telemetry, pointer, "usefulness-telemetry.json")?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} must project {source} `{expected}`; got `{actual}`"
+        ))
+    }
+}
+
+fn usefulness_readiness_counts(
+    repair_queue_projections: &BTreeMap<String, RepairQueueProjection>,
+) -> Result<BTreeMap<&'static str, usize>, String> {
+    let mut counts = BTreeMap::from([
+        ("ready", 0usize),
+        ("requires_witness_receipt", 0usize),
+        ("needs_human", 0usize),
+        ("unsupported", 0usize),
+    ]);
+    for projection in repair_queue_projections.values() {
+        let field = match projection.readiness_state.as_str() {
+            "ready_for_agent" => "ready",
+            "requires_witness_receipt" => "requires_witness_receipt",
+            "requires_human_review" => "needs_human",
+            "unsupported" => "unsupported",
+            other => {
+                return Err(format!(
+                    "repair-queue.json agent_readiness.state `{other}` cannot be projected into usefulness-telemetry.json"
+                ));
+            }
+        };
+        if let Some(count) = counts.get_mut(field) {
+            *count += 1;
+        }
+    }
+    Ok(counts)
 }
 
 fn check_manual_candidates_artifact(dir: &Path) -> Result<ManualCandidateIndexProjection, String> {
