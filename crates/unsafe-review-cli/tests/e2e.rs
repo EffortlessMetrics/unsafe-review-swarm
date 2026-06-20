@@ -242,6 +242,7 @@ fn pr_alias_accepts_exact_base_and_head_sha_inputs() -> Result<(), Box<dyn Error
 fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
     let repo = exact_pr_fixture_repo("unsafe-review-exact-pr-mismatch-e2e")?;
     let out_dir = repo.temp.path().join("review-kit");
+    let stale_head_sha = "1111111111111111111111111111111111111111";
 
     let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
         .arg("unsafe-review")
@@ -251,7 +252,7 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
         .arg("--base-sha")
         .arg(&repo.base_sha)
         .arg("--head-sha")
-        .arg(&repo.base_sha)
+        .arg(stale_head_sha)
         .arg("--out-dir")
         .arg(&out_dir)
         .output()?;
@@ -273,6 +274,22 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
     assert!(
         stderr.contains("before running pr"),
         "stderr must name the command the user ran: {stderr}"
+    );
+    assert!(
+        stderr.contains("git -C"),
+        "stderr must include a copyable git command: {stderr}"
+    );
+    assert!(
+        stderr.contains("fetch origin"),
+        "stderr must show the exact fetch step: {stderr}"
+    );
+    assert!(
+        stderr.contains(&repo.base_sha) && stderr.contains(stale_head_sha),
+        "stderr must keep exact base/head SHAs visible: {stderr}"
+    );
+    assert!(
+        stderr.contains("checkout --detach"),
+        "stderr must show the detach checkout step: {stderr}"
     );
     assert!(
         !out_dir.join("cards.json").exists(),
@@ -417,6 +434,32 @@ fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> 
         assert!(
             stdout.contains(artifact),
             "first-pr help must list bundle artifact `{artifact}`\nstdout:\n{stdout}"
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("first-pr")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    for expected in [
+        "External PR setup:",
+        "gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid",
+        "git -C /path/to/repo fetch origin <base-sha> <head-sha>",
+        "git -C /path/to/repo checkout --detach <head-sha>",
+        "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
+    ] {
+        assert!(
+            stdout.contains(expected),
+            "first-pr help must include exact external PR setup cue `{expected}`\nstdout:\n{stdout}"
         );
     }
 

@@ -1434,7 +1434,12 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         check.base = Some(detected_base);
     }
     if let Some(expected_head_sha) = &expected_head_sha {
-        validate_expected_head_sha(&check.root, expected_head_sha, terminal_command)?;
+        validate_expected_head_sha(
+            &check.root,
+            check.base.as_deref(),
+            expected_head_sha,
+            terminal_command,
+        )?;
     }
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
@@ -1654,6 +1659,7 @@ fn git_ref_error(base: &str, git_stderr: &str) -> String {
 
 fn validate_expected_head_sha(
     root: &Path,
+    base_ref: Option<&str>,
     expected_head_sha: &str,
     terminal_command: &str,
 ) -> Result<(), String> {
@@ -1665,10 +1671,13 @@ fn validate_expected_head_sha(
         )
     })?;
     if !actual.eq_ignore_ascii_case(expected_head_sha) {
+        let base_ref = base_ref.unwrap_or("<base-sha>");
+        let root_display = root.display();
         Err(format!(
-            "current HEAD in `{}` is {actual}, but --head-sha expected {expected_head_sha}. \
-             Check out the exact external PR head SHA before running {terminal_command}.",
-            root.display()
+            "current HEAD in `{root_display}` is {actual}, but --head-sha expected {expected_head_sha}. \
+             Prepare the exact external PR checkout before running {terminal_command}:\n\
+             \n  git -C \"{root_display}\" fetch origin {base_ref} {expected_head_sha}\n  \
+             git -C \"{root_display}\" checkout --detach {expected_head_sha}"
         ))
     } else if git_dirty_worktree(root).unwrap_or(true) {
         Err(format!(
@@ -2910,6 +2919,12 @@ fn print_first_pr_help() {
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!("  unsafe-review pr --diff change.diff --out-dir target/review");
     println!("  unsafe-review review --base origin/main --max-cards 20");
+    println!();
+    println!("External PR setup:");
+    println!("  gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid");
+    println!("  git -C /path/to/repo fetch origin <base-sha> <head-sha>");
+    println!("  git -C /path/to/repo checkout --detach <head-sha>");
+    println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
