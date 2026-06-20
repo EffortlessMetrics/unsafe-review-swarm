@@ -2891,14 +2891,7 @@ fn print_first_pr_help() {
     println!("  review   alias for first-pr");
     println!();
     println!("What first-pr writes:");
-    println!("- cards.json, pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,");
-    println!(
-        "  witness-plan.md, lsp.json, repair-queue.json, receipt-audit.md, receipt-audit.json,"
-    );
-    println!("  policy-report.json, policy-report.md, manual-candidates.json,");
-    println!(
-        "  manual-repair-queue.json, tokmd-packets.json, review-kit.json, unsafe-review-gate.json"
-    );
+    print_first_pr_artifacts_help();
     println!();
     println!("Options:");
     println!("- --root <dir>    repository or subdirectory to review (default: current directory)");
@@ -2922,6 +2915,12 @@ fn print_first_pr_help() {
     println!(
         "unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
     );
+}
+
+fn print_first_pr_artifacts_help() {
+    for chunk in FIRST_PR_ARTIFACTS.chunks(4) {
+        println!("- {}", chunk.join(", "));
+    }
 }
 
 fn print_pilot_help() {
