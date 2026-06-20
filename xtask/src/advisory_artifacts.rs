@@ -59,12 +59,16 @@ struct CardProjection {
     obligation_evidence: Vec<serde_json::Value>,
     verify_commands: Vec<String>,
     witness_routes: Vec<WitnessRouteProjection>,
-    /// SPEC-0029 coverage block slots (from cards.json coverage_block).
-    /// Empty string when coverage_block is absent from the card JSON.
+    /// SPEC-0029 coverage slots from cards.json coverage.
     contract_coverage: String,
     guard_coverage: String,
     test_reach_coverage: String,
     witness_receipt_coverage: String,
+    manual_context: String,
+    baseline_state: String,
+    outcome_movement: String,
+    comment_plan_status: String,
+    agent_lsp_readiness: String,
 }
 
 struct GateMovementProjection {
@@ -7675,37 +7679,30 @@ fn advisory_card_projections(
             })
             .transpose()?
             .unwrap_or_default();
-        // Read SPEC-0029 coverage block slots if present (SPEC-0032 validation).
-        let (contract_coverage, guard_coverage, test_reach_coverage, witness_receipt_coverage) =
-            if let Some(block) = card.get("coverage_block") {
-                let cc = super::require_non_empty_json_str(
-                    block,
-                    "contract_coverage",
-                    "cards.json card coverage_block",
-                )
-                .map(str::to_string)?;
-                let gc = super::require_non_empty_json_str(
-                    block,
-                    "guard_coverage",
-                    "cards.json card coverage_block",
-                )
-                .map(str::to_string)?;
-                let trc = super::require_non_empty_json_str(
-                    block,
-                    "test_reach_coverage",
-                    "cards.json card coverage_block",
-                )
-                .map(str::to_string)?;
-                let wrc = super::require_non_empty_json_str(
-                    block,
-                    "witness_receipt_coverage",
-                    "cards.json card coverage_block",
-                )
-                .map(str::to_string)?;
-                (cc, gc, trc, wrc)
-            } else {
-                (String::new(), String::new(), String::new(), String::new())
-            };
+        let coverage = card
+            .get("coverage")
+            .ok_or_else(|| "cards.json card is missing coverage".to_string())?;
+        if !coverage.is_object() {
+            return Err("cards.json card coverage must be an object".to_string());
+        }
+        let contract_coverage =
+            coverage_slot(coverage, "contract_coverage", "cards.json card coverage")?;
+        let guard_coverage = coverage_slot(coverage, "guard_coverage", "cards.json card coverage")?;
+        let test_reach_coverage =
+            coverage_slot(coverage, "test_reach_coverage", "cards.json card coverage")?;
+        let witness_receipt_coverage = coverage_slot(
+            coverage,
+            "witness_receipt_coverage",
+            "cards.json card coverage",
+        )?;
+        let manual_context = coverage_slot(coverage, "manual_context", "cards.json card coverage")?;
+        let baseline_state = coverage_slot(coverage, "baseline_state", "cards.json card coverage")?;
+        let outcome_movement =
+            coverage_slot(coverage, "outcome_movement", "cards.json card coverage")?;
+        let comment_plan_status =
+            coverage_slot(coverage, "comment_plan_status", "cards.json card coverage")?;
+        let agent_lsp_readiness =
+            coverage_slot(coverage, "agent_lsp_readiness", "cards.json card coverage")?;
         let projection = CardProjection {
             id,
             class_name,
@@ -7734,6 +7731,11 @@ fn advisory_card_projections(
             guard_coverage,
             test_reach_coverage,
             witness_receipt_coverage,
+            manual_context,
+            baseline_state,
+            outcome_movement,
+            comment_plan_status,
+            agent_lsp_readiness,
         };
         require_card_confirmation_cue_projection(
             card,
@@ -7743,6 +7745,14 @@ fn advisory_card_projections(
         projections.insert(projection.id.clone(), projection);
     }
     Ok(projections)
+}
+
+fn coverage_slot(
+    coverage: &serde_json::Value,
+    field: &str,
+    context: &str,
+) -> Result<String, String> {
+    super::require_non_empty_json_str(coverage, field, context).map(str::to_string)
 }
 
 fn require_card_confirmation_cue_projection(
@@ -8472,37 +8482,22 @@ fn expected_selection_reason(card: &CardProjection) -> String {
 /// Priority: contract_coverage → guard_coverage → test_reach_coverage →
 /// witness_receipt_coverage → fallback.
 fn expected_coverage_gap(card: &CardProjection) -> String {
-    // When coverage_block is absent (e.g. older fixture cards without the
-    // block), fall back to the class-based heuristic.
-    if !card.contract_coverage.is_empty() {
-        if card.contract_coverage != "present" {
-            return format!("contract_coverage: {}", card.contract_coverage);
-        }
-        if card.guard_coverage != "present" {
-            return format!("guard_coverage: {}", card.guard_coverage);
-        }
-        if card.test_reach_coverage != "present" {
-            return format!("test_reach_coverage: {}", card.test_reach_coverage);
-        }
-        if card.witness_receipt_coverage != "present" {
-            return format!(
-                "witness_receipt_coverage: {}",
-                card.witness_receipt_coverage
-            );
-        }
-        return "witness_receipt_coverage: missing".to_string();
+    if card.contract_coverage != "present" {
+        return format!("contract_coverage: {}", card.contract_coverage);
     }
-    // Fallback heuristic when coverage_block is absent.
-    expected_coverage_gap_from_class(&card.class_name)
-}
-
-fn expected_coverage_gap_from_class(class_name: &str) -> String {
-    match class_name {
-        "contract_missing" => "contract_coverage: missing".to_string(),
-        "guard_missing" => "guard_coverage: missing".to_string(),
-        "unsafe_unreached" => "test_reach_coverage: missing".to_string(),
-        _ => "witness_receipt_coverage: missing".to_string(),
+    if card.guard_coverage != "present" {
+        return format!("guard_coverage: {}", card.guard_coverage);
     }
+    if card.test_reach_coverage != "present" {
+        return format!("test_reach_coverage: {}", card.test_reach_coverage);
+    }
+    if card.witness_receipt_coverage != "present" {
+        return format!(
+            "witness_receipt_coverage: {}",
+            card.witness_receipt_coverage
+        );
+    }
+    "witness_receipt_coverage: missing".to_string()
 }
 
 fn expected_selection_reason_code(_card: &CardProjection) -> &'static str {
@@ -9858,7 +9853,8 @@ fn require_lsp_diagnostic_card_projection(
         &card.next_action,
         "lsp.json diagnostic",
     )?;
-    require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")
+    require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")?;
+    require_lsp_diagnostic_coverage_projection(diagnostic, card)
 }
 
 fn require_lsp_diagnostic_severity(
@@ -9875,6 +9871,35 @@ fn require_lsp_diagnostic_severity(
         "lsp.json diagnostic severity must project ReviewClass `{}` value `{expected}`; got `{actual}`",
         card.class_name
     ))
+}
+
+fn require_lsp_diagnostic_coverage_projection(
+    diagnostic: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let coverage = diagnostic
+        .get("coverage")
+        .ok_or_else(|| "lsp.json diagnostic is missing coverage".to_string())?;
+    if !coverage.is_object() {
+        return Err("lsp.json diagnostic coverage must be an object".to_string());
+    }
+    for (field, expected) in [
+        ("contract_coverage", card.contract_coverage.as_str()),
+        ("guard_coverage", card.guard_coverage.as_str()),
+        ("test_reach_coverage", card.test_reach_coverage.as_str()),
+        (
+            "witness_receipt_coverage",
+            card.witness_receipt_coverage.as_str(),
+        ),
+        ("manual_context", card.manual_context.as_str()),
+        ("baseline_state", card.baseline_state.as_str()),
+        ("outcome_movement", card.outcome_movement.as_str()),
+        ("comment_plan_status", card.comment_plan_status.as_str()),
+        ("agent_lsp_readiness", card.agent_lsp_readiness.as_str()),
+    ] {
+        require_projected_str(coverage, field, expected, "lsp.json diagnostic coverage")?;
+    }
+    Ok(())
 }
 
 fn check_lsp_diagnostic_evidence(
@@ -10412,6 +10437,38 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn lsp_diagnostic_coverage_rejects_cards_json_coverage_drift() -> Result<(), String> {
+        let card = minimal_comment_card_projection(
+            "card-1",
+            "unsafe_operation",
+            "owner",
+            "raw_pointer_read",
+        );
+        let diagnostic = serde_json::json!({
+            "coverage": {
+                "contract_coverage": "missing",
+                "guard_coverage": "missing",
+                "test_reach_coverage": "missing",
+                "witness_receipt_coverage": "present",
+                "manual_context": "absent",
+                "baseline_state": "new",
+                "outcome_movement": "regressed",
+                "comment_plan_status": "not_selected",
+                "agent_lsp_readiness": "ready"
+            }
+        });
+
+        let err = err_text(require_lsp_diagnostic_coverage_projection(
+            &diagnostic,
+            &card,
+        ))?;
+        if !err.contains("witness_receipt_coverage") || !err.contains("missing") {
+            return Err(format!("expected coverage drift error; got {err}"));
+        }
+        Ok(())
+    }
+
     fn minimal_comment_card_projection(
         id: &str,
         site_kind: &str,
@@ -10446,6 +10503,11 @@ mod tests {
             guard_coverage: "missing".to_string(),
             test_reach_coverage: "missing".to_string(),
             witness_receipt_coverage: "missing".to_string(),
+            manual_context: "absent".to_string(),
+            baseline_state: "new".to_string(),
+            outcome_movement: "regressed".to_string(),
+            comment_plan_status: "not_selected".to_string(),
+            agent_lsp_readiness: "ready".to_string(),
         }
     }
 
