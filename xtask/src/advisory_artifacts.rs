@@ -1,7 +1,7 @@
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::{Component, Path};
 
-use unsafe_review_core::COMMENT_BODY_WORD_LIMIT as COMMENT_PLAN_BODY_WORD_LIMIT;
+use unsafe_review_core::{COMMENT_BODY_WORD_LIMIT as COMMENT_PLAN_BODY_WORD_LIMIT, ReviewClass};
 
 const GATE_MANIFEST_TRUST_BOUNDARY: &str =
     "static unsafe-review coverage evidence; not proof, not a merge verdict";
@@ -6122,6 +6122,13 @@ fn check_sarif_result_projection<'a>(
             "cards.sarif result ruleId `{rule_id}` is not declared in tool.driver.rules"
         ));
     }
+    let review_class = review_class_from_name(&card_projection.class_name, "cards.sarif result")?;
+    let level = super::require_non_empty_json_str(result, "level", "cards.sarif result")?;
+    require_expected_value(
+        level,
+        review_class.sarif_level(),
+        "cards.sarif result level",
+    )?;
     require_projected_str(
         result
             .pointer("/properties")
@@ -8089,6 +8096,32 @@ fn require_allowed_value(actual: &str, allowed: &[&str], context: &str) -> Resul
     }
 }
 
+fn review_class_from_name(class_name: &str, context: &str) -> Result<ReviewClass, String> {
+    for review_class in [
+        ReviewClass::GuardedAndWitnessed,
+        ReviewClass::GuardedUnwitnessed,
+        ReviewClass::ContractMissing,
+        ReviewClass::GuardMissing,
+        ReviewClass::ReachableUnwitnessed,
+        ReviewClass::UnsafeUnreached,
+        ReviewClass::WitnessMismatch,
+        ReviewClass::RequiresLoom,
+        ReviewClass::RequiresSanitizer,
+        ReviewClass::RequiresKaniOrCrux,
+        ReviewClass::MiriUnsupported,
+        ReviewClass::StaticUnknown,
+        ReviewClass::BaselineKnown,
+        ReviewClass::Suppressed,
+    ] {
+        if review_class.as_str() == class_name {
+            return Ok(review_class);
+        }
+    }
+    Err(format!(
+        "{context} class `{class_name}` is not a known ReviewClass"
+    ))
+}
+
 fn should_project_planned_comment(card: &CardProjection) -> bool {
     class_is_actionable(&card.class_name)
         && comment_surfacing_disposition(card).allows_inline_comment()
@@ -9202,6 +9235,7 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
             "/range/start/line",
         )?;
         require_lsp_diagnostic_card_projection(diagnostic, card_projection)?;
+        require_lsp_diagnostic_severity(diagnostic, card_projection)?;
         super::json_array_at(
             diagnostic,
             "/required_safety_conditions",
@@ -9562,6 +9596,22 @@ fn require_lsp_diagnostic_card_projection(
         "lsp.json diagnostic",
     )?;
     require_projected_string_array(diagnostic, "hazards", &card.hazards, "lsp.json diagnostic")
+}
+
+fn require_lsp_diagnostic_severity(
+    diagnostic: &serde_json::Value,
+    card: &CardProjection,
+) -> Result<(), String> {
+    let actual = super::json_usize_at(diagnostic, "/severity", "lsp.json diagnostic")?;
+    let review_class = review_class_from_name(&card.class_name, "lsp.json diagnostic")?;
+    let expected = review_class.lsp_severity();
+    if actual == expected {
+        return Ok(());
+    }
+    Err(format!(
+        "lsp.json diagnostic severity must project ReviewClass `{}` value `{expected}`; got `{actual}`",
+        card.class_name
+    ))
 }
 
 fn check_lsp_diagnostic_evidence(

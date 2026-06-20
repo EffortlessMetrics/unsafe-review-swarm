@@ -56,6 +56,11 @@ the static-review trust boundary. Diagnostic data must include the operation
 identity, required safety conditions, obligation-level evidence states, missing
 evidence, witness routes, and verify commands.
 
+Diagnostic `severity` is a ReviewClass projection. It must use the same class
+table as SARIF `level`, must not be derived from priority, operation family,
+baseline state, or comment eligibility, and must not emit LSP `Error` severity
+for the default advisory projection.
+
 ## Non-goals
 
 - no soundness claim
