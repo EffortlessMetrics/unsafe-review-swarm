@@ -118,25 +118,24 @@ unsafe-review pr --root /path/to/repo --base origin/main
 ```
 
 For a public GitHub PR that is not checked out as the current branch, capture the
-exact base/head SHAs, write a local patch with Git, and pass that file to
-`--diff`:
+exact base/head SHAs, fetch them, check out the head, and ask `unsafe-review` to
+validate that the checkout matches before it analyzes:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
 git -C /path/to/repo fetch origin <base-sha> <head-sha>
 git -C /path/to/repo checkout --detach <head-sha>
-git -C /path/to/repo diff --no-ext-diff --binary \
-  --output=/absolute/path/to/unsafe-review-pr827.diff \
-  <base-sha> <head-sha>
 unsafe-review pr \
   --root /path/to/repo \
-  --diff /absolute/path/to/unsafe-review-pr827.diff \
+  --base-sha <base-sha> \
+  --head-sha <head-sha> \
   --out-dir target/unsafe-review
 ```
 
 This avoids rendered GitHub diffs and shell-redirection encoding surprises on
-Windows. A saved patch should still contain `diff --git`, `---`, `+++`, and
-`@@` lines.
+Windows. If you need a saved patch file instead, let Git write it with
+`git diff --output=<path>` and pass that file to `--diff`; a valid saved patch
+should still contain `diff --git`, `---`, `+++`, and `@@` lines.
 
 For a deterministic smoke case, run the bundled fixture from a repo checkout:
 

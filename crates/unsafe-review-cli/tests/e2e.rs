@@ -196,6 +196,137 @@ fn pr_alias_with_explicit_flags_produces_same_bundle_as_first_pr() -> Result<(),
 }
 
 #[test]
+fn pr_alias_accepts_exact_base_and_head_sha_inputs() -> Result<(), Box<dyn Error>> {
+    let repo = exact_pr_fixture_repo("unsafe-review-exact-pr-e2e")?;
+    let out_dir = repo.temp.path().join("review-kit");
+
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("pr")
+            .arg("--root")
+            .arg(&repo.root)
+            .arg("--base-sha")
+            .arg(&repo.base_sha)
+            .arg("--head-sha")
+            .arg(&repo.head_sha)
+            .arg("--out-dir")
+            .arg(&out_dir),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.starts_with("unsafe-review pr\n"),
+        "exact SHA PR path must preserve the pr entrypoint label: {stdout}"
+    );
+    let cards_text = fs::read_to_string(out_dir.join("cards.json"))?;
+    let cards: Value = serde_json::from_str(&cards_text)?;
+    assert_eq!(cards["scope"], "diff");
+    assert_eq!(cards["provenance"]["base_sha"], repo.base_sha);
+    assert_eq!(cards["provenance"]["head_sha"], repo.head_sha);
+    let families = cards["cards"]
+        .as_array()
+        .ok_or_else(|| "cards.json cards field must be an array".to_string())?
+        .iter()
+        .filter_map(|card| card["operation_family"].as_str())
+        .collect::<Vec<_>>();
+    assert!(
+        families.contains(&"raw_pointer_deref"),
+        "exact SHA path must preserve normal analyzer output; families={families:?}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
+    let repo = exact_pr_fixture_repo("unsafe-review-exact-pr-mismatch-e2e")?;
+    let out_dir = repo.temp.path().join("review-kit");
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .arg("--root")
+        .arg(&repo.root)
+        .arg("--base-sha")
+        .arg(&repo.base_sha)
+        .arg("--head-sha")
+        .arg(&repo.base_sha)
+        .arg("--out-dir")
+        .arg(&out_dir)
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "stale exact-head input must fail before analysis"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "exact-head mismatch must be a tool/input error"
+    );
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stderr.contains("--head-sha expected"),
+        "stderr must name the expected head SHA mismatch: {stderr}"
+    );
+    assert!(
+        stderr.contains("before running pr"),
+        "stderr must name the command the user ran: {stderr}"
+    );
+    assert!(
+        !out_dir.join("cards.json").exists(),
+        "stale exact-head input must not write PR artifacts"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_alias_rejects_dirty_worktree_with_exact_head_sha() -> Result<(), Box<dyn Error>> {
+    let repo = exact_pr_fixture_repo("unsafe-review-exact-pr-dirty-e2e")?;
+    let out_dir = repo.temp.path().join("review-kit");
+    fs::write(
+        repo.root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr.add(1) }\n}\n",
+    )?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .arg("--root")
+        .arg(&repo.root)
+        .arg("--base-sha")
+        .arg(&repo.base_sha)
+        .arg("--head-sha")
+        .arg(&repo.head_sha)
+        .arg("--out-dir")
+        .arg(&out_dir)
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "dirty exact-head worktree must fail before analysis"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "dirty exact-head worktree must be a tool/input error"
+    );
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stderr.contains("dirty worktree"),
+        "stderr must explain that exact-head mode requires a clean worktree: {stderr}"
+    );
+    assert!(
+        !out_dir.join("cards.json").exists(),
+        "dirty exact-head input must not write PR artifacts"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn pr_alias_auto_detect_unresolved_base_prints_actionable_error() -> Result<(), Box<dyn Error>> {
     // When `pr` is run without explicit flags from a directory that is not
     // inside a git repository, the error must name the exact command to run
@@ -566,6 +697,67 @@ fn fixture_root(name: &str) -> PathBuf {
     PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")
         .join(name)
+}
+
+struct ExactPrFixtureRepo {
+    temp: TempDir,
+    root: PathBuf,
+    base_sha: String,
+    head_sha: String,
+}
+
+fn exact_pr_fixture_repo(prefix: &str) -> Result<ExactPrFixtureRepo, Box<dyn Error>> {
+    let temp = TempDir::new(prefix)?;
+    let root = temp.path().join("repo");
+    fs::create_dir_all(root.join("src"))?;
+    run_git(&root, &["init"])?;
+    run_git(
+        &root,
+        &["config", "user.email", "unsafe-review@example.test"],
+    )?;
+    run_git(&root, &["config", "user.name", "unsafe-review test"])?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"exact-pr-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), "pub fn read_byte() -> u8 { 0 }\n")?;
+    run_git(&root, &["add", "."])?;
+    run_git(&root, &["commit", "-m", "base"])?;
+    let base_sha = run_git(&root, &["rev-parse", "HEAD"])?;
+
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "."])?;
+    run_git(&root, &["commit", "-m", "head"])?;
+    let head_sha = run_git(&root, &["rev-parse", "HEAD"])?;
+
+    Ok(ExactPrFixtureRepo {
+        temp,
+        root,
+        base_sha,
+        head_sha,
+    })
+}
+
+fn run_git(repo: &Path, args: &[&str]) -> Result<String, Box<dyn Error>> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(repo)
+        .args(args)
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {:?} failed with status {:?}\nstdout:\n{}\nstderr:\n{}",
+            args,
+            output.status.code(),
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?.trim().to_string())
 }
 
 struct TempDir {

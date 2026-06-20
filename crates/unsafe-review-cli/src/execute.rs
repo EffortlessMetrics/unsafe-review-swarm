@@ -1418,6 +1418,7 @@ fn detect_default_base(repo_root: &Path) -> Result<String, String> {
 
 fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let terminal_command = options.entrypoint.terminal_command();
+    let expected_head_sha = options.expected_head_sha;
     let mut check = options.check;
     check.policy = PolicyMode::Advisory;
     // When the caller requested auto-detection (i.e. `unsafe-review pr` with no
@@ -1431,6 +1432,9 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         let detected_base = detect_default_base(&detected_root)?;
         check.root = detected_root;
         check.base = Some(detected_base);
+    }
+    if let Some(expected_head_sha) = &expected_head_sha {
+        validate_expected_head_sha(&check.root, expected_head_sha, terminal_command)?;
     }
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
@@ -1645,6 +1649,36 @@ fn git_ref_error(base: &str, git_stderr: &str) -> String {
         )
     } else {
         format!("git diff failed: {git_stderr}")
+    }
+}
+
+fn validate_expected_head_sha(
+    root: &Path,
+    expected_head_sha: &str,
+    terminal_command: &str,
+) -> Result<(), String> {
+    let actual = git_rev_parse(root, "HEAD").ok_or_else(|| {
+        format!(
+            "could not resolve HEAD in `{}` for --head-sha validation. \
+             Fetch and check out the external PR head SHA, or use --diff <file>.",
+            root.display()
+        )
+    })?;
+    if !actual.eq_ignore_ascii_case(expected_head_sha) {
+        Err(format!(
+            "current HEAD in `{}` is {actual}, but --head-sha expected {expected_head_sha}. \
+             Check out the exact external PR head SHA before running {terminal_command}.",
+            root.display()
+        ))
+    } else if git_dirty_worktree(root).unwrap_or(true) {
+        Err(format!(
+            "dirty worktree in `{}` is not allowed with --head-sha. \
+             Commit, stash, or discard local changes before running {terminal_command}, \
+             or use --diff <file> for a saved patch input.",
+            root.display()
+        ))
+    } else {
+        Ok(())
     }
 }
 
@@ -2849,7 +2883,7 @@ fn print_first_pr_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review first-pr [--root .] [--base origin/main | --diff <file|->] \
+        "  unsafe-review first-pr [--root .] [--base origin/main | --base-sha <sha> [--head-sha <sha>] | --diff <file|->] \
          [--out-dir target/unsafe-review] [--max-cards <N>]"
     );
     println!();
@@ -2869,12 +2903,18 @@ fn print_first_pr_help() {
     println!("Options:");
     println!("- --root <dir>    repository or subdirectory to review (default: current directory)");
     println!("- --base <ref>    git ref to diff against HEAD (default: origin/main)");
+    println!("- --base-sha <sha> exact 40-hex base commit SHA for an external PR");
+    println!(
+        "- --head-sha <sha> exact 40-hex expected HEAD SHA; validates the checkout before analysis"
+    );
     println!("- --diff <file|-> read diff from a file or stdin instead of --base");
     println!("- --out-dir <dir> directory for all artifacts (default: target/unsafe-review)");
     println!("- --max-cards <N> stop collecting after N cards");
     println!();
     println!("Examples:");
     println!("  unsafe-review pr");
+    println!("  unsafe-review pr --base origin/main");
+    println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!("  unsafe-review pr --diff change.diff --out-dir target/review");
     println!("  unsafe-review review --base origin/main --max-cards 20");
     println!();
@@ -3229,7 +3269,7 @@ fn print_help() {
     );
     println!("  pr      first-run PR review bundle: auto-detects root and base ref");
     println!(
-        "  first-pr [--root .] [--base origin/main|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
+        "  first-pr [--root .] [--base origin/main|--base-sha SHA [--head-sha SHA]|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
     );
     println!("  review  alias for first-pr");
     println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");

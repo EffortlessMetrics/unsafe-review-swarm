@@ -108,9 +108,16 @@ cards, record it as a named limitation in the dogfood handoff or objective audit
 instead of counting it as an active corpus target. A zero-card result is not
 evidence that the PR is safe.
 
-When capturing a raw GitHub PR diff for product input, fetch the exact base/head
-SHAs into a local checkout and use `git diff --output=<path>` so the saved file
-is not shaped by the shell:
+When running a real PR from exact product input, fetch the exact base/head SHAs
+into a local checkout and run:
+
+```bash
+unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
+```
+
+The tool validates the checked-out head before analysis. If a dogfood target
+needs a saved raw diff, use `git diff --output=<path>` so the saved file is not
+shaped by the shell:
 
 ```bash
 rtk proxy git -C target/dogfood-work/hashbrown diff --no-ext-diff --binary \
