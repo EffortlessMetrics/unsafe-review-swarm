@@ -103,11 +103,6 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
             path_display_fwd(&out_dir.join("repair-queue.json"))
         ),
     );
-    assert_contains(&stdout, "Audit saved receipts:");
-    assert_contains(
-        &stdout,
-        "saved receipt metadata only; unsafe-review did not run a witness",
-    );
     assert_contains(&stdout, "Top card:");
     assert_contains(&stdout, "src/lib.rs:8 `raw_pointer_read`");
     assert_contains(&stdout, "Class: `guard_missing`");
@@ -123,6 +118,27 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &format!("unsafe-review context --root {}", fixture.display()),
     );
     assert_contains(&stdout, "--json");
+    assert_contains(&stdout, "Audit saved receipts:");
+    assert_contains(
+        &stdout,
+        "saved receipt metadata only; unsafe-review did not run a witness",
+    );
+    assert_contains(&stdout, "Manual candidates:");
+    assert_contains(
+        &stdout,
+        &format!(
+            "{} (0; manual/advisory sidecar, not analyzer ReviewCards)",
+            path_display_fwd(&out_dir.join("manual-candidates.json"))
+        ),
+    );
+    assert!(
+        !stdout.contains("Manual candidate queue preview:"),
+        "zero manual candidates should not print a queue preview:\n{stdout}"
+    );
+    assert_order(&stdout, "Top card:", "Audit saved receipts:");
+    assert_order(&stdout, "Audit saved receipts:", "Policy report:");
+    assert_order(&stdout, "Policy report:", "Manual candidates:");
+    assert_order(&stdout, "Manual candidates:", "Artifacts:");
     assert_contains(&stdout, "Artifacts:");
     assert_contains(&stdout, &path_display_fwd(&out_dir.join("review-kit.json")));
     assert_contains(
@@ -752,6 +768,15 @@ fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),
         "expected stdout to contain `{needle}`\nstdout:\n{haystack}"
+    );
+}
+
+fn assert_order(haystack: &str, before: &str, after: &str) {
+    let before_idx = haystack.find(before);
+    let after_idx = haystack.find(after);
+    assert!(
+        matches!((before_idx, after_idx), (Some(left), Some(right)) if left < right),
+        "expected `{before}` to appear before `{after}`\nstdout:\n{haystack}"
     );
 }
 
