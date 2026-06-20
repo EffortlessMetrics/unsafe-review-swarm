@@ -1366,6 +1366,21 @@ fn check_usefulness_telemetry_artifact(
         let expected = super::json_usize_at(&comment_plan, pointer, "comment-plan.json")?;
         require_usefulness_comment_selection_count(&telemetry, field, expected, source)?;
     }
+    let not_selected_histograms = usefulness_not_selected_histograms(&comment_plan)?;
+    require_usefulness_histogram(
+        &telemetry,
+        "/comment_selection/not_selected_reason_histogram",
+        "usefulness-telemetry.json comment_selection.not_selected_reason_histogram",
+        &not_selected_histograms.reason,
+        "comment-plan.json not_selected[].reason_code",
+    )?;
+    require_usefulness_histogram(
+        &telemetry,
+        "/comment_selection/not_selected_class_histogram",
+        "usefulness-telemetry.json comment_selection.not_selected_class_histogram",
+        &not_selected_histograms.class,
+        "comment-plan.json not_selected[].reason_code/class",
+    )?;
 
     let readiness_counts = usefulness_readiness_counts(repair_queue_projections)?;
     for (field, expected) in readiness_counts {
@@ -1438,6 +1453,69 @@ fn require_usefulness_count(
     } else {
         Err(format!(
             "{context} must project {source} `{expected}`; got `{actual}`"
+        ))
+    }
+}
+
+struct UsefulnessNotSelectedHistograms {
+    reason: BTreeMap<String, usize>,
+    class: BTreeMap<String, usize>,
+}
+
+fn usefulness_not_selected_histograms(
+    comment_plan: &serde_json::Value,
+) -> Result<UsefulnessNotSelectedHistograms, String> {
+    let mut reason = BTreeMap::<String, usize>::new();
+    let mut class = BTreeMap::<String, usize>::new();
+    let Some(not_selected) = comment_plan.get("not_selected") else {
+        return Ok(UsefulnessNotSelectedHistograms { reason, class });
+    };
+    let Some(not_selected) = not_selected.as_array() else {
+        return Err("comment-plan.json not_selected must be an array".to_string());
+    };
+    for entry in not_selected {
+        let reason_code = super::require_non_empty_json_str(
+            entry,
+            "reason_code",
+            "comment-plan.json not_selected",
+        )?;
+        let class_name =
+            super::require_non_empty_json_str(entry, "class", "comment-plan.json not_selected")?;
+        *reason.entry(reason_code.to_string()).or_insert(0) += 1;
+        *class
+            .entry(format!("{reason_code}/{class_name}"))
+            .or_insert(0) += 1;
+    }
+    Ok(UsefulnessNotSelectedHistograms { reason, class })
+}
+
+fn require_usefulness_histogram(
+    telemetry: &serde_json::Value,
+    pointer: &str,
+    context: &str,
+    expected: &BTreeMap<String, usize>,
+    source: &str,
+) -> Result<(), String> {
+    let value = telemetry
+        .pointer(pointer)
+        .ok_or_else(|| format!("{context} is missing"))?;
+    let Some(object) = value.as_object() else {
+        return Err(format!("{context} must be an object"));
+    };
+    let mut actual = BTreeMap::<String, usize>::new();
+    for (key, value) in object {
+        let Some(count) = value.as_u64() else {
+            return Err(format!("{context}.{key} must be an integer count"));
+        };
+        let count = usize::try_from(count)
+            .map_err(|err| format!("{context}.{key} count is out of range: {err}"))?;
+        actual.insert(key.clone(), count);
+    }
+    if &actual == expected {
+        Ok(())
+    } else {
+        Err(format!(
+            "{context} must project {source} `{expected:?}`; got `{actual:?}`"
         ))
     }
 }
@@ -10281,6 +10359,57 @@ mod tests {
             Ok(_) => Err("expected error".to_string()),
             Err(err) => Ok(err),
         }
+    }
+
+    #[test]
+    fn usefulness_telemetry_verifier_rejects_not_selected_histogram_drift() -> Result<(), String> {
+        let comment_plan = serde_json::json!({
+            "not_selected": [{
+                "reason_code": "covered_by_specific_operation_card",
+                "class": "contract_missing"
+            }]
+        });
+        let histograms = usefulness_not_selected_histograms(&comment_plan)?;
+        if histograms
+            .reason
+            .get("covered_by_specific_operation_card")
+            .copied()
+            != Some(1)
+        {
+            return Err("reason histogram did not derive expected not_selected count".to_string());
+        }
+        if histograms
+            .class
+            .get("covered_by_specific_operation_card/contract_missing")
+            .copied()
+            != Some(1)
+        {
+            return Err("class histogram did not derive expected not_selected count".to_string());
+        }
+
+        let telemetry = serde_json::json!({
+            "comment_selection": {
+                "not_selected_reason_histogram": {
+                    "covered_by_specific_operation_card": 1
+                },
+                "not_selected_class_histogram": {
+                    "covered_by_specific_operation_card/guard_missing": 1
+                }
+            }
+        });
+        let err = err_text(require_usefulness_histogram(
+            &telemetry,
+            "/comment_selection/not_selected_class_histogram",
+            "usefulness-telemetry.json comment_selection.not_selected_class_histogram",
+            &histograms.class,
+            "comment-plan.json not_selected[].reason_code/class",
+        ))?;
+        if !err.contains("not_selected_class_histogram")
+            || !err.contains("covered_by_specific_operation_card/contract_missing")
+        {
+            return Err(format!("expected class histogram drift error; got {err}"));
+        }
+        Ok(())
     }
 
     fn minimal_comment_card_projection(

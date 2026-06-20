@@ -23814,6 +23814,7 @@ review_after = "2026-08-01"
             }
         }
         let readiness_counts = usefulness_fixture_readiness_counts(dir)?;
+        let not_selected_histograms = usefulness_fixture_not_selected_histograms(&comment_plan)?;
         let value = serde_json::json!({
             "schema_version": "usefulness-telemetry/v1",
             "trust_boundary": "operational diagnostic usefulness only — not calibrated, not a measurement of detection accuracy, not a memory guarantee, not a soundness guarantee, not a gate, and not a merge verdict; all telemetry is projected from ReviewCard/Summary/CoverageBlock/CommentPlan fields deterministically",
@@ -23844,7 +23845,8 @@ review_after = "2026-08-01"
             "comment_selection": {
                 "selected_count": json_usize_at(&comment_plan, "/summary/selected_count", "comment-plan.json")?,
                 "not_selected_count": json_usize_at(&comment_plan, "/summary/not_selected_count", "comment-plan.json")?,
-                "not_selected_reason_histogram": {}
+                "not_selected_reason_histogram": not_selected_histograms.reason,
+                "not_selected_class_histogram": not_selected_histograms.class
             },
             "confidence_distribution": {
                 "high": fixture_count(&confidence_distribution, "high")?,
@@ -23857,6 +23859,43 @@ review_after = "2026-08-01"
         });
         fs::write(dir.join("usefulness-telemetry.json"), value.to_string())
             .map_err(|err| format!("write usefulness telemetry failed: {err}"))
+    }
+
+    fn usefulness_fixture_not_selected_histograms(
+        comment_plan: &serde_json::Value,
+    ) -> Result<UsefulnessFixtureNotSelectedHistograms, String> {
+        let mut reason = BTreeMap::<String, usize>::new();
+        let mut class = BTreeMap::<String, usize>::new();
+        if let Some(not_selected) = comment_plan.get("not_selected") {
+            let not_selected = not_selected.as_array().ok_or_else(|| {
+                "comment-plan.json fixture not_selected must be an array".to_string()
+            })?;
+            for entry in not_selected {
+                let reason_code = entry
+                    .get("reason_code")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        "comment-plan.json fixture not_selected entry must have reason_code"
+                            .to_string()
+                    })?;
+                let class_name = entry
+                    .get("class")
+                    .and_then(serde_json::Value::as_str)
+                    .ok_or_else(|| {
+                        "comment-plan.json fixture not_selected entry must have class".to_string()
+                    })?;
+                *reason.entry(reason_code.to_string()).or_insert(0) += 1;
+                *class
+                    .entry(format!("{reason_code}/{class_name}"))
+                    .or_insert(0) += 1;
+            }
+        }
+        Ok(UsefulnessFixtureNotSelectedHistograms { reason, class })
+    }
+
+    struct UsefulnessFixtureNotSelectedHistograms {
+        reason: BTreeMap<String, usize>,
+        class: BTreeMap<String, usize>,
     }
 
     fn fixture_count(

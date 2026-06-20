@@ -43,10 +43,10 @@ surfaces — not the quality or correctness of those findings. Specifically:
 `usefulness-telemetry.json` is emitted alongside all other `first-pr` artifacts.
 The first-pr artifact verifier cross-checks its summary projections against the
 canonical bundle sources: `card_inventory` must match `cards.json` summary
-movement counts, `comment_selection` must match `comment-plan.json` summary
-counts, and `agent_readiness` must match the checked `repair-queue.json`
-readiness projection. A telemetry drift is an artifact-integrity failure, not an
-unsafe-code policy result.
+movement counts, `comment_selection` counts and not-selected histograms must
+match `comment-plan.json`, and `agent_readiness` must match the checked
+`repair-queue.json` readiness projection. A telemetry drift is an
+artifact-integrity failure, not an unsafe-code policy result.
 
 ### Schema version
 
