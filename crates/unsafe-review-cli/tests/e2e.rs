@@ -135,7 +135,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         !stdout.contains("Manual candidate queue preview:"),
         "zero manual candidates should not print a queue preview:\n{stdout}"
     );
-    assert_order(&stdout, "Top card:", "Manual candidates:");
+    assert_order(&stdout, "Top card:", "Audit saved receipts:");
+    assert_order(&stdout, "Audit saved receipts:", "Policy report:");
+    assert_order(&stdout, "Policy report:", "Manual candidates:");
+    assert_order(&stdout, "Manual candidates:", "Artifacts:");
     assert_contains(&stdout, "Artifacts:");
     assert_contains(&stdout, &path_display_fwd(&out_dir.join("review-kit.json")));
     assert_contains(
