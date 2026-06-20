@@ -16,6 +16,17 @@
     {
       "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
       "code": "contract_missing",
+      "coverage": {
+        "agent_lsp_readiness": "needs_human",
+        "baseline_state": "new",
+        "comment_plan_status": "not_eligible",
+        "contract_coverage": "missing",
+        "guard_coverage": "present",
+        "manual_context": "absent",
+        "outcome_movement": "regressed",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing"
+      },
       "evidence_summary": {
         "contract": {
           "present": false,

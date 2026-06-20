@@ -1,6 +1,12 @@
 use crate::api::{AnalyzeOutput, Scope};
-use crate::domain::{EvidenceState, ObligationEvidence, Priority, ReviewCard, WitnessRoute};
-use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
+use crate::domain::{
+    CommentPlanStatus, CoverageBlock, EvidenceState, ObligationEvidence, Priority, ReviewCard,
+    WitnessRoute,
+};
+use crate::output::{
+    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, agent::card_has_scoped_repairs, comment_plan,
+};
+use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::{Deserialize, Serialize};
 
@@ -95,6 +101,7 @@ struct LspProjection<'a> {
 
 impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     fn from(output: &'a AnalyzeOutput) -> Self {
+        let statuses = comment_plan::card_statuses(output);
         Self {
             schema_version: &output.schema_version,
             tool: &output.tool,
@@ -102,7 +109,18 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             policy: output.policy.as_str(),
             scope: scope_label(output),
             status: status_for(output),
-            diagnostics: output.cards.iter().map(LspDiagnostic::from).collect(),
+            diagnostics: output
+                .cards
+                .iter()
+                .map(|card| {
+                    let status = statuses
+                        .get(&card.id)
+                        .copied()
+                        .unwrap_or(CommentPlanStatus::NotEligible);
+                    let snapshot = output.coverage_snapshot.get(&card.id.0);
+                    LspDiagnostic::from_with_status(card, status, snapshot)
+                })
+                .collect(),
             hovers: output.cards.iter().map(LspHover::from).collect(),
             code_actions: output
                 .cards
@@ -134,11 +152,31 @@ struct LspDiagnostic<'a> {
     next_action: &'a str,
     witness_routes: Vec<LspWitnessRoute<'a>>,
     verify_commands: &'a [String],
+    coverage: LspCoverageBlock,
     trust_boundary: &'static str,
 }
 
-impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
+impl<'a> LspDiagnostic<'a> {
+    fn from_with_status(
+        card: &'a ReviewCard,
+        comment_plan_status: CommentPlanStatus,
+        snapshot: Option<&SnapshotCoverage>,
+    ) -> Self {
+        let mut coverage_block = card.coverage_block();
+        coverage_block.comment_plan_status = comment_plan_status;
+        if let Some(snap) = snapshot {
+            coverage_block.apply_snapshot_slots(
+                &snap.contract_coverage,
+                &snap.guard_coverage,
+                &snap.test_reach_coverage,
+                &snap.witness_receipt_coverage,
+            );
+        }
+        coverage_block.agent_lsp_readiness = crate::domain::coverage::compute_agent_lsp_readiness(
+            card,
+            card_has_scoped_repairs(card),
+        )
+        .state;
         Self {
             card_id: &card.id.0,
             path: path_display(&card.site.location.file),
@@ -177,7 +215,37 @@ impl<'a> From<&'a ReviewCard> for LspDiagnostic<'a> {
             next_action: &card.next_action.summary,
             witness_routes: card.routes.iter().map(LspWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
+            coverage: LspCoverageBlock::from(coverage_block),
             trust_boundary: TRUST_BOUNDARY,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct LspCoverageBlock {
+    contract_coverage: &'static str,
+    guard_coverage: &'static str,
+    test_reach_coverage: &'static str,
+    witness_receipt_coverage: &'static str,
+    manual_context: &'static str,
+    baseline_state: &'static str,
+    outcome_movement: &'static str,
+    comment_plan_status: &'static str,
+    agent_lsp_readiness: &'static str,
+}
+
+impl From<CoverageBlock> for LspCoverageBlock {
+    fn from(block: CoverageBlock) -> Self {
+        Self {
+            contract_coverage: block.contract_coverage.as_str(),
+            guard_coverage: block.guard_coverage.as_str(),
+            test_reach_coverage: block.test_reach_coverage.as_str(),
+            witness_receipt_coverage: block.witness_receipt_coverage.as_str(),
+            manual_context: block.manual_context.as_str(),
+            baseline_state: block.baseline_state.as_str(),
+            outcome_movement: block.outcome_movement.as_str(),
+            comment_plan_status: block.comment_plan_status.as_str(),
+            agent_lsp_readiness: block.agent_lsp_readiness.as_str(),
         }
     }
 }

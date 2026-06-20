@@ -21060,11 +21060,15 @@ Snapshot reports:
         let dir = unique_temp_dir("unsafe-review-first-pr-lsp-obligation-evidence")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
         fs::write(
-            dir.join("lsp.json"),
+            &lsp_path,
             r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"severity":2,"code":"guard_missing","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","proof_path":"source_route_only","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","hazards":["alignment"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","path":"src/lib.rs","position":{"line":6,"character":0},"contents":"Card: `card-1`\n\nRelevant hazard families:\n- `alignment`\n\nTrust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","proof_path":"source_route_only","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","proof_path":"source_route_only","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
+        let mut lsp = parse_json_file(&lsp_path)?;
+        lsp["diagnostics"][0]["coverage"] = lsp_fixture_coverage();
+        fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -22515,6 +22519,7 @@ Snapshot reports:
         fs::write(&cards_path, cards.to_string())
             .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&cards_path)?;
+        add_coverage_to_cards(&cards_path)?;
 
         let pr_summary_path = dir.join("pr-summary.md");
         let pr_summary = fs::read_to_string(&pr_summary_path)
@@ -25148,6 +25153,59 @@ review_after = "2026-08-01"
             .map_err(|err| format!("write comment plan failed: {err}"))
     }
 
+    fn add_coverage_to_cards(path: &Path) -> Result<(), String> {
+        let mut value = parse_json_file(path)?;
+        let cards = value
+            .get_mut("cards")
+            .and_then(serde_json::Value::as_array_mut)
+            .ok_or_else(|| "cards fixture cards must be an array".to_string())?;
+        for card in cards {
+            let class_name = card
+                .get("class")
+                .and_then(serde_json::Value::as_str)
+                .ok_or_else(|| "cards fixture card class must be a string".to_string())?;
+            let operation_family = card
+                .get("operation_family")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let card_id = card
+                .get("id")
+                .and_then(serde_json::Value::as_str)
+                .unwrap_or_default();
+            let (contract, guard, test_reach, witness) = match class_name {
+                "contract_missing" => ("missing", "missing", "missing", "missing"),
+                "guard_missing" => ("present", "missing", "missing", "missing"),
+                "unsafe_unreached" => ("present", "present", "missing", "missing"),
+                "guarded_unwitnessed" | "reachable_unwitnessed" => {
+                    ("present", "present", "present", "missing")
+                }
+                _ => ("present", "present", "present", "missing"),
+            };
+            let comment_plan_status = if card_id == "card-2" {
+                "not_selected"
+            } else {
+                "selected"
+            };
+            let agent_lsp_readiness = if operation_family == "unsafe_declaration" {
+                "needs_human"
+            } else {
+                "ready"
+            };
+            card["coverage"] = serde_json::json!({
+                "contract_coverage": contract,
+                "guard_coverage": guard,
+                "test_reach_coverage": test_reach,
+                "witness_receipt_coverage": witness,
+                "manual_context": "absent",
+                "baseline_state": "new",
+                "outcome_movement": "regressed",
+                "comment_plan_status": comment_plan_status,
+                "agent_lsp_readiness": agent_lsp_readiness
+            });
+        }
+        fs::write(path, value.to_string()).map_err(|err| format!("write cards failed: {err}"))
+    }
+
     fn coverage_gap_for_fixture_class(class: &str) -> &'static str {
         match class {
             "contract_missing" => "contract_coverage: missing",
@@ -25370,6 +25428,7 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
+        add_coverage_to_cards(&dir.join("cards.json"))?;
         fs::write(
             dir.join("pr-summary.md"),
             "- Scope: `diff`\n- Review cards: 1\n- Open actionable gaps: 1\n- Policy mode: `advisory`\n\n## Top card\n\n- ID: `card-1`\n- Class: `guard_missing`\n- Proof path: `source_route_only`\n- Location: src/lib.rs:7\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n- Operation family: `raw_pointer_read`\n- Proof path: `source_route_only`\n- Hypothesis to confirm: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n- Build/run this first: Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route\n- Minimal repro cue:\n  - Confirm ReviewCard `card-1` still maps to `unsafe { ptr.cast::<Header>().read() }` at `src/lib.rs:7:5` before upgrading confidence.\n  - Build/run `cargo +nightly miri test card` as the smallest available command for this card.\n  - Attach a matching receipt only if that run confirms the same route and ReviewCard identity.\n  - Limitation: Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.\n- Missing evidence: No missing evidence recorded\n- Primary route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n- Next action: Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n- Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n- Explain: `unsafe-review explain card-1`\n- Agent context: `unsafe-review context card-1 --json`\n- Agent handoff: `ready_for_agent`; buckets: `repairable_by_guard`, `requires_witness_receipt`; bucket reasons: `guard_evidence_missing`, `witness_receipt_missing`; readiness reasons: specific operation family\n\n## Card table\n\n| ID | Class | Proof path | Location | Operation family | Operation | Missing evidence | Route | Next action |\n|---|---|---|---|---|---|---|---|---|\n| `card-1` | `guard_missing` | `source_route_only` | src/lib.rs:7 | `raw_pointer_read` | `unsafe { ptr.cast::<Header>().read() }` | No missing evidence recorded | `miri` | Add or expose the local guard that discharges the `raw_pointer_read` safety obligation. |\n\n## Witness plan\n\n- `card-1` hypothesis: static `guard_missing` ReviewCard for `unsafe { ptr.cast::<Header>().read() }`; confirm with external evidence before treating it as observed runtime behavior\n  - Confirmation step: build/run `cargo +nightly miri test card` first for this card, then attach a matching receipt if it confirms the route\n  - Build/run this first: Build/run `cargo +nightly miri test card` first for this card; attach a matching receipt only if it confirms the route\n  - Minimal repro cue:\n    - Confirm ReviewCard `card-1` still maps to `unsafe { ptr.cast::<Header>().read() }` at `src/lib.rs:7:5` before upgrading confidence.\n    - Build/run `cargo +nightly miri test card` as the smallest available command for this card.\n    - Attach a matching receipt only if that run confirms the same route and ReviewCard identity.\n    - Limitation: Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.\n  - Route: `miri` because route\n\n```bash\ncargo +nightly miri test card\n```\n\n## Trust boundary\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
@@ -25491,6 +25550,7 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write cards failed: {err}"))?;
         add_confirmation_cues_to_cards(&dir.join("cards.json"))?;
+        add_coverage_to_cards(&dir.join("cards.json"))?;
         fs::write(
             dir.join("pr-summary.md"),
             "- Scope: `diff`\n- Review cards: 2\n- Open actionable gaps: 2\n- Policy mode: `advisory`\n\n- Receipt audit: `receipt-audit.md` checks saved receipt metadata only; no witness was run.\n\nThis artifact is static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result unless a witness receipt is attached.\n",
@@ -25620,6 +25680,20 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         .to_string()
     }
 
+    fn lsp_fixture_coverage() -> serde_json::Value {
+        serde_json::json!({
+            "contract_coverage": "present",
+            "guard_coverage": "missing",
+            "test_reach_coverage": "missing",
+            "witness_receipt_coverage": "missing",
+            "manual_context": "absent",
+            "baseline_state": "new",
+            "outcome_movement": "regressed",
+            "comment_plan_status": "selected",
+            "agent_lsp_readiness": "ready"
+        })
+    }
+
     fn valid_lsp_json(code_actions: &str) -> Result<String, String> {
         let mut value: serde_json::Value = serde_json::from_str(&format!(
             r#"{{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}},"diagnostics":[{{"card_id":"card-1","path":"src/lib.rs","range":{{"start":{{"line":6,"character":0}},"end":{{"line":6,"character":1}}}},"severity":2,"code":"guard_missing","operation":"unsafe {{ ptr.cast::<Header>().read() }}","operation_family":"raw_pointer_read","proof_path":"source_route_only","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","hazards":["alignment"],"required_safety_conditions":[{{"key":"alignment","description":"pointer aligned"}}],"evidence_summary":{{"contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"state":"owner_reached","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}},"reach_limitation":"static reach evidence is not proof that the unsafe site executed"}},"obligation_evidence":[{{"key":"alignment","description":"pointer aligned","contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"present":true,"state":"present","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}}}}],"witness_routes":[{{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"hovers":[{{"card_id":"card-1","path":"src/lib.rs","position":{{"line":6,"character":0}},"contents":"Card: `card-1`; priority `high`; confidence `medium`\n\nWhy this card exists:\n- The changed code contains a `raw_pointer_read` unsafe operation that unsafe-review classifies as `guard_missing`.\n- Operation: `unsafe {{ ptr.cast::<Header>().read() }}`\n\nProof path: `source_route_only`\n\nRelevant hazard families:\n- `alignment`\n\nRequired safety conditions:\n- pointer aligned\n\nEvidence found:\n- Contract [present]: safety contract\n- Guard/discharge [missing]: No visible local guard\n- Reach [owner_reached]: related test mention\n- Witness [missing]: No imported witness receipt\n\nEvidence missing:\n- none recorded\n\nWhat would resolve this:\n- Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nVerify commands:\n- `cargo +nightly miri test card`\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `miri` because route.\n\nTrust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"code_actions":{code_actions},"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#
@@ -25638,6 +25712,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
             );
         value["hovers"][0]["contents"] = serde_json::json!(hover_contents);
         value["diagnostics"][0]["missing_evidence"] = serde_json::json!([]);
+        value["diagnostics"][0]["coverage"] = lsp_fixture_coverage();
         Ok(value.to_string())
     }
 

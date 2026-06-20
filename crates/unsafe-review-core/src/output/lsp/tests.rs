@@ -56,6 +56,39 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
         value["diagnostics"][0]["evidence_summary"]["discharge"]["state"],
         "missing"
     );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["contract_coverage"],
+        "present"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["guard_coverage"],
+        "missing"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["test_reach_coverage"],
+        "missing"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["witness_receipt_coverage"],
+        "missing"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["manual_context"],
+        "absent"
+    );
+    assert_eq!(value["diagnostics"][0]["coverage"]["baseline_state"], "new");
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["outcome_movement"],
+        "regressed"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["comment_plan_status"],
+        "selected"
+    );
+    assert_eq!(
+        value["diagnostics"][0]["coverage"]["agent_lsp_readiness"],
+        "ready"
+    );
     assert!(
         value["diagnostics"][0]["evidence_summary"]["reach_limitation"]
             .as_str()

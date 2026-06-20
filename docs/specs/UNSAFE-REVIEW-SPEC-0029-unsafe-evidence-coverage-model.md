@@ -75,6 +75,12 @@ No surface recomputes coverage from raw fields once this block exists; they read
 it. A verifier checks that the projected coverage in each surface matches the
 card's coverage block.
 
+Saved LSP diagnostics carry the same machine-readable `coverage` object as
+`cards.json`. The first-pr artifact verifier compares every LSP diagnostic
+coverage slot back to the matching card so IDE and agent consumers see the same
+contract, guard, reach, witness-receipt, movement, comment-plan, and readiness
+state as the canonical card artifact.
+
 ### Card statement shape
 
 A card's coverage block lets a surface render the canonical statement:

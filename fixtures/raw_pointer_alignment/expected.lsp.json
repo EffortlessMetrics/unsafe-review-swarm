@@ -16,6 +16,17 @@
     {
       "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
       "code": "guard_missing",
+      "coverage": {
+        "agent_lsp_readiness": "ready",
+        "baseline_state": "new",
+        "comment_plan_status": "selected",
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "manual_context": "absent",
+        "outcome_movement": "regressed",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing"
+      },
       "evidence_summary": {
         "contract": {
           "present": true,
