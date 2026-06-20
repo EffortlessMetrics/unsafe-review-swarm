@@ -66,7 +66,7 @@ fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), Stri
         },
         DiscoveryOptions::repo_defaults(),
         |event| {
-            if started.elapsed() >= timeout && !event.status.completed {
+            if generated_projection_timeout_elapsed(started, timeout) {
                 return Err(generated_projection_timeout_message(timeout, &event.status));
             }
             Ok(())
@@ -80,6 +80,10 @@ fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), Stri
         check_generated_endpoint_json(path, &expected_text)?;
     }
     Ok(())
+}
+
+fn generated_projection_timeout_elapsed(started: Instant, timeout: Duration) -> bool {
+    started.elapsed() >= timeout
 }
 
 fn generated_projection_timeout_message(timeout: Duration, status: &RepoScanStatus) -> String {
@@ -325,5 +329,15 @@ mod tests {
         assert!(message.contains("last_path=fixtures/slow/src/lib.rs"));
         assert!(message.contains("unsafe-review repo --format json"));
         assert!(message.contains("unsafe-review badges --out badges/"));
+    }
+
+    #[test]
+    fn generated_projection_timeout_elapsed_trips_after_deadline() {
+        let started = Instant::now() - Duration::from_secs(8);
+
+        assert!(generated_projection_timeout_elapsed(
+            started,
+            Duration::from_secs(7)
+        ));
     }
 }
