@@ -118,6 +118,9 @@ cards.sarif
 comment-plan.json
 witness-plan.md
 receipt-audit.md
+receipt-audit.json
+policy-report.json
+policy-report.md
 manual-candidates.json
 manual-repair-queue.json
 tokmd-packets.json

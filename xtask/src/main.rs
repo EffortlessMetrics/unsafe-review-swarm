@@ -11241,6 +11241,32 @@ jobs:
     }
 
     #[test]
+    fn first_pr_artifact_name_list_rejects_missing_policy_report() -> Result<(), String> {
+        let text = public_surfaces::FIRST_PR_BUNDLE_ARTIFACT_PATHS
+            .iter()
+            .copied()
+            .filter(|artifact| *artifact != "target/unsafe-review/policy-report.json")
+            .map(|artifact| {
+                Path::new(artifact)
+                    .file_name()
+                    .and_then(|name| name.to_str())
+                    .ok_or_else(|| format!("test artifact `{artifact}` has no file name"))
+            })
+            .collect::<Result<Vec<_>, _>>()?
+            .join("\n");
+
+        let Err(err) =
+            public_surfaces::require_first_pr_artifact_names(".github/actions/example.yml", &text)
+        else {
+            return Err("missing policy-report artifact name should fail".to_string());
+        };
+
+        assert!(err.contains(".github/actions/example.yml"));
+        assert!(err.contains("policy-report.json"));
+        Ok(())
+    }
+
+    #[test]
     fn docs_automation_scope_detects_external_agent_state_roots() {
         assert!(repo_path_is_under_scope_root(
             ".codex/agent-state.md",

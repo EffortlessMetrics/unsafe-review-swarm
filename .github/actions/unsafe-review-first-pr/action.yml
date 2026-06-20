@@ -73,9 +73,11 @@ outputs:
       Absolute path to the advisory bundle directory. Pass this to an artifact
       upload step. The bundle contains review-kit.json, cards.json,
       pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,
-      witness-plan.md, receipt-audit.md, manual-candidates.json,
-      manual-repair-queue.json, tokmd-packets.json, usefulness-telemetry.json,
-      lsp.json, repair-queue.json, and unsafe-review-gate.json.
+      witness-plan.md, receipt-audit.md, receipt-audit.json,
+      policy-report.json, policy-report.md, manual-candidates.json,
+      manual-repair-queue.json, tokmd-packets.json,
+      usefulness-telemetry.json, lsp.json, repair-queue.json, and
+      unsafe-review-gate.json.
     value: ${{ steps.set-outputs.outputs.bundle_dir }}
   gate_status:
     description: >
@@ -151,6 +153,9 @@ runs:
           comment-plan.json \
           witness-plan.md \
           receipt-audit.md \
+          receipt-audit.json \
+          policy-report.json \
+          policy-report.md \
           manual-candidates.json \
           manual-repair-queue.json \
           tokmd-packets.json \
