@@ -2925,6 +2925,11 @@ fn print_first_pr_help() {
     println!("  git -C /path/to/repo fetch origin <base-sha> <head-sha>");
     println!("  git -C /path/to/repo checkout --detach <head-sha>");
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
+    println!("Raw diff capture for receipts or --diff:");
+    println!(
+        "  git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha> <head-sha>"
+    );
+    println!("  unsafe-review pr --root /path/to/repo --diff /path/to/change.diff");
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
     println!(

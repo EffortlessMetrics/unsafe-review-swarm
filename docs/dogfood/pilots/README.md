@@ -20,6 +20,25 @@ adequacy, not policy readiness, and not a merge verdict. Pilot runs must be
 read-only: no source edits, no witness execution, and no third-party comments or
 issues.
 
+## Local Equivalent Acquisition
+
+Prefer the public Action when the target repository can run it read-only. For a
+local-equivalent pilot receipt, keep the exact PR commits visible and avoid
+shell redirection when capturing the raw diff:
+
+```bash
+gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/repo checkout --detach <head-sha>
+git -C /path/to/repo diff --binary --full-index --output=target/external-pilots/<id>/<id>.diff <base-sha> <head-sha>
+unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir target/external-pilots/<id>/first-pr
+```
+
+The `git diff --output=...` form writes Git's raw diff bytes directly to the
+receipt path, which avoids PowerShell or shell redirection changing the byte
+stream being hashed. Record the resulting path and SHA-256 in `diff_path` and
+`diff_sha256`.
+
 ## File Shape
 
 ```toml
