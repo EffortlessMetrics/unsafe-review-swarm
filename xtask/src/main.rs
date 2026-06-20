@@ -6551,6 +6551,11 @@ mod dogfood_checks {
                 "{DOGFOOD_MANIFEST} targets[{idx}] uses unknown artifact_status `{artifact_status}`"
             ));
         }
+        if (kind == "repo-snapshot" || kind == "pr-diff") && artifact_status != "local_untracked" {
+            return Err(format!(
+                "{DOGFOOD_MANIFEST} targets[{idx}] kind `{kind}` must use artifact_status `local_untracked`, got `{artifact_status}` (external targets must never be checked into the swarm repo)"
+            ));
+        }
         validate_artifacts(target, idx, id, artifact_status)?;
         let (repo_snapshots, pr_diffs, fixture_controls) = validate_kind_fields(target, idx, kind)?;
         let fixture_control_id = (fixture_controls > 0).then(|| id.to_string());
@@ -10714,6 +10719,44 @@ fn is_forbidden_generated_path(path: &str) -> bool {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn dogfood_external_targets_require_local_untracked() -> Result<(), String> {
+        let render = |kind: &str, artifact_status: &str| -> Result<toml::Value, String> {
+            format!(
+                "id = \"sample-target\"\n\
+                 kind = \"{kind}\"\n\
+                 repository = \"owner/repo\"\n\
+                 crate = \"demo\"\n\
+                 status = \"active\"\n\
+                 purpose = \"exercise external corpus target validation lint\"\n\
+                 command = \"unsafe-review first-pr --format json\"\n\
+                 artifact_status = \"{artifact_status}\"\n"
+            )
+            .parse::<toml::Table>()
+            .map(toml::Value::Table)
+            .map_err(|err| format!("sample target parse failed: {err}"))
+        };
+
+        // External targets (repo-snapshot / pr-diff) must never be checked into
+        // the swarm repo: the lint rejects any non-local_untracked artifact_status
+        // before the on-disk artifact checks run.
+        for kind in ["repo-snapshot", "pr-diff"] {
+            let value = render(kind, "checked_in")?;
+            let mut ids = BTreeSet::new();
+            match dogfood_checks::validate_target(&value, 0, &mut ids) {
+                Ok(_) => {
+                    return Err(format!("checked_in {kind} target should be rejected"));
+                }
+                Err(err) => {
+                    if !err.contains("must use artifact_status `local_untracked`") {
+                        return Err(format!("unexpected error for {kind}: {err}"));
+                    }
+                }
+            }
+        }
+        Ok(())
+    }
 
     fn registry_view<'a>(
         families: &'a BTreeSet<String>,
