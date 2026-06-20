@@ -1664,14 +1664,21 @@ fn validate_expected_head_sha(
             root.display()
         )
     })?;
-    if actual.eq_ignore_ascii_case(expected_head_sha) {
-        Ok(())
-    } else {
+    if !actual.eq_ignore_ascii_case(expected_head_sha) {
         Err(format!(
             "current HEAD in `{}` is {actual}, but --head-sha expected {expected_head_sha}. \
              Check out the exact external PR head SHA before running {terminal_command}.",
             root.display()
         ))
+    } else if git_dirty_worktree(root).unwrap_or(true) {
+        Err(format!(
+            "dirty worktree in `{}` is not allowed with --head-sha. \
+             Commit, stash, or discard local changes before running {terminal_command}, \
+             or use --diff <file> for a saved patch input.",
+            root.display()
+        ))
+    } else {
+        Ok(())
     }
 }
 

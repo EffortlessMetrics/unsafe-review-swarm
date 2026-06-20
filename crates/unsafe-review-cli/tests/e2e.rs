@@ -283,6 +283,50 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn pr_alias_rejects_dirty_worktree_with_exact_head_sha() -> Result<(), Box<dyn Error>> {
+    let repo = exact_pr_fixture_repo("unsafe-review-exact-pr-dirty-e2e")?;
+    let out_dir = repo.temp.path().join("review-kit");
+    fs::write(
+        repo.root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr.add(1) }\n}\n",
+    )?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .arg("--root")
+        .arg(&repo.root)
+        .arg("--base-sha")
+        .arg(&repo.base_sha)
+        .arg("--head-sha")
+        .arg(&repo.head_sha)
+        .arg("--out-dir")
+        .arg(&out_dir)
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "dirty exact-head worktree must fail before analysis"
+    );
+    assert_eq!(
+        output.status.code(),
+        Some(2),
+        "dirty exact-head worktree must be a tool/input error"
+    );
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(
+        stderr.contains("dirty worktree"),
+        "stderr must explain that exact-head mode requires a clean worktree: {stderr}"
+    );
+    assert!(
+        !out_dir.join("cards.json").exists(),
+        "dirty exact-head input must not write PR artifacts"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn pr_alias_auto_detect_unresolved_base_prints_actionable_error() -> Result<(), Box<dyn Error>> {
     // When `pr` is run without explicit flags from a directory that is not
     // inside a git repository, the error must name the exact command to run
