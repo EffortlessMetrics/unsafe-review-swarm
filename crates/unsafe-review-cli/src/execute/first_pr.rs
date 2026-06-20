@@ -2526,10 +2526,14 @@ mod tests {
     use super::*;
 
     #[test]
-    fn top_card_handoff_commands_quote_roots_with_spaces() {
+    fn handoff_commands_quote_roots_with_spaces() {
         let root = Path::new("C:/Code/Rust With Spaces/unsafe-review");
         let card_id = "UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1";
 
+        assert_eq!(
+            baseline_init_command(root),
+            "unsafe-review baseline init --root \"C:/Code/Rust With Spaces/unsafe-review\""
+        );
         assert_eq!(
             explain_command(root, &card_id),
             "unsafe-review explain --root \"C:/Code/Rust With Spaces/unsafe-review\" UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1"
