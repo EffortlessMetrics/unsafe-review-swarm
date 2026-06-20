@@ -367,6 +367,7 @@ Must include:
 card_id
 operation family
 review class
+level derived from review class
 hazards
 location
 message with missing evidence
@@ -376,6 +377,9 @@ trust boundary
 SARIF must not create a separate classification truth. It is a projection from ReviewCards.
 SARIF rule IDs are the stable `ReviewClass` string values; changing a rule ID is
 a code-scanning baseline contract change, not a wording-only edit.
+SARIF `level` must be derived from the same `ReviewClass` table as LSP
+diagnostic severity. It must not be derived from priority, operation family,
+baseline state, or comment eligibility.
 
 #### 3.5 `comment-plan.json`
 
@@ -567,6 +571,7 @@ Diagnostics should carry ReviewCard-derived evidence:
 
 ```text
 card_id
+severity
 operation
 hazards
 required safety conditions
@@ -577,6 +582,11 @@ witness routes
 verify commands
 trust boundary
 ```
+
+Diagnostic severity must be derived from the same `ReviewClass` table as SARIF
+`level`. The saved LSP projection must not derive severity from priority,
+operation family, baseline state, or comment eligibility, and must never emit
+LSP `Error` severity in the default advisory projection.
 
 Code actions must be command-only. They must not include `WorkspaceEdit` or
 source-edit fields in the action or nested payloads.
