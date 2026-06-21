@@ -325,7 +325,7 @@ fn required_baseline_coverage<'a>(case: &'a ChallengeCase, key: &str) -> Result<
             case.id
         )
     })?;
-    validate_coverage_value(value, key, &case.id)?;
+    validate_three_level_coverage_value(value, key, &case.id)?;
     Ok(value)
 }
 
@@ -340,21 +340,25 @@ fn required_baseline_witness_coverage(case: &ChallengeCase) -> Result<&str, Stri
                 case.id
             )
         })?;
-    if !matches!(value, "present" | "missing") {
-        return Err(format!(
-            "{LEDGER} challenge `{}` `{key}` must be `present` or `missing`; got `{value}`",
-            case.id
-        ));
-    }
+    validate_witness_coverage_value(value, key, &case.id)?;
     Ok(value)
 }
 
-fn validate_coverage_value(value: &str, key: &str, id: &str) -> Result<(), String> {
+fn validate_three_level_coverage_value(value: &str, key: &str, id: &str) -> Result<(), String> {
     if matches!(value, "present" | "weak" | "missing") {
         return Ok(());
     }
     Err(format!(
         "{LEDGER} challenge `{id}` `{key}` must be `present`, `weak`, or `missing`; got `{value}`"
+    ))
+}
+
+fn validate_witness_coverage_value(value: &str, key: &str, id: &str) -> Result<(), String> {
+    if matches!(value, "present" | "missing") {
+        return Ok(());
+    }
+    Err(format!(
+        "{LEDGER} challenge `{id}` `{key}` must be `present` or `missing`; got `{value}`"
     ))
 }
 
@@ -861,10 +865,32 @@ mod tests {
     }
 
     #[test]
-    fn coverage_value_validation_rejects_unknown_slot() {
-        let err = validate_coverage_value("maybe", "baseline_guard_coverage", "case")
+    fn three_level_coverage_validation_rejects_unknown_slot() {
+        let err = validate_three_level_coverage_value("maybe", "baseline_guard_coverage", "case")
             .err()
             .unwrap_or_default();
         assert!(err.contains("present"), "{err}");
+    }
+
+    #[test]
+    fn three_level_coverage_validation_accepts_weak_snapshot_slots() -> Result<(), String> {
+        for key in [
+            "baseline_contract_coverage",
+            "baseline_guard_coverage",
+            "baseline_test_reach_coverage",
+        ] {
+            validate_three_level_coverage_value("weak", key, "case")?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn witness_coverage_validation_rejects_weak_slot() {
+        let err =
+            validate_witness_coverage_value("weak", "baseline_witness_receipt_coverage", "case")
+                .err()
+                .unwrap_or_default();
+        assert!(err.contains("present"), "{err}");
+        assert!(err.contains("missing"), "{err}");
     }
 }

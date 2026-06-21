@@ -17,7 +17,11 @@ partition_by_kind = { "fixture-transform" = "conformance" }
 #   diff         - diff filename, relative to the generated root
 #   transformation - deterministic transform applied before scanning
 #   baseline_card_id - optional exact card id for synthetic baseline files
-#   baseline_*_coverage - optional snapshot override before scanning
+#   baseline_contract_coverage / baseline_guard_coverage /
+#     baseline_test_reach_coverage - optional snapshot coverage before scanning
+#     (present | weak | missing)
+#   baseline_witness_receipt_coverage - optional snapshot witness coverage
+#     before scanning (present | missing)
 #   no_new_debt_exit_code - expected --policy no-new-debt process exit
 #   [challenge.expected] - expected summary, first-card, and comment-plan fields
 
