@@ -231,7 +231,7 @@ owner = "repo-infra / ci"
 id = "detector-discipline-control-plane"
 name = "detector-discipline control plane"
 path = ".rails/lanes/control-plane/implementation-plan.md"
-status = "active"
+status = "done"
 owner = "repo-infra"
 
 [[lane]]
