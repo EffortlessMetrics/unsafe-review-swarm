@@ -526,7 +526,7 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
                 set_once(
                     &mut base_ref,
                     "--base-ref",
-                    parse_git_ref_token(inline_value(arg, "--base-ref")?)?,
+                    parse_git_ref_token(inline_value_allow_empty(arg, "--base-ref")?)?,
                 )?;
             }
             "--base-sha" => {
@@ -661,18 +661,26 @@ fn parse_pr_number(raw: &str) -> Result<String, String> {
 }
 
 fn parse_git_ref_token(raw: &str) -> Result<String, String> {
-    if raw.is_empty()
-        || raw.starts_with('-')
-        || raw.starts_with('+')
-        || raw.starts_with('@')
-        || raw == "@"
-        || raw.contains("..")
-        || !raw.bytes().all(|byte| {
-            byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b'+' | b'@')
-        })
-    {
+    if raw.is_empty() {
+        return Err("invalid --base-ref; value must not be empty".to_string());
+    }
+    if raw.starts_with('-') {
+        return Err("invalid --base-ref; value must not start with `-`".to_string());
+    }
+    if raw.starts_with('+') {
+        return Err("invalid --base-ref; value must not start with `+`".to_string());
+    }
+    if raw.starts_with('@') {
+        return Err("invalid --base-ref; value must not start with `@`".to_string());
+    }
+    if raw.contains("..") {
+        return Err("invalid --base-ref; value must not contain `..`".to_string());
+    }
+    if !raw.bytes().all(|byte| {
+        byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b'+' | b'@')
+    }) {
         return Err(
-            "invalid --base-ref; use a branch/ref token made of ASCII letters, digits, `/`, `.`, `_`, `-`, `+`, or `@`"
+            "invalid --base-ref; use only ASCII letters, digits, `/`, `.`, `_`, `-`, `+`, or `@`"
                 .to_string(),
         );
     }
@@ -1376,6 +1384,12 @@ fn inline_value<'a>(arg: &'a str, flag: &str) -> Result<&'a str, String> {
         return Err(format!("missing value for {flag}"));
     }
     Ok(value)
+}
+
+fn inline_value_allow_empty<'a>(arg: &'a str, flag: &str) -> Result<&'a str, String> {
+    arg.strip_prefix(flag)
+        .and_then(|rest| rest.strip_prefix('='))
+        .ok_or_else(|| format!("missing value for {flag}"))
 }
 
 fn format_name(format: &Format) -> &'static str {
@@ -2159,6 +2173,44 @@ mod tests {
             assert_eq!(options.base_ref, base_ref);
         }
         Ok(())
+    }
+
+    #[test]
+    fn pr_setup_base_ref_errors_identify_rejected_rule() {
+        for (base_ref, expected) in [
+            ("", "invalid --base-ref; value must not be empty"),
+            ("-main", "invalid --base-ref; value must not start with `-`"),
+            ("+main", "invalid --base-ref; value must not start with `+`"),
+            ("@main", "invalid --base-ref; value must not start with `@`"),
+            (
+                "main..next",
+                "invalid --base-ref; value must not contain `..`",
+            ),
+            (
+                "main;echo",
+                "invalid --base-ref; use only ASCII letters, digits, `/`, `.`, `_`, `-`, `+`, or `@`",
+            ),
+        ] {
+            let mut argv = args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+            ]);
+            argv.push(format!("--base-ref={base_ref}"));
+            argv.extend(args([
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            ]));
+
+            let err = parse(argv).err().unwrap_or_default();
+
+            assert_eq!(err, expected);
+        }
     }
 
     #[test]

@@ -146,8 +146,7 @@ unsafe-review pr-setup \
 ```
 
 `pr-setup` only prints commands; it does not fetch, checkout, run witnesses,
-post comments, or edit source. One direct checkout and analysis path it prints
-is:
+post comments, or edit source. The direct commands it prints are:
 
 ```bash
 git -C /path/to/bytes fetch origin <base-ref-name> pull/827/head
@@ -155,8 +154,12 @@ git -C /path/to/bytes checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/bytes \
   --base-sha <base-sha> \
-  --head-sha <head-sha> \
-  --out-dir target/unsafe-review
+  --head-sha <head-sha>
+mkdir -p /absolute/path/to
+git -C /path/to/bytes diff --binary --full-index --output=/absolute/path/to/bytes-pr827.diff <base-sha>...<head-sha>
+unsafe-review pr \
+  --root /path/to/bytes \
+  --diff /absolute/path/to/bytes-pr827.diff
 ```
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
@@ -164,11 +167,11 @@ Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 same-repo and fork PR heads; `--head-sha` then validates the checkout against
 the immutable SHA reported by `gh pr view`.
 
-If you need a saved patch file instead, let Git write it with
-`git diff --output=<path>` so shell redirection cannot re-encode the file on
-Windows. Use an absolute `--output` path when `git -C` changes directories. The
-saved patch must keep the `diff --git`, `---`, `+++`, and `@@` unified-diff
-lines that `unsafe-review` uses to scope the review.
+For saved patch files, let Git write the file with `git diff --output=<path>`
+so shell redirection cannot re-encode the file on Windows. Use an absolute
+`--output` path when `git -C` changes directories. The saved patch must keep the
+`diff --git`, `---`, `+++`, and `@@` unified-diff lines that `unsafe-review`
+uses to scope the review.
 
 The command analyzes once and renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
