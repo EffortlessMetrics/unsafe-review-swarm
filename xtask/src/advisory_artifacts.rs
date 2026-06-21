@@ -5622,7 +5622,6 @@ fn require_witness_plan_headings_known(
     path: &Path,
     card_ids: &BTreeSet<String>,
 ) -> Result<(), String> {
-    let mut seen = BTreeSet::new();
     for line in text.lines() {
         let trimmed = line.trim();
         let Some(rest) = trimmed.strip_prefix("#### `") else {
@@ -5643,12 +5642,6 @@ fn require_witness_plan_headings_known(
         if !card_ids.contains(card_id) {
             return Err(format!(
                 "{} witness-plan route heading references unknown card id `{card_id}`",
-                path.display()
-            ));
-        }
-        if !seen.insert(card_id.to_string()) {
-            return Err(format!(
-                "{} witness-plan route heading duplicates ReviewCard id `{card_id}`",
                 path.display()
             ));
         }
@@ -8893,125 +8886,142 @@ fn require_witness_plan_card_projections(
     card_projections: &BTreeMap<String, CardProjection>,
 ) -> Result<(), String> {
     for (card_id, card) in card_projections {
-        let section = witness_plan_card_section(text, card_id).ok_or_else(|| {
-            format!(
+        let sections = witness_plan_card_sections(text, card_id);
+        if sections.is_empty() {
+            return Err(format!(
                 "{} witness-plan must include a section for ReviewCard `{card_id}`",
                 path.display()
-            )
-        })?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "class",
-            &format!("- Class: `{}`", card.class_name),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "proof path",
-            &format!("- Proof path: `{}`", card.proof_path),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "location",
-            &format!("- Location: {}:{}", card.path, card.line),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "operation",
-            &format!("- Operation: `{}`", card.operation),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "operation family",
-            &format!("- Operation family: `{}`", card.operation_family),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "hazards",
-            &format!("- Hazards: {}", witness_plan_hazard_summary(&card.hazards)),
-        )?;
-        for (idx, condition) in card.required_safety_conditions.iter().enumerate() {
-            let expected = witness_plan_required_condition_line(
-                condition,
-                &format!("cards.json card `{card_id}` required_safety_conditions[{idx}]"),
-            )?;
-            require_witness_plan_card_line(
-                section,
-                path,
-                card_id,
-                "required safety condition",
-                &expected,
-            )?;
+            ));
         }
-        for (idx, evidence) in card.obligation_evidence.iter().enumerate() {
-            let expected = witness_plan_obligation_evidence_line(
-                evidence,
-                &format!("cards.json card `{card_id}` obligation_evidence[{idx}]"),
-            )?;
-            require_witness_plan_card_line(
-                section,
-                path,
-                card_id,
-                "obligation evidence",
-                &expected,
-            )?;
+        for section in &sections {
+            require_witness_plan_common_card_projection(section, path, card_id, card)?;
         }
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "next action",
-            &format!("- Next action: {}", card.next_action),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "hypothesis",
-            &format!(
-                "- Hypothesis to confirm: static `{}` ReviewCard",
-                card.class_name
-            ),
-        )?;
-        require_witness_plan_card_line(
-            section,
-            path,
-            card_id,
-            "confirmation step",
-            &expected_confirmation_step_fragment(card),
-        )?;
         for route in &card.witness_routes {
+            let route_line = format!("- Route: `{}`", route.kind);
+            let Some(route_section) = sections
+                .iter()
+                .copied()
+                .find(|section| section.contains(&route_line))
+            else {
+                return Err(format!(
+                    "{} witness-plan ReviewCard `{card_id}` witness route must include `{route_line}`",
+                    path.display()
+                ));
+            };
             require_witness_plan_card_line(
-                section,
+                route_section,
                 path,
                 card_id,
                 "witness route",
-                &format!("- Route: `{}`", route.kind),
+                &route_line,
             )?;
             require_witness_plan_card_line(
-                section,
+                route_section,
                 path,
                 card_id,
                 "witness route reason",
                 &format!("  - Reason: {}", route.reason),
             )?;
             if let Some(command) = &route.command {
-                require_witness_plan_route_command(section, path, card_id, command)?;
+                require_witness_plan_route_command(route_section, path, card_id, command)?;
             }
         }
     }
     Ok(())
+}
+
+fn require_witness_plan_common_card_projection(
+    section: &str,
+    path: &Path,
+    card_id: &str,
+    card: &CardProjection,
+) -> Result<(), String> {
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "class",
+        &format!("- Class: `{}`", card.class_name),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "proof path",
+        &format!("- Proof path: `{}`", card.proof_path),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "location",
+        &format!("- Location: {}:{}", card.path, card.line),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "operation",
+        &format!("- Operation: `{}`", card.operation),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "operation family",
+        &format!("- Operation family: `{}`", card.operation_family),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "hazards",
+        &format!("- Hazards: {}", witness_plan_hazard_summary(&card.hazards)),
+    )?;
+    for (idx, condition) in card.required_safety_conditions.iter().enumerate() {
+        let expected = witness_plan_required_condition_line(
+            condition,
+            &format!("cards.json card `{card_id}` required_safety_conditions[{idx}]"),
+        )?;
+        require_witness_plan_card_line(
+            section,
+            path,
+            card_id,
+            "required safety condition",
+            &expected,
+        )?;
+    }
+    for (idx, evidence) in card.obligation_evidence.iter().enumerate() {
+        let expected = witness_plan_obligation_evidence_line(
+            evidence,
+            &format!("cards.json card `{card_id}` obligation_evidence[{idx}]"),
+        )?;
+        require_witness_plan_card_line(section, path, card_id, "obligation evidence", &expected)?;
+    }
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "next action",
+        &format!("- Next action: {}", card.next_action),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "hypothesis",
+        &format!(
+            "- Hypothesis to confirm: static `{}` ReviewCard",
+            card.class_name
+        ),
+    )?;
+    require_witness_plan_card_line(
+        section,
+        path,
+        card_id,
+        "confirmation step",
+        &expected_confirmation_step_fragment(card),
+    )
 }
 
 fn expected_confirmation_step_fragment(card: &CardProjection) -> String {
@@ -9107,17 +9117,23 @@ fn witness_route_command_projection(
     Ok(Some(command.to_string()))
 }
 
-fn witness_plan_card_section<'a>(text: &'a str, card_id: &str) -> Option<&'a str> {
+fn witness_plan_card_sections<'a>(text: &'a str, card_id: &str) -> Vec<&'a str> {
     let heading = format!("#### `{card_id}`");
-    let start = text.find(&heading)?;
-    let body_start = start + heading.len();
-    let tail = &text[body_start..];
-    let end = [tail.find("\n#### `"), tail.find("\n## Trust boundary")]
-        .into_iter()
-        .flatten()
-        .min()
-        .unwrap_or(tail.len());
-    Some(&tail[..end])
+    let mut sections = Vec::new();
+    let mut offset = 0usize;
+    while let Some(relative_start) = text[offset..].find(&heading) {
+        let start = offset + relative_start;
+        let body_start = start + heading.len();
+        let tail = &text[body_start..];
+        let end = [tail.find("\n#### `"), tail.find("\n## Trust boundary")]
+            .into_iter()
+            .flatten()
+            .min()
+            .unwrap_or(tail.len());
+        sections.push(&tail[..end]);
+        offset = body_start + end;
+    }
+    sections
 }
 
 fn require_witness_plan_card_line(
@@ -10467,6 +10483,129 @@ mod tests {
             return Err(format!("expected coverage drift error; got {err}"));
         }
         Ok(())
+    }
+
+    #[test]
+    fn witness_plan_projection_accepts_routes_split_across_route_groups() -> Result<(), String> {
+        let mut card = minimal_comment_card_projection("card-1", "ffi_call", "fill_inner", "ffi");
+        card.class_name = "miri_unsupported".to_string();
+        card.proof_path = "observable_red_green".to_string();
+        card.path = "src/backends/windows.rs".to_string();
+        card.line = 51;
+        card.operation =
+            "unsafe { ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) }".to_string();
+        card.next_action =
+            "Use sanitizer/cargo-careful or an explicit FFI boundary contract.".to_string();
+        card.verify_commands = vec![
+            "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner".to_string(),
+            "cargo +nightly careful test fill_inner".to_string(),
+        ];
+        card.witness_routes = vec![
+            WitnessRouteProjection {
+                kind: "asan".to_string(),
+                reason: "FFI boundary detected; sanitizer route preferred".to_string(),
+                command: Some(
+                    "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner".to_string(),
+                ),
+                required: false,
+            },
+            WitnessRouteProjection {
+                kind: "cargo-careful".to_string(),
+                reason: "cargo-careful can exercise Rust-side FFI assumptions".to_string(),
+                command: Some("cargo +nightly careful test fill_inner".to_string()),
+                required: false,
+            },
+            WitnessRouteProjection {
+                kind: "human-deep-review".to_string(),
+                reason: "reviewed FFI assumptions can be recorded manually".to_string(),
+                command: None,
+                required: false,
+            },
+        ];
+        let mut projections = BTreeMap::new();
+        projections.insert(card.id.clone(), card);
+        let text = r#"
+#### `card-1`
+
+- Class: `miri_unsupported`
+- Proof path: `observable_red_green`
+- Location: src/backends/windows.rs:51
+- Operation family: `ffi`
+- Operation: `unsafe { ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) }`
+- Hazards: none recorded
+- Next action: Use sanitizer/cargo-careful or an explicit FFI boundary contract.
+- Hypothesis to confirm: static `miri_unsupported` ReviewCard
+- Confirmation step: build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner` first
+- Route: `cargo-careful`
+  - Reason: cargo-careful can exercise Rust-side FFI assumptions
+  - Command:
+
+```bash
+cargo +nightly careful test fill_inner
+```
+
+#### `card-1`
+
+- Class: `miri_unsupported`
+- Proof path: `observable_red_green`
+- Location: src/backends/windows.rs:51
+- Operation family: `ffi`
+- Operation: `unsafe { ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) }`
+- Hazards: none recorded
+- Next action: Use sanitizer/cargo-careful or an explicit FFI boundary contract.
+- Hypothesis to confirm: static `miri_unsupported` ReviewCard
+- Confirmation step: build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner` first
+- Route: `asan`
+  - Reason: FFI boundary detected; sanitizer route preferred
+  - Command:
+
+```bash
+RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
+```
+
+#### `card-1`
+
+- Class: `miri_unsupported`
+- Proof path: `observable_red_green`
+- Location: src/backends/windows.rs:51
+- Operation family: `ffi`
+- Operation: `unsafe { ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) }`
+- Hazards: none recorded
+- Next action: Use sanitizer/cargo-careful or an explicit FFI boundary contract.
+- Hypothesis to confirm: static `miri_unsupported` ReviewCard
+- Confirmation step: build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner` first
+- Route: `human-deep-review`
+  - Reason: reviewed FFI assumptions can be recorded manually
+
+## Trust boundary
+"#;
+
+        require_witness_plan_card_projections(
+            text,
+            Path::new("target/test/witness-plan.md"),
+            &projections,
+        )
+    }
+
+    #[test]
+    fn witness_plan_heading_checker_allows_route_group_repeated_card_headings() -> Result<(), String>
+    {
+        let card_ids = BTreeSet::from(["card-1".to_string()]);
+        let text = r#"
+#### `card-1`
+
+- Route: `cargo-careful`
+
+#### `card-1`
+
+- Route: `asan`
+"#;
+
+        require_witness_plan_headings_known(
+            text,
+            Path::new("target/test/witness-plan.md"),
+            &card_ids,
+        )
     }
 
     fn minimal_comment_card_projection(
