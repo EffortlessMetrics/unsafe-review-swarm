@@ -13,3 +13,9 @@
 # Local scan/projection output dumps written to the repo root during dev runs.
 # Real runs should use --out-dir or a path outside the repo; never commit dumps.
 /*_out.json
+
+# Windows reserved device names — accidental shell-redirect artifacts.
+# `command > nul` (or `2> nul`) on Windows can create a literal file named `nul`
+# when the redirect is interpreted as a path rather than the device. Gitignore it
+# so the artifact never gets committed. See #1797.
+nul
