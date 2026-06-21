@@ -562,7 +562,58 @@ mod tests {
             "lower_relevance"
         );
         assert_eq!(not_selected["not_selected"][0]["relevance"], "low");
+        assert_eq!(
+            not_selected["not_selected"][0]["repair_queue_buckets"],
+            serde_json::json!([
+                "repairable_by_guard",
+                "repairable_by_test",
+                "requires_witness_receipt",
+                "requires_human_review",
+                "do_not_auto_repair"
+            ])
+        );
+        assert_eq!(
+            not_selected["not_selected"][0]["repair_queue_bucket_reasons"],
+            serde_json::json!([
+                "guard_evidence_missing",
+                "reach_evidence_missing",
+                "witness_receipt_missing",
+                "human_review_required",
+                "not_ready_for_automatic_repair"
+            ])
+        );
 
+        Ok(())
+    }
+
+    #[test]
+    fn comment_plan_not_selected_uses_canonical_repair_bucket_order() -> Result<(), String> {
+        let value = parse_json(&render(&fixture_output("split_unsafe_block")?))?;
+        assert_eq!(value["comments"].as_array().map_or(1, Vec::len), 0);
+        assert_eq!(value["not_selected"].as_array().map_or(0, Vec::len), 1);
+
+        assert_eq!(
+            value["not_selected"][0]["repair_queue_buckets"],
+            serde_json::json!([
+                "repairable_by_guard",
+                "repairable_by_safety_docs",
+                "repairable_by_test",
+                "requires_witness_receipt",
+                "requires_human_review",
+                "do_not_auto_repair"
+            ])
+        );
+        assert_eq!(
+            value["not_selected"][0]["repair_queue_bucket_reasons"],
+            serde_json::json!([
+                "guard_evidence_missing",
+                "safety_docs_evidence_missing",
+                "reach_evidence_missing",
+                "witness_receipt_missing",
+                "human_review_required",
+                "not_ready_for_automatic_repair"
+            ])
+        );
         Ok(())
     }
 

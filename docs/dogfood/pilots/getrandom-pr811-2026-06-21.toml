@@ -1,0 +1,187 @@
+schema_version = "external-pilot/v1"
+id = "getrandom-pr811-2026-06-21"
+status = "recorded"
+date = "2026-06-21"
+reviewer = "codex"
+repository = "rust-random/getrandom"
+pr = 811
+url = "https://github.com/rust-random/getrandom/pull/811"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone plus exact pull ref fetch; raw diff captured with git diff --binary --full-index --output over base...head and first-pr run against pinned SHAs"
+tool_version = "0.3.8"
+base_sha = "75895571b0eb4f9137381a0ddad876d3be5cfe53"
+head_sha = "3bcf4fc43a4707dbcc6a87827c6e0de888c74138"
+diff_path = "target/external-pilots/getrandom-pr811-2026-06-21/getrandom-pr811-2026-06-21.diff"
+diff_sha256 = "54e739916b36432bd875bec7ee3f27b2d5e312494d2cfef9cce63e69486af25e"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 1
+agent_ready = 0
+human_only = 1
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 0
+not_selected_count = 1
+selection_reason = "bounded reviewer noise; the single FFI card remained visible in artifacts but was not selected for inline comment because relevance was low under the active policy"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 1
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+
+[run]
+exit_code = 0
+elapsed_seconds = 12.600
+diff_bytes = 2517
+artifact_count = 18
+artifact_total_bytes = 99120
+rust_files_changed = 1
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/cards.json"
+bytes = 8053
+sha256 = "8c9bb798c0be7112cf378a8bdf77f62c6d34cc987e0b38aa1101255010c52846"
+
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/cards.sarif"
+bytes = 4637
+sha256 = "c8a2aa415228c86e1e1f5da1367003b60c345805637c2a40ce1e0b1650ecfd62"
+
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/comment-plan.json"
+bytes = 2354
+sha256 = "2e330fa8e99ca5413aeb1858ed8f28b6c10659137525f6678bd433221bc48aee"
+
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/github-summary.md"
+bytes = 4614
+sha256 = "e297b3cf949fff579cc2a16cdc0b474cb1fb2c8f6abe1950460f241ab1e48d6e"
+
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/lsp.json"
+bytes = 12643
+sha256 = "be4972a469746dbe44d7568a67e75cd7333463b407396a0d409a45cff544ca6b"
+
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/policy-report.json"
+bytes = 2772
+sha256 = "517d438822360c76e7ac878da49d508d83fd75310c5b7c4e6fa9f5fceb65ebb8"
+
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/policy-report.md"
+bytes = 2964
+sha256 = "b25b046022246e097f7483fd1ef9d031f98f1c21e0042cd35868c61bff57ad2a"
+
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/pr-summary.md"
+bytes = 6884
+sha256 = "9ce715d0828138cb922075a5bb4b4bb43712007c8308252a5ff1d882b606d217"
+
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "a0cf9c399e8094b0fe53e4e2564c5a04683f834bd8fb310ac7a62d32fef77c5a"
+
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "6cc6ae97df906000c96afff8c0f8193e527952b4010881fb34f04d576cb5f8ce"
+
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/repair-queue.json"
+bytes = 16704
+sha256 = "a3f127f045a02a3462a0b78789aec8f8f57c49e952d604e5bb148515b762f2f7"
+
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/review-kit.json"
+bytes = 13730
+sha256 = "1bf1442677350ddb9ea2d44f0759144ff37601d20d33af7abea1bf78909e22f9"
+
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/tokmd-packets.json"
+bytes = 3320
+sha256 = "b17951a25dec61cb263df49b684d08886fd3ec3526a530a4e8965cad21997d74"
+
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/unsafe-review-gate.json"
+bytes = 781
+sha256 = "86cc09e0258e8e2f243475dcab56ea2b6a07269c2c63a169be581999d690937f"
+
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/usefulness-telemetry.json"
+bytes = 1422
+sha256 = "f929bcc87147d4aacbeaee3451464fd6082bf9fa5a362d52b2a5755b207d5846"
+
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/getrandom-pr811-2026-06-21/first-pr/witness-plan.md"
+bytes = 9578
+sha256 = "22941cb639f0582bf97ebe878da9f12d1a27ea98f92216a8e568c2489ef01e16"
+
+[[judgments]]
+surface = "pr_summary"
+label = "actionable"
+reason = "The first screen identified the changed Windows ProcessPrng FFI seam, one new advisory gap, missing contract/guard/reach/witness evidence, and sanitizer or cargo-careful confirmation routes."
+next_step = "Keep this as a usefulness sample for FFI boundary review; do not treat it as a safety, UB, or witness result."
+
+[[judgments]]
+surface = "comment_plan"
+label = "correct_but_not_worth_surfacing"
+reason = "The single card remained in structured artifacts but selected_count stayed zero under the active low-noise policy for a medium-confidence FFI review card."
+next_step = "Use future pilots to check whether FFI cards should stay artifact-only by default or need a distinct reviewer-facing summary cue."
+
+[[judgments]]
+surface = "agent_packet"
+label = "human_only"
+reason = "The packet gives route, obligation, missing-evidence, and command context, but readiness remains requires_human_review because the card is miri_unsupported and the family is ffi."
+next_step = "Do not delegate this as an automatic repair; use it as a human review packet unless a later receipt or explicit contract narrows the task."
+
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "The local-equivalent path still required a clone, explicit pull-ref fetch, detached checkout, anchored raw diff output, and manual hash capture rather than a one-command public Action flow."
+next_step = "Keep first-use and public Action acquisition improvements on the adoption backlog."
+
+[[judgments]]
+surface = "artifact_bundle"
+label = "artifact_friction"
+reason = "The pilot exposed verifier friction before this receipt was recorded: repair bucket ordering and grouped witness-plan route sections had to be aligned with the generated artifacts."
+next_step = "Keep check-first-pr-artifacts in the pilot loop so external bundles continue to test cross-surface projection rails."

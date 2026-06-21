@@ -1071,6 +1071,29 @@ fn agent_packet_repair_queue_matches_aggregate_projection() -> Result<(), String
 }
 
 #[test]
+fn agent_packet_repair_queue_uses_canonical_bucket_order() -> Result<(), String> {
+    let output = fixture_output("split_unsafe_block")?;
+    let Some(card) = output.cards.first() else {
+        return Err("fixture should emit at least one card".to_string());
+    };
+    let value = parse_json(&render(card))?;
+
+    assert_eq!(
+        json_string_array(&value["repair_queue"]["buckets"], "repair queue buckets")?,
+        vec![
+            "repairable_by_guard",
+            "repairable_by_safety_docs",
+            "repairable_by_test",
+            "requires_witness_receipt",
+            "requires_human_review",
+            "do_not_auto_repair",
+        ],
+        "agent packet bucket order must match repair-queue/comment-plan projection order"
+    );
+    Ok(())
+}
+
+#[test]
 fn agent_packet_marks_no_missing_cards_not_ready_for_repair() -> Result<(), String> {
     let output = fixture_output("raw_pointer_alignment")?;
     let Some(mut card) = output.cards.first().cloned() else {

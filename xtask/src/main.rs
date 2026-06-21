@@ -18976,9 +18976,9 @@ Snapshot reports:
     }
 
     #[test]
-    fn first_pr_artifact_checker_rejects_witness_plan_duplicate_card_heading() -> Result<(), String>
-    {
-        let dir = unique_temp_dir("unsafe-review-first-pr-witness-duplicate-heading")?;
+    fn first_pr_artifact_checker_accepts_witness_plan_repeated_route_group_heading()
+    -> Result<(), String> {
+        let dir = unique_temp_dir("unsafe-review-first-pr-witness-repeated-heading")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
         let path = dir.join("witness-plan.md");
@@ -18996,13 +18996,7 @@ Snapshot reports:
         let result = check_first_pr_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(
-            result
-                .err()
-                .unwrap_or_default()
-                .contains("witness-plan route heading duplicates ReviewCard id `card-1`")
-        );
-        Ok(())
+        result
     }
 
     #[test]

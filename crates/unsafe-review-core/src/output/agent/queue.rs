@@ -104,11 +104,11 @@ pub(crate) fn card_has_scoped_repairs(card: &ReviewCard) -> bool {
 
 fn repair_queue(card: &ReviewCard, readiness: &AgentReadiness) -> AgentRepairQueue {
     let mut buckets = Vec::new();
-    if has_missing_kind(card, "contract") {
-        push_bucket(&mut buckets, "repairable_by_safety_docs");
-    }
     if has_missing_kind(card, "guard") {
         push_bucket(&mut buckets, "repairable_by_guard");
+    }
+    if has_missing_kind(card, "contract") {
+        push_bucket(&mut buckets, "repairable_by_safety_docs");
     }
     if has_missing_kind(card, "reach") {
         push_bucket(&mut buckets, "repairable_by_test");
