@@ -524,6 +524,12 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
 
 #[test]
 fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>> {
+    let diff_out = std::env::current_dir()?.join("target/external-pilots/bytes-pr827.diff");
+    let diff_out_parent = diff_out
+        .parent()
+        .ok_or("expected diff output path to have a parent")?;
+    let diff_out_arg = rendered_shell_path(&diff_out);
+    let diff_out_parent_arg = rendered_shell_path(diff_out_parent);
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
             .arg("unsafe-review")
@@ -546,21 +552,22 @@ fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>
     let stdout = String::from_utf8(output.stdout)?;
 
     for expected in [
-        "unsafe-review pr-setup",
-        "Read-only setup commands for external GitHub PR tokio-rs/bytes#827.",
-        "This command did not fetch, checkout, run unsafe-review, execute witnesses, post comments, or edit source.",
-        "gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid",
-        "git -C \"/tmp/bytes checkout\" fetch origin main pull/827/head",
-        "git -C \"/tmp/bytes checkout\" checkout --detach bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "unsafe-review pr --root \"/tmp/bytes checkout\" --base-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --head-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "git -C \"/tmp/bytes checkout\" diff --binary --full-index --output=\"target/external-pilots/bytes-pr827.diff\" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "unsafe-review pr --root \"/tmp/bytes checkout\" --diff \"target/external-pilots/bytes-pr827.diff\"",
-        "baseRefName: main",
-        "baseRefOid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
-        "headRefOid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
-        "Trust boundary: always advisory;",
+        "unsafe-review pr-setup".to_string(),
+        "Read-only setup commands for external GitHub PR tokio-rs/bytes#827.".to_string(),
+        "This command did not fetch, checkout, run unsafe-review, execute witnesses, post comments, or edit source.".to_string(),
+        "gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid".to_string(),
+        "git -C \"/tmp/bytes checkout\" fetch origin main pull/827/head".to_string(),
+        "git -C \"/tmp/bytes checkout\" checkout --detach bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        "unsafe-review pr --root \"/tmp/bytes checkout\" --base-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --head-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        format!("mkdir -p {diff_out_parent_arg}"),
+        format!("git -C \"/tmp/bytes checkout\" diff --binary --full-index --output={diff_out_arg} aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
+        format!("unsafe-review pr --root \"/tmp/bytes checkout\" --diff {diff_out_arg}"),
+        "baseRefName: main".to_string(),
+        "baseRefOid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
+        "headRefOid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        "Trust boundary: always advisory;".to_string(),
     ] {
-        assert_contains(&stdout, expected);
+        assert_contains(&stdout, &expected);
     }
 
     Ok(())
@@ -955,6 +962,15 @@ fn assert_contains(haystack: &str, needle: &str) {
         haystack.contains(needle),
         "expected stdout to contain `{needle}`\nstdout:\n{haystack}"
     );
+}
+
+fn rendered_shell_path(path: &Path) -> String {
+    let raw = path.display().to_string();
+    if cfg!(windows) {
+        format!("\"{}\"", raw.replace('\\', "/"))
+    } else {
+        format!("\"{}\"", raw)
+    }
 }
 
 fn assert_order(haystack: &str, before: &str, after: &str) {

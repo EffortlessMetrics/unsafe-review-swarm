@@ -2842,6 +2842,11 @@ fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
 fn pr_setup(options: ExternalPrSetupOptions) {
     let root = shell_path_arg(&options.root);
     let diff_out = shell_path_arg(&options.diff_out);
+    let diff_out_parent = options
+        .diff_out
+        .parent()
+        .map(shell_path_arg)
+        .unwrap_or_else(|| shell_path_arg(Path::new(".")));
     println!("unsafe-review pr-setup");
     println!();
     println!(
@@ -2872,6 +2877,7 @@ fn pr_setup(options: ExternalPrSetupOptions) {
     );
     println!();
     println!("Raw diff capture for pilot receipts or --diff:");
+    println!("  mkdir -p {diff_out_parent}");
     println!(
         "  git -C {root} diff --binary --full-index --output={diff_out} {}...{}",
         options.base_sha, options.head_sha
@@ -3037,7 +3043,9 @@ fn print_pr_setup_help() {
     println!("- --base-sha <baseRefOid>   exact 40-hex base commit SHA");
     println!("- --head-sha <headRefOid>   exact 40-hex head commit SHA");
     println!("- --root <dir>              local checkout path to use in printed commands");
-    println!("- --diff-out <file>         raw diff path to use in printed commands");
+    println!(
+        "- --diff-out <file>         raw diff path; relative values resolve from the current directory"
+    );
     println!();
     println!("Example:");
     println!("  gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid");

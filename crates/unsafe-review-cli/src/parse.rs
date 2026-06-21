@@ -5,7 +5,10 @@ use crate::command::{
     ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
     SubcommandHelpTarget,
 };
-use std::path::{Path, PathBuf};
+use std::{
+    env,
+    path::{Path, PathBuf},
+};
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
 
 const DEFAULT_CANDIDATE_SKELETON_ID: &str = "R4R2-S000-TODO";
@@ -455,79 +458,129 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
     let mut repo = None;
     let mut number = None;
     let mut root = PathBuf::from(".");
+    let mut saw_root = false;
     let mut base_ref = None;
     let mut base_sha = None;
     let mut head_sha = None;
     let mut diff_out = PathBuf::from("target/unsafe-review/external-pr.diff");
+    let mut saw_diff_out = false;
     let mut idx = 0usize;
     while idx < args.len() {
         match args[idx].as_str() {
             "--repo" => {
                 idx += 1;
-                repo = Some(parse_github_repo(value(&args, idx, "--repo")?)?);
+                set_once(
+                    &mut repo,
+                    "--repo",
+                    parse_github_repo(value(&args, idx, "--repo")?)?,
+                )?;
             }
             arg if arg.starts_with("--repo=") => {
-                repo = Some(parse_github_repo(inline_value(arg, "--repo")?)?);
+                set_once(
+                    &mut repo,
+                    "--repo",
+                    parse_github_repo(inline_value(arg, "--repo")?)?,
+                )?;
             }
             "--number" => {
                 idx += 1;
-                number = Some(parse_pr_number(value(&args, idx, "--number")?)?);
+                set_once(
+                    &mut number,
+                    "--number",
+                    parse_pr_number(value(&args, idx, "--number")?)?,
+                )?;
             }
             arg if arg.starts_with("--number=") => {
-                number = Some(parse_pr_number(inline_value(arg, "--number")?)?);
+                set_once(
+                    &mut number,
+                    "--number",
+                    parse_pr_number(inline_value(arg, "--number")?)?,
+                )?;
             }
             "--root" => {
                 idx += 1;
-                root = parse_path_value(&args, idx, "--root")?;
+                set_path_once(
+                    &mut root,
+                    &mut saw_root,
+                    "--root",
+                    parse_path_value(&args, idx, "--root")?,
+                )?;
             }
             arg if arg.starts_with("--root=") => {
-                root = parse_inline_path_value(arg, "--root")?;
+                set_path_once(
+                    &mut root,
+                    &mut saw_root,
+                    "--root",
+                    parse_inline_path_value(arg, "--root")?,
+                )?;
             }
             "--base-ref" => {
                 idx += 1;
-                base_ref = Some(parse_git_ref_token(value(&args, idx, "--base-ref")?)?);
+                set_once(
+                    &mut base_ref,
+                    "--base-ref",
+                    parse_git_ref_token(value(&args, idx, "--base-ref")?)?,
+                )?;
             }
             arg if arg.starts_with("--base-ref=") => {
-                base_ref = Some(parse_git_ref_token(inline_value(arg, "--base-ref")?)?);
+                set_once(
+                    &mut base_ref,
+                    "--base-ref",
+                    parse_git_ref_token(inline_value(arg, "--base-ref")?)?,
+                )?;
             }
             "--base-sha" => {
                 idx += 1;
-                base_sha = Some(parse_commit_sha(
-                    value(&args, idx, "--base-sha")?,
+                set_once(
+                    &mut base_sha,
                     "--base-sha",
-                )?);
+                    parse_commit_sha(value(&args, idx, "--base-sha")?, "--base-sha")?,
+                )?;
             }
             arg if arg.starts_with("--base-sha=") => {
-                base_sha = Some(parse_commit_sha(
-                    inline_value(arg, "--base-sha")?,
+                set_once(
+                    &mut base_sha,
                     "--base-sha",
-                )?);
+                    parse_commit_sha(inline_value(arg, "--base-sha")?, "--base-sha")?,
+                )?;
             }
             "--head-sha" => {
                 idx += 1;
-                head_sha = Some(parse_commit_sha(
-                    value(&args, idx, "--head-sha")?,
+                set_once(
+                    &mut head_sha,
                     "--head-sha",
-                )?);
+                    parse_commit_sha(value(&args, idx, "--head-sha")?, "--head-sha")?,
+                )?;
             }
             arg if arg.starts_with("--head-sha=") => {
-                head_sha = Some(parse_commit_sha(
-                    inline_value(arg, "--head-sha")?,
+                set_once(
+                    &mut head_sha,
                     "--head-sha",
-                )?);
+                    parse_commit_sha(inline_value(arg, "--head-sha")?, "--head-sha")?,
+                )?;
             }
             "--diff-out" => {
                 idx += 1;
-                diff_out = parse_path_value(&args, idx, "--diff-out")?;
+                set_path_once(
+                    &mut diff_out,
+                    &mut saw_diff_out,
+                    "--diff-out",
+                    parse_path_value(&args, idx, "--diff-out")?,
+                )?;
             }
             arg if arg.starts_with("--diff-out=") => {
-                diff_out = parse_inline_path_value(arg, "--diff-out")?;
+                set_path_once(
+                    &mut diff_out,
+                    &mut saw_diff_out,
+                    "--diff-out",
+                    parse_inline_path_value(arg, "--diff-out")?,
+                )?;
             }
             other => return Err(format!("unknown pr-setup argument `{other}`")),
         }
         idx += 1;
     }
-    let options = ExternalPrSetupOptions {
+    let mut options = ExternalPrSetupOptions {
         repo: repo.ok_or_else(|| "missing --repo".to_string())?,
         number: number.ok_or_else(|| "missing --number".to_string())?,
         root,
@@ -538,7 +591,40 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
     };
     reject_control_path(&options.root, "--root")?;
     reject_control_path(&options.diff_out, "--diff-out")?;
+    options.diff_out = absolute_pr_setup_diff_out(&options.diff_out)?;
+    reject_control_path(&options.diff_out, "--diff-out")?;
     Ok(options)
+}
+
+fn set_once<T>(slot: &mut Option<T>, flag: &str, value: T) -> Result<(), String> {
+    if slot.is_some() {
+        return Err(format!("duplicate {flag}"));
+    }
+    *slot = Some(value);
+    Ok(())
+}
+
+fn set_path_once(
+    slot: &mut PathBuf,
+    seen: &mut bool,
+    flag: &str,
+    value: PathBuf,
+) -> Result<(), String> {
+    if *seen {
+        return Err(format!("duplicate {flag}"));
+    }
+    *slot = value;
+    *seen = true;
+    Ok(())
+}
+
+fn absolute_pr_setup_diff_out(path: &Path) -> Result<PathBuf, String> {
+    if path.is_absolute() {
+        return Ok(path.to_path_buf());
+    }
+    let cwd = env::current_dir()
+        .map_err(|err| format!("failed to resolve current directory for --diff-out: {err}"))?;
+    Ok(cwd.join(path))
 }
 
 fn parse_github_repo(raw: &str) -> Result<String, String> {
@@ -577,12 +663,16 @@ fn parse_pr_number(raw: &str) -> Result<String, String> {
 fn parse_git_ref_token(raw: &str) -> Result<String, String> {
     if raw.is_empty()
         || raw.starts_with('-')
-        || !raw
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
+        || raw.starts_with('+')
+        || raw.starts_with('@')
+        || raw == "@"
+        || raw.contains("..")
+        || !raw.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b'+' | b'@')
+        })
     {
         return Err(
-            "invalid --base-ref; use a branch/ref token made of ASCII letters, digits, `/`, `.`, `_`, or `-`"
+            "invalid --base-ref; use a branch/ref token made of ASCII letters, digits, `/`, `.`, `_`, `-`, `+`, or `@`"
                 .to_string(),
         );
     }
@@ -2012,6 +2102,9 @@ mod tests {
 
     #[test]
     fn parse_pr_setup_accepts_exact_external_pr_inputs() -> Result<(), String> {
+        let expected_diff_out = env::current_dir()
+            .map_err(|err| err.to_string())?
+            .join("target/external-pilots/bytes-pr827.diff");
         let command = parse(args([
             "unsafe-review",
             "pr-setup",
@@ -2039,11 +2132,80 @@ mod tests {
         assert_eq!(options.base_sha, "245adff079eb0cb1a706d35bab5f68b2d51919f6");
         assert_eq!(options.head_sha, "2f6852ec5295160bc4f1e687ea19847f9cd4e665");
         assert_eq!(options.root, PathBuf::from("/tmp/bytes checkout"));
-        assert_eq!(
-            options.diff_out,
-            PathBuf::from("target/external-pilots/bytes-pr827.diff")
-        );
+        assert_eq!(options.diff_out, expected_diff_out);
         Ok(())
+    }
+
+    #[test]
+    fn pr_setup_accepts_common_github_base_ref_tokens() -> Result<(), String> {
+        for base_ref in ["release+1", "feat@bar"] {
+            let command = parse(args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                base_ref,
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            ]))?;
+            let Command::PrSetup(options) = command else {
+                return Err("expected pr-setup command".to_string());
+            };
+            assert_eq!(options.base_ref, base_ref);
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pr_setup_rejects_duplicate_flags() {
+        for (flag, first, second) in [
+            ("--repo", "tokio-rs/bytes", "tokio-rs/tokio"),
+            ("--number", "827", "828"),
+            ("--root", "/tmp/bytes", "/tmp/tokio"),
+            ("--base-ref", "main", "release+1"),
+            (
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "1111111111111111111111111111111111111111",
+            ),
+            (
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+                "2222222222222222222222222222222222222222",
+            ),
+            (
+                "--diff-out",
+                "target/external-pilots/bytes-pr827.diff",
+                "target/external-pilots/bytes-pr828.diff",
+            ),
+        ] {
+            let mut argv = args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                "main",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            ]);
+            argv.push(flag.to_string());
+            argv.push(first.to_string());
+            argv.push(flag.to_string());
+            argv.push(second.to_string());
+
+            let err = parse(argv).err().unwrap_or_default();
+            assert_eq!(err, format!("duplicate {flag}"));
+        }
     }
 
     #[test]
