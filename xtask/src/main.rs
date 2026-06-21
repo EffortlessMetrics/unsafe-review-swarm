@@ -18984,12 +18984,16 @@ Snapshot reports:
         let path = dir.join("witness-plan.md");
         let witness_plan =
             fs::read_to_string(&path).map_err(|err| format!("read witness plan failed: {err}"))?;
+        let (before_trust, trust_boundary) = witness_plan
+            .split_once("## Trust boundary")
+            .ok_or_else(|| "witness plan fixture must contain trust boundary".to_string())?;
+        let card_section_start = before_trust
+            .find("#### `card-1`")
+            .ok_or_else(|| "witness plan fixture must contain card-1 section".to_string())?;
+        let card_section = &before_trust[card_section_start..];
         fs::write(
             &path,
-            witness_plan.replace(
-                "## Trust boundary",
-                "#### `card-1`\n\n- Route: `human-deep-review`\n  - Reason: duplicate route section\n  - What it can show: focused reviewer attention\n  - What it cannot prove: arbitrary callers\n  - Receipt hint: unsafe-review receipt import-manual card-1\n\n## Trust boundary",
-            ),
+            format!("{before_trust}{card_section}\n## Trust boundary{trust_boundary}"),
         )
         .map_err(|err| format!("write witness plan failed: {err}"))?;
 
