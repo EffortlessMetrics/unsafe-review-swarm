@@ -282,13 +282,14 @@ diff --git
     }
 
     #[test]
-    fn external_pr_guidance_rejects_missing_raw_diff_capture_cues() -> Result<(), String> {
+    fn external_pr_guidance_rejects_missing_git_diff_output_cue() -> Result<(), String> {
         let text = r#"
 gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
 git -C /path/to/repo fetch origin <base-sha> <head-sha>
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
 Avoid rendered GitHub diff views and older Windows PowerShell redirection.
+git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
 unsafe-review pr --diff /absolute/path/to/change.diff
 diff --git
 ---
@@ -296,10 +297,13 @@ diff --git
 @@
 "#;
         let result = require_external_pr_guidance_text("docs/example.md", text);
-        if result.is_err() {
+        let err = result.err().unwrap_or_default();
+        if err.contains("external-PR guidance is missing `git diff --output`") {
             Ok(())
         } else {
-            Err("expected missing raw diff capture cue".to_string())
+            Err(format!(
+                "expected missing `git diff --output` cue, got `{err}`"
+            ))
         }
     }
 }
