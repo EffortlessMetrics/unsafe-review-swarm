@@ -1,9 +1,9 @@
 use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrOptions,
-    Format, OutcomeOptions, ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
-    SubcommandHelpTarget,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput,
+    ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions,
+    RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -132,6 +132,10 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
             DiscoveryOptions::default(),
         ),
         Command::FirstPr(options) => first_pr(options).map_err(crate::RunFailure::Tool),
+        Command::PrSetup(options) => {
+            pr_setup(options);
+            Ok(())
+        }
         Command::Badges { root, out } => badges(&root, &out).map_err(crate::RunFailure::Tool),
         Command::Explain { root, id, format } => {
             explain(&root, &id, format).map_err(crate::RunFailure::Tool)
@@ -2835,6 +2839,76 @@ fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
     Ok(())
 }
 
+fn pr_setup(options: ExternalPrSetupOptions) {
+    let root = shell_path_arg(&options.root);
+    let diff_out = shell_path_arg(&options.diff_out);
+    let diff_out_parent = options
+        .diff_out
+        .parent()
+        .map(shell_path_arg)
+        .unwrap_or_else(|| shell_path_arg(Path::new(".")));
+    println!("unsafe-review pr-setup");
+    println!();
+    println!(
+        "Read-only setup commands for external GitHub PR {}#{}.",
+        options.repo, options.number
+    );
+    println!(
+        "This command did not fetch, checkout, run unsafe-review, execute witnesses, post comments, or edit source."
+    );
+    println!();
+    println!("Capture immutable PR refs:");
+    println!(
+        "  gh pr view {} --repo {} --json baseRefName,baseRefOid,headRefOid",
+        options.number, options.repo
+    );
+    println!();
+    println!("Prepare a local checkout:");
+    println!(
+        "  git -C {root} fetch origin {} pull/{}/head",
+        options.base_ref, options.number
+    );
+    println!("  git -C {root} checkout --detach {}", options.head_sha);
+    println!();
+    println!("Run the normal advisory first-pr bundle:");
+    println!(
+        "  unsafe-review pr --root {root} --base-sha {} --head-sha {}",
+        options.base_sha, options.head_sha
+    );
+    println!();
+    println!("Raw diff capture for pilot receipts or --diff:");
+    println!("  mkdir -p {diff_out_parent}");
+    println!(
+        "  git -C {root} diff --binary --full-index --output={diff_out} {}...{}",
+        options.base_sha, options.head_sha
+    );
+    println!("  unsafe-review pr --root {root} --diff {diff_out}");
+    println!();
+    println!("Inputs kept visible:");
+    println!("  repo: {}", options.repo);
+    println!("  number: {}", options.number);
+    println!("  baseRefName: {}", options.base_ref);
+    println!("  baseRefOid: {}", options.base_sha);
+    println!("  headRefOid: {}", options.head_sha);
+    println!();
+    println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
+}
+
+fn shell_path_arg(path: &Path) -> String {
+    let raw = path.display().to_string();
+    format!("\"{}\"", normalize_shell_path(&raw))
+}
+
+#[cfg(windows)]
+fn normalize_shell_path(raw: &str) -> String {
+    raw.replace('\\', "/")
+}
+
+#[cfg(not(windows))]
+fn normalize_shell_path(raw: &str) -> String {
+    raw.to_string()
+}
+
 fn print_subcommand_help(target: SubcommandHelpTarget) {
     match target {
         SubcommandHelpTarget::Check => print_check_help(),
@@ -2846,6 +2920,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::Receipt => print_receipt_help(),
         SubcommandHelpTarget::Outcome => print_outcome_help(),
         SubcommandHelpTarget::Policy => print_policy_help(),
+        SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
@@ -2926,6 +3001,9 @@ fn print_first_pr_help() {
     println!(
         "  gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid"
     );
+    println!(
+        "  unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --diff-out /path/to/change.diff"
+    );
     println!("  git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head");
     println!("  git -C /path/to/repo checkout --detach <head-sha>");
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
@@ -2939,6 +3017,43 @@ fn print_first_pr_help() {
     println!(
         "unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
     );
+}
+
+fn print_pr_setup_help() {
+    println!("unsafe-review pr-setup: print read-only external GitHub PR setup commands");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review pr-setup --repo <owner>/<repo> --number <pr> --base-ref <baseRefName> --base-sha <baseRefOid> --head-sha <headRefOid> [--root .] [--diff-out target/unsafe-review/external-pr.diff]"
+    );
+    println!();
+    println!("What pr-setup does:");
+    println!(
+        "- Expands exact PR metadata into copyable checkout, first-pr, and raw-diff commands."
+    );
+    println!(
+        "- Prints commands only; it does not run gh, git, unsafe-review, witnesses, agents, or comments."
+    );
+    println!("- Keeps exact base/head SHAs visible for pilot receipts and review handoffs.");
+    println!();
+    println!("Inputs:");
+    println!("- --repo <owner>/<repo>      GitHub repository slug from `gh pr view --repo`");
+    println!("- --number <pr>             GitHub PR number");
+    println!("- --base-ref <baseRefName>  base branch name reported by `gh pr view`");
+    println!("- --base-sha <baseRefOid>   exact 40-hex base commit SHA");
+    println!("- --head-sha <headRefOid>   exact 40-hex head commit SHA");
+    println!("- --root <dir>              local checkout path to use in printed commands");
+    println!(
+        "- --diff-out <file>         raw diff path; relative values resolve from the current directory"
+    );
+    println!();
+    println!("Example:");
+    println!("  gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid");
+    println!(
+        "  unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref main --base-sha <baseRefOid> --head-sha <headRefOid> --root /path/to/bytes --diff-out target/external-pilots/bytes-pr827.diff"
+    );
+    println!();
+    println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
 fn print_first_pr_artifacts_help() {
@@ -3291,6 +3406,7 @@ fn print_help() {
         "  repo    [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
     );
     println!("  pr      first-run PR review bundle: auto-detects root and base ref");
+    println!("  pr-setup print read-only external GitHub PR checkout and raw-diff commands");
     println!(
         "  first-pr [--root .] [--base origin/main|--base-sha SHA [--head-sha SHA]|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
     );
@@ -3524,7 +3640,7 @@ fn print_candidate_help() {
 mod tests {
     use super::{
         RepoScanScopeMetadata, render_repo_scan_incomplete_status, render_repo_scan_status,
-        repo_status_operator_json, resolve_diff_path, writable_status, yes_no,
+        repo_status_operator_json, resolve_diff_path, shell_path_arg, writable_status, yes_no,
     };
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
@@ -3533,6 +3649,16 @@ mod tests {
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
         RepoScanScopeMetadata::new(Path::new("/tmp/repo"), &DiscoveryOptions::repo_defaults())
+    }
+
+    #[test]
+    fn shell_path_arg_only_rewrites_backslashes_on_windows() {
+        let formatted = shell_path_arg(Path::new(r"dir\name"));
+        if cfg!(windows) {
+            assert_eq!(formatted, "\"dir/name\"");
+        } else {
+            assert_eq!(formatted, "\"dir\\name\"");
+        }
     }
 
     #[test]

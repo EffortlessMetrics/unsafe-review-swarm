@@ -31,6 +31,9 @@ const EXTERNAL_PR_GUIDANCE_DOCS: &[&str] = &[FIRST_HOUR_DOC, FIRST_USE_DOC];
 const REQUIRED_EXTERNAL_PR_GUIDANCE: &[&str] = &[
     "gh pr view",
     "baseRefName,baseRefOid,headRefOid",
+    "unsafe-review pr-setup",
+    "--base-ref <base-ref-name>",
+    "--diff-out",
     "fetch origin <base-ref-name> pull/<number>/head",
     "checkout --detach <head-sha>",
     "--base-sha <base-sha>",
@@ -266,6 +269,7 @@ mod tests {
     fn external_pr_guidance_accepts_raw_diff_capture_cues() -> Result<(), String> {
         let text = r#"
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --diff-out /absolute/path/to/change.diff
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
@@ -285,6 +289,7 @@ diff --git
     fn external_pr_guidance_rejects_missing_git_diff_output_cue() -> Result<(), String> {
         let text = r#"
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --diff-out /absolute/path/to/change.diff
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
