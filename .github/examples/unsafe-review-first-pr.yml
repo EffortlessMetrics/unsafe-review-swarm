@@ -15,7 +15,7 @@
 #   - block on unsafe-review findings
 #   - claim memory safety, UB-free status, Miri-clean status, or site-execution proof
 #
-# See docs/ci/github-actions.md in the unsafe-review repository for the full
+# See docs/ci/github-action.md in the unsafe-review repository for the full
 # user-facing guide.
 
 name: unsafe-review-first-pr-example

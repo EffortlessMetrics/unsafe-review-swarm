@@ -235,7 +235,7 @@ current card identity.
 ## Related Docs
 
 - [Find and fix UB-risk review seams](../FIND_AND_FIX_UB.md)
-- [GitHub Actions guide](github-actions.md)
+- [GitHub Actions guide](github-action.md)
 - [PR and CI model](PR_CI.md)
 - [Comment-plan examples](COMMENT_PLAN_EXAMPLES.md)
 - [Trusted comment poster](TRUSTED_COMMENT_POSTER.md)

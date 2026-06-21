@@ -27,7 +27,7 @@ All of it must preserve the advisory ReviewCard trust boundary.
 2. Add `cargo run --locked -p xtask -- check-first-hour` to keep the
    documented first hour runnable: doctor, fixture first-pr, artifact verify,
    no-card fixture path.
-3. Add `docs/ci/github-actions.md` as the copy-paste user-facing GitHub Actions
+3. Add `docs/ci/github-action.md` as the copy-paste user-facing GitHub Action
    guide and re-anchor `.github/examples/unsafe-review-first-pr.yml` as the
    canonical drop-in.
 4. Add a bounded `github-summary.md` job-summary fragment so CI does not have

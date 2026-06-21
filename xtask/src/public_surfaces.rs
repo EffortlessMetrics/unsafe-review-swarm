@@ -34,6 +34,18 @@ const FIRST_PR_ARTIFACT_NAME_SURFACES: &[&str] = &[
     "docs/ci/github-action.md",
     "docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md",
 ];
+const CANONICAL_GITHUB_ACTION_GUIDE: &str = "docs/ci/github-action.md";
+const LEGACY_GITHUB_ACTION_GUIDE_ALIAS: &str = "docs/ci/github-actions.md";
+const GITHUB_ACTION_GUIDE_POINTER_SURFACES: &[&str] = &[
+    ".github/actions/unsafe-review-first-pr/action.yml",
+    ".github/examples/unsafe-review-first-pr.yml",
+    ".rails/lanes/marketplace-first-hour-ux/implementation-plan.md",
+    ".rails/lanes/marketplace-first-hour-ux/closeout.md",
+    "docs/README.md",
+    "docs/START-HERE.md",
+    "docs/ci/UB_RISK_REVIEW_CI.md",
+    "docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md",
+];
 pub(crate) const FIRST_PR_BUNDLE_ARTIFACT_PATHS: &[&str] = &[
     "target/unsafe-review/review-kit.json",
     "target/unsafe-review/cards.json",
@@ -87,6 +99,7 @@ pub(crate) fn check_impl() -> Result<usize, String> {
 }
 
 pub(crate) fn check_first_pr_artifact_list_surfaces() -> Result<(), String> {
+    check_github_action_guide_canonicalization()?;
     for path in FIRST_PR_ARTIFACT_LIST_SURFACES {
         require_file(path)?;
         let source = workspace_path(path);
@@ -146,6 +159,55 @@ fn check_forbidden_terms(value: &toml::Value) -> Result<(), String> {
                 "{PUBLIC_SURFACES_LEDGER} contains duplicate forbidden term `{term}`"
             ));
         }
+    }
+    Ok(())
+}
+
+fn check_github_action_guide_canonicalization() -> Result<(), String> {
+    require_file(CANONICAL_GITHUB_ACTION_GUIDE)?;
+    require_file(LEGACY_GITHUB_ACTION_GUIDE_ALIAS)?;
+
+    let alias = read_to_string(&workspace_path(LEGACY_GITHUB_ACTION_GUIDE_ALIAS))?;
+    require_legacy_github_action_guide_alias(LEGACY_GITHUB_ACTION_GUIDE_ALIAS, &alias)?;
+
+    for path in GITHUB_ACTION_GUIDE_POINTER_SURFACES {
+        require_file(path)?;
+        let text = read_to_string(&workspace_path(path))?;
+        require_canonical_github_action_guide_pointer(path, &text)?;
+    }
+    Ok(())
+}
+
+pub(crate) fn require_legacy_github_action_guide_alias(
+    path: &str,
+    text: &str,
+) -> Result<(), String> {
+    if !text.contains("[docs/ci/github-action.md](github-action.md)") {
+        return Err(format!(
+            "{path} must point to canonical guide `{CANONICAL_GITHUB_ACTION_GUIDE}`"
+        ));
+    }
+    if text.contains("```") {
+        return Err(format!(
+            "{path} must stay a compatibility alias, not a duplicate guide with code blocks"
+        ));
+    }
+    Ok(())
+}
+
+pub(crate) fn require_canonical_github_action_guide_pointer(
+    path: &str,
+    text: &str,
+) -> Result<(), String> {
+    if text.contains("github-actions.md") {
+        return Err(format!(
+            "{path} must reference canonical guide `{CANONICAL_GITHUB_ACTION_GUIDE}`, not legacy alias `{LEGACY_GITHUB_ACTION_GUIDE_ALIAS}`"
+        ));
+    }
+    if !text.contains("github-action.md") {
+        return Err(format!(
+            "{path} must reference canonical guide `{CANONICAL_GITHUB_ACTION_GUIDE}`"
+        ));
     }
     Ok(())
 }
