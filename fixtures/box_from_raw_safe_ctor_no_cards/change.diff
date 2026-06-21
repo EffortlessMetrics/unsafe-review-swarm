@@ -1,0 +1,26 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -0,0 +1,22 @@
++/// A type with a safe `from_raw` constructor. `from_raw` is a common safe
++/// constructor name; calling it outside any unsafe scope must not produce a
++/// ReviewCard (D1 unsafe-scope gate distinguishes it from `Box::from_raw`).
++pub struct Handle {
++    id: u32,
++}
++
++impl Handle {
++    /// Safe constructor — no unsafe involved.
++    pub fn from_raw(id: u32) -> Self {
++        Handle { id }
++    }
++
++    pub fn id(&self) -> u32 {
++        self.id
++    }
++}
++
++/// Safe caller invoking the safe `Handle::from_raw` — must not produce a card.
++pub fn make_handle() -> Handle {
++    Handle::from_raw(7)
++}

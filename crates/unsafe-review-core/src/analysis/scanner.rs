@@ -843,6 +843,14 @@ fn detect_syntax_site(
             // - MaybeUninitAssumeInit (assume_init and variants)
             // - StrFromUtf8Unchecked  (str::from_utf8_unchecked)
             // - Zeroed                (mem::zeroed)
+            // - UnwrapUnchecked       (Option/Result::unwrap_unchecked)
+            // - NonNullUnchecked      (NonNull::new_unchecked)
+            // - UnreachableUnchecked  (hint::unreachable_unchecked)
+            // - DropInPlace           (ptr::drop_in_place)
+            // - BoxFromRaw            (Box::from_raw; the bare `from_raw` name also
+            //                          spells common safe constructors like
+            //                          `Thing::from_raw`, so the scope gate is what
+            //                          separates the unsafe stdlib call from homonyms)
             if matches!(
                 result,
                 Some((
@@ -852,7 +860,12 @@ fn detect_syntax_site(
                         | OperationFamily::SliceFromRawParts
                         | OperationFamily::MaybeUninitAssumeInit
                         | OperationFamily::StrFromUtf8Unchecked
-                        | OperationFamily::Zeroed,
+                        | OperationFamily::Zeroed
+                        | OperationFamily::UnwrapUnchecked
+                        | OperationFamily::NonNullUnchecked
+                        | OperationFamily::UnreachableUnchecked
+                        | OperationFamily::DropInPlace
+                        | OperationFamily::BoxFromRaw,
                 ))
             ) && !is_inside_range(fact, unsafe_block_ranges)
                 && !is_inside_range(fact, unsafe_fn_ranges)

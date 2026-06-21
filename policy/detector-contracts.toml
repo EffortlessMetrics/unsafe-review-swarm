@@ -345,13 +345,14 @@ positive_fixtures = [
   "unwrap_unchecked_let_else_ok_guard",
 ]
 negative_fixtures = [
+  "unwrap_unchecked_safe_method_no_cards",
   "unwrap_unchecked_is_none_return_comment_not_guard",
   "unwrap_unchecked_is_ok_observed_not_guard",
   "unwrap_unchecked_match_some_reassigned_not_guard",
   "unwrap_unchecked_other_if_let_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Bare call-name unwrap_unchecked family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate rejecting definition headers (D2); gated on unsafe scope (D1). is_some/match-ok/if-let/let-else discharge paths confirmed positive; return-comment masking (D4), observed-only, reassigned-binding, and unrelated-option (D3) negative controls confirm discipline gates. Advisory heuristic only."
+evidence = "Bare call-name unwrap_unchecked family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate rejecting definition headers (D2). Gated on unsafe scope (D1) by the detect_syntax_site / fallback_scan call-site gate; the safe-method no-card control confirms a same-named safe method outside unsafe scope emits no card. is_some/match-ok/if-let/let-else discharge paths confirmed positive; return-comment masking (D4), observed-only, reassigned-binding, and unrelated-option (D3) negative controls confirm discipline gates. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]
@@ -370,7 +371,7 @@ negative_fixtures = [
   "nonnull_new_shadowed_ptr_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "NonNull::new_unchecked family matched by the nonnull operation classifier with the central is_fn_definition_header gate (D2) and word-boundary anchoring (D5); gated on unsafe scope (D1). null-check and constructor guard discharge paths confirmed positive; return-comment masking (D4), observed-only, reassigned-pointer, and shadowed-pointer (D3 same-origin) negative controls confirm discipline gates. Advisory heuristic only."
+evidence = "NonNull::new_unchecked family matched by the nonnull operation classifier with the central is_fn_definition_header gate (D2) and word-boundary anchoring (D5). Gated on unsafe scope (D1) by the detect_syntax_site / fallback_scan call-site gate; a bare safe new_unchecked homonym routes to unsafe_fn_call rather than this family, so the D1 control is the shared call-site gate rather than a family-specific safe-context fixture. null-check and constructor guard discharge paths confirmed positive; return-comment masking (D4), observed-only, reassigned-pointer, and shadowed-pointer (D3 same-origin) negative controls confirm discipline gates. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]
@@ -381,12 +382,13 @@ positive_fixtures = [
   "unreachable_unchecked_path",
 ]
 negative_fixtures = [
+  "unreachable_unchecked_safe_fn_no_cards",
   "unreachable_unchecked_closed_infallible_match_not_guard",
   "unreachable_unchecked_other_infallible_not_guard",
   "unreachable_unchecked_post_infallible_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Bare call-name unreachable_unchecked family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2); gated on unsafe scope (D1). Infallible-path discharge confirmed positive; closed-branch, unrelated-infallible (D3), and post-infallible ordering negative controls confirm discipline gates. Comment/string masking (D4) applies centrally. Advisory heuristic only."
+evidence = "Bare call-name unreachable_unchecked family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2). Gated on unsafe scope (D1) by the detect_syntax_site / fallback_scan call-site gate; the safe-fn no-card control confirms a same-named safe free function outside unsafe scope emits no card. Infallible-path discharge confirmed positive; closed-branch, unrelated-infallible (D3), and post-infallible ordering negative controls confirm discipline gates. Comment/string masking (D4) applies centrally. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]
@@ -397,10 +399,11 @@ positive_fixtures = [
   "drop_in_place_box_origin",
 ]
 negative_fixtures = [
+  "drop_in_place_safe_fn_no_cards",
   "drop_in_place_reassigned_origin_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "ptr::drop_in_place family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2); gated on unsafe scope (D1). Box-origin discharge path confirmed positive; the reassigned-origin (D3 same-origin) negative control confirms the discharge gate. Comment/string masking (D4) applies centrally. Only a same-origin negative control exists at this time; additional discipline-specific controls are a future extension. Advisory heuristic only."
+evidence = "ptr::drop_in_place family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2). Gated on unsafe scope (D1) by the detect_syntax_site / fallback_scan call-site gate; the safe-fn no-card control confirms a same-named safe free function outside unsafe scope emits no card. Box-origin discharge path confirmed positive; the reassigned-origin (D3 same-origin) negative control confirms the discharge gate. Comment/string masking (D4) applies centrally. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]
@@ -411,10 +414,11 @@ positive_fixtures = [
   "box_from_raw_box_origin",
 ]
 negative_fixtures = [
+  "box_from_raw_safe_ctor_no_cards",
   "box_from_raw_reassigned_origin_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Box::from_raw family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2); gated on unsafe scope (D1). Box-origin discharge path confirmed positive; the reassigned-origin (D3 same-origin) negative control confirms the discharge gate. Comment/string masking (D4) applies centrally. Only a same-origin negative control exists at this time; additional discipline-specific controls are a future extension. Advisory heuristic only."
+evidence = "Box::from_raw family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2). Gated on unsafe scope (D1) by the detect_syntax_site / fallback_scan call-site gate: the bare `from_raw` name also spells common safe constructors (e.g. `Handle::from_raw`), and the safe-ctor no-card control confirms such a call outside unsafe scope emits no card. Box-origin discharge path confirmed positive; the reassigned-origin (D3 same-origin) negative control confirms the discharge gate. Comment/string masking (D4) applies centrally. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]

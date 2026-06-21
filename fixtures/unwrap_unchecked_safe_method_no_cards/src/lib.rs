@@ -1,0 +1,18 @@
+/// A type with a safe inherent `unwrap_unchecked` method. Calling it outside
+/// any unsafe scope must not produce a ReviewCard (D1 unsafe-scope gate
+/// distinguishes it from `Option::unwrap_unchecked`).
+pub struct Cell {
+    value: u32,
+}
+
+impl Cell {
+    /// Safe `unwrap_unchecked` homonym — returns the stored value, no unsafe.
+    pub fn unwrap_unchecked(&self) -> u32 {
+        self.value
+    }
+}
+
+/// Safe caller invoking the safe `Cell::unwrap_unchecked` — must not produce a card.
+pub fn read(cell: &Cell) -> u32 {
+    cell.unwrap_unchecked()
+}

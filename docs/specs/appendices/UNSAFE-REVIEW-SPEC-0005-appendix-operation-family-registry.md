@@ -64,7 +64,9 @@ name as stdlib unsafe operations when called outside any unsafe scope (no unsafe
 block and not inside an unsafe fn body) as no-card cases: pointer_arithmetic_safe_method_add_no_cards,
 set_len_safe_method_no_cards, from_raw_parts_safe_ctor_no_cards,
 assume_init_safe_method_no_cards, from_utf8_unchecked_safe_wrapper_no_cards,
-and zeroed_safe_wrapper_no_cards.  These controls verify the F1 bare-name scope
+zeroed_safe_wrapper_no_cards, box_from_raw_safe_ctor_no_cards,
+drop_in_place_safe_fn_no_cards, unwrap_unchecked_safe_method_no_cards,
+and unreachable_unchecked_safe_fn_no_cards.  These controls verify the F1 bare-name scope
 gate: a same-named call in safe context is not the stdlib operation and must not
 produce a ReviewCard.
 The following fixtures verify the F3 same-call binding rule: `atomic_pointer_state_swap_not_same_call`
