@@ -133,9 +133,20 @@ unsafe-review pr \
 ```
 
 This avoids rendered GitHub diffs and shell-redirection encoding surprises on
-Windows. If you need a saved patch file instead, let Git write it with
-`git diff --output=<path>` and pass that file to `--diff`; a valid saved patch
-should still contain `diff --git`, `---`, `+++`, and `@@` lines.
+older Windows PowerShell. If you need a saved patch file instead, let Git write
+it with `git diff --output=<path>` and pass that file to `--diff`. Use an
+absolute output path when `git -C` changes directories:
+
+```bash
+git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
+unsafe-review pr \
+  --root /path/to/repo \
+  --diff /absolute/path/to/change.diff \
+  --out-dir target/unsafe-review
+```
+
+A valid saved patch should still contain `diff --git`, `---`, `+++`, and `@@`
+lines.
 
 For a deterministic smoke case, run the bundled fixture from a repo checkout:
 

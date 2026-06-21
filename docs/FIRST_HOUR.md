@@ -243,8 +243,17 @@ Avoid copying from rendered GitHub diff views, and avoid shell redirection for
 saved patches on older Windows PowerShell: it can re-encode the file while
 leaving it readable to humans. If you need a saved patch file instead, let Git
 write it with `git diff --output=<path>` and use an absolute output path when
-`git -C` changes directories. A valid saved patch still contains `diff --git`,
-`---`, `+++`, and `@@` lines.
+`git -C` changes directories:
+
+```bash
+git -C /path/to/external/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
+unsafe-review pr \
+  --root /path/to/external/repo \
+  --diff /absolute/path/to/change.diff \
+  --out-dir target/unsafe-review
+```
+
+A valid saved patch still contains `diff --git`, `---`, `+++`, and `@@` lines.
 
 **Step 2 — understand the advisory boundary:**
 
