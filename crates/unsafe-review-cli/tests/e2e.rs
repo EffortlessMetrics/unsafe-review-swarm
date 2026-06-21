@@ -323,6 +323,10 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
         "stderr must show the exact fetch step: {stderr}"
     );
     assert!(
+        stderr.contains("pull/<number>/head"),
+        "stderr must use the public PR pull ref for head checkout recovery: {stderr}"
+    );
+    assert!(
         stderr.contains(&repo.base_sha) && stderr.contains(stale_head_sha),
         "stderr must keep exact base/head SHAs visible: {stderr}"
     );

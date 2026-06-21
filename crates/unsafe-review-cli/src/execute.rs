@@ -1676,7 +1676,8 @@ fn validate_expected_head_sha(
         Err(format!(
             "current HEAD in `{root_display}` is {actual}, but --head-sha expected {expected_head_sha}. \
              Prepare the exact external PR checkout before running {terminal_command}:\n\
-             \n  git -C \"{root_display}\" fetch origin {base_ref} {expected_head_sha}\n  \
+             \n  gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid\n  \
+             git -C \"{root_display}\" fetch origin {base_ref} pull/<number>/head\n  \
              git -C \"{root_display}\" checkout --detach {expected_head_sha}"
         ))
     } else if git_dirty_worktree(root).unwrap_or(true) {
