@@ -496,7 +496,7 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
         "git -C /path/to/repo checkout --detach <head-sha>",
         "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
         "Raw diff capture for receipts or --diff:",
-        "git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha> <head-sha>",
+        "git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha>",
         "unsafe-review pr --root /path/to/repo --diff /path/to/change.diff",
     ] {
         assert!(

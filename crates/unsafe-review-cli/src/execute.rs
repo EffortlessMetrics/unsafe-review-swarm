@@ -2927,7 +2927,7 @@ fn print_first_pr_help() {
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!("Raw diff capture for receipts or --diff:");
     println!(
-        "  git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha> <head-sha>"
+        "  git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha>"
     );
     println!("  unsafe-review pr --root /path/to/repo --diff /path/to/change.diff");
     println!();

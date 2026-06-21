@@ -31,14 +31,15 @@ gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid
 git -C /path/to/repo fetch origin <base-sha> <head-sha>
 git -C /path/to/repo checkout --detach <head-sha>
 mkdir -p target/external-pilots/<id>
-git -C /path/to/repo diff --binary --full-index --output=target/external-pilots/<id>/<id>.diff <base-sha> <head-sha>
+git -C /path/to/repo diff --binary --full-index --output=target/external-pilots/<id>/<id>.diff <base-sha>...<head-sha>
 unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir target/external-pilots/<id>/first-pr
 ```
 
 The `git diff --output=...` form writes Git's raw diff bytes directly to the
-receipt path after its parent directory exists, which avoids PowerShell or
-shell redirection changing the byte stream being hashed. Record the resulting
-path and SHA-256 in `diff_path` and `diff_sha256`.
+receipt path after its parent directory exists, using the same merge-base diff
+shape as `unsafe-review pr --base-sha ... --head-sha ...`. This avoids
+PowerShell or shell redirection changing the byte stream being hashed. Record
+the resulting path and SHA-256 in `diff_path` and `diff_sha256`.
 
 ## File Shape
 
