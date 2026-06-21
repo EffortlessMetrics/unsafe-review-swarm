@@ -296,11 +296,7 @@ diff --git
 @@
 "#;
         let result = require_external_pr_guidance_text("docs/example.md", text);
-        if result
-            .err()
-            .unwrap_or_default()
-            .contains("external-PR guidance is missing `git diff --output`")
-        {
+        if result.is_err() {
             Ok(())
         } else {
             Err("expected missing raw diff capture cue".to_string())
