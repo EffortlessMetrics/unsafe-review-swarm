@@ -69,7 +69,7 @@ owner = "product / cli"
 id = "UNSAFE-REVIEW-SPEC-0037"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md"
-status = "proposed"
+status = "accepted"
 owner = "repo-infra / ci"
 
 [[artifact]]
@@ -112,14 +112,14 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0021"
 id = "UNSAFE-REVIEW-SPEC-0040"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0040-detector-contracts-ledger.md"
-status = "proposed"
+status = "accepted"
 owner = "core / analysis"
 
 [[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0041"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md"
-status = "proposed"
+status = "accepted"
 owner = "core / analysis"
 
 [[artifact]]
