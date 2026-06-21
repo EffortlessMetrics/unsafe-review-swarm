@@ -16,7 +16,12 @@ partition_by_kind = { "fixture-transform" = "conformance" }
 #   source_fixture - fixture copied to target/evidence-loss-challenges/<id>/root
 #   diff         - diff filename, relative to the generated root
 #   transformation - deterministic transform applied before scanning
-#   baseline_contract_coverage - optional snapshot override before scanning
+#   baseline_card_id - optional exact card id for synthetic baseline files
+#   baseline_contract_coverage / baseline_guard_coverage /
+#     baseline_test_reach_coverage - optional snapshot coverage before scanning
+#     (present | weak | missing)
+#   baseline_witness_receipt_coverage - optional snapshot witness coverage
+#     before scanning (present | missing)
 #   no_new_debt_exit_code - expected --policy no-new-debt process exit
 #   [challenge.expected] - expected summary, first-card, and comment-plan fields
 
@@ -39,6 +44,33 @@ inherited_gaps = 1
 selected_count = 0
 not_selected_count = 1
 operation_family = "raw_pointer_deref"
+class = "baseline_known"
+baseline_state = "worsened"
+outcome_movement = "regressed"
+
+[[challenge]]
+id = "debug-assert-bool-valid-value-guard"
+kind = "fixture-transform"
+source_fixture = "fixtures/transmute_bool_valid_value_guard"
+diff = "change.diff"
+transformation = "weaken-bool-valid-value-guard-to-debug-assert"
+baseline_card_id = "UR-transmute-bool-valid-value-guard-src-lib-rs-byte-to-bool-checked-operation-transmute-u8-bool-bdefdb7b6120-invalid_value-c1"
+baseline_contract_coverage = "present"
+baseline_guard_coverage = "present"
+baseline_test_reach_coverage = "missing"
+baseline_witness_receipt_coverage = "missing"
+no_new_debt_exit_code = 1
+
+[challenge.expected]
+cards = 1
+new_gaps = 0
+worsened_gaps = 1
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 1
+selected_count = 0
+not_selected_count = 1
+operation_family = "transmute"
 class = "baseline_known"
 baseline_state = "worsened"
 outcome_movement = "regressed"

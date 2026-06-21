@@ -118,10 +118,12 @@ loop without overclaiming precision or safety. Keep each step review-forward:
   expected movement, first-card, comment-plan, and no-new-debt invariants. The
   first case removes a `# Safety` section and SAFETY comment from a raw-pointer
   deref fixture and must regress `contract_coverage` without changing the
-  low-noise comment stance. Future transformations such as weakening a guard,
-  removing a receipt, or adding an unsafe declaration can extend the same
-  ledger. Acceptance: shows known evidence-loss transformations on realistic
-  inputs are detected; no global recall claim.
+  low-noise comment stance. A follow-up case weakens a runtime bool-domain
+  `assert!` guard to `debug_assert!` and must regress `guard_coverage` without
+  making baseline-known debt inline-commentable. Future transformations such as
+  removing a receipt or adding an unsafe declaration can extend the same ledger.
+  Acceptance: shows known evidence-loss transformations on realistic inputs are
+  detected; no global recall claim.
 - **GPR-4 — external pilot receipts (initial rail landed).** Run the public
   Action or equivalent artifact bundle read-only on real external PRs. The
   initial receipt rail lives in `docs/dogfood/pilots/` and is enforced by

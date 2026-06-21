@@ -23,13 +23,20 @@ const REMOVE_SAFETY_DOC_REPLACEMENT: &str =
     "/// Caller must ensure the pointer is valid and properly aligned.\n";
 const REMOVE_SAFETY_COMMENT_BLOCK: &str = "    // SAFETY: caller guarantees the invariants documented in the function-level\n    // # Safety section.\n";
 const REMOVE_SAFETY_DIFF: &str = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -5,17 +5,6 @@\n /// Read config from a raw pointer.\n ///\n-/// # Safety\n-///\n-/// The caller must ensure `ptr` is non-null, properly aligned for `Config`,\n-/// points to an initialized `Config` value that remains live for this call,\n-/// and that the access stays within one allocation.\n-///\n-/// This PR adds the safety contract above; the underlying unsafe dereference\n-/// is unchanged.  The coverage slot for contract moves from `missing` to\n-/// `present` -- an evidence improvement, NOT a safety proof or resolution.\n-/// The unsafe site remains open and advisory.\n+/// Caller must ensure the pointer is valid and properly aligned.\n pub fn read_config(ptr: *const Config) -> Config {\n-    // SAFETY: caller guarantees the invariants documented in the function-level\n-    // # Safety section.\n     unsafe { *ptr }\n }\n";
+const WEAKEN_BOOL_VALID_VALUE_GUARD_BEFORE: &str = "    assert!(value <= 1);\n";
+const WEAKEN_BOOL_VALID_VALUE_GUARD_AFTER: &str = "    debug_assert!(value <= 1);\n";
+const WEAKEN_BOOL_VALID_VALUE_DIFF: &str = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,7 +1,7 @@\n pub fn byte_to_bool_checked(value: u8) -> bool {\n     assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());\n-    assert!(value <= 1);\n+    debug_assert!(value <= 1);\n     // SAFETY: size equality and the bool byte domain are checked locally.\n     unsafe { core::mem::transmute::<u8, bool>(value) }\n }\n";
 
 struct ChallengeCase {
     id: String,
     source_fixture: String,
     diff: String,
     transformation: String,
+    baseline_card_id: Option<String>,
     baseline_contract_coverage: Option<String>,
+    baseline_guard_coverage: Option<String>,
+    baseline_test_reach_coverage: Option<String>,
+    baseline_witness_receipt_coverage: Option<String>,
     expected: Expected,
     no_new_debt_exit_code: Option<i32>,
 }
@@ -93,6 +100,7 @@ fn run_case(case: &ChallengeCase) -> Result<(), String> {
     }
     copy_dir_all(Path::new(&case.source_fixture), &root)?;
     apply_transformation(case, &root)?;
+    apply_baseline_state(case, &root)?;
 
     let diff = root.join(&case.diff);
     let check_stdout = run_unsafe_review_capture([
@@ -190,13 +198,19 @@ fn run_case(case: &ChallengeCase) -> Result<(), String> {
 }
 
 fn apply_transformation(case: &ChallengeCase, root: &Path) -> Result<(), String> {
-    if case.transformation != "remove-safety-section" {
-        return Err(format!(
+    match case.transformation.as_str() {
+        "remove-safety-section" => remove_safety_section(case, root),
+        "weaken-bool-valid-value-guard-to-debug-assert" => {
+            weaken_bool_valid_value_guard_to_debug_assert(case, root)
+        }
+        _ => Err(format!(
             "{LEDGER} challenge `{}` uses unsupported transformation `{}`",
             case.id, case.transformation
-        ));
+        )),
     }
+}
 
+fn remove_safety_section(case: &ChallengeCase, root: &Path) -> Result<(), String> {
     let src = root.join("src").join("lib.rs");
     let text =
         fs::read_to_string(&src).map_err(|err| format!("read {} failed: {err}", src.display()))?;
@@ -214,6 +228,40 @@ fn apply_transformation(case: &ChallengeCase, root: &Path) -> Result<(), String>
     )?;
     fs::write(&src, text).map_err(|err| format!("write {} failed: {err}", src.display()))?;
 
+    let diff_path = root.join(&case.diff);
+    fs::write(&diff_path, REMOVE_SAFETY_DIFF)
+        .map_err(|err| format!("write {} failed: {err}", diff_path.display()))?;
+    Ok(())
+}
+
+fn weaken_bool_valid_value_guard_to_debug_assert(
+    case: &ChallengeCase,
+    root: &Path,
+) -> Result<(), String> {
+    let src = root.join("src").join("lib.rs");
+    let text =
+        fs::read_to_string(&src).map_err(|err| format!("read {} failed: {err}", src.display()))?;
+    let text = normalize_lf(&text);
+    let text = replace_once(
+        &text,
+        WEAKEN_BOOL_VALID_VALUE_GUARD_BEFORE,
+        WEAKEN_BOOL_VALID_VALUE_GUARD_AFTER,
+        &format!("{} src/lib.rs runtime bool-value guard", case.id),
+    )?;
+    fs::write(&src, text).map_err(|err| format!("write {} failed: {err}", src.display()))?;
+
+    let diff_path = root.join(&case.diff);
+    fs::write(&diff_path, WEAKEN_BOOL_VALID_VALUE_DIFF)
+        .map_err(|err| format!("write {} failed: {err}", diff_path.display()))?;
+    Ok(())
+}
+
+fn apply_baseline_state(case: &ChallengeCase, root: &Path) -> Result<(), String> {
+    if let Some(card_id) = &case.baseline_card_id {
+        write_synthetic_baseline(case, root, card_id)?;
+        return Ok(());
+    }
+
     if let Some(contract_coverage) = &case.baseline_contract_coverage {
         let snapshot = root
             .join("policy")
@@ -230,10 +278,100 @@ fn apply_transformation(case: &ChallengeCase, root: &Path) -> Result<(), String>
         fs::write(&snapshot, snapshot_text)
             .map_err(|err| format!("write {} failed: {err}", snapshot.display()))?;
     }
+    Ok(())
+}
 
-    let diff_path = root.join(&case.diff);
-    fs::write(&diff_path, REMOVE_SAFETY_DIFF)
-        .map_err(|err| format!("write {} failed: {err}", diff_path.display()))?;
+fn write_synthetic_baseline(
+    case: &ChallengeCase,
+    root: &Path,
+    card_id: &str,
+) -> Result<(), String> {
+    validate_baseline_card_id(card_id)
+        .map_err(|err| format!("{LEDGER} challenge `{}` baseline_card_id {err}", case.id))?;
+    let contract = required_baseline_coverage(case, "baseline_contract_coverage")?;
+    let guard = required_baseline_coverage(case, "baseline_guard_coverage")?;
+    let test_reach = required_baseline_coverage(case, "baseline_test_reach_coverage")?;
+    let witness = required_baseline_witness_coverage(case)?;
+    let policy_dir = root.join("policy");
+    fs::create_dir_all(&policy_dir)
+        .map_err(|err| format!("create {} failed: {err}", policy_dir.display()))?;
+
+    let ledger_path = policy_dir.join("unsafe-review-baseline.toml");
+    let ledger = format!(
+        "schema_version = \"0.1\"\nstatus = \"active\"\n\n[[entries]]\ncard_id = \"{card_id}\"\nowner = \"evidence-loss-challenge\"\nreason = \"synthetic baseline for evidence-loss challenge\"\nevidence = \"baseline records the pre-transformation coverage slots for this controlled challenge\"\nreview_after = \"2027-01-01\"\n"
+    );
+    fs::write(&ledger_path, ledger.replace("\r\n", "\n"))
+        .map_err(|err| format!("write {} failed: {err}", ledger_path.display()))?;
+
+    let snapshot_path = policy_dir.join("unsafe-review-baseline-snapshot.toml");
+    let snapshot = format!(
+        "schema_version = \"0.1\"\npolicy = \"unsafe-review-baseline-snapshot\"\n\n[[entries]]\ncard_id = \"{card_id}\"\ncontract_coverage = \"{contract}\"\nguard_coverage = \"{guard}\"\ntest_reach_coverage = \"{test_reach}\"\nwitness_receipt_coverage = \"{witness}\"\n"
+    );
+    fs::write(&snapshot_path, snapshot.replace("\r\n", "\n"))
+        .map_err(|err| format!("write {} failed: {err}", snapshot_path.display()))?;
+    Ok(())
+}
+
+fn required_baseline_coverage<'a>(case: &'a ChallengeCase, key: &str) -> Result<&'a str, String> {
+    let value = match key {
+        "baseline_contract_coverage" => case.baseline_contract_coverage.as_deref(),
+        "baseline_guard_coverage" => case.baseline_guard_coverage.as_deref(),
+        "baseline_test_reach_coverage" => case.baseline_test_reach_coverage.as_deref(),
+        _ => None,
+    }
+    .ok_or_else(|| {
+        format!(
+            "{LEDGER} challenge `{}` baseline_card_id requires `{key}`",
+            case.id
+        )
+    })?;
+    validate_three_level_coverage_value(value, key, &case.id)?;
+    Ok(value)
+}
+
+fn required_baseline_witness_coverage(case: &ChallengeCase) -> Result<&str, String> {
+    let key = "baseline_witness_receipt_coverage";
+    let value = case
+        .baseline_witness_receipt_coverage
+        .as_deref()
+        .ok_or_else(|| {
+            format!(
+                "{LEDGER} challenge `{}` baseline_card_id requires `{key}`",
+                case.id
+            )
+        })?;
+    validate_witness_coverage_value(value, key, &case.id)?;
+    Ok(value)
+}
+
+fn validate_three_level_coverage_value(value: &str, key: &str, id: &str) -> Result<(), String> {
+    if matches!(value, "present" | "weak" | "missing") {
+        return Ok(());
+    }
+    Err(format!(
+        "{LEDGER} challenge `{id}` `{key}` must be `present`, `weak`, or `missing`; got `{value}`"
+    ))
+}
+
+fn validate_witness_coverage_value(value: &str, key: &str, id: &str) -> Result<(), String> {
+    if matches!(value, "present" | "missing") {
+        return Ok(());
+    }
+    Err(format!(
+        "{LEDGER} challenge `{id}` `{key}` must be `present` or `missing`; got `{value}`"
+    ))
+}
+
+fn validate_baseline_card_id(value: &str) -> Result<(), &'static str> {
+    if !value.starts_with("UR-") {
+        return Err("must start with `UR-`");
+    }
+    let Some((_, count)) = value.rsplit_once("-c") else {
+        return Err("must end in counted identity suffix `-cN`");
+    };
+    if count.is_empty() || !count.chars().all(|ch| ch.is_ascii_digit()) {
+        return Err("must end in counted identity suffix `-cN`");
+    }
     Ok(())
 }
 
@@ -424,8 +562,24 @@ fn parse_ledger(path: &Path) -> Result<Vec<ChallengeCase>, String> {
             &format!("{ledger_path} challenge[{idx}] ({id}) diff"),
         )?;
         let transformation = required_str(table, "transformation", &ledger_path, idx)?;
+        let baseline_card_id = table
+            .get("baseline_card_id")
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
         let baseline_contract_coverage = table
             .get("baseline_contract_coverage")
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
+        let baseline_guard_coverage = table
+            .get("baseline_guard_coverage")
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
+        let baseline_test_reach_coverage = table
+            .get("baseline_test_reach_coverage")
+            .and_then(toml::Value::as_str)
+            .map(str::to_string);
+        let baseline_witness_receipt_coverage = table
+            .get("baseline_witness_receipt_coverage")
             .and_then(toml::Value::as_str)
             .map(str::to_string);
         let expected_table = table
@@ -452,7 +606,11 @@ fn parse_ledger(path: &Path) -> Result<Vec<ChallengeCase>, String> {
             source_fixture,
             diff,
             transformation,
+            baseline_card_id,
             baseline_contract_coverage,
+            baseline_guard_coverage,
+            baseline_test_reach_coverage,
+            baseline_witness_receipt_coverage,
             expected,
             no_new_debt_exit_code,
         });
@@ -696,5 +854,43 @@ mod tests {
             .err()
             .unwrap_or_default();
         assert!(err.contains("generated challenge root"), "{err}");
+    }
+
+    #[test]
+    fn validate_baseline_card_id_requires_counted_identity() {
+        let err = validate_baseline_card_id("UR-example")
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("counted identity"), "{err}");
+    }
+
+    #[test]
+    fn three_level_coverage_validation_rejects_unknown_slot() {
+        let err = validate_three_level_coverage_value("maybe", "baseline_guard_coverage", "case")
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("present"), "{err}");
+    }
+
+    #[test]
+    fn three_level_coverage_validation_accepts_weak_snapshot_slots() -> Result<(), String> {
+        for key in [
+            "baseline_contract_coverage",
+            "baseline_guard_coverage",
+            "baseline_test_reach_coverage",
+        ] {
+            validate_three_level_coverage_value("weak", key, "case")?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn witness_coverage_validation_rejects_weak_slot() {
+        let err =
+            validate_witness_coverage_value("weak", "baseline_witness_receipt_coverage", "case")
+                .err()
+                .unwrap_or_default();
+        assert!(err.contains("present"), "{err}");
+        assert!(err.contains("missing"), "{err}");
     }
 }
