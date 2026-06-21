@@ -2890,7 +2890,17 @@ fn pr_setup(options: ExternalPrSetupOptions) {
 
 fn shell_path_arg(path: &Path) -> String {
     let raw = path.display().to_string();
-    format!("\"{}\"", raw.replace('\\', "/"))
+    format!("\"{}\"", normalize_shell_path(&raw))
+}
+
+#[cfg(windows)]
+fn normalize_shell_path(raw: &str) -> String {
+    raw.replace('\\', "/")
+}
+
+#[cfg(not(windows))]
+fn normalize_shell_path(raw: &str) -> String {
+    raw.to_string()
 }
 
 fn print_subcommand_help(target: SubcommandHelpTarget) {
@@ -3622,7 +3632,7 @@ fn print_candidate_help() {
 mod tests {
     use super::{
         RepoScanScopeMetadata, render_repo_scan_incomplete_status, render_repo_scan_status,
-        repo_status_operator_json, resolve_diff_path, writable_status, yes_no,
+        repo_status_operator_json, resolve_diff_path, shell_path_arg, writable_status, yes_no,
     };
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
@@ -3631,6 +3641,16 @@ mod tests {
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
         RepoScanScopeMetadata::new(Path::new("/tmp/repo"), &DiscoveryOptions::repo_defaults())
+    }
+
+    #[test]
+    fn shell_path_arg_only_rewrites_backslashes_on_windows() {
+        let formatted = shell_path_arg(Path::new(r"dir\name"));
+        if cfg!(windows) {
+            assert_eq!(formatted, "\"dir/name\"");
+        } else {
+            assert_eq!(formatted, "\"dir\\name\"");
+        }
     }
 
     #[test]
