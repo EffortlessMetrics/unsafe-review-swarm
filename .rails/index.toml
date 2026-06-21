@@ -87,6 +87,13 @@ status = "proposed"
 owner = "repo-infra"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0018"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0018-live-lsp-server.md"
+status = "accepted"
+owner = "editor/lsp"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SPEC-0021"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0021-vscode-openvsx-extension.md"
