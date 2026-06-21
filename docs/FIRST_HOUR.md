@@ -231,6 +231,7 @@ unsafe-review pr-setup \
   --base-sha <base-sha> \
   --head-sha <head-sha> \
   --root /path/to/external/repo \
+  --out-dir /absolute/path/to/review-kit \
   --diff-out /absolute/path/to/change.diff
 ```
 
@@ -244,13 +245,19 @@ git -C /path/to/external/repo checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/external/repo \
   --base-sha <base-sha> \
-  --head-sha <head-sha>
+  --head-sha <head-sha> \
+  --out-dir /absolute/path/to/review-kit
 mkdir -p /absolute/path/to
 git -C /path/to/external/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
 unsafe-review pr \
   --root /path/to/external/repo \
-  --diff /absolute/path/to/change.diff
+  --diff /absolute/path/to/change.diff \
+  --out-dir /absolute/path/to/review-kit
 ```
+
+Use the first `unsafe-review pr` command for checkout-based analysis. Use the
+final `--diff` form when you need the saved raw patch route for receipts or
+replay.
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 `<base-sha>`, and `headRefOid` for `<head-sha>`. The `pull/<number>/head` fetch
@@ -261,8 +268,9 @@ Avoid copying from rendered GitHub diff views, and avoid shell redirection for
 saved patches on older Windows PowerShell: it can re-encode the file while
 leaving it readable to humans. The printed raw-diff path lets Git write the file
 with `git diff --output=<path>` and uses an absolute output path because
-`git -C` changes directories. A valid saved patch still contains `diff --git`,
-`---`, `+++`, and `@@` lines.
+`git -C` changes directories. The printed `--out-dir` keeps the review bundle
+anchored with the pilot artifacts. A valid saved patch still contains
+`diff --git`, `---`, `+++`, and `@@` lines.
 
 **Step 2 — understand the advisory boundary:**
 

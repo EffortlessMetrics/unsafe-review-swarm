@@ -2841,6 +2841,7 @@ fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
 
 fn pr_setup(options: ExternalPrSetupOptions) {
     let root = shell_path_arg(&options.root);
+    let out_dir = shell_path_arg(&options.out_dir);
     let diff_out = shell_path_arg(&options.diff_out);
     let diff_out_parent = options
         .diff_out
@@ -2872,7 +2873,7 @@ fn pr_setup(options: ExternalPrSetupOptions) {
     println!();
     println!("Run the normal advisory first-pr bundle:");
     println!(
-        "  unsafe-review pr --root {root} --base-sha {} --head-sha {}",
+        "  unsafe-review pr --root {root} --base-sha {} --head-sha {} --out-dir {out_dir}",
         options.base_sha, options.head_sha
     );
     println!();
@@ -2882,7 +2883,7 @@ fn pr_setup(options: ExternalPrSetupOptions) {
         "  git -C {root} diff --binary --full-index --output={diff_out} {}...{}",
         options.base_sha, options.head_sha
     );
-    println!("  unsafe-review pr --root {root} --diff {diff_out}");
+    println!("  unsafe-review pr --root {root} --diff {diff_out} --out-dir {out_dir}");
     println!();
     println!("Inputs kept visible:");
     println!("  repo: {}", options.repo);
@@ -2890,6 +2891,7 @@ fn pr_setup(options: ExternalPrSetupOptions) {
     println!("  baseRefName: {}", options.base_ref);
     println!("  baseRefOid: {}", options.base_sha);
     println!("  headRefOid: {}", options.head_sha);
+    println!("  out_dir: {}", options.out_dir.display());
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
 }
@@ -2993,7 +2995,9 @@ fn print_first_pr_help() {
     println!("Examples:");
     println!("  unsafe-review pr");
     println!("  unsafe-review pr --base origin/main");
-    println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
+    println!(
+        "  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /path/to/review-kit"
+    );
     println!("  unsafe-review pr --diff change.diff --out-dir target/review");
     println!("  unsafe-review review --base origin/main --max-cards 20");
     println!();
@@ -3002,16 +3006,20 @@ fn print_first_pr_help() {
         "  gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid"
     );
     println!(
-        "  unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --diff-out /path/to/change.diff"
+        "  unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --out-dir /path/to/review-kit --diff-out /path/to/change.diff"
     );
     println!("  git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head");
     println!("  git -C /path/to/repo checkout --detach <head-sha>");
-    println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
+    println!(
+        "  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /path/to/review-kit"
+    );
     println!("Raw diff capture for receipts or --diff:");
     println!(
         "  git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha>"
     );
-    println!("  unsafe-review pr --root /path/to/repo --diff /path/to/change.diff");
+    println!(
+        "  unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit"
+    );
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
@@ -3024,7 +3032,7 @@ fn print_pr_setup_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review pr-setup --repo <owner>/<repo> --number <pr> --base-ref <baseRefName> --base-sha <baseRefOid> --head-sha <headRefOid> [--root .] [--diff-out target/unsafe-review/external-pr.diff]"
+        "  unsafe-review pr-setup --repo <owner>/<repo> --number <pr> --base-ref <baseRefName> --base-sha <baseRefOid> --head-sha <headRefOid> [--root .] [--out-dir target/unsafe-review] [--diff-out target/unsafe-review/external-pr.diff]"
     );
     println!();
     println!("What pr-setup does:");
@@ -3044,13 +3052,16 @@ fn print_pr_setup_help() {
     println!("- --head-sha <headRefOid>   exact 40-hex head commit SHA");
     println!("- --root <dir>              local checkout path to use in printed commands");
     println!(
+        "- --out-dir <dir>           advisory bundle path; relative values resolve from the current directory"
+    );
+    println!(
         "- --diff-out <file>         raw diff path; relative values resolve from the current directory"
     );
     println!();
     println!("Example:");
     println!("  gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid");
     println!(
-        "  unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref main --base-sha <baseRefOid> --head-sha <headRefOid> --root /path/to/bytes --diff-out target/external-pilots/bytes-pr827.diff"
+        "  unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref main --base-sha <baseRefOid> --head-sha <headRefOid> --root /path/to/bytes --out-dir target/external-pilots/bytes-pr827/first-pr --diff-out target/external-pilots/bytes-pr827.diff"
     );
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");

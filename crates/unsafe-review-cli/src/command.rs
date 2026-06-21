@@ -91,6 +91,7 @@ pub(crate) struct ExternalPrSetupOptions {
     pub base_ref: String,
     pub base_sha: String,
     pub head_sha: String,
+    pub out_dir: PathBuf,
     pub diff_out: PathBuf,
 }
 

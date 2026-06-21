@@ -33,6 +33,8 @@ const REQUIRED_EXTERNAL_PR_GUIDANCE: &[&str] = &[
     "baseRefName,baseRefOid,headRefOid",
     "unsafe-review pr-setup",
     "--base-ref <base-ref-name>",
+    "--out-dir",
+    "/absolute/path/to/review-kit",
     "--diff-out",
     "fetch origin <base-ref-name> pull/<number>/head",
     "checkout --detach <head-sha>",
@@ -269,14 +271,14 @@ mod tests {
     fn external_pr_guidance_accepts_raw_diff_capture_cues() -> Result<(), String> {
         let text = r#"
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
-unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --diff-out /absolute/path/to/change.diff
+unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/review-kit --diff-out /absolute/path/to/change.diff
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
-unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
+unsafe-review pr --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/review-kit
 Avoid rendered GitHub diff views and older Windows PowerShell redirection.
 git diff --output=/absolute/path/to/change.diff
 git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
-unsafe-review pr --diff /absolute/path/to/change.diff
+unsafe-review pr --diff /absolute/path/to/change.diff --out-dir /absolute/path/to/review-kit
 diff --git
 ---
 +++
@@ -289,13 +291,13 @@ diff --git
     fn external_pr_guidance_rejects_missing_git_diff_output_cue() -> Result<(), String> {
         let text = r#"
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
-unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --diff-out /absolute/path/to/change.diff
+unsafe-review pr-setup --repo tokio-rs/bytes --number 827 --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/review-kit --diff-out /absolute/path/to/change.diff
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
-unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
+unsafe-review pr --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/review-kit
 Avoid rendered GitHub diff views and older Windows PowerShell redirection.
 git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
-unsafe-review pr --diff /absolute/path/to/change.diff
+unsafe-review pr --diff /absolute/path/to/change.diff --out-dir /absolute/path/to/review-kit
 diff --git
 ---
 +++

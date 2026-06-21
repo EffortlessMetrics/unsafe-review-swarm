@@ -35,6 +35,7 @@ unsafe-review pr-setup \
   --base-sha <base-sha> \
   --head-sha <head-sha> \
   --root /path/to/repo \
+  --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr \
   --diff-out /absolute/path/to/target/external-pilots/<id>/<id>.diff
 ```
 
@@ -45,11 +46,15 @@ local-equivalent commands are:
 ```bash
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
-pilot_dir="$PWD/target/external-pilots/<id>"
-mkdir -p "$pilot_dir"
-git -C /path/to/repo diff --binary --full-index --output="$pilot_dir/<id>.diff" <base-sha>...<head-sha>
-unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir "$pilot_dir/first-pr"
+unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
+mkdir -p /absolute/path/to/target/external-pilots/<id>
+git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/target/external-pilots/<id>/<id>.diff <base-sha>...<head-sha>
+unsafe-review pr --root /path/to/repo --diff /absolute/path/to/target/external-pilots/<id>/<id>.diff --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
 ```
+
+Use the checkout-based `unsafe-review pr --base-sha ... --head-sha ...` command
+for the primary bundle. Use the final `--diff` form when the receipt also needs
+to prove the saved raw patch path.
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 `<base-sha>`, and `headRefOid` for `<head-sha>`. The `pull/<number>/head` ref
@@ -59,11 +64,11 @@ fields still use the immutable SHAs from `gh pr view`.
 
 The `git diff --output=...` form writes Git's raw diff bytes directly to the
 receipt path after its parent directory exists, using the same merge-base diff
-shape as `unsafe-review pr --base-sha ... --head-sha ...`. Anchor `pilot_dir`
-to the current repository root so Git's `-C /path/to/repo` does not resolve the
-output path inside the external checkout. This also avoids PowerShell or shell
-redirection changing the byte stream being hashed. Record the resulting path
-and SHA-256 in `diff_path` and `diff_sha256`.
+shape as `unsafe-review pr --base-sha ... --head-sha ...`. Pass absolute
+`--diff-out` and `--out-dir` paths to `pr-setup` so Git's `-C /path/to/repo`
+does not resolve outputs inside the external checkout. This also avoids
+PowerShell or shell redirection changing the byte stream being hashed. Record
+the resulting path and SHA-256 in `diff_path` and `diff_sha256`.
 
 ## File Shape
 

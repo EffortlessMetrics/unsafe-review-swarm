@@ -462,6 +462,8 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
     let mut base_ref = None;
     let mut base_sha = None;
     let mut head_sha = None;
+    let mut out_dir = PathBuf::from("target/unsafe-review");
+    let mut saw_out_dir = false;
     let mut diff_out = PathBuf::from("target/unsafe-review/external-pr.diff");
     let mut saw_diff_out = false;
     let mut idx = 0usize;
@@ -559,6 +561,23 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
                     parse_commit_sha(inline_value(arg, "--head-sha")?, "--head-sha")?,
                 )?;
             }
+            "--out-dir" => {
+                idx += 1;
+                set_path_once(
+                    &mut out_dir,
+                    &mut saw_out_dir,
+                    "--out-dir",
+                    parse_path_value(&args, idx, "--out-dir")?,
+                )?;
+            }
+            arg if arg.starts_with("--out-dir=") => {
+                set_path_once(
+                    &mut out_dir,
+                    &mut saw_out_dir,
+                    "--out-dir",
+                    parse_inline_path_value(arg, "--out-dir")?,
+                )?;
+            }
             "--diff-out" => {
                 idx += 1;
                 set_path_once(
@@ -587,11 +606,13 @@ fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
         base_ref: base_ref.ok_or_else(|| "missing --base-ref".to_string())?,
         base_sha: base_sha.ok_or_else(|| "missing --base-sha".to_string())?,
         head_sha: head_sha.ok_or_else(|| "missing --head-sha".to_string())?,
+        out_dir,
         diff_out,
     };
     reject_control_path(&options.root, "--root")?;
-    reject_control_path(&options.diff_out, "--diff-out")?;
-    options.diff_out = absolute_pr_setup_diff_out(&options.diff_out)?;
+    options.out_dir = absolute_pr_setup_path(&options.out_dir, "--out-dir")?;
+    reject_control_path(&options.out_dir, "--out-dir")?;
+    options.diff_out = absolute_pr_setup_path(&options.diff_out, "--diff-out")?;
     reject_control_path(&options.diff_out, "--diff-out")?;
     Ok(options)
 }
@@ -618,12 +639,12 @@ fn set_path_once(
     Ok(())
 }
 
-fn absolute_pr_setup_diff_out(path: &Path) -> Result<PathBuf, String> {
+fn absolute_pr_setup_path(path: &Path, flag: &str) -> Result<PathBuf, String> {
     if path.is_absolute() {
         return Ok(path.to_path_buf());
     }
     let cwd = env::current_dir()
-        .map_err(|err| format!("failed to resolve current directory for --diff-out: {err}"))?;
+        .map_err(|err| format!("failed to resolve current directory for {flag}: {err}"))?;
     Ok(cwd.join(path))
 }
 
@@ -2119,6 +2140,9 @@ mod tests {
         let expected_diff_out = env::current_dir()
             .map_err(|err| err.to_string())?
             .join("target/external-pilots/bytes-pr827.diff");
+        let expected_out_dir = env::current_dir()
+            .map_err(|err| err.to_string())?
+            .join("target/external-pilots/bytes-pr827/first-pr");
         let command = parse(args([
             "unsafe-review",
             "pr-setup",
@@ -2134,6 +2158,8 @@ mod tests {
             "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
             "--root",
             "/tmp/bytes checkout",
+            "--out-dir",
+            "target/external-pilots/bytes-pr827/first-pr",
             "--diff-out",
             "target/external-pilots/bytes-pr827.diff",
         ]))?;
@@ -2146,6 +2172,7 @@ mod tests {
         assert_eq!(options.base_sha, "245adff079eb0cb1a706d35bab5f68b2d51919f6");
         assert_eq!(options.head_sha, "2f6852ec5295160bc4f1e687ea19847f9cd4e665");
         assert_eq!(options.root, PathBuf::from("/tmp/bytes checkout"));
+        assert_eq!(options.out_dir, expected_out_dir);
         assert_eq!(options.diff_out, expected_diff_out);
         Ok(())
     }
@@ -2231,6 +2258,11 @@ mod tests {
                 "2222222222222222222222222222222222222222",
             ),
             (
+                "--out-dir",
+                "target/external-pilots/bytes-pr827/first-pr",
+                "target/external-pilots/bytes-pr828/first-pr",
+            ),
+            (
                 "--diff-out",
                 "target/external-pilots/bytes-pr827.diff",
                 "target/external-pilots/bytes-pr828.diff",
@@ -2304,6 +2336,22 @@ mod tests {
                 "245adff079eb0cb1a706d35bab5f68b2d51919f6",
                 "--head-sha",
                 "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+                "--out-dir",
+                "target/`cmd`",
+            ]),
+            args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                "main",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
                 "--diff-out",
                 "target/evil`cmd`.diff",
             ]),
@@ -2328,6 +2376,7 @@ mod tests {
             assert!(
                 err.contains("invalid --repo")
                     || err.contains("invalid --base-ref")
+                    || err.contains("invalid --out-dir")
                     || err.contains("invalid --diff-out"),
                 "unexpected error: {err}"
             );

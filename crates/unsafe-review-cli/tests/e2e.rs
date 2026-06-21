@@ -505,13 +505,13 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
     for expected in [
         "External PR setup:",
         "gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid",
-        "unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --diff-out /path/to/change.diff",
+        "unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --out-dir /path/to/review-kit --diff-out /path/to/change.diff",
         "git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head",
         "git -C /path/to/repo checkout --detach <head-sha>",
-        "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
+        "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /path/to/review-kit",
         "Raw diff capture for receipts or --diff:",
         "git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha>",
-        "unsafe-review pr --root /path/to/repo --diff /path/to/change.diff",
+        "unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit",
     ] {
         assert!(
             stdout.contains(expected),
@@ -525,10 +525,12 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
 #[test]
 fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>> {
     let diff_out = std::env::current_dir()?.join("target/external-pilots/bytes-pr827.diff");
+    let out_dir = std::env::current_dir()?.join("target/external-pilots/bytes-pr827/first-pr");
     let diff_out_parent = diff_out
         .parent()
         .ok_or("expected diff output path to have a parent")?;
     let diff_out_arg = rendered_shell_path(&diff_out);
+    let out_dir_arg = rendered_shell_path(&out_dir);
     let diff_out_parent_arg = rendered_shell_path(diff_out_parent);
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
@@ -546,6 +548,8 @@ fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>
             .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
             .arg("--root")
             .arg("/tmp/bytes checkout")
+            .arg("--out-dir")
+            .arg("target/external-pilots/bytes-pr827/first-pr")
             .arg("--diff-out")
             .arg("target/external-pilots/bytes-pr827.diff"),
     )?;
@@ -558,13 +562,14 @@ fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>
         "gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid".to_string(),
         "git -C \"/tmp/bytes checkout\" fetch origin main pull/827/head".to_string(),
         "git -C \"/tmp/bytes checkout\" checkout --detach bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
-        "unsafe-review pr --root \"/tmp/bytes checkout\" --base-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --head-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        format!("unsafe-review pr --root \"/tmp/bytes checkout\" --base-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --head-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb --out-dir {out_dir_arg}"),
         format!("mkdir -p {diff_out_parent_arg}"),
         format!("git -C \"/tmp/bytes checkout\" diff --binary --full-index --output={diff_out_arg} aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"),
-        format!("unsafe-review pr --root \"/tmp/bytes checkout\" --diff {diff_out_arg}"),
+        format!("unsafe-review pr --root \"/tmp/bytes checkout\" --diff {diff_out_arg} --out-dir {out_dir_arg}"),
         "baseRefName: main".to_string(),
         "baseRefOid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa".to_string(),
         "headRefOid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb".to_string(),
+        format!("out_dir: {}", out_dir.display()),
         "Trust boundary: always advisory;".to_string(),
     ] {
         assert_contains(&stdout, &expected);
@@ -665,6 +670,41 @@ fn pr_setup_rejects_shell_expanding_diff_path() -> Result<(), Box<dyn Error>> {
     assert_eq!(output.status.code(), Some(2));
     let stderr = String::from_utf8(output.stderr)?;
     assert_contains(&stderr, "invalid --diff-out");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        !stdout.contains("git -C"),
+        "rejected input must not print a command plan: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_setup_rejects_shell_expanding_out_dir() -> Result<(), Box<dyn Error>> {
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr-setup")
+        .arg("--repo")
+        .arg("tokio-rs/bytes")
+        .arg("--number")
+        .arg("827")
+        .arg("--base-ref")
+        .arg("main")
+        .arg("--base-sha")
+        .arg("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        .arg("--head-sha")
+        .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .arg("--out-dir")
+        .arg("target/$(whoami)")
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "shell-expanding out dir must be rejected"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_contains(&stderr, "invalid --out-dir");
     let stdout = String::from_utf8(output.stdout)?;
     assert!(
         !stdout.contains("git -C"),
