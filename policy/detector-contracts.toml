@@ -202,3 +202,116 @@ negative_fixtures = [
 surfaces = ["json", "sarif", "human", "agent"]
 evidence = "zstd-style native FFI handoff positive path confirmed; owned-copy-before-handoff negative control confirms discharge gate. Only one positive fixture exists at this time; additional real-crate dogfood evidence needed before promotion. Advisory heuristic only."
 review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "copy_nonoverlapping"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "copy_nonoverlapping",
+  "copy_nonoverlapping_slice_range_guard",
+  "copy_nonoverlapping_slice_range_conjunctive_assert_guard",
+  "copy_nonoverlapping_slice_range_early_return_guard",
+]
+negative_fixtures = [
+  "copy_nonoverlapping_slice_range_disjunctive_early_return_block_comment_not_guard",
+  "copy_nonoverlapping_other_len_not_guard",
+  "copy_nonoverlapping_slice_range_closed_branch_not_guard",
+  "copy_nonoverlapping_slice_range_reassigned_count_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Sibling of ptr_copy with identical slice-range guard discipline. Conjunctive-assert and early-return guard discharge paths confirmed positive; block-comment masking (D4), unrelated-len (D3), closed-branch, and reassigned-count negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "vec_from_raw_parts"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "vec_from_raw_parts",
+  "vec_from_raw_parts_capacity_guard",
+  "vec_from_raw_parts_capacity_assert_guard",
+  "vec_from_raw_parts_manuallydrop_origin",
+]
+negative_fixtures = [
+  "vec_from_raw_parts_capacity_return_comment_not_guard",
+  "vec_from_raw_parts_capacity_observed_not_guard",
+  "vec_from_raw_parts_capacity_reassigned_not_guard",
+  "vec_from_raw_parts_stale_pointer_origin_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Capacity-guard and ManuallyDrop-origin discharge paths confirmed positive; return-comment masking (D4), observed-only, reassigned-capacity, and stale-pointer-origin (D3) negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "raw_pointer_read"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "raw_pointer_alignment",
+  "raw_pointer_alignment_is_aligned_guard",
+  "raw_pointer_read_cast_origin_bounds_guard",
+  "raw_pointer_read_len_capacity_assert",
+]
+negative_fixtures = [
+  "comment_alignment_not_guard",
+  "raw_pointer_alignment_observed_not_guard",
+  "raw_pointer_read_reassigned_origin_not_guard",
+  "raw_pointer_read_open_branch_shadowed_origin_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Alignment and same-origin bounds-guard discharge paths confirmed positive; comment masking (D4), observed-only alignment, reassigned-origin, and shadowed-origin (D3) negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "raw_pointer_write"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "raw_pointer_write_bytes",
+  "raw_pointer_write_same_origin_bounds_guard",
+  "raw_pointer_write_bool_bytes_guard",
+  "raw_pointer_write_maybeuninit",
+]
+negative_fixtures = [
+  "raw_pointer_write_bool_closed_branch_not_guard",
+  "raw_pointer_write_other_len_not_guard",
+  "raw_pointer_write_bool_reassigned_byte_not_guard",
+  "raw_pointer_write_previous_u8_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Same-origin bounds-guard and bool-byte write discharge paths confirmed positive; closed-branch, unrelated-len (D3), reassigned-byte, and previous-write (stale origin) negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "pointer_arithmetic"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "pointer_arithmetic_num_ctrl_bytes_guard",
+  "pointer_arithmetic_slice_end",
+  "pointer_arithmetic_unsafe_fn_offset",
+]
+negative_fixtures = [
+  "pointer_arithmetic_closed_branch_not_guard",
+  "pointer_arithmetic_other_offset_not_guard",
+  "pointer_arithmetic_reassigned_offset_not_guard",
+  "pointer_arithmetic_shadowed_offset_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Bare-name `.add`/`.offset`/`.sub` family gated on unsafe scope (D1) centrally in the fallback dispatcher. Offset bounds-guard discharge paths confirmed positive; closed-branch, unrelated-offset (D3), reassigned-offset, and shadowed-offset negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "str_from_utf8_unchecked"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "str_from_utf8_unchecked_is_ok_guard",
+  "str_from_utf8_unchecked_match_ok_guard",
+  "str_from_utf8_unchecked_question_mark_guard",
+  "str_from_utf8_unchecked_let_else_ok_guard",
+]
+negative_fixtures = [
+  "str_from_utf8_unchecked_comment_not_guard",
+  "str_from_utf8_unchecked_other_buffer_not_guard",
+  "str_from_utf8_unchecked_post_validation_not_guard",
+  "str_from_utf8_unchecked_match_ok_reassigned_not_guard",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Bare-name str::from_utf8_unchecked family gated on unsafe scope (D1) centrally in the fallback dispatcher. Validation-guard discharge paths (is_ok, match-ok, question-mark, let-else) confirmed positive; comment masking (D4), unrelated-buffer (D3), post-validation ordering, and reassigned-binding negative controls confirm discipline gates. Advisory heuristic only."
+review_after = "2026-12-15"

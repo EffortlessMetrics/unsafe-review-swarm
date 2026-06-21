@@ -233,12 +233,16 @@ not introduce a second truth surface.
 
 ## Current ledger state
 
-`policy/detector-contracts.toml` carries 11 registered families as of the
-control-plane PR-C enforcement flip. All 11 entries have non-empty
-`negative_fixtures` arrays, so the gate passes clean on current main. The
-gate is now enforcing: any future contract entry with an empty
-`negative_fixtures` must carry `proof_gap + owner + review_after` or the gate
-fails.
+`policy/detector-contracts.toml` carries 17 registered families. The first 11
+landed in the control-plane PR-C enforcement flip; a follow-up batch registered
+six more foundational call/expression families (`copy_nonoverlapping`,
+`vec_from_raw_parts`, `raw_pointer_read`, `raw_pointer_write`,
+`pointer_arithmetic`, `str_from_utf8_unchecked`) that already carry positive and
+negative-control fixtures. The ledger `status` remains `partial` until all
+promoted families have entries. All 17 entries have non-empty `negative_fixtures`
+arrays, so the gate passes clean on current main. The gate is enforcing: any
+future contract entry with an empty `negative_fixtures` must carry
+`proof_gap + owner + review_after` or the gate fails.
 
 ## Implementation tracking
 
