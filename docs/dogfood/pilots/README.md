@@ -27,8 +27,8 @@ local-equivalent pilot receipt, keep the exact PR commits visible and avoid
 shell redirection when capturing the raw diff:
 
 ```bash
-gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid
-git -C /path/to/repo fetch origin <base-sha> pull/<number>/head
+gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 pilot_dir="$PWD/target/external-pilots/<id>"
 mkdir -p "$pilot_dir"
@@ -36,10 +36,11 @@ git -C /path/to/repo diff --binary --full-index --output="$pilot_dir/<id>.diff" 
 unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir "$pilot_dir/first-pr"
 ```
 
-The `pull/<number>/head` ref fetches the public PR head through the base
-repository, including fork PR heads. Keep recording `base_sha` and `head_sha`;
-the checkout validation and receipt fields still use the immutable SHAs from
-`gh pr view`.
+Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
+`<base-sha>`, and `headRefOid` for `<head-sha>`. The `pull/<number>/head` ref
+fetches the public PR head through the base repository, including fork PR heads.
+Keep recording `base_sha` and `head_sha`; the checkout validation and receipt
+fields still use the immutable SHAs from `gh pr view`.
 
 The `git diff --output=...` form writes Git's raw diff bytes directly to the
 receipt path after its parent directory exists, using the same merge-base diff

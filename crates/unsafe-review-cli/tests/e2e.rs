@@ -323,8 +323,12 @@ fn pr_alias_rejects_exact_head_sha_mismatch() -> Result<(), Box<dyn Error>> {
         "stderr must show the exact fetch step: {stderr}"
     );
     assert!(
-        stderr.contains("pull/<number>/head"),
-        "stderr must use the public PR pull ref for head checkout recovery: {stderr}"
+        stderr.contains("baseRefName,baseRefOid,headRefOid"),
+        "stderr must tell users to capture the base branch name plus exact SHAs: {stderr}"
+    );
+    assert!(
+        stderr.contains("pull/<number>/head") && stderr.contains("<base-ref-name>"),
+        "stderr must use the public PR pull ref and base branch for checkout recovery: {stderr}"
     );
     assert!(
         stderr.contains(&repo.base_sha) && stderr.contains(stale_head_sha),
@@ -495,8 +499,8 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
 
     for expected in [
         "External PR setup:",
-        "gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid",
-        "git -C /path/to/repo fetch origin <base-sha> pull/<number>/head",
+        "gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid",
+        "git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head",
         "git -C /path/to/repo checkout --detach <head-sha>",
         "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
         "Raw diff capture for receipts or --diff:",

@@ -108,8 +108,8 @@ cards, record it as a named limitation in the dogfood handoff or objective audit
 instead of counting it as an active corpus target. A zero-card result is not
 evidence that the PR is safe.
 
-When running a real PR from exact product input, fetch the exact base/head SHAs
-into a local checkout and run:
+When running a real PR from exact product input, fetch the base branch and PR
+ref into a local checkout, keep the exact base/head SHAs visible, and run:
 
 ```bash
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>

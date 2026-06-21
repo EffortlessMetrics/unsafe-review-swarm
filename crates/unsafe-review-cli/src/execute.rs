@@ -1676,9 +1676,10 @@ fn validate_expected_head_sha(
         Err(format!(
             "current HEAD in `{root_display}` is {actual}, but --head-sha expected {expected_head_sha}. \
              Prepare the exact external PR checkout before running {terminal_command}:\n\
-             \n  gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid\n  \
-             git -C \"{root_display}\" fetch origin {base_ref} pull/<number>/head\n  \
-             git -C \"{root_display}\" checkout --detach {expected_head_sha}"
+             \n  gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid\n  \
+             git -C \"{root_display}\" fetch origin <base-ref-name> pull/<number>/head\n  \
+             git -C \"{root_display}\" checkout --detach {expected_head_sha}\n  \
+             unsafe-review {terminal_command} --root \"{root_display}\" --base-sha {base_ref} --head-sha {expected_head_sha}"
         ))
     } else if git_dirty_worktree(root).unwrap_or(true) {
         Err(format!(
@@ -2922,8 +2923,10 @@ fn print_first_pr_help() {
     println!("  unsafe-review review --base origin/main --max-cards 20");
     println!();
     println!("External PR setup:");
-    println!("  gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid");
-    println!("  git -C /path/to/repo fetch origin <base-sha> pull/<number>/head");
+    println!(
+        "  gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid"
+    );
+    println!("  git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head");
     println!("  git -C /path/to/repo checkout --detach <head-sha>");
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!("Raw diff capture for receipts or --diff:");

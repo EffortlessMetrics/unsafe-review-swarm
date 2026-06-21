@@ -129,13 +129,13 @@ target/unsafe-review/unsafe-review-gate.json
 Use `--out-dir <dir>` to choose another artifact directory, or `--diff file|-`
 to review a supplied diff.
 
-For an external GitHub PR, prefer a local checkout from exact base/head SHAs
-instead of a rendered display diff. `--head-sha` validates that `--root` is
-checked out at the expected PR head before analysis starts:
+For an external GitHub PR, prefer a local checkout from the base branch name and
+exact base/head SHAs instead of a rendered display diff. `--head-sha` validates
+that `--root` is checked out at the expected PR head before analysis starts:
 
 ```bash
-gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
-git -C /path/to/bytes fetch origin <base-sha> pull/827/head
+gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+git -C /path/to/bytes fetch origin <base-ref-name> pull/827/head
 git -C /path/to/bytes checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/bytes \
@@ -144,8 +144,10 @@ unsafe-review pr \
   --out-dir target/unsafe-review
 ```
 
-The pull-ref fetch works for same-repo and fork PR heads; `--head-sha` then
-validates the checkout against the immutable SHA reported by `gh pr view`.
+Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
+`<base-sha>`, and `headRefOid` for `<head-sha>`. The pull-ref fetch works for
+same-repo and fork PR heads; `--head-sha` then validates the checkout against
+the immutable SHA reported by `gh pr view`.
 
 If you need a saved patch file instead, let Git write it with
 `git diff --output=<path>` so shell redirection cannot re-encode the file on
