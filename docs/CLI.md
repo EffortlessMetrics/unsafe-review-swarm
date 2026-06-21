@@ -142,6 +142,7 @@ unsafe-review pr-setup \
   --base-sha <base-sha> \
   --head-sha <head-sha> \
   --root /path/to/bytes \
+  --out-dir /absolute/path/to/bytes-pr827/first-pr \
   --diff-out /absolute/path/to/bytes-pr827.diff
 ```
 
@@ -154,13 +155,19 @@ git -C /path/to/bytes checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/bytes \
   --base-sha <base-sha> \
-  --head-sha <head-sha>
+  --head-sha <head-sha> \
+  --out-dir /absolute/path/to/bytes-pr827/first-pr
 mkdir -p /absolute/path/to
 git -C /path/to/bytes diff --binary --full-index --output=/absolute/path/to/bytes-pr827.diff <base-sha>...<head-sha>
 unsafe-review pr \
   --root /path/to/bytes \
-  --diff /absolute/path/to/bytes-pr827.diff
+  --diff /absolute/path/to/bytes-pr827.diff \
+  --out-dir /absolute/path/to/bytes-pr827/first-pr
 ```
+
+Use the first `unsafe-review pr` command for checkout-based analysis. Use the
+final `--diff` form when you need the saved raw patch route for receipts or
+replay.
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 `<base-sha>`, and `headRefOid` for `<head-sha>`. The pull-ref fetch works for
@@ -168,12 +175,13 @@ same-repo and fork PR heads; `--head-sha` then validates the checkout against
 the immutable SHA reported by `gh pr view`.
 
 For saved patch files, let Git write the file with `git diff --output=<path>`
-so shell redirection cannot re-encode the file on Windows. Use an absolute
-`--output` path when `git -C` changes directories. The saved patch must keep the
-`diff --git`, `---`, `+++`, and `@@` unified-diff lines that `unsafe-review`
-uses to scope the review.
+so shell redirection cannot re-encode the file on Windows. Use absolute
+`--output` and `--out-dir` paths for external pilots so the raw diff and
+advisory bundle stay anchored outside the external checkout while `git -C`
+changes directories. The saved patch must keep the `diff --git`, `---`, `+++`,
+and `@@` unified-diff lines that `unsafe-review` uses to scope the review.
 
-The command analyzes once and renders every artifact from the same
+Each analysis command renders every artifact from the same
 `ReviewCard`s. It stays advisory-only: it does not execute witness tools, post
 comments, edit source, or enforce blocking policy.
 

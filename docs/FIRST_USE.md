@@ -131,6 +131,7 @@ unsafe-review pr-setup \
   --base-sha <base-sha> \
   --head-sha <head-sha> \
   --root /path/to/repo \
+  --out-dir /absolute/path/to/review-kit \
   --diff-out /absolute/path/to/change.diff
 ```
 
@@ -144,13 +145,19 @@ git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/repo \
   --base-sha <base-sha> \
-  --head-sha <head-sha>
+  --head-sha <head-sha> \
+  --out-dir /absolute/path/to/review-kit
 mkdir -p /absolute/path/to
 git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
 unsafe-review pr \
   --root /path/to/repo \
-  --diff /absolute/path/to/change.diff
+  --diff /absolute/path/to/change.diff \
+  --out-dir /absolute/path/to/review-kit
 ```
+
+Use the first `unsafe-review pr` command for checkout-based analysis. Use the
+final `--diff` form when you need the saved raw patch route for receipts or
+replay.
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 `<base-sha>`, and `headRefOid` for `<head-sha>`. The `pull/<number>/head` fetch
@@ -159,8 +166,9 @@ fetching an arbitrary SHA from `origin`. `--head-sha` still validates that the
 checked-out commit is the exact head SHA reported by `gh pr view`. This avoids
 rendered GitHub diffs and shell-redirection encoding surprises on older Windows
 PowerShell. The raw diff command is the `git diff --output=<path>` route for
-capturing a saved patch. A valid saved patch should still contain `diff --git`,
-`---`, `+++`, and `@@` lines.
+capturing a saved patch, and `--out-dir` anchors the advisory bundle beside the
+pilot artifacts instead of inside the external checkout. A valid saved patch
+should still contain `diff --git`, `---`, `+++`, and `@@` lines.
 
 For a deterministic smoke case, run the bundled fixture from a repo checkout:
 
