@@ -26,6 +26,27 @@ const REQUIRED_ARTIFACT_PATHS: &[&str] = &[
 
 const REQUIRED_FIXTURE_PATH: &str = "fixtures/raw_pointer_alignment";
 
+const EXTERNAL_PR_GUIDANCE_DOCS: &[&str] = &[FIRST_HOUR_DOC, FIRST_USE_DOC];
+
+const REQUIRED_EXTERNAL_PR_GUIDANCE: &[&str] = &[
+    "gh pr view",
+    "baseRefOid,headRefOid",
+    "fetch origin <base-sha> <head-sha>",
+    "checkout --detach <head-sha>",
+    "--base-sha <base-sha>",
+    "--head-sha <head-sha>",
+    "rendered GitHub diff",
+    "PowerShell",
+    "git diff --output",
+    "diff --binary --full-index --output=",
+    "<base-sha>...<head-sha>",
+    "--diff",
+    "diff --git",
+    "---",
+    "+++",
+    "@@",
+];
+
 const REQUIRED_TRUST_BOUNDARY_PHRASES: &[&str] =
     &["does not prove memory safety", "does not", "advisory"];
 
@@ -50,6 +71,7 @@ pub(crate) fn check_first_hour() -> Result<(), String> {
     require_commands_present(&text)?;
     require_artifact_paths_present(&text)?;
     require_fixture_reference(&text)?;
+    require_external_pr_guidance_present()?;
     require_trust_boundary_present(&text)?;
     require_no_overclaims(&text)?;
     require_inbound_links()?;
@@ -91,6 +113,24 @@ fn require_fixture_reference(text: &str) -> Result<(), String> {
         return Err(format!(
             "first-hour fixture directory missing: {REQUIRED_FIXTURE_PATH}"
         ));
+    }
+    Ok(())
+}
+
+fn require_external_pr_guidance_present() -> Result<(), String> {
+    for doc in EXTERNAL_PR_GUIDANCE_DOCS {
+        let path = Path::new(doc);
+        let text = read_to_string(path)?;
+        require_external_pr_guidance_text(doc, &text)?;
+    }
+    Ok(())
+}
+
+fn require_external_pr_guidance_text(doc: &str, text: &str) -> Result<(), String> {
+    for needle in REQUIRED_EXTERNAL_PR_GUIDANCE {
+        if !text_contains_ignore_ascii_case(text, needle) {
+            return Err(format!("{doc} external-PR guidance is missing `{needle}`"));
+        }
     }
     Ok(())
 }
@@ -220,5 +260,50 @@ mod tests {
     fn overclaim_detection_handles_non_ascii_context() -> Result<(), String> {
         let text = "Step 1 — install. This does not mean unsafe-review proves memory safety.";
         require_no_overclaims(text)
+    }
+
+    #[test]
+    fn external_pr_guidance_accepts_raw_diff_capture_cues() -> Result<(), String> {
+        let text = r#"
+gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/repo checkout --detach <head-sha>
+unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
+Avoid rendered GitHub diff views and older Windows PowerShell redirection.
+git diff --output=/absolute/path/to/change.diff
+git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
+unsafe-review pr --diff /absolute/path/to/change.diff
+diff --git
+---
++++
+@@
+"#;
+        require_external_pr_guidance_text("docs/example.md", text)
+    }
+
+    #[test]
+    fn external_pr_guidance_rejects_missing_git_diff_output_cue() -> Result<(), String> {
+        let text = r#"
+gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/repo checkout --detach <head-sha>
+unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
+Avoid rendered GitHub diff views and older Windows PowerShell redirection.
+git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>
+unsafe-review pr --diff /absolute/path/to/change.diff
+diff --git
+---
++++
+@@
+"#;
+        let result = require_external_pr_guidance_text("docs/example.md", text);
+        let err = result.err().unwrap_or_default();
+        if err.contains("external-PR guidance is missing `git diff --output`") {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected missing `git diff --output` cue, got `{err}`"
+            ))
+        }
     }
 }
