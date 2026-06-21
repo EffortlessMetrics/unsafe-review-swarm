@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0019 — First-run cockpit (0.2.0 lane)
 
-- Status: Accepted
+- Status: accepted
 - Last updated: 2026-05-21
 - Owners: unsafe-review maintainers
 - Depends on: 0001, 0002, 0008, 0009, 0010, 0011, 0012, 0013, 0016, 0024
