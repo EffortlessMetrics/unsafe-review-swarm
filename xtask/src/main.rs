@@ -11246,6 +11246,43 @@ jobs:
     }
 
     #[test]
+    fn github_action_guide_alias_stays_pointer_only() -> Result<(), String> {
+        public_surfaces::require_legacy_github_action_guide_alias(
+            "docs/ci/github-actions.md",
+            "# GitHub Actions Guide\n\n[docs/ci/github-action.md](github-action.md)\n",
+        )?;
+
+        let Err(err) = public_surfaces::require_legacy_github_action_guide_alias(
+            "docs/ci/github-actions.md",
+            "# GitHub Actions Guide\n\n```yaml\nsteps: []\n```\n[docs/ci/github-action.md](github-action.md)\n",
+        ) else {
+            return Err("duplicate guide content should fail".to_string());
+        };
+
+        assert!(err.contains("compatibility alias"));
+        Ok(())
+    }
+
+    #[test]
+    fn github_action_guide_surfaces_reject_legacy_alias() -> Result<(), String> {
+        public_surfaces::require_canonical_github_action_guide_pointer(
+            "docs/README.md",
+            "See docs/ci/github-action.md for setup.",
+        )?;
+
+        let Err(err) = public_surfaces::require_canonical_github_action_guide_pointer(
+            "docs/README.md",
+            "See docs/ci/github-actions.md for setup.",
+        ) else {
+            return Err("legacy action guide pointer should fail".to_string());
+        };
+
+        assert!(err.contains("docs/ci/github-action.md"));
+        assert!(err.contains("docs/ci/github-actions.md"));
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_name_list_rejects_missing_new_action_artifacts() -> Result<(), String> {
         for missing in [
             "target/unsafe-review/receipt-audit.json",

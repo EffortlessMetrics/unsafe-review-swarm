@@ -24,7 +24,7 @@ Status per work item below; PR receipts are listed where applicable.
 
 ## GitHub Actions user guide — done (#357)
 
-- `docs/ci/github-actions.md` exists with a single canonical example
+- `docs/ci/github-action.md` exists with a single canonical example
   referenced by `.github/examples/unsafe-review-first-pr.yml`.
 - Default behavior: read-only token, advisory packet, artifact upload,
   bounded job summary, no comments, no witnesses, no blocking.
