@@ -76,7 +76,7 @@ owner = "repo-infra / ci"
 id = "UNSAFE-REVIEW-SPEC-0038"
 kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md"
-status = "proposed"
+status = "accepted"
 owner = "product / cli"
 
 [[artifact]]
@@ -196,7 +196,7 @@ owner = "product / cli"
 id = "usefulness-telemetry-projection"
 name = "low-noise usefulness telemetry projection"
 path = ".rails/lanes/usefulness-telemetry/implementation-plan.md"
-status = "active"
+status = "done"
 owner = "product / cli"
 
 [[lane]]

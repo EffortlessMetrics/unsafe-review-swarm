@@ -2,6 +2,10 @@
 
 ## End state
 
+Status: landed. SPEC-0038 is accepted and the projection is present in the
+first-pr artifact bundle, gate manifest artifact map, review-kit classifier, and
+first-pr artifact verifier.
+
 This lane adds a `usefulness-telemetry.json` artifact emitted alongside all
 first-pr artifacts. It is a pure read-only projection from existing
 `ReviewCard/Summary/CoverageBlock/CommentPlan` data. No new analysis state.
@@ -26,4 +30,5 @@ cargo run --locked -p xtask -- check-pr
 
 ## Work items
 
-- `usefulness-telemetry-projection` — add SPEC-0038 projection, e2e test, artifact wiring
+- `usefulness-telemetry-projection` - done; SPEC-0038 projection, e2e test,
+  artifact wiring, review-kit classifier, and verifier checks landed.

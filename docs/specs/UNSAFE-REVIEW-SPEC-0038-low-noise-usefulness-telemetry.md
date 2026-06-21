@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0038: Low-Noise Usefulness Telemetry
 
-Status: proposed
+Status: accepted
 Owner: product / output
 Created: 2026-06-12
 Linked proposal: UNSAFE-REVIEW-PROP-0002-source-of-truth-stack
@@ -11,7 +11,9 @@ Linked plan:
 Linked issues:
 - none
 Linked PRs:
-- TBD
+- https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1630
+- https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1634
+- https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1647
 Support-tier impact: output projection only
 
 ## Problem
