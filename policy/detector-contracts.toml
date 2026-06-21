@@ -281,7 +281,7 @@ review_after = "2026-12-15"
 
 [[contract]]
 operation_family = "pointer_arithmetic"
-obligations = ["D1", "D2", "D3", "D4", "D5"]
+obligations = ["D1", "D3", "D4"]
 positive_fixtures = [
   "pointer_arithmetic_num_ctrl_bytes_guard",
   "pointer_arithmetic_slice_end",
@@ -294,7 +294,7 @@ negative_fixtures = [
   "pointer_arithmetic_shadowed_offset_not_guard",
 ]
 surfaces = ["json", "sarif", "human", "agent"]
-evidence = "Bare-name `.add`/`.offset`/`.sub` family gated on unsafe scope (D1) centrally in the fallback dispatcher. Offset bounds-guard discharge paths confirmed positive; closed-branch, unrelated-offset (D3), reassigned-offset, and shadowed-offset negative controls confirm discipline gates. Advisory heuristic only."
+evidence = "Detected via raw-pointer method-receiver form `.add(`/`.offset(` (scanner.rs), gated on unsafe scope (D1) centrally in the fallback dispatcher. D2 (definition-vs-call) and D5 (path-segment anchoring) are structurally inapplicable: the match requires a leading receiver `.`, so a `fn add(`/`fn offset(` definition header cannot match (no FM2), and the family uses no `module::path` call form (no FM5 path half). Offset bounds-guard discharge paths confirmed positive; closed-branch, unrelated-offset (D3), reassigned-offset, and shadowed-offset negative controls confirm the same-origin discharge gate; comment/string masking (D4) applies centrally. Advisory heuristic only."
 review_after = "2026-12-15"
 
 [[contract]]
