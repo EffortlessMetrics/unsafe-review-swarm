@@ -117,9 +117,11 @@ adversarial negative controls are required before promotion.
 
 **`surfaces`** (non-empty array of strings, required): the output surface names that
 project cards from this family. Valid values are the surface names used in the
-pipeline: `"json"`, `"sarif"`, `"markdown"`, `"lsp"`, `"agent"`,
+pipeline: `"json"`, `"sarif"`, `"human"`, `"markdown"`, `"lsp"`, `"agent"`,
 `"comment_plan"`, `"witness_plan"`, `"badges"`, `"baselines"`, `"outcome"`.
-The enforcing gate rejects an empty array or non-string entries.
+(`"human"` is the terminal renderer; `"markdown"` is the PR-summary renderer —
+both are distinct surfaces.) The enforcing gate rejects an empty array or
+non-string entries.
 
 **`evidence`** (string, required): a typed note describing the evidence type
 and its relationship to the obligation. May reference fixture names or spec
