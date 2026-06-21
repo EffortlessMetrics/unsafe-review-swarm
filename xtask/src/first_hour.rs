@@ -30,8 +30,8 @@ const EXTERNAL_PR_GUIDANCE_DOCS: &[&str] = &[FIRST_HOUR_DOC, FIRST_USE_DOC];
 
 const REQUIRED_EXTERNAL_PR_GUIDANCE: &[&str] = &[
     "gh pr view",
-    "baseRefOid,headRefOid",
-    "fetch origin <base-sha> <head-sha>",
+    "baseRefName,baseRefOid,headRefOid",
+    "fetch origin <base-ref-name> pull/<number>/head",
     "checkout --detach <head-sha>",
     "--base-sha <base-sha>",
     "--head-sha <head-sha>",
@@ -265,8 +265,8 @@ mod tests {
     #[test]
     fn external_pr_guidance_accepts_raw_diff_capture_cues() -> Result<(), String> {
         let text = r#"
-gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
-git -C /path/to/repo fetch origin <base-sha> <head-sha>
+gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
 Avoid rendered GitHub diff views and older Windows PowerShell redirection.
@@ -284,8 +284,8 @@ diff --git
     #[test]
     fn external_pr_guidance_rejects_missing_git_diff_output_cue() -> Result<(), String> {
         let text = r#"
-gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
-git -C /path/to/repo fetch origin <base-sha> <head-sha>
+gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr --base-sha <base-sha> --head-sha <head-sha>
 Avoid rendered GitHub diff views and older Windows PowerShell redirection.
