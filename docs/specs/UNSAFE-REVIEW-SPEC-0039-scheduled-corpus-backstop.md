@@ -289,13 +289,22 @@ belongs in `check-pr`, via `check_policy()`.
 - `generated_at` is a non-empty string.
 - `trust_boundary` contains `"not calibrated"` and `"not a gate"` and does
   not make positive `UB-free`, `Miri-clean`, `site-execution`, or `proof` claims.
-- `fixture_subset` is a non-empty array of objects with `fixture` and `rationale`.
+- `fixture_subset` is a non-empty array of objects with `fixture`,
+  `rationale`, `status`, and `elapsed_ms`.
 - `corpus_totals` is an object with numeric `fixtures_run`, `fixtures_completed`,
   `fixtures_failed`.
-- `card_inventory` is an object.
-- `agent_readiness` is an object.
+- `card_inventory` is an object with numeric `total_cards`, `actionable_cards`,
+  `new_cards`, `worsened_cards`, `resolved_cards`, and `inherited_cards`.
+- `coverage_slots` is an object with numeric `contract_missing`,
+  `contract_weak`, `guard_missing`, `guard_weak`, `test_reach_missing`,
+  `test_reach_weak`, and `witness_receipt_missing`.
+- `agent_readiness` is an object with numeric `ready`,
+  `requires_witness_receipt`, `needs_human`, and `unsupported`.
+- `not_selected_reason_histogram` and `not_selected_class_histogram` are objects.
+- `unfulfilled_obligation_count` is a number.
 - `scan_cost_range` has `elapsed_ms_min`, `elapsed_ms_median`, `elapsed_ms_max`
-  (each number or null).
+  and `output_bytes_min`, `output_bytes_median`, `output_bytes_max` (each number
+  or null).
 - `human_summary` is a non-empty string.
 
 The sample file `policy/corpus-usefulness-sample-rollup.json` is validated by
