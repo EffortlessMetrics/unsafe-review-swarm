@@ -43,6 +43,12 @@ pub(super) fn sites(
         // - MaybeUninitAssumeInit (assume_init and variants)
         // - StrFromUtf8Unchecked  (str::from_utf8_unchecked)
         // - Zeroed                (mem::zeroed)
+        // - UnwrapUnchecked       (Option/Result::unwrap_unchecked)
+        // - NonNullUnchecked      (NonNull::new_unchecked)
+        // - UnreachableUnchecked  (hint::unreachable_unchecked)
+        // - DropInPlace           (ptr::drop_in_place)
+        // - BoxFromRaw            (Box::from_raw; bare `from_raw` also spells safe
+        //                          constructors, so the scope gate separates them)
         if kind == UnsafeSiteKind::Operation
             && matches!(
                 family,
@@ -52,6 +58,11 @@ pub(super) fn sites(
                     | OperationFamily::MaybeUninitAssumeInit
                     | OperationFamily::StrFromUtf8Unchecked
                     | OperationFamily::Zeroed
+                    | OperationFamily::UnwrapUnchecked
+                    | OperationFamily::NonNullUnchecked
+                    | OperationFamily::UnreachableUnchecked
+                    | OperationFamily::DropInPlace
+                    | OperationFamily::BoxFromRaw
             )
             && !in_unsafe_block[idx]
             && !line_is_in_unsafe_fn(lines, idx)

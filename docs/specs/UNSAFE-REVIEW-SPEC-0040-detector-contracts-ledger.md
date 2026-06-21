@@ -233,16 +233,21 @@ not introduce a second truth surface.
 
 ## Current ledger state
 
-`policy/detector-contracts.toml` carries 17 registered families. The first 11
-landed in the control-plane PR-C enforcement flip; a follow-up batch registered
-six more foundational call/expression families (`copy_nonoverlapping`,
+`policy/detector-contracts.toml` carries 24 registered families. The first 11
+landed in the control-plane PR-C enforcement flip; a second batch registered six
+foundational call/expression families (`copy_nonoverlapping`,
 `vec_from_raw_parts`, `raw_pointer_read`, `raw_pointer_write`,
-`pointer_arithmetic`, `str_from_utf8_unchecked`) that already carry positive and
-negative-control fixtures. The ledger `status` remains `partial` until all
-promoted families have entries. All 17 entries have non-empty `negative_fixtures`
-arrays, so the gate passes clean on current main. The gate is enforcing: any
-future contract entry with an empty `negative_fixtures` must carry
-`proof_gap + owner + review_after` or the gate fails.
+`pointer_arithmetic`, `str_from_utf8_unchecked`); a third batch registered seven
+more bare call-name families (`maybe_uninit_assume_init`, `unwrap_unchecked`,
+`nonnull_unchecked`, `unreachable_unchecked`, `drop_in_place`, `box_from_raw`,
+`slice_from_raw_parts`) whose D2 definition-rejection and D5 word-boundary
+anchoring are enforced centrally (`is_fn_definition_header` and
+`contains_call_name` in `scanner.rs`). Each carries positive and negative-control
+fixtures. The ledger `status` remains `partial` until all promoted families have
+entries. All 24 entries have non-empty `negative_fixtures` arrays, so the gate
+passes clean on current main. The gate is enforcing: any future contract entry
+with an empty `negative_fixtures` must carry `proof_gap + owner + review_after`
+or the gate fails.
 
 ## Implementation tracking
 

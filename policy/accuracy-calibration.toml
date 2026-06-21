@@ -1642,6 +1642,10 @@ fixtures = [
   "assume_init_safe_method_no_cards",
   "from_utf8_unchecked_safe_wrapper_no_cards",
   "zeroed_safe_wrapper_no_cards",
+  "box_from_raw_safe_ctor_no_cards",
+  "drop_in_place_safe_fn_no_cards",
+  "unwrap_unchecked_safe_method_no_cards",
+  "unreachable_unchecked_safe_fn_no_cards",
   "ptr_read_path_segment_not_raw",
 ]
 dogfood_targets = []

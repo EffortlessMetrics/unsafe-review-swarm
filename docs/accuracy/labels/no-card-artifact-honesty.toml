@@ -121,3 +121,35 @@ kind = "false_positive_control"
 expected_cards = 0
 label_source = "fixture_golden"
 rationale = "A call path alias whose name ends in `ptr` (e.g. registry_ptr::read_entry) is not a std::ptr module call and must not produce a raw-pointer-read ReviewCard."
+
+[[samples]]
+id = "safe-from-raw-ctor-outside-unsafe-scope-emits-no-cards"
+fixture = "box_from_raw_safe_ctor_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `from_raw()` constructor called outside any unsafe scope is not Box::from_raw and must not produce a ReviewCard; the bare `from_raw` name also spells common safe constructors."
+
+[[samples]]
+id = "safe-drop-in-place-fn-outside-unsafe-scope-emits-no-cards"
+fixture = "drop_in_place_safe_fn_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe free function named `drop_in_place` called outside any unsafe scope is not ptr::drop_in_place and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-unwrap-unchecked-method-outside-unsafe-scope-emits-no-cards"
+fixture = "unwrap_unchecked_safe_method_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent `unwrap_unchecked()` method called outside any unsafe scope is not Option::unwrap_unchecked and must not produce a ReviewCard."
+
+[[samples]]
+id = "safe-unreachable-unchecked-fn-outside-unsafe-scope-emits-no-cards"
+fixture = "unreachable_unchecked_safe_fn_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe free function named `unreachable_unchecked` called outside any unsafe scope is not hint::unreachable_unchecked and must not produce a ReviewCard."

@@ -401,6 +401,10 @@ required_core_fixtures = [
   "zeroed_definition_no_cards",
   "zeroed_safe_wrapper_no_cards",
   "zeroed_call_still_cards",
+  "box_from_raw_safe_ctor_no_cards",
+  "drop_in_place_safe_fn_no_cards",
+  "unwrap_unchecked_safe_method_no_cards",
+  "unreachable_unchecked_safe_fn_no_cards",
   "inline_asm_human_review",
   "raw_pointer_read_volatile",
   "raw_pointer_read_len_capacity_assert",
@@ -6658,3 +6662,31 @@ expected_cards = 2
 expected_class = "guard_missing"
 expected_operation_family = "unsafe_fn_call"
 expected_hazard = "unknown"
+
+[[cases]]
+fixture = "box_from_raw_safe_ctor_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent from_raw() constructor called outside any unsafe scope is not carded as Box::from_raw"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "drop_in_place_safe_fn_no_cards"
+kind = "false_positive_control"
+claim = "a safe free function named drop_in_place called outside any unsafe scope is not carded as ptr::drop_in_place"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "unwrap_unchecked_safe_method_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent unwrap_unchecked() method called outside any unsafe scope is not carded as Option::unwrap_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
+
+[[cases]]
+fixture = "unreachable_unchecked_safe_fn_no_cards"
+kind = "false_positive_control"
+claim = "a safe free function named unreachable_unchecked called outside any unsafe scope is not carded as hint::unreachable_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
