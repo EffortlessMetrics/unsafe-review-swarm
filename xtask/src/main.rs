@@ -11259,7 +11259,9 @@ jobs:
             return Err("duplicate guide content should fail".to_string());
         };
 
-        assert!(err.contains("compatibility alias"));
+        if !err.contains("compatibility alias") {
+            return Err(format!("expected compatibility alias error, got: {err}"));
+        }
         Ok(())
     }
 
@@ -11277,8 +11279,14 @@ jobs:
             return Err("legacy action guide pointer should fail".to_string());
         };
 
-        assert!(err.contains("docs/ci/github-action.md"));
-        assert!(err.contains("docs/ci/github-actions.md"));
+        if !err.contains("docs/ci/github-action.md") {
+            return Err(format!(
+                "expected canonical guide path in error, got: {err}"
+            ));
+        }
+        if !err.contains("docs/ci/github-actions.md") {
+            return Err(format!("expected legacy guide path in error, got: {err}"));
+        }
         Ok(())
     }
 
