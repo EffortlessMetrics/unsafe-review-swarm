@@ -1,10 +1,11 @@
 use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
     CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput, FirstPrEntrypoint,
-    FirstPrOptions, Format, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput,
+    ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
+    SubcommandHelpTarget,
 };
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use unsafe_review_core::{MANUAL_CANDIDATE_STABLE_BYTE_CLASSES, PolicyMode};
 
 const DEFAULT_CANDIDATE_SKELETON_ID: &str = "R4R2-S000-TODO";
@@ -47,6 +48,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "doctor" => parse_doctor(rest),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
+        "pr-setup" => parse_pr_setup(rest).map(Command::PrSetup),
         "pr" => {
             let auto_detect = !has_explicit_pr_input(&rest);
             parse_first_pr(rest).map(|mut options| {
@@ -439,6 +441,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "receipt" | "receipt-template" => SubcommandHelpTarget::Receipt,
         "outcome" => SubcommandHelpTarget::Outcome,
         "policy" => SubcommandHelpTarget::Policy,
+        "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
@@ -446,6 +449,144 @@ fn subcommand_help_for(command: &str) -> Command {
         _ => return Command::Help,
     };
     Command::SubcommandHelp(target)
+}
+
+fn parse_pr_setup(args: Vec<String>) -> Result<ExternalPrSetupOptions, String> {
+    let mut repo = None;
+    let mut number = None;
+    let mut root = PathBuf::from(".");
+    let mut base_ref = None;
+    let mut base_sha = None;
+    let mut head_sha = None;
+    let mut diff_out = PathBuf::from("target/unsafe-review/external-pr.diff");
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--repo" => {
+                idx += 1;
+                repo = Some(parse_github_repo(value(&args, idx, "--repo")?)?);
+            }
+            arg if arg.starts_with("--repo=") => {
+                repo = Some(parse_github_repo(inline_value(arg, "--repo")?)?);
+            }
+            "--number" => {
+                idx += 1;
+                number = Some(parse_pr_number(value(&args, idx, "--number")?)?);
+            }
+            arg if arg.starts_with("--number=") => {
+                number = Some(parse_pr_number(inline_value(arg, "--number")?)?);
+            }
+            "--root" => {
+                idx += 1;
+                root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--base-ref" => {
+                idx += 1;
+                base_ref = Some(parse_git_ref_token(value(&args, idx, "--base-ref")?)?);
+            }
+            arg if arg.starts_with("--base-ref=") => {
+                base_ref = Some(parse_git_ref_token(inline_value(arg, "--base-ref")?)?);
+            }
+            "--base-sha" => {
+                idx += 1;
+                base_sha = Some(parse_commit_sha(
+                    value(&args, idx, "--base-sha")?,
+                    "--base-sha",
+                )?);
+            }
+            arg if arg.starts_with("--base-sha=") => {
+                base_sha = Some(parse_commit_sha(
+                    inline_value(arg, "--base-sha")?,
+                    "--base-sha",
+                )?);
+            }
+            "--head-sha" => {
+                idx += 1;
+                head_sha = Some(parse_commit_sha(
+                    value(&args, idx, "--head-sha")?,
+                    "--head-sha",
+                )?);
+            }
+            arg if arg.starts_with("--head-sha=") => {
+                head_sha = Some(parse_commit_sha(
+                    inline_value(arg, "--head-sha")?,
+                    "--head-sha",
+                )?);
+            }
+            "--diff-out" => {
+                idx += 1;
+                diff_out = parse_path_value(&args, idx, "--diff-out")?;
+            }
+            arg if arg.starts_with("--diff-out=") => {
+                diff_out = parse_inline_path_value(arg, "--diff-out")?;
+            }
+            other => return Err(format!("unknown pr-setup argument `{other}`")),
+        }
+        idx += 1;
+    }
+    let options = ExternalPrSetupOptions {
+        repo: repo.ok_or_else(|| "missing --repo".to_string())?,
+        number: number.ok_or_else(|| "missing --number".to_string())?,
+        root,
+        base_ref: base_ref.ok_or_else(|| "missing --base-ref".to_string())?,
+        base_sha: base_sha.ok_or_else(|| "missing --base-sha".to_string())?,
+        head_sha: head_sha.ok_or_else(|| "missing --head-sha".to_string())?,
+        diff_out,
+    };
+    reject_control_path(&options.root, "--root")?;
+    reject_control_path(&options.diff_out, "--diff-out")?;
+    Ok(options)
+}
+
+fn parse_github_repo(raw: &str) -> Result<String, String> {
+    let Some((owner, name)) = raw.split_once('/') else {
+        return Err("invalid --repo; expected <owner>/<repo>".to_string());
+    };
+    if owner.is_empty() || name.is_empty() || name.contains('/') {
+        return Err("invalid --repo; expected <owner>/<repo>".to_string());
+    }
+    for part in [owner, name] {
+        if !part
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+        {
+            return Err(
+                "invalid --repo; use only ASCII letters, digits, `-`, `_`, and `.`".to_string(),
+            );
+        }
+    }
+    Ok(raw.to_string())
+}
+
+fn parse_pr_number(raw: &str) -> Result<String, String> {
+    if raw.is_empty() || !raw.bytes().all(|byte| byte.is_ascii_digit()) {
+        return Err("invalid --number; expected a positive integer".to_string());
+    }
+    let value = raw
+        .parse::<u64>()
+        .map_err(|_err| "invalid --number; expected a positive integer".to_string())?;
+    if value == 0 {
+        return Err("invalid --number; expected a positive integer".to_string());
+    }
+    Ok(raw.to_string())
+}
+
+fn parse_git_ref_token(raw: &str) -> Result<String, String> {
+    if raw.is_empty()
+        || raw.starts_with('-')
+        || !raw
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
+    {
+        return Err(
+            "invalid --base-ref; use a branch/ref token made of ASCII letters, digits, `/`, `.`, `_`, or `-`"
+                .to_string(),
+        );
+    }
+    Ok(raw.to_string())
 }
 
 fn has_help_flag(args: &[String]) -> bool {
@@ -971,6 +1112,20 @@ fn parse_inline_path_value(arg: &str, flag: &str) -> Result<PathBuf, String> {
     Ok(PathBuf::from(inline_value(arg, flag)?))
 }
 
+fn reject_control_path(path: &Path, flag: &str) -> Result<(), String> {
+    let raw = path.to_string_lossy();
+    if raw.is_empty()
+        || raw
+            .chars()
+            .any(|ch| ch.is_control() || matches!(ch, '"' | '`' | '$'))
+    {
+        return Err(format!(
+            "invalid {flag}; paths printed in pr-setup commands must not be empty or contain control characters, quotes, backticks, or `$`"
+        ));
+    }
+    Ok(())
+}
+
 fn json_or_markdown_format(format: Format, command_name: &str) -> Result<Format, String> {
     match format {
         Format::Json => Ok(Format::Json),
@@ -1219,6 +1374,10 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "policy", "--help"]))?,
             Command::SubcommandHelp(SubcommandHelpTarget::Policy)
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "pr-setup", "--help"]))?,
+            Command::SubcommandHelp(SubcommandHelpTarget::PrSetup)
         );
         assert_eq!(
             parse(args(["unsafe-review", "doctor", "--help"]))?,
@@ -1849,6 +2008,116 @@ mod tests {
             "`pr` with explicit external PR SHAs must not auto-detect"
         );
         Ok(())
+    }
+
+    #[test]
+    fn parse_pr_setup_accepts_exact_external_pr_inputs() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "pr-setup",
+            "--repo",
+            "tokio-rs/bytes",
+            "--number",
+            "827",
+            "--base-ref",
+            "main",
+            "--base-sha",
+            "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+            "--head-sha",
+            "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            "--root",
+            "/tmp/bytes checkout",
+            "--diff-out",
+            "target/external-pilots/bytes-pr827.diff",
+        ]))?;
+        let Command::PrSetup(options) = command else {
+            return Err("expected pr-setup command".to_string());
+        };
+        assert_eq!(options.repo, "tokio-rs/bytes");
+        assert_eq!(options.number, "827");
+        assert_eq!(options.base_ref, "main");
+        assert_eq!(options.base_sha, "245adff079eb0cb1a706d35bab5f68b2d51919f6");
+        assert_eq!(options.head_sha, "2f6852ec5295160bc4f1e687ea19847f9cd4e665");
+        assert_eq!(options.root, PathBuf::from("/tmp/bytes checkout"));
+        assert_eq!(
+            options.diff_out,
+            PathBuf::from("target/external-pilots/bytes-pr827.diff")
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pr_setup_rejects_command_injection_tokens() {
+        for argv in [
+            args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes;rm",
+                "--number",
+                "827",
+                "--base-ref",
+                "main",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            ]),
+            args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                "main;echo",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+            ]),
+            args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                "main",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+                "--diff-out",
+                "target/evil`cmd`.diff",
+            ]),
+            args([
+                "unsafe-review",
+                "pr-setup",
+                "--repo",
+                "tokio-rs/bytes",
+                "--number",
+                "827",
+                "--base-ref",
+                "main",
+                "--base-sha",
+                "245adff079eb0cb1a706d35bab5f68b2d51919f6",
+                "--head-sha",
+                "2f6852ec5295160bc4f1e687ea19847f9cd4e665",
+                "--diff-out",
+                "target/$(whoami).diff",
+            ]),
+        ] {
+            let err = parse(argv).err().unwrap_or_default();
+            assert!(
+                err.contains("invalid --repo")
+                    || err.contains("invalid --base-ref")
+                    || err.contains("invalid --diff-out"),
+                "unexpected error: {err}"
+            );
+        }
     }
 
     #[test]

@@ -224,10 +224,19 @@ immutable base/head SHAs:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup \
+  --repo tokio-rs/bytes \
+  --number 827 \
+  --base-ref <base-ref-name> \
+  --base-sha <base-sha> \
+  --head-sha <head-sha> \
+  --root /path/to/external/repo \
+  --diff-out /absolute/path/to/change.diff
 ```
 
-Then fetch the base branch and PR ref into a local checkout, check out the head, and ask
-`unsafe-review` to validate the checked-out head before analysis:
+`pr-setup` prints the copyable checkout, `unsafe-review pr`, and raw diff
+commands without running `gh`, `git`, witnesses, comments, or source edits. The
+direct commands it prints are:
 
 ```bash
 git -C /path/to/external/repo fetch origin <base-ref-name> pull/<number>/head

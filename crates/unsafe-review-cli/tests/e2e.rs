@@ -444,6 +444,11 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
         stdout.contains("auto-detects root and base ref"),
         "help must say pr auto-detects first-run inputs: {stdout}"
     );
+    assert!(
+        stdout
+            .contains("pr-setup print read-only external GitHub PR checkout and raw-diff commands"),
+        "help must mention the read-only external PR setup helper: {stdout}"
+    );
 
     Ok(())
 }
@@ -500,6 +505,7 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
     for expected in [
         "External PR setup:",
         "gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid",
+        "unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --diff-out /path/to/change.diff",
         "git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head",
         "git -C /path/to/repo checkout --detach <head-sha>",
         "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
@@ -512,6 +518,151 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
             "first-pr help must include exact external PR setup cue `{expected}`\nstdout:\n{stdout}"
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("pr-setup")
+            .arg("--repo")
+            .arg("tokio-rs/bytes")
+            .arg("--number")
+            .arg("827")
+            .arg("--base-ref")
+            .arg("main")
+            .arg("--base-sha")
+            .arg("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+            .arg("--head-sha")
+            .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+            .arg("--root")
+            .arg("/tmp/bytes checkout")
+            .arg("--diff-out")
+            .arg("target/external-pilots/bytes-pr827.diff"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    for expected in [
+        "unsafe-review pr-setup",
+        "Read-only setup commands for external GitHub PR tokio-rs/bytes#827.",
+        "This command did not fetch, checkout, run unsafe-review, execute witnesses, post comments, or edit source.",
+        "gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid",
+        "git -C \"/tmp/bytes checkout\" fetch origin main pull/827/head",
+        "git -C \"/tmp/bytes checkout\" checkout --detach bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "unsafe-review pr --root \"/tmp/bytes checkout\" --base-sha aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa --head-sha bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "git -C \"/tmp/bytes checkout\" diff --binary --full-index --output=\"target/external-pilots/bytes-pr827.diff\" aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "unsafe-review pr --root \"/tmp/bytes checkout\" --diff \"target/external-pilots/bytes-pr827.diff\"",
+        "baseRefName: main",
+        "baseRefOid: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+        "headRefOid: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+        "Trust boundary: always advisory;",
+    ] {
+        assert_contains(&stdout, expected);
+    }
+
+    Ok(())
+}
+
+#[test]
+fn pr_setup_rejects_injected_repo_token() -> Result<(), Box<dyn Error>> {
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr-setup")
+        .arg("--repo")
+        .arg("tokio-rs/bytes;rm")
+        .arg("--number")
+        .arg("827")
+        .arg("--base-ref")
+        .arg("main")
+        .arg("--base-sha")
+        .arg("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        .arg("--head-sha")
+        .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "malformed repo token must be rejected"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_contains(&stderr, "invalid --repo");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        !stdout.contains("git -C"),
+        "rejected input must not print a command plan: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_setup_rejects_injected_base_ref() -> Result<(), Box<dyn Error>> {
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr-setup")
+        .arg("--repo")
+        .arg("tokio-rs/bytes")
+        .arg("--number")
+        .arg("827")
+        .arg("--base-ref")
+        .arg("main;echo")
+        .arg("--base-sha")
+        .arg("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        .arg("--head-sha")
+        .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "malformed base ref must be rejected"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_contains(&stderr, "invalid --base-ref");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        !stdout.contains("git -C"),
+        "rejected input must not print a command plan: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn pr_setup_rejects_shell_expanding_diff_path() -> Result<(), Box<dyn Error>> {
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr-setup")
+        .arg("--repo")
+        .arg("tokio-rs/bytes")
+        .arg("--number")
+        .arg("827")
+        .arg("--base-ref")
+        .arg("main")
+        .arg("--base-sha")
+        .arg("aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa")
+        .arg("--head-sha")
+        .arg("bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb")
+        .arg("--diff-out")
+        .arg("target/$(whoami).diff")
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "shell-expanding diff path must be rejected"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert_contains(&stderr, "invalid --diff-out");
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        !stdout.contains("git -C"),
+        "rejected input must not print a command plan: {stdout}"
+    );
 
     Ok(())
 }
@@ -561,6 +712,7 @@ fn subcommand_help_is_command_specific() -> Result<(), Box<dyn Error>> {
         (&["receipt", "audit", "-h"], "unsafe-review receipt:"),
         (&["outcome", "--help"], "unsafe-review outcome:"),
         (&["policy", "--help"], "unsafe-review policy:"),
+        (&["pr-setup", "--help"], "unsafe-review pr-setup:"),
         (&["doctor", "--help"], "unsafe-review doctor:"),
         (&["badges", "--help"], "unsafe-review badges:"),
         (&["lsp", "--help"], "unsafe-review lsp:"),

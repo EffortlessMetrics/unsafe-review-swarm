@@ -124,6 +124,21 @@ matches before it analyzes:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup \
+  --repo tokio-rs/bytes \
+  --number 827 \
+  --base-ref <base-ref-name> \
+  --base-sha <base-sha> \
+  --head-sha <head-sha> \
+  --root /path/to/repo \
+  --diff-out /absolute/path/to/change.diff
+```
+
+`pr-setup` prints the copyable checkout, `unsafe-review pr`, and raw diff
+commands. It does not run `gh`, `git`, `unsafe-review`, witnesses, agents, or PR
+comments. The direct commands it prints are:
+
+```bash
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr \

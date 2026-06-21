@@ -83,6 +83,17 @@ impl Default for FirstPrOptions {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ExternalPrSetupOptions {
+    pub repo: String,
+    pub number: String,
+    pub root: PathBuf,
+    pub base_ref: String,
+    pub base_sha: String,
+    pub head_sha: String,
+    pub diff_out: PathBuf,
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) enum FirstPrEntrypoint {
     FirstPr,
@@ -281,6 +292,7 @@ pub(crate) enum SubcommandHelpTarget {
     Receipt,
     Outcome,
     Policy,
+    PrSetup,
     Doctor,
     Badges,
     Lsp,
@@ -303,6 +315,7 @@ pub(crate) enum Command {
     Repo(RepoOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
+    PrSetup(ExternalPrSetupOptions),
     Badges {
         root: PathBuf,
         out: PathBuf,

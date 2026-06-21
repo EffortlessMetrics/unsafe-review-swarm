@@ -28,6 +28,21 @@ shell redirection when capturing the raw diff:
 
 ```bash
 gh pr view <number> --repo <owner>/<repo> --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup \
+  --repo <owner>/<repo> \
+  --number <number> \
+  --base-ref <base-ref-name> \
+  --base-sha <base-sha> \
+  --head-sha <head-sha> \
+  --root /path/to/repo \
+  --diff-out /absolute/path/to/target/external-pilots/<id>/<id>.diff
+```
+
+`pr-setup` prints the direct checkout, raw diff, and `unsafe-review pr` commands
+without running `gh`, `git`, witnesses, comments, or source edits. The direct
+local-equivalent commands are:
+
+```bash
 git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 pilot_dir="$PWD/target/external-pilots/<id>"

@@ -135,6 +135,21 @@ that `--root` is checked out at the expected PR head before analysis starts:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefName,baseRefOid,headRefOid
+unsafe-review pr-setup \
+  --repo tokio-rs/bytes \
+  --number 827 \
+  --base-ref <base-ref-name> \
+  --base-sha <base-sha> \
+  --head-sha <head-sha> \
+  --root /path/to/bytes \
+  --diff-out /absolute/path/to/bytes-pr827.diff
+```
+
+`pr-setup` only prints commands; it does not fetch, checkout, run witnesses,
+post comments, or edit source. One direct checkout and analysis path it prints
+is:
+
+```bash
 git -C /path/to/bytes fetch origin <base-ref-name> pull/827/head
 git -C /path/to/bytes checkout --detach <head-sha>
 unsafe-review pr \
