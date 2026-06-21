@@ -33,6 +33,19 @@ active goal, implementation plan, and linked closeouts.
 | `UNSAFE-REVIEW-SPEC-0041` syntax-first dispatch architecture | accepted | Spec accepted; dispatcher implementation and ledger gate tracked by control-plane lane (SPEC-0040, PR-5, PR-C) | `cargo run --locked -p xtask -- check-spec-status`; `cargo run --locked -p xtask -- check-pr` | 2026-06-18 | Documents AST-first → bounded text fallback → D1–D5 discipline checks at fallback entry; references SPEC-0005 appendix as canonical D1–D5/FM1–FM9 source; advisory only, no proof/UB-free/Miri-clean/site-execution/calibrated claim |
 | `UNSAFE-REVIEW-SPEC-0042` corpus validation taxonomy | proposed | Spec document plus enforced GPR-1 partition contract landed; GPR-2 initial holdout target/report landed with `getrandom-holdout`, exact SHA pinning, first result recorded before tuning, and `dogfood-exec --include-holdout` opt-in; GPR-3 initial evidence-loss challenge harness landed with `policy/evidence-loss-challenges.toml`, `xtask check-evidence-loss-challenges`, and conformance partition ownership; GPR-4 initial external pilot receipt rail landed with `docs/dogfood/pilots/`, `xtask check-external-pilots`, and the first read-only local-equivalent pilot receipt for `tokio-rs/bytes#827`; GPR-5 validation closeout landed at `docs/dogfood/reports/2026-06-19-generalization-validation-closeout.md`; formalizes the four-layer validation taxonomy (detector-control/pure-example/real-repo/real-PR), the conformance/regression/holdout overlay, `partition_default` / `partition_by_kind` ownership metadata in the existing ledgers, `xtask check-corpus-partitions`, evidence-loss challenge corpus, external pilot judgments, and release-readiness closeout path | `cargo run --locked -p xtask -- check-corpus-partitions`; `cargo run --locked -p xtask -- check-evidence-loss-challenges`; `cargo run --locked -p xtask -- check-external-pilots`; `cargo run --locked -p xtask -- check-spec-status`; `cargo run --locked -p xtask -- check-docs`; `cargo run --locked -p xtask -- check-pr` | 2026-06-19 | Taxonomy index only — no duplicate corpus ledgers; partition metadata extends `fixtures/calibration.toml`, `docs/dogfood/corpus.toml`, `policy/pr-corpus.toml`, and `policy/evidence-loss-challenges.toml`; exact goldens only for pure examples; real-repo/real-PR/holdout/challenge/pilot evidence remains diagnostic, never proof; no calibrated/UB-free/Miri-clean/site-execution claim |
 
+## Withdrawn / reserved numbers
+
+Spec numbers can be intentionally skipped when a planned spec is dropped as
+redundant before landing. The skip is recorded here so the gap is not mistaken
+for a typo or an unfilled allocation.
+
+- **SPEC-0036** — dropped 2026-06-12 as redundant with SPEC-0005 (hazard
+  taxonomy) and SPEC-0028 (delivery surfaces). The detector-discipline
+  control-plane lane reuses the D1–D5 obligation set under SPEC-0040 /
+  0041 / 0042 instead of inventing a new 9-obligation schema. See
+  `.rails/lanes/control-plane/implementation-plan.md`. Do not recreate
+  SPEC-0036.
+
 ## Reading notes
 
 - **Status** is specification lifecycle intent (draft/accepted/etc.).
