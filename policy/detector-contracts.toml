@@ -434,3 +434,18 @@ negative_fixtures = [
 surfaces = ["json", "sarif", "human", "agent"]
 evidence = "slice::from_raw_parts family matched by contains_call_name (word-boundary anchored, D5) with the central is_fn_definition_header gate (D2); gated on unsafe scope (D1) in the fallback dispatcher's bare-name family list. MaybeUninit-backed construction confirmed positive; the unrelated-MaybeUninit (D3 same-origin) negative control confirms the discharge gate. Comment/string masking (D4) applies centrally. Only a same-origin negative control exists at this time; additional discipline-specific controls are a future extension. Advisory heuristic only."
 review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "atomic_pointer_state"
+obligations = ["D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "atomic_pointer_state_swap",
+  "atomic_pointer_state_fetch_ops",
+]
+negative_fixtures = [
+  "atomic_pointer_state_swap_not_same_call",
+  "atomic_pointer_state_fetch_not_same_call",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Atomic pointer state-transition hazard detector: `.swap(ptr::null_mut(), Ordering::..)` and `from_ptr(.. fetch_and/fetch_or/fetch_xor ..)`. D1 is inapplicable: AtomicPtr swap/fetch operations are safe Rust, so the detector intentionally fires in safe context and is not behind the unsafe-scope gate; declaring D1 would suppress every real detection. Call names matched by contains_call_name (word-boundary anchored, D5) behind the central is_fn_definition_header gate (D2); comment/string masking (D4) applies centrally. The same-call binding (call_args_span) requires ptr::null_mut/Ordering/fetch_* to sit inside the same call's argument list (D3): the swap_not_same_call and fetch_not_same_call negative controls confirm separate co-occurring calls produce no card. Advisory heuristic only."
+review_after = "2026-12-15"

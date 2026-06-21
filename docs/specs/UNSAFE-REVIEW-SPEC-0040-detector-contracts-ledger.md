@@ -117,9 +117,11 @@ adversarial negative controls are required before promotion.
 
 **`surfaces`** (non-empty array of strings, required): the output surface names that
 project cards from this family. Valid values are the surface names used in the
-pipeline: `"json"`, `"sarif"`, `"markdown"`, `"lsp"`, `"agent"`,
+pipeline: `"json"`, `"sarif"`, `"human"`, `"markdown"`, `"lsp"`, `"agent"`,
 `"comment_plan"`, `"witness_plan"`, `"badges"`, `"baselines"`, `"outcome"`.
-The enforcing gate rejects an empty array or non-string entries.
+(`"human"` is the terminal renderer; `"markdown"` is the PR-summary renderer —
+both are distinct surfaces.) The enforcing gate rejects an empty array or
+non-string entries.
 
 **`evidence`** (string, required): a typed note describing the evidence type
 and its relationship to the obligation. May reference fixture names or spec
@@ -233,7 +235,7 @@ not introduce a second truth surface.
 
 ## Current ledger state
 
-`policy/detector-contracts.toml` carries 24 registered families. The first 11
+`policy/detector-contracts.toml` carries 25 registered families. The first 11
 landed in the control-plane PR-C enforcement flip; a second batch registered six
 foundational call/expression families (`copy_nonoverlapping`,
 `vec_from_raw_parts`, `raw_pointer_read`, `raw_pointer_write`,
@@ -242,12 +244,15 @@ more bare call-name families (`maybe_uninit_assume_init`, `unwrap_unchecked`,
 `nonnull_unchecked`, `unreachable_unchecked`, `drop_in_place`, `box_from_raw`,
 `slice_from_raw_parts`) whose D2 definition-rejection and D5 word-boundary
 anchoring are enforced centrally (`is_fn_definition_header` and
-`contains_call_name` in `scanner.rs`). Each carries positive and negative-control
-fixtures. The ledger `status` remains `partial` until all promoted families have
-entries. All 24 entries have non-empty `negative_fixtures` arrays, so the gate
-passes clean on current main. The gate is enforcing: any future contract entry
-with an empty `negative_fixtures` must carry `proof_gap + owner + review_after`
-or the gate fails.
+`contains_call_name` in `scanner.rs`); and `atomic_pointer_state`, a hazard
+detector on safe atomic operations that declares `D2`/`D3`/`D4`/`D5` but not
+`D1` (the unsafe-scope gate is inapplicable because `AtomicPtr` swap/fetch calls
+are safe Rust). Each carries positive and negative-control fixtures. The ledger
+`status` remains `partial` until all promoted families have entries. All 25
+entries have non-empty `negative_fixtures` arrays, so the gate passes clean on
+current main. The gate is enforcing: any future contract entry with an empty
+`negative_fixtures` must carry `proof_gap + owner + review_after` or the gate
+fails.
 
 ## Implementation tracking
 
