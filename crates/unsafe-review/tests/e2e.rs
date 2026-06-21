@@ -4475,8 +4475,8 @@ fn support_reports_current_posture_without_overclaims() -> Result<(), Box<dyn Er
     assert!(text.contains("source edits: not supported"));
     assert!(text.contains("witness execution: not default"));
     assert!(text.contains("blocking policy: not default"));
-    assert!(text.contains("live LSP: deferred"));
-    assert!(text.contains("saved lsp.json"));
+    assert!(text.contains("live LSP: re-analyzes the workspace on open/save/change"));
+    assert!(text.contains("saved lsp.json remains the batch projection"));
     assert!(text.contains("static unsafe contract review only"));
     assert!(text.contains("not memory-safety proof"));
     assert!(text.contains("not UB-free status"));
