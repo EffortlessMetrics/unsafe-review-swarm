@@ -2922,7 +2922,7 @@ fn print_first_pr_help() {
     println!();
     println!("External PR setup:");
     println!("  gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid");
-    println!("  git -C /path/to/repo fetch origin <base-sha> <head-sha>");
+    println!("  git -C /path/to/repo fetch origin <base-sha> pull/<number>/head");
     println!("  git -C /path/to/repo checkout --detach <head-sha>");
     println!("  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>");
     println!("Raw diff capture for receipts or --diff:");

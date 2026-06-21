@@ -492,7 +492,7 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
     for expected in [
         "External PR setup:",
         "gh pr view <number> --repo <owner>/<repo> --json baseRefOid,headRefOid",
-        "git -C /path/to/repo fetch origin <base-sha> <head-sha>",
+        "git -C /path/to/repo fetch origin <base-sha> pull/<number>/head",
         "git -C /path/to/repo checkout --detach <head-sha>",
         "unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha>",
         "Raw diff capture for receipts or --diff:",

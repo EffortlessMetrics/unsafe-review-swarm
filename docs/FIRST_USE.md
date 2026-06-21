@@ -123,7 +123,7 @@ validate that the checkout matches before it analyzes:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
-git -C /path/to/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/repo fetch origin <base-sha> pull/<number>/head
 git -C /path/to/repo checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/repo \
@@ -132,10 +132,14 @@ unsafe-review pr \
   --out-dir target/unsafe-review
 ```
 
-This avoids rendered GitHub diffs and shell-redirection encoding surprises on
-older Windows PowerShell. If you need a saved patch file instead, let Git write
-it with `git diff --output=<path>` and pass that file to `--diff`. Use an
-absolute output path when `git -C` changes directories:
+The `pull/<number>/head` fetch gets the PR head through GitHub's PR ref, so
+forked PR heads do not depend on fetching an arbitrary SHA from `origin`.
+`--head-sha` still validates that the checked-out commit is the exact head SHA
+reported by `gh pr view`. This avoids rendered GitHub diffs and
+shell-redirection encoding surprises on older Windows PowerShell. If you need a
+saved patch file instead, let Git write it with `git diff --output=<path>` and
+pass that file to `--diff`. Use an absolute output path when `git -C` changes
+directories:
 
 ```bash
 git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/change.diff <base-sha>...<head-sha>

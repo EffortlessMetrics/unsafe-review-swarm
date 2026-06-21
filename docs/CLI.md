@@ -135,7 +135,7 @@ checked out at the expected PR head before analysis starts:
 
 ```bash
 gh pr view 827 --repo tokio-rs/bytes --json baseRefOid,headRefOid
-git -C /path/to/bytes fetch origin <base-sha> <head-sha>
+git -C /path/to/bytes fetch origin <base-sha> pull/827/head
 git -C /path/to/bytes checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/bytes \
@@ -143,6 +143,9 @@ unsafe-review pr \
   --head-sha <head-sha> \
   --out-dir target/unsafe-review
 ```
+
+The pull-ref fetch works for same-repo and fork PR heads; `--head-sha` then
+validates the checkout against the immutable SHA reported by `gh pr view`.
 
 If you need a saved patch file instead, let Git write it with
 `git diff --output=<path>` so shell redirection cannot re-encode the file on

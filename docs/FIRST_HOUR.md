@@ -230,7 +230,7 @@ Then fetch those SHAs into a local checkout, check out the head, and ask
 `unsafe-review` to validate the checked-out head before analysis:
 
 ```bash
-git -C /path/to/external/repo fetch origin <base-sha> <head-sha>
+git -C /path/to/external/repo fetch origin <base-sha> pull/<number>/head
 git -C /path/to/external/repo checkout --detach <head-sha>
 unsafe-review pr \
   --root /path/to/external/repo \
@@ -239,6 +239,9 @@ unsafe-review pr \
   --out-dir target/unsafe-review
 ```
 
+The `pull/<number>/head` fetch gets the PR head through GitHub's PR ref, which
+works for fork PRs without relying on raw-SHA fetch support from `origin`.
+`--head-sha` still keeps the exact checked-out head visible and validated.
 Avoid copying from rendered GitHub diff views, and avoid shell redirection for
 saved patches on older Windows PowerShell: it can re-encode the file while
 leaving it readable to humans. If you need a saved patch file instead, let Git
