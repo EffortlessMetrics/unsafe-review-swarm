@@ -44,6 +44,9 @@ Specs define behavior. They do not carry the PR queue.
 33. [LLM context packet](UNSAFE-REVIEW-SPEC-0033-llm-context-packet.md)
 34. [ub-review gate manifest](UNSAFE-REVIEW-SPEC-0034-ub-review-gate-manifest.md)
 35. [Repo-scan diagnosability](UNSAFE-REVIEW-SPEC-0035-repo-scan-diagnosability.md)
+
+    *SPEC-0036 was dropped 2026-06-12 as redundant with SPEC-0005/0028; the control-plane lane reuses the D1–D5 obligation set under SPEC-0040/0041/0042. See `.rails/lanes/control-plane/implementation-plan.md`.*
+
 36. [PR-gate composite GitHub Action](UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md)
 37. [Low-noise usefulness telemetry](UNSAFE-REVIEW-SPEC-0038-low-noise-usefulness-telemetry.md)
 38. [Scheduled corpus backstop](UNSAFE-REVIEW-SPEC-0039-scheduled-corpus-backstop.md)
