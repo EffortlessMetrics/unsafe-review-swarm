@@ -295,7 +295,7 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
         }
     };
 
-    // Each fixture_subset entry must have fixture and rationale strings
+    // Each fixture_subset entry must have the documented identity, rationale, status, and timing.
     for (idx, entry) in subset.iter().enumerate() {
         let entry_obj = entry.as_object().ok_or_else(|| {
             format!(
@@ -303,7 +303,7 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
                 path.display()
             )
         })?;
-        for field in ["fixture", "rationale"] {
+        for field in ["fixture", "rationale", "status"] {
             match entry_obj.get(field) {
                 Some(serde_json::Value::String(s)) if !s.is_empty() => {}
                 Some(_) => {
@@ -318,6 +318,21 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
                         path.display()
                     ));
                 }
+            }
+        }
+        match entry_obj.get("elapsed_ms") {
+            Some(serde_json::Value::Number(_)) => {}
+            Some(_) => {
+                return Err(format!(
+                    "{}: fixture_subset[{idx}].elapsed_ms must be a number",
+                    path.display()
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "{}: fixture_subset[{idx}] missing required field elapsed_ms",
+                    path.display()
+                ));
             }
         }
     }
@@ -356,9 +371,9 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
         }
     }
 
-    // card_inventory must be an object
-    match obj.get("card_inventory") {
-        Some(serde_json::Value::Object(_)) => {}
+    // card_inventory must be an object with required numeric counters
+    let card_inventory = match obj.get("card_inventory") {
+        Some(serde_json::Value::Object(o)) => o,
         Some(_) => {
             return Err(format!(
                 "{}: card_inventory must be an object",
@@ -371,11 +386,77 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
                 path.display()
             ));
         }
+    };
+    for field in [
+        "total_cards",
+        "actionable_cards",
+        "new_cards",
+        "worsened_cards",
+        "resolved_cards",
+        "inherited_cards",
+    ] {
+        match card_inventory.get(field) {
+            Some(serde_json::Value::Number(_)) => {}
+            Some(_) => {
+                return Err(format!(
+                    "{}: card_inventory.{field} must be a number",
+                    path.display()
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "{}: card_inventory missing required field {field}",
+                    path.display()
+                ));
+            }
+        }
     }
 
-    // agent_readiness must be an object
-    match obj.get("agent_readiness") {
-        Some(serde_json::Value::Object(_)) => {}
+    // coverage_slots must be an object with required SPEC-0038 counters
+    let coverage_slots = match obj.get("coverage_slots") {
+        Some(serde_json::Value::Object(o)) => o,
+        Some(_) => {
+            return Err(format!(
+                "{}: coverage_slots must be an object",
+                path.display()
+            ));
+        }
+        None => {
+            return Err(format!(
+                "{}: missing required field coverage_slots",
+                path.display()
+            ));
+        }
+    };
+    for field in [
+        "contract_missing",
+        "contract_weak",
+        "guard_missing",
+        "guard_weak",
+        "test_reach_missing",
+        "test_reach_weak",
+        "witness_receipt_missing",
+    ] {
+        match coverage_slots.get(field) {
+            Some(serde_json::Value::Number(_)) => {}
+            Some(_) => {
+                return Err(format!(
+                    "{}: coverage_slots.{field} must be a number",
+                    path.display()
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "{}: coverage_slots missing required field {field}",
+                    path.display()
+                ));
+            }
+        }
+    }
+
+    // agent_readiness must be an object with required histogram buckets
+    let agent_readiness = match obj.get("agent_readiness") {
+        Some(serde_json::Value::Object(o)) => o,
         Some(_) => {
             return Err(format!(
                 "{}: agent_readiness must be an object",
@@ -388,9 +469,67 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
                 path.display()
             ));
         }
+    };
+    for field in [
+        "ready",
+        "requires_witness_receipt",
+        "needs_human",
+        "unsupported",
+    ] {
+        match agent_readiness.get(field) {
+            Some(serde_json::Value::Number(_)) => {}
+            Some(_) => {
+                return Err(format!(
+                    "{}: agent_readiness.{field} must be a number",
+                    path.display()
+                ));
+            }
+            None => {
+                return Err(format!(
+                    "{}: agent_readiness missing required field {field}",
+                    path.display()
+                ));
+            }
+        }
     }
 
-    // scan_cost_range must be an object with elapsed_ms_min/median/max
+    // not-selected histograms must be objects
+    for field in [
+        "not_selected_reason_histogram",
+        "not_selected_class_histogram",
+    ] {
+        match obj.get(field) {
+            Some(serde_json::Value::Object(_)) => {}
+            Some(_) => {
+                return Err(format!("{}: {field} must be an object", path.display()));
+            }
+            None => {
+                return Err(format!(
+                    "{}: missing required field {field}",
+                    path.display()
+                ));
+            }
+        }
+    }
+
+    // unfulfilled_obligation_count must be a number
+    match obj.get("unfulfilled_obligation_count") {
+        Some(serde_json::Value::Number(_)) => {}
+        Some(_) => {
+            return Err(format!(
+                "{}: unfulfilled_obligation_count must be a number",
+                path.display()
+            ));
+        }
+        None => {
+            return Err(format!(
+                "{}: missing required field unfulfilled_obligation_count",
+                path.display()
+            ));
+        }
+    }
+
+    // scan_cost_range must be an object with elapsed_ms_* and output_bytes_* ranges
     let scan_cost = match obj.get("scan_cost_range") {
         Some(serde_json::Value::Object(o)) => o,
         Some(_) => {
@@ -406,7 +545,14 @@ pub(crate) fn check_schema(path: &Path) -> Result<(), String> {
             ));
         }
     };
-    for field in ["elapsed_ms_min", "elapsed_ms_median", "elapsed_ms_max"] {
+    for field in [
+        "elapsed_ms_min",
+        "elapsed_ms_median",
+        "elapsed_ms_max",
+        "output_bytes_min",
+        "output_bytes_median",
+        "output_bytes_max",
+    ] {
         match scan_cost.get(field) {
             Some(serde_json::Value::Number(_)) | Some(serde_json::Value::Null) => {}
             Some(_) => {
@@ -922,9 +1068,8 @@ mod tests {
         Ok(std::env::temp_dir().join(format!("{prefix}-{nanos}.json")))
     }
 
-    #[test]
-    fn schema_check_accepts_valid_sample() -> Result<(), String> {
-        let rollup = serde_json::json!({
+    fn valid_schema_rollup() -> serde_json::Value {
+        serde_json::json!({
             "schema_version": SCHEMA_VERSION,
             "generated_at": "2026-06-12T00:00:00Z",
             "trust_boundary": TRUST_BOUNDARY,
@@ -971,9 +1116,17 @@ mod tests {
                 "elapsed_ms_min": serde_json::Value::Null,
                 "elapsed_ms_median": serde_json::Value::Null,
                 "elapsed_ms_max": serde_json::Value::Null,
+                "output_bytes_min": serde_json::Value::Null,
+                "output_bytes_median": serde_json::Value::Null,
+                "output_bytes_max": serde_json::Value::Null,
             },
             "human_summary": "1/1 fixtures completed; 0 total cards (0 actionable)",
-        });
+        })
+    }
+
+    #[test]
+    fn schema_check_accepts_valid_sample() -> Result<(), String> {
+        let rollup = valid_schema_rollup();
         let sample = serde_json::to_string_pretty(&rollup)
             .map_err(|err| format!("test sample serialisation failed: {err}"))?;
 
@@ -1034,6 +1187,58 @@ mod tests {
                 "schema check should have rejected trust_boundary missing 'not calibrated'"
                     .to_string(),
             )
+        }
+    }
+
+    #[test]
+    fn schema_check_rejects_missing_output_byte_scan_cost_range() -> Result<(), String> {
+        let mut rollup = valid_schema_rollup();
+        let scan_cost = rollup
+            .get_mut("scan_cost_range")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| "valid schema rollup missing scan_cost_range object".to_string())?;
+        scan_cost.remove("output_bytes_min");
+        let sample = serde_json::to_string_pretty(&rollup)
+            .map_err(|err| format!("serialise failed: {err}"))?;
+        let path = unique_temp_path("corpus-usefulness-test-missing-output-bytes")?;
+        fs::write(&path, &sample).map_err(|err| format!("write test sample failed: {err}"))?;
+        let result = check_schema(&path);
+        let _ = fs::remove_file(&path);
+        let err = result
+            .err()
+            .ok_or_else(|| "schema check should reject missing output_bytes_min".to_string())?;
+        if err.contains("scan_cost_range missing required field output_bytes_min") {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected missing output_bytes_min schema error; got {err}"
+            ))
+        }
+    }
+
+    #[test]
+    fn schema_check_rejects_missing_coverage_slot_counter() -> Result<(), String> {
+        let mut rollup = valid_schema_rollup();
+        let coverage_slots = rollup
+            .get_mut("coverage_slots")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| "valid schema rollup missing coverage_slots object".to_string())?;
+        coverage_slots.remove("witness_receipt_missing");
+        let sample = serde_json::to_string_pretty(&rollup)
+            .map_err(|err| format!("serialise failed: {err}"))?;
+        let path = unique_temp_path("corpus-usefulness-test-missing-coverage-slot")?;
+        fs::write(&path, &sample).map_err(|err| format!("write test sample failed: {err}"))?;
+        let result = check_schema(&path);
+        let _ = fs::remove_file(&path);
+        let err = result.err().ok_or_else(|| {
+            "schema check should reject missing witness_receipt_missing".to_string()
+        })?;
+        if err.contains("coverage_slots missing required field witness_receipt_missing") {
+            Ok(())
+        } else {
+            Err(format!(
+                "expected missing witness_receipt_missing schema error; got {err}"
+            ))
         }
     }
 
