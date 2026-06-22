@@ -136,6 +136,13 @@ a defect.
 - **In-tool per-run RSS** stays parked (revivable on validated operator demand;
   ADR-0008).
 
+Update 2026-06-22: the first real external-PR noise-reading step now exists as
+four read-only external pilot receipts under `docs/dogfood/pilots/`, checked by
+`xtask check-external-pilots`. This reduces the "no real external PR reading"
+gap, but it does not close the broader product-validation gap: the sample is
+still diagnostic, not calibrated, not independent maintainer validation, and not
+a release Action smoke.
+
 ## Next lane (evidence-backed)
 
 The measured low-noise validation layer is complete: inherited debt is visible
@@ -146,7 +153,8 @@ inertia. Candidates this lane surfaced:
 
 - the resolve-vs-reclassify product question above (should a fully-evidenced
   in-scope site resolve, or settle at `guarded_and_witnessed`?);
-- a real external-repo PR noise reading (needs dogfood-target seeding);
+- more real external-repo PR noise readings plus independent usefulness
+  judgments beyond the first four local-equivalent pilot receipts;
 - the deferred items in *What remains*.
 
 Everything here is a characterization on a controlled corpus — explicitly
