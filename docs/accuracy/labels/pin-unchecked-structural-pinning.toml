@@ -1,0 +1,33 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "pin-unchecked-structural-pinning-evidence"
+operation_family = "pin_unchecked"
+hazard = "pin_invariant"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned
+ReviewCard pin-invariant evidence behavior for Pin::new_unchecked; they are
+not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "pin-unchecked-missing-pin-invariant"
+fixture = "pin_new_unchecked"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "pin_unchecked"
+expected_hazard = "pin_invariant"
+expected_obligation_key = "pin"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A bare Pin::new_unchecked call does not prove the value will not move or that projections preserve pinning invariants."
+
+[[samples]]
+id = "pin-unchecked-safe-ctor-no-cards"
+fixture = "pin_unchecked_safe_ctor_no_cards"
+kind = "false_positive_control"
+expected_cards = 0
+label_source = "fixture_golden"
+rationale = "A safe inherent new_unchecked() constructor called outside any unsafe scope is not carded as Pin::new_unchecked (D1 unsafe-scope gate); the \"Pin\" token in a nearby comment does not trigger a card because the call is outside unsafe scope (D4 comment masking)."

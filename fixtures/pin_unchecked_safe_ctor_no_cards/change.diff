@@ -1,0 +1,24 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,32 @@
++pub struct Slot {
++    inner: u32,
++}
++
++impl Slot {
++    pub fn new_unchecked(inner: u32) -> Self {
++        Slot { inner }
++    }
++
++    pub fn inner(&self) -> u32 {
++        self.inner
++    }
++}
++
++// "Pin" appears in this comment to stress the D4 comment/string masking
++// alongside the D1 unsafe-scope gate. The bare `new_unchecked` call name plus
++// the "Pin" token must still not card because the call is outside unsafe scope.
++pub fn make_slot() -> Slot {
++    Slot::new_unchecked(7)
++}

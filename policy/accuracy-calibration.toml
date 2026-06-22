@@ -62,6 +62,38 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "pin-unchecked-structural-pinning-evidence"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "pin_unchecked"
+hazard = "pin_invariant"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "pin_new_unchecked",
+  "pin_unchecked_safe_ctor_no_cards",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/pin-unchecked-structural-pinning.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned Pin::new_unchecked structural-pinning evidence confirms a
+bare Pin::new_unchecked call reports a pin-invariant obligation, and that a
+safe new_unchecked() homonym called outside unsafe scope is not carded in
+the listed fixtures.
+"""
+forbidden_claims = [
+  "broad Pin::new_unchecked soundness",
+  "structural pinning proof",
+  "pin-invariant proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "drop-in-place-box-origin-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

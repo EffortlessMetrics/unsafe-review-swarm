@@ -422,6 +422,19 @@ evidence = "Box::from_raw family matched by contains_call_name (word-boundary an
 review_after = "2026-12-15"
 
 [[contract]]
+operation_family = "pin_unchecked"
+obligations = ["D1", "D2", "D3", "D4", "D5"]
+positive_fixtures = [
+  "pin_new_unchecked",
+]
+negative_fixtures = [
+  "pin_unchecked_safe_ctor_no_cards",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Pin::new_unchecked family matched by contains_call_name(line, \"new_unchecked\") && line.contains(\"Pin\") (word-boundary anchored on the call name, D5) with the central is_fn_definition_header gate (D2). Gated on unsafe scope (D1) by the fallback_scan call-site gate: the bare `new_unchecked` name also spells common safe constructors and unsafe stdlib calls (NonNull::new_unchecked, Option/Result::unwrap_unchecked, etc.), so the scope gate separates the unsafe stdlib Pin call from safe homonyms. The safe-ctor no-card control (`Slot::new_unchecked` called outside any unsafe scope, on a line whose comment also mentions \"Pin\" to stress D4 masking) confirms such a call emits no card. The existing `pin_new_unchecked` positive fixture confirms a real `Pin::new_unchecked` call inside an unsafe block emits a pin_unchecked/pin_invariant/guard_missing card. Comment/string masking (D4) applies centrally. Only a same-name D1 negative control exists at this time; a D3 same-origin discharge positive is a future extension. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
 operation_family = "slice_from_raw_parts"
 obligations = ["D1", "D2", "D3", "D4", "D5"]
 positive_fixtures = [
