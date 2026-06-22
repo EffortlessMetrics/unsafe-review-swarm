@@ -402,6 +402,7 @@ required_core_fixtures = [
   "zeroed_safe_wrapper_no_cards",
   "zeroed_call_still_cards",
   "box_from_raw_safe_ctor_no_cards",
+  "pin_unchecked_safe_ctor_no_cards",
   "drop_in_place_safe_fn_no_cards",
   "unwrap_unchecked_safe_method_no_cards",
   "unreachable_unchecked_safe_fn_no_cards",
@@ -5064,6 +5065,13 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "box_from_raw"
 expected_hazard = "drop_or_deallocation"
+
+[[cases]]
+fixture = "pin_unchecked_safe_ctor_no_cards"
+kind = "false_positive_control"
+claim = "a safe inherent new_unchecked() constructor called outside any unsafe scope is not carded as Pin::new_unchecked"
+support_tier = "Core operation smoke slice"
+expected_cards = 0
 
 [[cases]]
 fixture = "static_mut_global_state"

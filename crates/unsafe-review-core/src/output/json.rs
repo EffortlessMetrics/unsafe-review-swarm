@@ -768,6 +768,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "zeroed_valid_u32",
     "zeroed_safe_wrapper_no_cards",
     "box_from_raw_safe_ctor_no_cards",
+    "pin_unchecked_safe_ctor_no_cards",
     "drop_in_place_safe_fn_no_cards",
     "unwrap_unchecked_safe_method_no_cards",
     "unreachable_unchecked_safe_fn_no_cards",
