@@ -1,0 +1,175 @@
+schema_version = "external-pilot/v1"
+id = "memchr-pr226-2026-06-22"
+status = "recorded"
+date = "2026-06-22"
+reviewer = "codex"
+repository = "BurntSushi/memchr"
+pr = 226
+url = "https://github.com/BurntSushi/memchr/pull/226"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone plus exact base and pull-ref fetch; raw diff captured with git diff --binary --full-index --output over base...head and first-pr run against pinned SHAs"
+tool_version = "0.3.8"
+base_sha = "b41293b805c2709ef19d98f9b1191ca2e3a4e7c8"
+head_sha = "8221739db864a86b90e4c4f39723477f421e4dcb"
+diff_path = "target/external-pilots/memchr-pr226-2026-06-22/memchr-pr226-2026-06-22.diff"
+diff_sha256 = "4afcf9bc7da13db59528457b1707d9baa800258abc0ff4fca983103410d61ee2"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 1
+agent_ready = 1
+human_only = 0
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 1
+not_selected_count = 0
+selection_reason = "bounded reviewer noise; the single medium-confidence pointer-arithmetic card was selected as the top actionable card"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 1
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+
+[run]
+exit_code = 0
+elapsed_seconds = 1.819
+diff_bytes = 1889
+artifact_count = 18
+artifact_total_bytes = 84169
+rust_files_changed = 2
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/cards.json"
+bytes = 6585
+sha256 = "b96e5dff39e9d353ff7b9371ee2f405e2ee999d00f03e2ff1d709eab383d01ad"
+
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/cards.sarif"
+bytes = 4037
+sha256 = "83a8d45ed0300cfda163b0150be3ba7645172a95e0c4d43fb44cf307091706e6"
+
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/comment-plan.json"
+bytes = 5827
+sha256 = "1b7a5cc75e06115938e7d23ec5d2192040adb51b871792ece846080dc78586f3"
+
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/github-summary.md"
+bytes = 4219
+sha256 = "a904dae90ffe2d8665a2063e1fe39f0519f1cbd9fdc65146b84cbb71d968cde6"
+
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/lsp.json"
+bytes = 11522
+sha256 = "21e4fd8b89a78077a03ff44694d40538d9704abcb33433a6ff0a50b19f50424e"
+
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/policy-report.json"
+bytes = 2763
+sha256 = "ca59045a96cf8c5da8200f252a5a9ed991c12195dcea8dec1b882d4803c4b891"
+
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/policy-report.md"
+bytes = 2955
+sha256 = "2cc9b7961f060eea0638beb50893e601e4665c6a4d1a5aa1651149e29d7bf284"
+
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/pr-summary.md"
+bytes = 6286
+sha256 = "5c6a1316e04aa9556639e20a60c2c4c52c5df70fb878c552a128bbde3190d7a1"
+
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "b53d5b1a2e38891cbdd48532fb00ce10d3d8eadf6b6be6b6a94d12a2d294aae8"
+
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "3cc94abca2377790e99bf15e90d5da3c1c2abbf4ccb64d02d34d0bbfa61cd522"
+
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/repair-queue.json"
+bytes = 8575
+sha256 = "60d58c48111151e6f9b57fa9b229ebc7530f331a18b19635871fe91172ad2ce4"
+
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/review-kit.json"
+bytes = 13339
+sha256 = "b228af37714e0a2a26bc37eda5f26c06f3aad768271bb8def6fb6c5a25f2f6a5"
+
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/tokmd-packets.json"
+bytes = 3324
+sha256 = "52f5a6431c3af66beda76bde75ca01de9e0580fa905ece47da23d14eec1a60b2"
+
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/unsafe-review-gate.json"
+bytes = 781
+sha256 = "86cc09e0258e8e2f243475dcab56ea2b6a07269c2c63a169be581999d690937f"
+
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/usefulness-telemetry.json"
+bytes = 1341
+sha256 = "7a6fb2a41340ccf82f9e5467c83e7cf4e60b4dcb47113dcc5864493378e154e9"
+
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/memchr-pr226-2026-06-22/first-pr/witness-plan.md"
+bytes = 3951
+sha256 = "6b3263d6cd71792ff9ba05d99ad3382deacc70d541ce1ab42acb9c5d0bc8bd18"
+
+[[judgments]]
+surface = "pr_summary"
+label = "actionable"
+reason = "The first screen identified one changed pointer-arithmetic seam, the missing guard/reach/witness evidence, and a concrete Miri or cargo-careful confirmation route."
+next_step = "Keep this as a usefulness sample for pointer-arithmetic review; do not treat it as a safety, UB, or witness result."
+
+[[judgments]]
+surface = "agent_packet"
+label = "agent_ready"
+reason = "The generated packet names one specific operation, card-scoped allowed repairs, and verify commands, while preserving the static-review trust boundary."
+next_step = "Use the packet as a bounded investigation input only; no source edits or witness claims were made during the pilot."
+
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "The local-equivalent path still required an external clone, exact pull-ref fetch, detached checkout, raw diff output, and manual hash capture instead of a single public Action run."
+next_step = "Keep first-use and public Action acquisition improvements on the adoption backlog."
