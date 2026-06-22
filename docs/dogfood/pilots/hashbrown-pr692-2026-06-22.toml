@@ -1,0 +1,181 @@
+schema_version = "external-pilot/v1"
+id = "hashbrown-pr692-2026-06-22"
+status = "recorded"
+date = "2026-06-22"
+reviewer = "codex"
+repository = "rust-lang/hashbrown"
+pr = 692
+url = "https://github.com/rust-lang/hashbrown/pull/692"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone plus exact pull-ref fetch; historical base ref was gone but base SHA was reachable, raw diff captured with git diff --binary --full-index --output over base...head and first-pr run against pinned SHAs"
+tool_version = "0.3.8"
+base_sha = "d84a5526b24518033e9563d4ab4bebb1c6ba6c3c"
+head_sha = "7b3bba6eb4b2f03636155c918552b5f30c1a05b3"
+diff_path = "target/external-pilots/hashbrown-pr692-2026-06-22/hashbrown-pr692-2026-06-22.diff"
+diff_sha256 = "ea8fad4ca4eb5e4819c8ad55753be216a55eed1afc8f872eefd30162c85fe8aa"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 3
+agent_ready = 3
+human_only = 0
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 3
+not_selected_count = 0
+selection_reason = "bounded reviewer noise; three medium-confidence changed-line cards fit the active comment budget and were selected as top actionable cards"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 3
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+
+[run]
+exit_code = 0
+elapsed_seconds = 1.439
+diff_bytes = 1287
+artifact_count = 18
+artifact_total_bytes = 181852
+rust_files_changed = 2
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/cards.json"
+bytes = 23420
+sha256 = "2f5574729dee0ca566b11fb3cd46d4e716d9ef086e1028584d40979f013320f7"
+
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/cards.sarif"
+bytes = 10226
+sha256 = "28672a5677e7bf3583770f57da32b4ed5119bf6cd0bb2ddd3556c86df8773849"
+
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/comment-plan.json"
+bytes = 16930
+sha256 = "b2cf0fe8074c8b36656c760abca1fe077ae83e6185265a8a2f509363cbd7c9dc"
+
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/github-summary.md"
+bytes = 4385
+sha256 = "0b5d94439918c9be149c3916cce2a89dc7be0c8382320edf7ac9cf09b2144816"
+
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/lsp.json"
+bytes = 42185
+sha256 = "7cf52845401dadaed920ebd67cd83ab647930f1b900cf1b5be05d6461c8133f0"
+
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/policy-report.json"
+bytes = 4447
+sha256 = "8e6d41d1a5597fec7455d99bd5b2bb01c8eff3d7252e2e15445857695befe8b5"
+
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/policy-report.md"
+bytes = 4165
+sha256 = "6ef87017c1c313bfb58efa57d9bc2534128b71c32dc9448b8688f4954e74574e"
+
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/pr-summary.md"
+bytes = 10656
+sha256 = "52d0cdc36f290854b44f55b6ab22e988915ced35005cc59c840ca64d7b302124"
+
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "b53d5b1a2e38891cbdd48532fb00ce10d3d8eadf6b6be6b6a94d12a2d294aae8"
+
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "3cc94abca2377790e99bf15e90d5da3c1c2abbf4ccb64d02d34d0bbfa61cd522"
+
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/repair-queue.json"
+bytes = 18447
+sha256 = "c753309291e40649cb37a06b3f22518e6824a64702f2058dbade724a993cc355"
+
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/review-kit.json"
+bytes = 19766
+sha256 = "1da65069f8e6a28a8e9a30a92ee4bc84e41dffc8d40c7e26aa720bcbec15e98d"
+
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/tokmd-packets.json"
+bytes = 3324
+sha256 = "a575e5b2e634d2787260d0619762beb39fbdab9dd06d5e4ffb56b3816e3ec9a2"
+
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/unsafe-review-gate.json"
+bytes = 781
+sha256 = "594ad1556dac34f3592d85001dc3d1accc347c4ae14877c313e8a31ce1204558"
+
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/usefulness-telemetry.json"
+bytes = 1343
+sha256 = "f2137a6fbe1af712baf744168042881aa49378f1e5180b8139f93f69140125ad"
+
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/hashbrown-pr692-2026-06-22/first-pr/witness-plan.md"
+bytes = 13113
+sha256 = "015a0b115b1e8131cf6dc115a47ea8dcd6139a0c85ebe15cfae949f783be3db5"
+
+[[judgments]]
+surface = "pr_summary"
+label = "actionable"
+reason = "The first screen identified three changed unsafe seams, separated raw-pointer write, pointer arithmetic, and slice-from-raw-parts families, and named concrete confirmation routes."
+next_step = "Keep this as a usefulness sample for multi-family changed-line review; do not treat it as a safety, UB, or witness result."
+
+[[judgments]]
+surface = "comment_plan"
+label = "actionable"
+reason = "All three cards fit the active comment budget and each selected candidate carried operation family, missing evidence, next action, and verify-command context."
+next_step = "Use future pilots to see whether selecting all budget-fitting medium-confidence cards remains tolerable on larger or noisier external PRs."
+
+[[judgments]]
+surface = "agent_packet"
+label = "agent_ready"
+reason = "The selected packets provide bounded guard or witness-investigation tasks with specific operations, allowed repair buckets, and verification commands."
+next_step = "Treat the packets as investigation inputs only; no automatic repair, source edit, or witness result was produced by the pilot."
+
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "The baseRefName reported by GitHub was no longer fetchable as a branch ref, so the local-equivalent path had to rely on immutable base and head SHAs plus a fetched PR head."
+next_step = "Keep runtime-root and PR setup guidance explicit about SHA-pinned fallbacks for historical external PRs."
