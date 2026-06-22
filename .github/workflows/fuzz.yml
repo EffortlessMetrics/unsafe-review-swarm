@@ -1,7 +1,7 @@
 name: fuzz
 
 # Advisory scheduled fuzz run over the `analyze` target.
-# Runs `cargo +nightly fuzz run analyze` for a bounded wall-clock budget and
+# Runs `cargo +nightly-2026-06-01 fuzz run analyze` for a bounded wall-clock budget and
 # uploads any crash/repro artifacts. DIAGNOSTIC ROBUSTNESS INPUT ONLY — not a
 # memory-safety proof, not a UB-free claim, not a Miri-clean claim, not a
 # coverage claim, and never a PR gate. Crashes are triage input, not merge
@@ -14,6 +14,9 @@ on:
 
 permissions:
   contents: read
+
+env:
+  FUZZ_TOOLCHAIN: nightly-2026-06-01
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -31,19 +34,21 @@ jobs:
         with:
           persist-credentials: false
 
-      # cargo-fuzz requires nightly. Pin a specific nightly so the run is
-      # reproducible; bump deliberately when re-pinning.
-      - uses: dtolnay/rust-toolchain@nightly
+      # cargo-fuzz requires nightly. Pin the installer action and use a dated
+      # nightly so reproducers know which toolchain path ran.
+      - uses: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537
+        with:
+          toolchain: ${{ env.FUZZ_TOOLCHAIN }}
 
       - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo install cargo-fuzz --locked --version 0.11.2
+        run: cargo +${FUZZ_TOOLCHAIN} install cargo-fuzz --locked --version 0.11.2
 
       - name: Run fuzz target (bounded wall-clock)
         run: |
           cd fuzz
-          cargo +nightly fuzz run analyze -- -max_total_time=120s || true
+          cargo +${FUZZ_TOOLCHAIN} fuzz run analyze -- -max_total_time=120s
 
       - name: Collect crash artifacts (if any)
         if: always()
@@ -54,13 +59,14 @@ jobs:
           if [ -d fuzz/artifacts ]; then
             cp -r fuzz/artifacts fuzz-artifacts/ || true
           fi
-          # Record the last log line for quick triage.
+          # Record a compact triage summary for the artifact bundle.
           {
             echo "## fuzz analyze run (advisory)"
             echo
             echo "- target: analyze"
             echo "- max_total_time: 120s"
-            echo "- nightly: pinned via dtolnay/rust-toolchain@nightly"
+            echo "- rust toolchain: ${FUZZ_TOOLCHAIN}"
+            echo "- rust-toolchain action: dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537"
             echo "- status: see step outcome (continue-on-error; never blocks)"
             echo
             if [ -d fuzz/artifacts ] && [ -n "$(ls -A fuzz/artifacts 2>/dev/null)" ]; then

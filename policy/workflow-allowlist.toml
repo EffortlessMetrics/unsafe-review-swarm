@@ -138,10 +138,10 @@ path = ".github/workflows/fuzz.yml"
 permissions = "contents: read"
 actions = [
   "actions/checkout@v6",
-  "dtolnay/rust-toolchain@nightly",
+  "dtolnay/rust-toolchain@67ef31d5b988238dd797d409d6f9574278e20537",
   "Swatinem/rust-cache@v2",
   "actions/upload-artifact@v7",
 ]
-reason = "Advisory scheduled fuzz run over the `analyze` target (fuzz/fuzz_targets/analyze.rs). Runs `cargo +nightly fuzz run analyze -- -max_total_time=120s` on a weekly schedule (Monday 04:17 UTC, offset from corpus-backstop) and workflow_dispatch only. cargo-fuzz requires nightly, hence dtolnay/rust-toolchain@nightly (no other workflow uses nightly; this is the sole exception). The fuzz step and job are both continue-on-error so a crash or nightly-toolchain breakage never fails the run. Uploads crash repros (if any) and a summary as a 30-day artifact. Never a required PR gate, never triggers on pull_request or push, no witness execution, no source edits, no comment posting, no write permissions. Diagnostic robustness input only — not a memory-safety proof, UB-free claim, Miri-clean claim, coverage claim, or merge blocker. See #1807 and docs/FUZZING.md."
+reason = "Advisory scheduled fuzz run over the `analyze` target (fuzz/fuzz_targets/analyze.rs). Runs `cargo +nightly-2026-06-01 fuzz run analyze -- -max_total_time=120s` on a weekly schedule (Monday 04:17 UTC, offset from corpus-backstop) and workflow_dispatch only. cargo-fuzz requires nightly, so the workflow pins the rust-toolchain installer action to an immutable SHA and installs dated toolchain nightly-2026-06-01 (no other workflow uses nightly; this is the sole exception). The job is continue-on-error so a crash or nightly-toolchain breakage never fails the advisory lane, while the fuzz step itself still reports its true outcome. Uploads crash repros (if any) and a summary as a 30-day artifact. Never a required PR gate, never triggers on pull_request or push, no witness execution, no source edits, no comment posting, no write permissions. Diagnostic robustness input only — not a memory-safety proof, UB-free claim, Miri-clean claim, coverage claim, or merge blocker. See #1807 and docs/FUZZING.md."
 created = "2026-06-21"
 review_after = "2026-08-21"
