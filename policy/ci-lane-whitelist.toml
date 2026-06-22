@@ -129,3 +129,13 @@ cost_estimate = "low"
 trigger_policy = "schedule (weekly), workflow_dispatch"
 status = "advisory"
 review_after = "2026-08-12"
+
+[[lane]]
+id = "fuzz"
+owner = "repo-infra"
+intent = "Run a bounded advisory fuzz pass over the analyze target on a weekly schedule to catch panics and renderer-parseability regressions under adversarial input"
+proof_obligation = "workflow runs on schedule/dispatch only, is never a required PR gate, uses nightly toolchain (cargo-fuzz requirement, sole nightly exception), runs continue-on-error so crashes never fail the run, and uploads crash repros as artifacts; diagnostic robustness input only"
+cost_estimate = "low"
+trigger_policy = "schedule (weekly), workflow_dispatch"
+status = "advisory"
+review_after = "2026-08-21"
