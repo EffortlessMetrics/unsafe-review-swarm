@@ -533,6 +533,19 @@ unsafe-review-swarm develops
 unsafe-review publishes
 ```
 
+Posture (2026-06-21): the guard runs **local-only** by design. A hosted
+runner would have to `git fetch` the same two repos into the local refs
+the guard reads (`refs/unsafe-review-sync/source-main`,
+`refs/unsafe-review-sync/swarm-main`), so a CI workflow would not produce
+information a developer does not already get faster from
+`cargo run --locked -p xtask -- source-divergence` locally. The guard
+remains advisory (`Ok(())` always — `xtask/src/source_sync.rs`), never a
+hard CI failure, and is not wired into any workflow. Developers run it
+before routine swarm implementation per `AGENTS.md`. If the owner later
+wants on-demand CI invocation without a local checkout, a
+`workflow_dispatch`-only workflow is the documented path; it is not
+warranted today. See #1809.
+
 ### 4.7 Future `comment-poster.yml` - trusted poster lane
 
 Purpose:
