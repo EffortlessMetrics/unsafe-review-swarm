@@ -833,11 +833,11 @@ const FUZZ_REQUIRED_FILES: &[&str] = &[
     "fuzz/fuzz_targets/analyze.rs",
 ];
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct DocArtifactEntry {
-    kind: String,
-    path: String,
-    status: String,
-    owner: String,
+pub(crate) struct DocArtifactEntry {
+    pub(crate) kind: String,
+    pub(crate) path: String,
+    pub(crate) status: String,
+    pub(crate) owner: String,
 }
 
 fn main() {
@@ -3551,7 +3551,7 @@ pub(crate) fn source_truth_index_ids(
     Ok(ids)
 }
 
-fn source_truth_index_artifacts(
+pub(crate) fn source_truth_index_artifacts(
     value: &toml::Value,
 ) -> Result<BTreeMap<String, DocArtifactEntry>, String> {
     let entries = toml_array(value, "artifact", SOURCE_OF_TRUTH_INDEX)?;
