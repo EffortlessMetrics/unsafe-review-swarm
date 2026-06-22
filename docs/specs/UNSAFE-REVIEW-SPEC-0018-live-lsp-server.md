@@ -1,6 +1,6 @@
 # UNSAFE-REVIEW-SPEC-0018: Live LSP server
 
-Status: proposed
+Status: accepted, partial-runtime
 Owner: editor/lsp
 Created: 2026-05-20
 Linked proposal: ../proposals/UNSAFE-REVIEW-PROP-0001-product-contract.md
