@@ -935,3 +935,4 @@ review (check flags, diff path, and root). The stderr prefix names the category:
 Advisory policy (the default) always exits 0 when the review completes,
 regardless of findings. Exit 1 only fires when `--policy no-new-debt` is
 explicit and the diff adds or worsens coverage gaps.
+<!-- probe: test if main CI is green (2026-06-22) -->
