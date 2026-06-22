@@ -46,8 +46,11 @@ read-only product-usefulness evidence, not third-party review authority.
   regression on a realistic fixture input.
 - External pilots now have a receipt schema and checker, so usefulness evidence
   can be recorded without third-party writes or accuracy claims. The first four
-  receipts cover FFI, pointer arithmetic, raw-pointer write, and
-  slice-from-raw-parts review seams while preserving read-only operation.
+  receipts include `getrandom#811` for an FFI boundary, `memchr#226` for pointer
+  arithmetic, `hashbrown#692` for raw-pointer write, pointer arithmetic, and
+  slice-from-raw-parts seams together, and `bytes#827` as a low-noise
+  comment-selection/setup-friction pilot rather than a one-seam classifier
+  sample. All preserve read-only operation.
 - First-pr consumer surfaces have a stronger contract rail: changing the gate
   manifest trust boundary, movement counts, status, or artifact pointers now
   fails the verifier.
