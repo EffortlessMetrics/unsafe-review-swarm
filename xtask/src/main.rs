@@ -1150,7 +1150,33 @@ fn check_docs() -> Result<(), String> {
         Path::new(".rails"),
         Path::new("policy"),
     ])?;
+    check_doc_claim_discipline()?;
     println!("check-docs: ok");
+    Ok(())
+}
+
+/// Scan the two highest-visibility public markdown surfaces for forbidden
+/// positive overclaims.
+///
+/// Reuses `reject_positive_overclaims` (the same rail that guards the first-pr
+/// artifact bundle) across the root README and CHANGELOG — the surfaces an
+/// adopter reads first. The rail exempts lines with negative-claim context
+/// (e.g. "not UB-free", "does not prove sound") so the canonical trust-boundary
+/// disclaimers pass. This partially closes #1804.
+///
+/// Scope note: `docs/**/*.md` is intentionally NOT scanned yet. Docs use
+/// richer multi-line negation forms (table "Not meaning" column headers,
+/// "never", "must not", "nor" lists) that the rail's line-local
+/// `has_negative_claim_context` does not recognize, producing false positives.
+/// Extending the rail to handle doc negation forms without weakening the
+/// artifact rail is tracked as follow-up in #1804. README.md and CHANGELOG.md
+/// were verified clean on 2026-06-21 and are the highest-value surfaces to
+/// guard first.
+fn check_doc_claim_discipline() -> Result<(), String> {
+    for path in [Path::new("README.md"), Path::new("CHANGELOG.md")] {
+        let text = read_to_string(path)?;
+        reject_positive_overclaims(path, &text)?;
+    }
     Ok(())
 }
 
@@ -26346,5 +26372,30 @@ single_truth = true
             "expected blocking finding for missing canonical_source"
         );
         Ok(())
+    }
+
+    // #1804: the doc-claim-discipline check reuses reject_positive_overclaims
+    // over README.md / CHANGELOG.md. Lock both the catch (a bare Miri-clean
+    // claim with no negation context is rejected) and the pass (the same claim
+    // with "not " negation context is accepted) so the doc guard cannot
+    // silently degrade to a no-op.
+    #[test]
+    fn doc_claim_rail_catches_bare_miri_clean_claim() -> Result<(), String> {
+        let path = std::path::Path::new("README.md");
+        let err = reject_positive_overclaims(path, "unsafe-review is Miri-clean.");
+        let Err(msg) = err else {
+            return Err("bare Miri-clean claim must be rejected".to_string());
+        };
+        if !msg.contains("Miri-clean") {
+            return Err(format!("error must name Miri-clean: {msg}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn doc_claim_rail_accepts_negated_miri_clean_disclaimer() -> Result<(), String> {
+        let path = std::path::Path::new("README.md");
+        // The canonical trust-boundary form: "not Miri-clean status".
+        reject_positive_overclaims(path, "This is not Miri-clean status.")
     }
 }
