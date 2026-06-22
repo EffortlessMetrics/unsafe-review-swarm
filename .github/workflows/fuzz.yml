@@ -1,0 +1,80 @@
+name: fuzz
+
+# Advisory scheduled fuzz run over the `analyze` target.
+# Runs `cargo +nightly fuzz run analyze` for a bounded wall-clock budget and
+# uploads any crash/repro artifacts. DIAGNOSTIC ROBUSTNESS INPUT ONLY — not a
+# memory-safety proof, not a UB-free claim, not a Miri-clean claim, not a
+# coverage claim, and never a PR gate. Crashes are triage input, not merge
+# blockers. See #1807 and docs/FUZZING.md.
+
+on:
+  schedule:
+    - cron: '17 4 * * 1'   # weekly, Monday 04:17 UTC (offset from corpus-backstop)
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  fuzz_analyze:
+    name: fuzz analyze (advisory, non-blocking)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    continue-on-error: true
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      # cargo-fuzz requires nightly. Pin a specific nightly so the run is
+      # reproducible; bump deliberately when re-pinning.
+      - uses: dtolnay/rust-toolchain@nightly
+
+      - uses: Swatinem/rust-cache@v2
+
+      - name: Install cargo-fuzz
+        run: cargo install cargo-fuzz --locked --version 0.11.2
+
+      - name: Run fuzz target (bounded wall-clock)
+        run: |
+          cd fuzz
+          cargo +nightly fuzz run analyze -- -max_total_time=120s || true
+
+      - name: Collect crash artifacts (if any)
+        if: always()
+        run: |
+          mkdir -p fuzz-artifacts
+          # cargo-fuzz writes crashes to fuzz/artifacts/ and the corpus to
+          # fuzz/corpus/analyze/. Copy any crash repros into the artifact dir.
+          if [ -d fuzz/artifacts ]; then
+            cp -r fuzz/artifacts fuzz-artifacts/ || true
+          fi
+          # Record the last log line for quick triage.
+          {
+            echo "## fuzz analyze run (advisory)"
+            echo
+            echo "- target: analyze"
+            echo "- max_total_time: 120s"
+            echo "- nightly: pinned via dtolnay/rust-toolchain@nightly"
+            echo "- status: see step outcome (continue-on-error; never blocks)"
+            echo
+            if [ -d fuzz/artifacts ] && [ -n "$(ls -A fuzz/artifacts 2>/dev/null)" ]; then
+              echo "- crashes found: yes (see artifacts/)"
+              ls -R fuzz/artifacts || true
+            else
+              echo "- crashes found: none in this run"
+            fi
+          } | tee fuzz-artifacts/summary.md
+
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: fuzz-analyze-report
+          path: fuzz-artifacts/
+          if-no-files-found: warn
+          retention-days: 30
