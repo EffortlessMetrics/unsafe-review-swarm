@@ -16,6 +16,13 @@ claude = ".claude"
 jules = ".jules"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-PROP-0001"
+kind = "proposal"
+path = "docs/proposals/UNSAFE-REVIEW-PROP-0001-product-contract.md"
+status = "accepted"
+owner = "core/product"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-PROP-0002"
 kind = "proposal"
 path = "docs/proposals/UNSAFE-REVIEW-PROP-0002-source-of-truth-stack.md"

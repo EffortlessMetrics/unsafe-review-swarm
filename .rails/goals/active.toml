@@ -107,6 +107,9 @@ commands = [
   "git diff --check",
 ]
 
+# Cross-cutting maintainability lane (instrument truthfulness across
+# SPEC-0009/0029/0030/0035 receipts, coverage, baseline, scan-completeness).
+# No single `spec =` because it spans multiple specs; governed by `plan` below.
 [[work_item]]
 id = "validation-residue"
 status = "active"
