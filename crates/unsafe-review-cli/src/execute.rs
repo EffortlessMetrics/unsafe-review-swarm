@@ -189,7 +189,9 @@ fn print_support() {
     println!("- source edits: not supported.");
     println!("- witness execution: not default.");
     println!("- blocking policy: not default.");
-    println!("- live LSP: deferred; saved lsp.json is the current editor-adjacent artifact.");
+    println!(
+        "- live LSP: re-analyzes the workspace on open/save/change; saved lsp.json remains the batch projection from first-pr."
+    );
     println!();
     println!("Trust boundary:");
     println!("- static unsafe contract review only.");
@@ -3351,10 +3353,10 @@ fn print_lsp_help() {
     println!();
     println!("What lsp does:");
     println!(
-        "- Reads lsp.json (the saved LSP diagnostic artifact from first-pr) and serves it over the LSP stdio protocol."
+        "- Starts a live Language Server Protocol server over stdio that re-analyzes the workspace on open/save/change and publishes diagnostics, hovers, code actions, and commands (SPEC-0018)."
     );
     println!(
-        "- Intended for editor integration where the lsp.json was produced by a previous first-pr or check run."
+        "- This is distinct from the saved lsp.json batch projection emitted by first-pr (SPEC-0012); the live server is the editor-integration entrypoint."
     );
     println!();
     println!("Examples:");
