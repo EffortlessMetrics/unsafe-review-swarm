@@ -134,6 +134,33 @@ pub(crate) fn evaluate_detector_contracts(
             "surfaces array is empty",
             &mut report,
         );
+
+        // #1711 discipline-coverage check: every contract with declared obligations
+        // must have at least one negative fixture whose name follows the adversarial
+        // control naming convention (`_no_card`, `_no_cards`, `_not_*`, or contains
+        // `control`). This prevents a new detector from shipping without an adversarial
+        // test for its applicable D1–D5 disciplines — the false-positive class #1672–#1707
+        // found. The existing negative_fixtures-non-empty check above covers existence;
+        // this check covers naming-convention coverage so a reviewer can tell at a glance
+        // which fixtures are adversarial controls.
+        let has_obligations = table
+            .get("obligations")
+            .and_then(toml::Value::as_array)
+            .map(|obs| !obs.is_empty())
+            .unwrap_or(false);
+        let neg_arr = table
+            .get("negative_fixtures")
+            .and_then(toml::Value::as_array);
+        if has_obligations && let Some(neg_fixtures) = neg_arr {
+            let has_named_control = neg_fixtures
+                .iter()
+                .any(|v| v.as_str().map(is_adversarial_control_name).unwrap_or(false));
+            if !has_named_control && !neg_fixtures.is_empty() {
+                report.tracked.push(format!(
+                    "contract `{id}`: negative_fixtures exist but none follow the adversarial control naming convention (_no_card, _no_cards, _not_*, or contains 'control') — add a named adversarial control (see #1711)"
+                ));
+            }
+        }
     }
 
     // Handle optional [[exception]] entries — structural errors are blocking.
@@ -235,5 +262,98 @@ pub(crate) fn check_detector_contracts() -> Result<(), String> {
             "check-detector-contracts: {} blocking finding(s)",
             report.blocking.len()
         ))
+    }
+}
+
+/// Returns `true` when a fixture name follows the adversarial negative-control
+/// naming convention used across the calibration corpus. A fixture is an
+/// adversarial control if its name ends with `_no_card`, `_no_cards`, `_not_*`,
+/// or contains the word `control`. This lets the #1711 discipline-coverage check
+/// distinguish adversarial controls (which test a specific D1–D5 discipline) from
+/// positive fixtures or unrelated smoke fixtures.
+fn is_adversarial_control_name(name: &str) -> bool {
+    name.ends_with("_no_card")
+        || name.ends_with("_no_cards")
+        || name.contains("_not_")
+        || name.contains("control")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn adversarial_control_name_recognizes_standard_suffixes() {
+        assert!(is_adversarial_control_name(
+            "box_from_raw_safe_ctor_no_cards"
+        ));
+        assert!(is_adversarial_control_name("ffi_safe_wrapper_only_no_card"));
+        assert!(is_adversarial_control_name(
+            "get_unchecked_mut_other_len_not_guard"
+        ));
+        assert!(is_adversarial_control_name(
+            "stable_byte_native_ffi_zstd_owned_copy_control"
+        ));
+    }
+
+    #[test]
+    fn adversarial_control_name_rejects_positive_fixture_names() {
+        assert!(!is_adversarial_control_name("inline_asm_human_review"));
+        assert!(!is_adversarial_control_name("box_from_raw"));
+        assert!(!is_adversarial_control_name("static_mut_global_state"));
+    }
+
+    // #1711 red-test: a contract with obligations and negative_fixtures, but NONE
+    // following the adversarial control naming convention, must produce a tracked
+    // finding. This locks the discipline-coverage check so a future change cannot
+    // silently turn it into a no-op.
+    #[test]
+    fn contract_with_unnamed_negatives_produces_tracked_finding() -> Result<(), String> {
+        let toml = r#"
+[[contract]]
+operation_family = "test_unnamed_negatives"
+obligations = ["D1", "D4"]
+positive_fixtures = ["test_positive"]
+negative_fixtures = ["some_random_fixture"]
+surfaces = ["json"]
+"#;
+        let value: toml::Value = toml::from_str(toml).map_err(|e| e.to_string())?;
+        let report = evaluate_detector_contracts(&value, "test")?;
+        let found = report
+            .tracked
+            .iter()
+            .any(|t| t.contains("adversarial control naming convention"));
+        if !found {
+            return Err(
+                "contract with no named adversarial control must produce a tracked finding"
+                    .to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn contract_with_named_negative_produces_no_naming_finding() -> Result<(), String> {
+        let toml = r#"
+[[contract]]
+operation_family = "test_named_negative"
+obligations = ["D1", "D4"]
+positive_fixtures = ["test_positive"]
+negative_fixtures = ["test_safe_ctor_no_cards"]
+surfaces = ["json"]
+"#;
+        let value: toml::Value = toml::from_str(toml).map_err(|e| e.to_string())?;
+        let report = evaluate_detector_contracts(&value, "test")?;
+        let found = report
+            .tracked
+            .iter()
+            .any(|t| t.contains("adversarial control naming convention"));
+        if found {
+            return Err(
+                "contract WITH a named adversarial control must NOT produce a naming finding"
+                    .to_string(),
+            );
+        }
+        Ok(())
     }
 }
