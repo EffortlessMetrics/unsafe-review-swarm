@@ -145,7 +145,7 @@ jobs:
       # Needed only so the advisory ub-review step can post its grouped PR review.
       pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           # Full history so ub-review can diff base..head; the core gate is happy with it too.
           fetch-depth: 0
@@ -241,7 +241,7 @@ jobs:
         # change unsafe-review's gate. Bump deliberately; keep the allowlist in sync.
         # SHA 4053bc0df7cd5918f8c6f80ceb3f714a572789d7 — #363 structured gate.json ingestion
         # (routes by schema, no markdown scraping) + #365 inline path:line review comments.
-        uses: EffortlessMetrics/ub-review@d1e2da78f6fd1dc1c3b2864b7ae81fec5c7d3ad2
+        uses: EffortlessMetrics/ub-review@d5a6f88ec115a5ad5c8fe57648c5e0d456618a39
         with:
           preset: bun-ub
           mode: intelligent-ci
