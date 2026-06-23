@@ -147,3 +147,10 @@ kind = "spec"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md"
 status = "proposed"
 owner = "repo-infra"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-SPEC-0043"
+kind = "spec"
+path = "docs/specs/UNSAFE-REVIEW-SPEC-0043-release-ergonomics-prebuilt-and-automated-promotion.md"
+status = "proposed"
+owner = "release/public-surface"

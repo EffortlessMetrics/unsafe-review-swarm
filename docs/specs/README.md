@@ -53,6 +53,7 @@ Specs define behavior. They do not carry the PR queue.
 39. [Detector-contracts ledger](UNSAFE-REVIEW-SPEC-0040-detector-contracts-ledger.md)
 40. [Syntax-first dispatch architecture](UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md)
 41. [Corpus validation taxonomy](UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md)
+42. [Release ergonomics — prebuilt binaries and automated promotion](UNSAFE-REVIEW-SPEC-0043-release-ergonomics-prebuilt-and-automated-promotion.md)
 
 
 ## Appendices
