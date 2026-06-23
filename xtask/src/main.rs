@@ -23,10 +23,10 @@ mod commands;
 mod corpus_backstop;
 mod corpus_partitions;
 mod corpus_usefulness;
+mod detector_contracts;
 mod docs_automation_paths;
 mod dogfood_exec;
 mod dogfood_usefulness;
-mod detector_contracts;
 mod evidence_loss_challenges;
 mod external_pilots;
 mod first_hour;
@@ -915,7 +915,9 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckCorpusUsefulnessSchema(path) => {
             corpus_usefulness::check_schema(&path)
         }
-        commands::XtaskCommand::CheckDetectorContracts => detector_contracts::check_detector_contracts(),
+        commands::XtaskCommand::CheckDetectorContracts => {
+            detector_contracts::check_detector_contracts()
+        }
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
         commands::XtaskCommand::CheckStanceCoverage => check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
@@ -9971,7 +9973,11 @@ fn require_json_usize_at(
     }
 }
 
-pub(crate) fn require_toml_string(value: &toml::Value, key: &str, path: &str) -> Result<(), String> {
+pub(crate) fn require_toml_string(
+    value: &toml::Value,
+    key: &str,
+    path: &str,
+) -> Result<(), String> {
     match value.get(key).and_then(toml::Value::as_str) {
         Some(_) => Ok(()),
         None => Err(format!("{path} is missing string key `{key}`")),
