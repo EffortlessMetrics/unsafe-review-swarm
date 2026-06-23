@@ -26,17 +26,84 @@ pub(crate) fn validate() -> Result<CalibrationManifest, String> {
     let value = parse_toml_file(&workspace_path(CALIBRATION_MANIFEST))?;
     require_toml_string(&value, "schema_version", CALIBRATION_MANIFEST)?;
     let required = required_core_fixtures(&value)?;
-    let cases = calibration_cases(&value)?;
+    let monolith_cases = calibration_cases(&value)?;
 
-    let index = index_calibration_cases(cases)?;
+    // #1712 per-fixture registration: scan for sidecar `calibration.toml` files
+    // inside each fixture directory. Sidecars let a fixture PR register its case
+    // in `fixtures/<name>/calibration.toml` instead of the monolithic
+    // `fixtures/calibration.toml`, so parallel fixture PRs that touch different
+    // fixtures do not conflict. Sidecar cases are merged with the monolith cases;
+    // a fixture registered in BOTH is a blocking double-registration error.
+    // Sidecar fixtures are also auto-added to required_core_fixtures so they
+    // pass the fixture-parity check without editing the monolith's array.
+    let sidecar_cases = collect_sidecar_cases()?;
+    let mut all_case_fixtures: BTreeSet<String> = BTreeSet::new();
+    for case in monolith_cases {
+        if let Some(fixture) = case.get("fixture").and_then(toml::Value::as_str) {
+            all_case_fixtures.insert(fixture.to_string());
+        }
+    }
+    let mut merged_cases: Vec<toml::Value> = monolith_cases.to_vec();
+    let mut sidecar_required: BTreeSet<String> = BTreeSet::new();
+    for (sidecar_path, sidecar_case) in &sidecar_cases {
+        let fixture = sidecar_case
+            .get("fixture")
+            .and_then(toml::Value::as_str)
+            .unwrap_or("");
+        if all_case_fixtures.contains(fixture) {
+            return Err(format!(
+                "{CALIBRATION_MANIFEST}: fixture `{fixture}` is registered in both the monolith and a sidecar ({sidecar_path}); remove one registration"
+            ));
+        }
+        all_case_fixtures.insert(fixture.to_string());
+        sidecar_required.insert(fixture.to_string());
+        merged_cases.push(sidecar_case.clone());
+    }
+
+    let index = index_calibration_cases(&merged_cases)?;
     require_all_calibration_kinds(&index.kinds)?;
-    require_required_core_fixture_parity(required, &index.fixtures)?;
+    require_required_core_fixture_parity_with_sidecars(
+        required,
+        &index.fixtures,
+        &sidecar_required,
+    )?;
     require_expected_card_fixture_coverage(&index.fixtures)?;
 
     Ok(CalibrationManifest {
-        case_count: cases.len(),
+        case_count: merged_cases.len(),
         fixture_cases: index.fixture_cases,
     })
+}
+
+/// Scan fixture directories for sidecar `calibration.toml` files (#1712).
+/// Each sidecar may declare one `[[cases]]` entry for its fixture. Returns
+/// `(sidecar_path, parsed_case_table)` pairs for merging into the monolith.
+fn collect_sidecar_cases() -> Result<Vec<(String, toml::Value)>, String> {
+    let mut sidecars = Vec::new();
+    for dir in fixture_dirs(&workspace_path("fixtures"))? {
+        let sidecar = dir.join("calibration.toml");
+        if !sidecar.is_file() {
+            continue;
+        }
+        let rel = sidecar
+            .strip_prefix(workspace_path(""))
+            .unwrap_or(&sidecar)
+            .display()
+            .to_string();
+        let value = parse_toml_file(&sidecar)?;
+        let cases = value
+            .get("cases")
+            .and_then(toml::Value::as_array)
+            .ok_or_else(|| format!("{rel}: sidecar must contain a `[[cases]]` entry"))?;
+        if cases.len() != 1 {
+            return Err(format!(
+                "{rel}: sidecar must contain exactly one `[[cases]]` entry (found {})",
+                cases.len()
+            ));
+        }
+        sidecars.push((rel, cases[0].clone()));
+    }
+    Ok(sidecars)
 }
 
 fn required_core_fixtures(value: &toml::Value) -> Result<&Vec<toml::Value>, String> {
@@ -241,13 +308,17 @@ fn require_all_calibration_kinds(kinds: &BTreeSet<String>) -> Result<(), String>
     Ok(())
 }
 
-fn require_required_core_fixture_parity(
+/// #1712: validates required_core_fixtures parity, also allowing
+/// sidecar-registered fixtures (which are auto-required without being listed
+/// in the monolith's required_core_fixtures).
+fn require_required_core_fixture_parity_with_sidecars(
     required: &[toml::Value],
     fixtures: &BTreeSet<String>,
+    sidecar_fixtures: &BTreeSet<String>,
 ) -> Result<(), String> {
     let required_fixtures = collect_required_core_fixtures(required, fixtures)?;
     for fixture in fixtures {
-        if !required_fixtures.contains(fixture) {
+        if !required_fixtures.contains(fixture) && !sidecar_fixtures.contains(fixture) {
             return Err(format!(
                 "{CALIBRATION_MANIFEST} case fixture `{fixture}` is missing from required_core_fixtures"
             ));
