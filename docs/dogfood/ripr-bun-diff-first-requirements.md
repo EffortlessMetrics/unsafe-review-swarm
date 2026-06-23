@@ -2,6 +2,19 @@
 
 Status: future tooling-interface requirements
 
+**Producer-side contract.** The ripr producer-side contract for this rail is
+SPEC-0070 (`docs/specs/RIPR-SPEC-0070-downstream-review-consumer-use-case.md`
+in ripr-swarm, merged via ripr-swarm#1046). SPEC-0070 §"Rail alignment" maps
+every requirement in this document to a concrete ripr field or a named gap.
+See issue EffortlessMetrics/ripr-swarm#1041 for alignment history. A revision
+to this rail without a corresponding SPEC-0070 update is a named defect ("rail
+drift" per SPEC-0070 §"Failure Modes").
+
+**Gap ownership (2026-06-23 consumer-side review).** The five named gaps from
+SPEC-0070 have been reviewed from the consumer side. The ownership decisions
+are recorded in §"Gap ownership decisions" at the end of this document. No gap
+may be silently dropped.
+
 This note records what the Bun stable-byte burndown needs from `ripr` when it
 acts as a diff-first inventory or mutation-exposure helper for unsafe-review.
 It is a requirements rail only. It does not add a live integration, run
@@ -120,3 +133,90 @@ receipt, not analyzer discovery, not witness execution, not source editing, not
 automatic commenting, not proof of memory safety, not UB-free status, not
 Miri-clean status, not site-execution proof, not calibrated precision or recall,
 and not policy readiness.
+
+## Gap ownership decisions
+
+Consumer-side review of SPEC-0070 §"Rail alignment" (2026-06-23). Each gap is
+confirmed accurate from the consumer side. The ownership decision for each is
+one of: **ripr-side closure** (ripr adds a field), **consumer-side closure**
+(unsafe-review synthesises downstream), or **deferred** (stays named in both
+documents until a slice closes it).
+
+### Rail alignment table review
+
+The SPEC-0070 rail alignment table was reviewed row-by-row against this
+document's Requirements, Output Shape, Receipts, and Acceptance Checklist
+sections. **All mappings are confirmed accurate from the consumer side.** No
+row misrepresents the rail's intent. Specifically:
+
+- `schema_version`: confirmed — the consumer expects `"0.1"` on check JSON,
+  evidence records, and OUTPUT_SCHEMA.md.
+- `status: partial` semantics: confirmed — `limited_*` + `downstream_consumable
+  = false` for whole-repo; `limited_diff_scope` + `downstream_consumable = true`
+  for diff-scoped matches the rail's intent.
+- repo root + diff as first-class input: confirmed — the `analysis_scope` block
+  as a named planned delta is accurately described.
+- changed seams ranked before whole-repo inventory: confirmed.
+- usable non-empty partial output, skip metadata, skip remediation,
+  mixed-language route context, proof_mode, oracle fields, coverage_confidence,
+  limitation line, receipts, manual-candidate provenance, trust boundary,
+  acceptance checklist: all confirmed accurate.
+
+### Gap 1 — Preflight-skip structured counts
+
+**Decision: deferred (ripr-side closure preferred).**
+
+The cache-store skip (`lane1_repo_exposure_cache_store_skipped_large_entry`)
+already populates structured `observed_seams` and `cache_limit`. The preflight
+skip (`lane1_repo_exposure_large_cache_preflight_skip`) reports footprint in
+prose only. The consumer needs structured `observed_seams` / `cache_limit` from
+the preflight skip to render skip metadata uniformly. This is a ripr-side
+closure: ripr should populate the structured fields on the preflight-skip
+category. Until then, the gap stays named in both documents.
+
+### Gap 2 — Cache persistence keying
+
+**Decision: deferred (ripr-side closure, operational guarantee form).**
+
+The rail's acceptance checklist says "cache persistence is explicit and
+reproducible." The consumer does not need a visible contract field in the
+output for cache keying — an operational guarantee (documented in SPEC-0070,
+not emitted in check JSON) is sufficient. The consumer must not assert cache
+keying. ripr should document the cache-keying guarantee in SPEC-0070; the gap
+stays named until that documentation lands.
+
+### Gap 3 — Per-seam `source_route`
+
+**Decision: consumer-side closure.**
+
+The rail's `source_route` field (e.g. `Bun.gzipSync BufferSource plus options
+getter reentry`) is a downstream-computed label, not a ripr-emitted field. The
+consumer (unsafe-review) synthesises it from the configured-route metadata on
+`bun_cross_language_grip` and the stable-byte family classification. ripr
+should annotate the SPEC-0070 gap row as "consumer-owned" and document that
+consumers may compute `source_route` from grip metadata. The rail documents the
+synthesis rule: `source_route` = configured-route label from
+`bun_cross_language_grip` + the stable-byte family name.
+
+### Gap 4 — Per-seam `stable_byte_family`
+
+**Decision: consumer-side closure.**
+
+Same as Gap 3. The `stable_byte_family` label (e.g.
+`stable-byte-source-getter-reentry`) is a downstream-assigned classification,
+not a ripr-emitted field. The consumer maps the configured-route metadata and
+bridge inventory to the stable-byte family taxonomy (the 4 families:
+`stable_byte_source_getter_reentry`, `stable_byte_source_rab_async`,
+`stable_byte_source_sab_race`, `stable_byte_source_native_ffi_read`). ripr
+should annotate the gap row as "consumer-owned."
+
+### Gap 5 — Report-level diff-first mode (`mode: diff_first` / `changed_seams_first`)
+
+**Decision: deferred (ripr-side closure, `analysis_scope` form).**
+
+The rail's `mode: diff_first` and `changed_seams_first: true` are intended as
+illustrative YAML, not stable machine-readable fields. The existing
+`analysis_scope.run_status = "limited_diff_scope"` encoding satisfies the
+consumer's need to distinguish diff-scoped from whole-repo output. No distinct
+`mode` field needs to land in ripr. The gap stays named in SPEC-0070 to
+document that `analysis_scope` is the encoding, not a literal `mode` field.
