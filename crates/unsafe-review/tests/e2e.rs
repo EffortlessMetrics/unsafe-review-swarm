@@ -7902,11 +7902,24 @@ fn empty_review_card_snapshot_json() -> &'static str {
 
 #[test]
 fn candidate_list_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
+    // Use a path guaranteed not to exist on any machine. Hardcoded paths like
+    // /nonexistent/path/that/does/not/exist can collide with real directories
+    // created by prior tooling (see #1817 — C:\nonexistent existed on a dev
+    // machine, causing is_dir() to return true and the test to fail). Embedding
+    // the PID makes the path unique per-process without adding a temp-dir
+    // dependency.
+    let nonexistent = std::env::temp_dir().join(format!(
+        "unsafe-review-nonexistent-root-test-{}-{}",
+        std::process::id(),
+        "candidate-list"
+    ));
+    let _ = std::fs::remove_dir_all(&nonexistent);
+
     let output = run_failure([
         os("candidate"),
         os("list"),
         os("--root"),
-        os("/nonexistent/path/that/does/not/exist"),
+        nonexistent.as_os_str().to_os_string(),
     ])?;
 
     assert_eq!(
@@ -7943,11 +7956,19 @@ fn candidate_list_valid_root_no_candidates_exits_0() -> Result<(), Box<dyn Error
 
 #[test]
 fn receipt_validate_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
+    // Use a guaranteed-nonexistent path. See #1817.
+    let nonexistent = std::env::temp_dir().join(format!(
+        "unsafe-review-nonexistent-root-test-{}-{}",
+        std::process::id(),
+        "receipt-validate"
+    ));
+    let _ = std::fs::remove_dir_all(&nonexistent);
+
     let output = run_failure([
         os("receipt"),
         os("validate"),
         os("--root"),
-        os("/nonexistent/path/that/does/not/exist"),
+        nonexistent.as_os_str().to_os_string(),
     ])?;
 
     assert_eq!(
