@@ -999,6 +999,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "multiline_transmute_copy_invalid_value",
     "unsafe_impl_send",
     "unsafe_impl_send_generic_owner",
+    "unsafe_impl_send_owner_substring_not_reached",
     "unsafe_impl_sync_generic_bound",
     "unsafe_impl_custom_trait_not_send_sync",
     "ffi_sanitizer_route",

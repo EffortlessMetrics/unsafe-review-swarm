@@ -475,3 +475,59 @@ negative_fixtures = [
 surfaces = ["json", "sarif", "human", "agent"]
 evidence = "Inline asm family matched by `line.contains(\"asm!\")` in the text-fallback path (scanner.rs:197). D1 applies: detection fires only inside an unsafe block (the fallback dispatcher receives unsafe-block content). D4 applies centrally via line_for_text_detection + LineCommentState (string literals and comments containing \"asm!\" are masked before detect_site — confirmed by the text_detection_ignores_string_literal_unsafe_tokens test). D5 (call-name anchoring) is a KNOWN LIMITATION: the text-fallback `line.contains(\"asm!\")` cannot distinguish `core::arch::asm!` from a user-defined `macro_rules! asm` — the `inline_asm_safe_macro_homonym_no_cards` fixture pins this known false positive (expected_cards=1, kind=evidence_precision). The AST syntax path would classify a user macro correctly; the text-fallback path cannot. D2 (fn-definition-header gate) does not apply because asm! is a macro call, not a function call. D3 (same-origin discharge) does not apply to inline assembly (no ownership origin to trace). Advisory heuristic only; the known user-macro FP is documented, not hidden."
 review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "static_mut"
+obligations = ["D2", "D4"]
+positive_fixtures = [
+  "static_mut_global_state",
+]
+negative_fixtures = [
+  "static_lifetime_mut_ref_not_static_mut",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Static mut family detected at the item level by is_static_mut_item (scanner.rs:101) and text-fallback compact.contains(\"static mut\") (scanner.rs:788). D1 (call-site unsafe-scope gate) is INAPPLICABLE: static mut is an item-level declaration, not a call site — declaring D1 would suppress every real detection since static mut items live outside unsafe blocks. D2 applies: is_static_mut_item parses the item structure to distinguish a real static mut declaration from a &'static mut reference type (the static_lifetime_mut_ref_not_static_mut negative confirms the distinction). D4 applies centrally (comment/string masking). D3 (same-origin discharge) and D5 (call-name anchoring) do not apply to item-level declarations. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "target_feature"
+obligations = ["D4"]
+positive_fixtures = [
+  "target_feature_safety_docs",
+  "target_feature_missing_safety_docs",
+]
+negative_fixtures = [
+  "cfg_target_feature_not_operation",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Target feature family detected at the attribute level by is_target_feature_attribute (scanner.rs:210), which distinguishes #[target_feature(enable=...)] from #[cfg(target_feature=...)] (the cfg_target_feature_not_operation negative confirms). D1 (call-site unsafe-scope gate) is INAPPLICABLE: target_feature is an attribute on an item, not a call site. D2 (fn-definition-header gate) does not apply (attribute, not a function). D4 applies centrally (comment/string masking). D3 (same-origin discharge) and D5 (call-name anchoring) do not apply. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "unsafe_declaration"
+obligations = ["D2", "D4"]
+positive_fixtures = [
+  "documented_private_unsafe_fn",
+]
+negative_fixtures = [
+  "unsafe_fn_unknown_family_no_card",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Unsafe declaration family detected at the item level: unsafe fn declarations via line_contains_unsafe_fn_declaration (scanner.rs:89, which distinguishes named fn declarations from unsafe fn pointer types in field/type position), and unsafe trait declarations via line.contains(\"unsafe trait\") (scanner.rs:92). D1 (call-site unsafe-scope gate) is INAPPLICABLE: unsafe fn/trait declarations are item-level, not call sites. D2 applies: line_contains_unsafe_fn_declaration is the fn-definition-header gate that rejects fn-pointer types (the test at scanner.rs:1939 confirms the distinction). D4 applies centrally. D3 and D5 do not apply to declarations. The unsafe_fn_unknown_family_no_card fixture confirms an unsafe fn whose body has no precise operation family stays uncarded at the declaration level. Advisory heuristic only."
+review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "unsafe_impl_send_sync"
+obligations = ["D2", "D4"]
+positive_fixtures = [
+  "unsafe_impl_send",
+  "unsafe_impl_send_generic_owner",
+  "unsafe_impl_sync_generic_bound",
+]
+negative_fixtures = [
+  "unsafe_impl_custom_trait_not_send_sync",
+  "unsafe_impl_send_owner_substring_not_reached",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Unsafe impl Send/Sync family detected at the item level by parse_impl_trait_name (scanner.rs:766-779), which matches unsafe impl Send for / unsafe impl Sync for and distinguishes them from unsafe impl CustomTrait (the unsafe_impl_custom_trait_not_send_sync negative confirms). D1 (call-site unsafe-scope gate) is INAPPLICABLE per the SPEC-0005 appendix: unsafe impl Send/Sync is detected at the item level, not the call level. D2 applies: parse_impl_trait_name is the trait-name gate. D4 applies centrally. D3 and D5 do not apply to item-level impls. The unsafe_impl_send_owner_substring_not_reached negative confirms owner-substring matching does not over-trigger. Advisory heuristic only."
+review_after = "2026-12-15"
