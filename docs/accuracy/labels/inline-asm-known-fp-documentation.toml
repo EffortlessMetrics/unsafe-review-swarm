@@ -1,0 +1,36 @@
+schema_version = "0.1"
+status = "fixture_pinned"
+claim_id = "inline-asm-known-fp-documentation"
+operation_family = "inline_asm"
+hazard = "inline_asm"
+partition = "fixture"
+source_kind = "fixture_golden"
+trust_boundary = """
+Static unsafe contract review only. These labels describe fixture-pinned ReviewCard inline-assembly evidence behavior for asm!; they are not memory-safety proof, not UB-free status, not a Miri result, not Miri-clean status, not site execution evidence, not calibrated precision or recall, not witness adequacy, and not policy readiness.
+"""
+
+[[samples]]
+id = "inline-asm-human-review"
+fixture = "inline_asm_human_review"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "inline_asm"
+expected_hazard = "inline_asm"
+expected_obligation_key = "asm"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A core::arch::asm! call inside an unsafe block reports an inline_asm hazard and routes to human review."
+
+[[samples]]
+id = "inline-asm-safe-macro-homonym-known-fp"
+fixture = "inline_asm_safe_macro_homonym_no_cards"
+kind = "positive"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "inline_asm"
+expected_hazard = "inline_asm"
+expected_obligation_key = "asm"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "KNOWN FALSE POSITIVE: the text-fallback detector (line.contains(\"asm!\")) cannot distinguish core::arch::asm! from a user-defined macro_rules! asm. This case pins the known-FP behavior (expected_cards=1) so a future detector improvement (e.g. AST-path classification) is detected as a golden change. The fixture name ends in _no_cards aspirationally — the detector does not yet meet that aspiration."

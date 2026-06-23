@@ -773,6 +773,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "unwrap_unchecked_safe_method_no_cards",
     "unreachable_unchecked_safe_fn_no_cards",
     "inline_asm_human_review",
+    "inline_asm_safe_macro_homonym_no_cards",
     "pointer_arithmetic_num_ctrl_bytes_guard",
     "pointer_arithmetic_other_offset_not_guard",
     "pointer_arithmetic_reassigned_offset_not_guard",

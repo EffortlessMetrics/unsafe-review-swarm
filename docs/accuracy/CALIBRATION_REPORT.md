@@ -15,14 +15,14 @@ It does not promote any claim to labeled calibration or policy readiness.
 
 ## Counts
 
-- Claims: 42
-- Fixture-pinned claims: 42
+- Claims: 43
+- Fixture-pinned claims: 43
 - Dogfood-measured claims: 0
 - Labeled-calibrated claims: 0
 - Policy-eligible claims: 0
-- Calibration cases: 621
-- Label ledgers: 42
-- Label samples: 596
+- Calibration cases: 622
+- Label ledgers: 43
+- Label samples: 598
 - Labeled reports: 0
 
 ## Current Claim Level

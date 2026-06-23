@@ -462,3 +462,16 @@ negative_fixtures = [
 surfaces = ["json", "sarif", "human", "agent"]
 evidence = "Atomic pointer state-transition hazard detector: `.swap(ptr::null_mut(), Ordering::..)` and `from_ptr(.. fetch_and/fetch_or/fetch_xor ..)`. D1 is inapplicable: AtomicPtr swap/fetch operations are safe Rust, so the detector intentionally fires in safe context and is not behind the unsafe-scope gate; declaring D1 would suppress every real detection. Call names matched by contains_call_name (word-boundary anchored, D5) behind the central is_fn_definition_header gate (D2); comment/string masking (D4) applies centrally. The same-call binding (call_args_span) requires ptr::null_mut/Ordering/fetch_* to sit inside the same call's argument list (D3): the swap_not_same_call and fetch_not_same_call negative controls confirm separate co-occurring calls produce no card. Advisory heuristic only."
 review_after = "2026-12-15"
+
+[[contract]]
+operation_family = "inline_asm"
+obligations = ["D1", "D4", "D5"]
+positive_fixtures = [
+  "inline_asm_human_review",
+]
+negative_fixtures = [
+  "inline_asm_safe_macro_homonym_no_cards",
+]
+surfaces = ["json", "sarif", "human", "agent"]
+evidence = "Inline asm family matched by `line.contains(\"asm!\")` in the text-fallback path (scanner.rs:197). D1 applies: detection fires only inside an unsafe block (the fallback dispatcher receives unsafe-block content). D4 applies centrally via line_for_text_detection + LineCommentState (string literals and comments containing \"asm!\" are masked before detect_site — confirmed by the text_detection_ignores_string_literal_unsafe_tokens test). D5 (call-name anchoring) is a KNOWN LIMITATION: the text-fallback `line.contains(\"asm!\")` cannot distinguish `core::arch::asm!` from a user-defined `macro_rules! asm` — the `inline_asm_safe_macro_homonym_no_cards` fixture pins this known false positive (expected_cards=1, kind=evidence_precision). The AST syntax path would classify a user macro correctly; the text-fallback path cannot. D2 (fn-definition-header gate) does not apply because asm! is a macro call, not a function call. D3 (same-origin discharge) does not apply to inline assembly (no ownership origin to trace). Advisory heuristic only; the known user-macro FP is documented, not hidden."
+review_after = "2026-12-15"

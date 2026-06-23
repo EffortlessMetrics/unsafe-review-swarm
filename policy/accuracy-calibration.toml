@@ -62,6 +62,37 @@ forbidden_claims = [
 ]
 
 [[claim]]
+id = "inline-asm-known-fp-documentation"
+status = "fixture_pinned"
+kind = "evidence_precision"
+owner = "calibration"
+operation_family = "inline_asm"
+hazard = "inline_asm"
+support_tier = "Core operation smoke slice"
+fixtures = [
+  "inline_asm_human_review",
+  "inline_asm_safe_macro_homonym_no_cards",
+]
+dogfood_targets = []
+label_ledgers = [
+  "docs/accuracy/labels/inline-asm-known-fp-documentation.toml",
+]
+labeled_reports = []
+allowed_public_claim = """
+Fixture-pinned inline-assembly evidence confirms a core::arch::asm! call
+reports an inline_asm hazard, and documents the known text-fallback false
+positive for user-defined asm! macro homonyms in the listed fixtures.
+"""
+forbidden_claims = [
+  "broad inline_asm soundness",
+  "inline assembly proof",
+  "register/clobber invariant proof",
+  "global precision",
+  "global recall",
+  "memory-safety proof",
+]
+
+[[claim]]
 id = "pin-unchecked-structural-pinning-evidence"
 status = "fixture_pinned"
 kind = "evidence_precision"

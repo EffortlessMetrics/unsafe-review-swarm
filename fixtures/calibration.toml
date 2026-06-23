@@ -407,6 +407,7 @@ required_core_fixtures = [
   "unwrap_unchecked_safe_method_no_cards",
   "unreachable_unchecked_safe_fn_no_cards",
   "inline_asm_human_review",
+  "inline_asm_safe_macro_homonym_no_cards",
   "raw_pointer_read_volatile",
   "raw_pointer_read_len_capacity_assert",
   "raw_pointer_read_assert_shadowed_origin_not_guard",
@@ -4582,6 +4583,16 @@ expected_hazard = "invalid_value"
 fixture = "inline_asm_human_review"
 kind = "positive"
 claim = "inline asm reports assembly/target hazards and routes to human review instead of a generic unsafe function call"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "inline_asm"
+expected_hazard = "inline_asm"
+
+[[cases]]
+fixture = "inline_asm_safe_macro_homonym_no_cards"
+kind = "positive"
+claim = "KNOWN FALSE POSITIVE (text-fallback D5 limitation): a user-defined safe `asm!` macro called inside an unsafe block IS detected as inline_asm because line.contains(\"asm!\") cannot distinguish core::arch::asm! from a user macro_rules! asm. The AST path would classify it correctly. This case pins the known-FP behavior so a future detector improvement is detected as a golden change."
 support_tier = "Core operation smoke slice"
 expected_cards = 1
 expected_class = "guard_missing"
