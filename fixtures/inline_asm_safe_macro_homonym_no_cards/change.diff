@@ -1,0 +1,25 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,28 @@
++macro_rules! asm {
++    () => {
++        println!("asm! stub: no actual inline assembly");
++    };
++}
++
++pub fn call_safe_asm_macro() {
++    // SAFETY: the `asm!` invocation here is the safe user macro above, not
++    // `core::arch::asm!`. No inline assembly is executed.
++    unsafe {
++        asm!();
++    }
++}
++
++#[cfg(test)]
++mod tests {
++    #[test]
++    fn mentions_caller() {
++        let _ = stringify!(call_safe_asm_macro);
++    }
++}
