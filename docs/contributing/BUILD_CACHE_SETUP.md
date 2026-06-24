@@ -44,6 +44,23 @@ df -h .  # check the repo drive has headroom
 du -sh "${CARGO_TARGET_DIR:-target}"  # confirm build output is on the relocated drive
 ```
 
+## Agent builder convention (#1607 item 2)
+
+Agents (Codex, Jules, Claude, etc.) that create worktrees and build locally
+must record their `CARGO_TARGET_DIR` choice so a follow-up agent can discover
+it without guessing. The convention:
+
+1. Set `CARGO_TARGET_DIR` in the worktree's `.claude/settings.local.json`
+   (gitignored — do not commit machine-specific paths).
+2. Reference the relocation in the PR's "Workbench hygiene" section
+   (`.github/PULL_REQUEST_TEMPLATE.md`).
+3. Run `cargo run --locked -p xtask -- cleanup-audit` before opening the PR
+   to confirm no stray target dirs are left on the repo drive.
+
+This makes the build-cache policy durable across agent handoffs: a fresh
+agent reads the PR's hygiene section, sees the `CARGO_TARGET_DIR` note, and
+knows to relocate before building.
+
 ## Worktree cleanup
 
 After agent-builder PRs merge, remove the temporary worktree and verify no

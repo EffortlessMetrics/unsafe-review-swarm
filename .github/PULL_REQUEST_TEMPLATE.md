@@ -98,6 +98,15 @@ For analyzer behavior changes only:
 - [ ] Relevant targeted tests
 - [ ] ripr/unsafe-review/source-exception artifacts checked if applicable
 
+## Workbench hygiene (#1607)
+
+For PRs created from a worktree or that generate build artifacts:
+
+- [ ] Worktree will be removed after merge (clean status verified)
+- [ ] `CARGO_TARGET_DIR` relocated off the repo drive if this PR required a full build
+- [ ] No stray `target/` left on the repo drive
+- [ ] `cargo run --locked -p xtask -- cleanup-audit` run if disk headroom is uncertain
+
 ## Rollback
 
 -
