@@ -218,15 +218,29 @@ jobs:
           # recorded exit code is the first failing command's, or 0 if all pass.
           # Per-step timing (#1515): each step prints its elapsed seconds so the
           # core.log (and thus the job summary tail) shows which step dominates.
+          #
+          # Diff-scoped test skip (#1515 candidate 2): if the PR touches only
+          # docs/specs/policy/CI files (no .rs source), skip the slow
+          # `cargo test --workspace` step. fmt + clippy + check-pr still run —
+          # they are the real gate. This cuts ~3-5 min off docs-only PRs.
           (
             _step() { local _s; _s=$(date +%s); "$@"; local _rc=$?; echo "[step-timing] $(($((date +%s) - _s)))s: $*"; return $_rc; }
-            _step cargo fmt --all --check \
-              && _step cargo clippy --workspace --all-targets --locked -- -D warnings \
-              && _step cargo test --workspace --locked \
-              && _step cargo run --locked -p xtask -- check-pr
+            _changed_rs=$(git diff --name-only origin/${{ github.base_ref || 'main' }}...HEAD 2>/dev/null | grep '\.rs$' || true)
+            if [ -z "$_changed_rs" ]; then
+              echo "[diff-scope] no .rs files changed — skipping cargo test (#1515)"
+              _step cargo fmt --all --check \
+                && _step cargo clippy --workspace --all-targets --locked -- -D warnings \
+                && echo "[diff-scope] skipped cargo test --workspace (docs-only PR)" \
+                && _step cargo run --locked -p xtask -- check-pr
+            else
+              _step cargo fmt --all --check \
+                && _step cargo clippy --workspace --all-targets --locked -- -D warnings \
+                && _step cargo test --workspace --locked \
+                && _step cargo run --locked -p xtask -- check-pr
+            fi
             echo "$?" > target/ci-core/core_exit
           ) > target/ci-core/core.log 2>&1 &
-          echo "launched background core gate (pid $!): fmt + clippy + test + check-pr"
+          echo "launched background core gate (pid $!): fmt + clippy + [test?] + check-pr"
       # ADVISORY LLM layer, in this same job, concurrent with the backgrounded core
       # gate (the CPU-bound build runs under the network-bound LLM latency).
       # setup-rust:false reuses the toolchain installed above. intelligent-ci posts a
