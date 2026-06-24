@@ -31,6 +31,7 @@ pub(crate) enum XtaskCommand {
     CorpusUsefulness(Option<PathBuf>),
     CheckCorpusUsefulnessSchema(PathBuf),
     CheckDetectorContracts,
+    CheckSelfUnsafe,
     CheckStanceDecisions,
     CheckStanceCoverage,
     CheckSpecCoverage,
@@ -121,6 +122,9 @@ impl XtaskCommand {
                 "check-detector-contracts",
                 Self::CheckDetectorContracts,
             ),
+            Some("check-self-unsafe") => {
+                parse_no_extra(args, "check-self-unsafe", Self::CheckSelfUnsafe)
+            }
             Some("check-stance-decisions") => {
                 parse_no_extra(args, "check-stance-decisions", Self::CheckStanceDecisions)
             }
