@@ -34,6 +34,7 @@ mod markdown;
 mod public_badges;
 mod public_surfaces;
 mod real_pr_corpus;
+mod self_unsafe;
 mod source_sync;
 mod spec_status;
 mod support_tiers;
@@ -882,6 +883,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             check_dogfood()?;
             check_manual_fuzz_harness()?;
             check_tracked_generated_artifacts()?;
+            self_unsafe::check_self_unsafe()?;
             println!("check-pr: ok");
             Ok(())
         }
@@ -918,6 +920,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckDetectorContracts => {
             detector_contracts::check_detector_contracts()
         }
+        commands::XtaskCommand::CheckSelfUnsafe => self_unsafe::check_self_unsafe(),
         commands::XtaskCommand::CheckStanceDecisions => check_stance_decisions(),
         commands::XtaskCommand::CheckStanceCoverage => check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => check_spec_coverage(),
