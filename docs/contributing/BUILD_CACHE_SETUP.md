@@ -1,0 +1,62 @@
+# Build cache setup
+
+This document records the workbench build-cache relocation policy so a fresh
+agent or machine can discover it without reading gitignored settings files.
+
+## Problem
+
+Rust builds write multi-GB `target/` directories and cargo caches to the
+default locations (`./target/` in the repo root and `~/.cargo/`). On a
+constrained drive (the drive holding the repo + worktrees), this can saturate
+disk and cause git operations to fail mid-build.
+
+## Policy
+
+Relocate heavy caches to a high-capacity drive before starting agent builder
+work. This is documented in `docs/contributing/AGENT-ORCHESTRATION.md` §9
+("Relocate heavy caches off constrained drives").
+
+## Setup
+
+Set these environment variables (or in `.claude/settings.local.json`, which is
+gitignored — do not commit machine-specific paths):
+
+```bash
+# Point cargo target dir at a high-capacity drive
+export CARGO_TARGET_DIR=/path/to/high-capacity-drive/rust-target
+
+# Point cargo home (registry + cache) off the constrained drive
+export CARGO_HOME=/path/to/high-capacity-drive/cargo
+```
+
+The paths above are illustrative — use whatever high-capacity drive your
+machine has. The key invariant is: **the repo checkout and git operations
+must not share a drive with multi-GB build output**.
+
+## Verification
+
+After setting up, verify the relocation:
+
+```bash
+echo "CARGO_TARGET_DIR=${CARGO_TARGET_DIR:-not set (default ./target)}"
+echo "CARGO_HOME=${CARGO_HOME:-not set (default ~/.cargo)}"
+df -h .  # check the repo drive has headroom
+du -sh "${CARGO_TARGET_DIR:-target}"  # confirm build output is on the relocated drive
+```
+
+## Worktree cleanup
+
+After agent-builder PRs merge, remove the temporary worktree and verify no
+stray target outputs were left on the repo drive:
+
+```bash
+git worktree remove <worktree-path> --force  # only after merge + clean status
+git worktree prune
+du -sh target/  # should be minimal or absent if CARGO_TARGET_DIR is relocated
+```
+
+## Trust boundary
+
+Operational/workbench hardening only. No product behavior change; advisory
+trust boundary intact. This document does not commit machine-specific paths
+or gitignored settings.
