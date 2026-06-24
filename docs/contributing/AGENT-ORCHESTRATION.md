@@ -228,7 +228,8 @@ findings into a "your call" list.
 - Clean worktrees and stale agent branches after each merge. Do not let temporary
   worktrees accumulate.
 - Relocate heavy caches (e.g. `CARGO_HOME`, npm caches) off constrained drives to
-  avoid disk-full incidents mid-build.
+  avoid disk-full incidents mid-build. See `BUILD_CACHE_SETUP.md` for a
+  checked-in setup guide with verification commands.
 - Resolve repository-tool roots at runtime. A cached helper binary must not bake a
   checkout path into its behavior; shared target dirs and worktree reuse can
   otherwise make it read a stale or deleted checkout. Prefer an explicit
