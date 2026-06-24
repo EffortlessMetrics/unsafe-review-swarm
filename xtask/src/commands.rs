@@ -18,6 +18,7 @@ pub(crate) enum XtaskCommand {
     CheckCalibration,
     CheckDogfood,
     CheckFuzz,
+    CleanupAudit,
     CheckAdvisoryArtifacts(PathBuf),
     CheckFirstPrArtifacts(PathBuf),
     CheckManualCandidateExamples,
@@ -77,6 +78,7 @@ impl XtaskCommand {
             }
             Some("check-dogfood") => parse_no_extra(args, "check-dogfood", Self::CheckDogfood),
             Some("check-fuzz") => parse_no_extra(args, "check-fuzz", Self::CheckFuzz),
+            Some("cleanup-audit") => parse_no_extra(args, "cleanup-audit", Self::CleanupAudit),
             Some("check-advisory-artifacts") => Ok(Self::CheckAdvisoryArtifacts(
                 command_args::require_subcommand_dir_arg(args, "check-advisory-artifacts")?,
             )),

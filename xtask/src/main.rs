@@ -18,6 +18,7 @@ mod accuracy_labels;
 mod advisory_artifacts;
 mod calibration_constants;
 mod calibration_manifest;
+mod cleanup_auditor;
 mod command_args;
 mod commands;
 mod corpus_backstop;
@@ -893,6 +894,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckCalibration => check_calibration(),
         commands::XtaskCommand::CheckDogfood => check_dogfood(),
         commands::XtaskCommand::CheckFuzz => fuzz_artifact_checks::check_manual_fuzz_harness(),
+        commands::XtaskCommand::CleanupAudit => cleanup_auditor::cleanup_audit(),
         commands::XtaskCommand::CheckAdvisoryArtifacts(dir) => check_advisory_artifacts(&dir),
         commands::XtaskCommand::CheckFirstPrArtifacts(dir) => check_first_pr_artifacts(&dir),
         commands::XtaskCommand::CheckManualCandidateExamples => check_manual_candidate_examples(),
