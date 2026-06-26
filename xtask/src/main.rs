@@ -919,8 +919,12 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckStanceDecisions => stance_checks::check_stance_decisions(),
         commands::XtaskCommand::CheckStanceCoverage => stance_checks::check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => stance_checks::check_spec_coverage(),
-        commands::XtaskCommand::CheckFixtureSurfaceParity => fixture_surfaces::check_fixture_surface_parity(),
-        commands::XtaskCommand::CheckSurfaceDeterminism => fixture_surfaces::check_surface_determinism(),
+        commands::XtaskCommand::CheckFixtureSurfaceParity => {
+            fixture_surfaces::check_fixture_surface_parity()
+        }
+        commands::XtaskCommand::CheckSurfaceDeterminism => {
+            fixture_surfaces::check_surface_determinism()
+        }
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
