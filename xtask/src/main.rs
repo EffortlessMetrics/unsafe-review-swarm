@@ -18,6 +18,7 @@ mod accuracy_labels;
 mod advisory_artifacts;
 mod calibration_constants;
 mod calibration_manifest;
+mod ci_lanes;
 mod cleanup_auditor;
 mod command_args;
 mod commands;
@@ -889,7 +890,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckPublicSurfaces => public_surfaces::check(),
         commands::XtaskCommand::CheckGoals => check_goals(),
         commands::XtaskCommand::CheckPackageBoundary => check_package_boundary(),
-        commands::XtaskCommand::CheckCiLanes => check_ci_lanes(),
+        commands::XtaskCommand::CheckCiLanes => ci_lanes::check(),
         commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
         commands::XtaskCommand::CheckFixtures => fixture_surfaces::check_fixtures(),
         commands::XtaskCommand::CheckCalibration => check_calibration(),
@@ -1206,7 +1207,7 @@ fn check_policy() -> Result<(), String> {
     public_surfaces::check()?;
     check_goals()?;
     check_package_boundary()?;
-    check_ci_lanes()?;
+    ci_lanes::check()?;
     check_ci_routing_contract()?;
     corpus_backstop::check_schema(Path::new(CORPUS_BACKSTOP_SAMPLE_REPORT))?;
     corpus_usefulness::check_schema(Path::new(CORPUS_USEFULNESS_SAMPLE_ROLLUP))?;
@@ -2978,67 +2979,6 @@ fn check_package_boundary() -> Result<(), String> {
     }
     println!("check-package-boundary: ok ({} packages)", names.len());
     Ok(())
-}
-
-fn check_ci_lanes() -> Result<(), String> {
-    ci_lanes::check()
-}
-
-mod ci_lanes {
-    use super::*;
-
-    const REQUIRED_LANE_KEYS: &[&str] = &[
-        "owner",
-        "intent",
-        "proof_obligation",
-        "cost_estimate",
-        "trigger_policy",
-        "review_after",
-    ];
-
-    pub(super) fn check() -> Result<(), String> {
-        let lanes = parse_lanes()?;
-        let lane_ids = collect_lane_ids(lanes)?;
-        println!("check-ci-lanes: ok ({} lanes)", lane_ids.len());
-        Ok(())
-    }
-
-    fn parse_lanes() -> Result<Vec<toml::Value>, String> {
-        let value = parse_toml_file(Path::new(CI_LANE_LEDGER))?;
-        require_toml_string(&value, "schema_version", CI_LANE_LEDGER)?;
-        let lanes = toml_array(&value, "lane", CI_LANE_LEDGER)?;
-        if lanes.is_empty() {
-            return Err(format!("{CI_LANE_LEDGER} must list at least one lane"));
-        }
-        Ok(lanes.to_vec())
-    }
-
-    fn collect_lane_ids(lanes: Vec<toml::Value>) -> Result<BTreeSet<String>, String> {
-        let mut ids = BTreeSet::new();
-        for (idx, lane) in lanes.iter().enumerate() {
-            let lane_id = validate_lane(lane, idx)?;
-            if !ids.insert(lane_id.to_string()) {
-                return Err(format!(
-                    "{CI_LANE_LEDGER} contains duplicate lane `{lane_id}`"
-                ));
-            }
-        }
-        Ok(ids)
-    }
-
-    fn validate_lane(lane: &toml::Value, idx: usize) -> Result<&str, String> {
-        let table = toml_table(lane, CI_LANE_LEDGER, "lane", idx)?;
-        let lane_id = required_table_string(table, "id", CI_LANE_LEDGER, "lane", idx)?;
-        for key in REQUIRED_LANE_KEYS {
-            required_table_string(table, key, CI_LANE_LEDGER, "lane", idx)?;
-        }
-        let status = required_table_string(table, "status", CI_LANE_LEDGER, "lane", idx)?;
-        require_known(status, CI_LANE_STATUSES, CI_LANE_LEDGER, "status")?;
-        if lane_id == "policy-contracts" {
-            require_file(".github/workflows/policy-contracts.yml")?;
-        }
-        Ok(lane_id)
-    }
 }
 
 #[derive(Clone, Copy)]
