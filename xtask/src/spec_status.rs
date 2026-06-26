@@ -3,8 +3,8 @@ use std::path::{Path, PathBuf};
 
 use crate::{
     SOURCE_OF_TRUTH_INDEX, markdown, markdown_files, markdown_table_columns, parse_toml_file,
-    read_to_string, require_known, source_truth_index_artifacts, source_truth_index_ids,
-    workspace_path,
+    read_to_string, require_known, source_truth_ledgers::source_truth_index_artifacts,
+    source_truth_ledgers::source_truth_index_ids, workspace_path,
 };
 
 pub(crate) const DASHBOARD: &str = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md";
