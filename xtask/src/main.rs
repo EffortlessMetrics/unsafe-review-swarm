@@ -45,6 +45,7 @@ mod source_truth_ledgers;
 mod spec_status;
 mod stance_checks;
 mod support_tiers;
+mod unsafe_review_ledger;
 mod workflow_allowlist;
 
 use advisory_artifacts::{check_advisory_artifacts, check_first_pr_artifacts};
@@ -1198,13 +1199,13 @@ fn check_policy() -> Result<(), String> {
         Path::new(WORKFLOW_ALLOWLIST),
         Path::new(WORKFLOW_DIR),
     )?;
-    check_unsafe_review_ledger(
+    unsafe_review_ledger::check_unsafe_review_ledger(
         Path::new("policy/unsafe-review-baseline.toml"),
-        LedgerKind::Baseline,
+        unsafe_review_ledger::LedgerKind::Baseline,
     )?;
-    check_unsafe_review_ledger(
+    unsafe_review_ledger::check_unsafe_review_ledger(
         Path::new("policy/unsafe-review-suppressions.toml"),
-        LedgerKind::Suppression,
+        unsafe_review_ledger::LedgerKind::Suppression,
     )?;
     check_doc_artifacts()?;
     check_docs_automation()?;
@@ -2705,171 +2706,6 @@ fn require_existing_repo_path(path: &str, ledger: &str, field: &str) -> Result<(
     } else {
         Err(format!("{ledger} {field} path does not exist: {path}"))
     }
-}
-#[derive(Clone, Copy)]
-enum LedgerKind {
-    Baseline,
-    Suppression,
-}
-
-impl LedgerKind {
-    fn name(self) -> &'static str {
-        match self {
-            Self::Baseline => "baseline",
-            Self::Suppression => "suppression",
-        }
-    }
-}
-
-fn check_unsafe_review_ledger(path: &Path, kind: LedgerKind) -> Result<(), String> {
-    let value = parse_toml_file(path)?;
-    let path_display = path.display().to_string();
-    let status = value
-        .get("status")
-        .and_then(toml::Value::as_str)
-        .unwrap_or("active");
-    let entries = value
-        .get("entries")
-        .and_then(toml::Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
-
-    if status == "empty" {
-        if entries.is_empty() {
-            return Ok(());
-        }
-        return Err(format!(
-            "{path_display} status is empty but contains entries"
-        ));
-    }
-
-    for (idx, entry) in entries.iter().enumerate() {
-        let Some(entry) = entry.as_table() else {
-            return Err(format!(
-                "{path_display} entries[{idx}] must be a TOML table"
-            ));
-        };
-        for key in ["card_id", "owner", "reason", "evidence"] {
-            require_ledger_entry_string(entry, key, &path_display, idx)?;
-        }
-        let evidence = entry
-            .get("evidence")
-            .and_then(toml::Value::as_str)
-            .unwrap_or_default();
-        if !looks_like_typed_evidence(evidence) {
-            return Err(format!(
-                "{path_display} entries[{idx}] `evidence` must start with a typed prefix \
-                 (e.g. test:, doc:, spec:, adr:, ripr:, unsafe-review:, coverage:, \
-                 issue:, pr:, baseline-init:) followed by at least one non-whitespace character"
-            ));
-        }
-        let has_review_after = ledger_entry_date(entry, "review_after", &path_display, idx)?;
-        let has_expires = ledger_entry_date(entry, "expires", &path_display, idx)?;
-        match kind {
-            LedgerKind::Baseline if !has_review_after => {
-                return Err(format!(
-                    "{path_display} entries[{idx}] baseline entry is missing review_after"
-                ));
-            }
-            LedgerKind::Suppression if !has_review_after && !has_expires => {
-                return Err(format!(
-                    "{path_display} entries[{idx}] suppression entry must set review_after or expires"
-                ));
-            }
-            _ => {}
-        }
-        let card_id = entry
-            .get("card_id")
-            .and_then(toml::Value::as_str)
-            .unwrap_or_default();
-        if !looks_like_counted_card_id(card_id) {
-            return Err(format!(
-                "{path_display} entries[{idx}] {} card_id must be an exact counted UR-* identity ending in -cN",
-                kind.name()
-            ));
-        }
-    }
-
-    Ok(())
-}
-
-fn require_ledger_entry_string(
-    entry: &toml::map::Map<String, toml::Value>,
-    key: &str,
-    path: &str,
-    idx: usize,
-) -> Result<(), String> {
-    let Some(value) = entry.get(key).and_then(toml::Value::as_str) else {
-        return Err(format!("{path} entries[{idx}] is missing string `{key}`"));
-    };
-    if value.trim().is_empty() {
-        Err(format!("{path} entries[{idx}] string `{key}` is empty"))
-    } else {
-        Ok(())
-    }
-}
-
-fn ledger_entry_date(
-    entry: &toml::map::Map<String, toml::Value>,
-    key: &str,
-    path: &str,
-    idx: usize,
-) -> Result<bool, String> {
-    let Some(value) = entry.get(key) else {
-        return Ok(false);
-    };
-    let Some(value) = value.as_str() else {
-        return Err(format!("{path} entries[{idx}] `{key}` must be a string"));
-    };
-    if !looks_like_iso_date(value) {
-        return Err(format!("{path} entries[{idx}] `{key}` must use YYYY-MM-DD"));
-    }
-    Ok(true)
-}
-
-fn looks_like_iso_date(value: &str) -> bool {
-    let bytes = value.as_bytes();
-    bytes.len() == 10
-        && bytes[0..4].iter().all(u8::is_ascii_digit)
-        && bytes[4] == b'-'
-        && bytes[5..7].iter().all(u8::is_ascii_digit)
-        && bytes[7] == b'-'
-        && bytes[8..10].iter().all(u8::is_ascii_digit)
-}
-
-fn looks_like_counted_card_id(value: &str) -> bool {
-    let Some((prefix, count)) = value.rsplit_once("-c") else {
-        return false;
-    };
-    value.starts_with("UR-")
-        && !prefix.is_empty()
-        && !count.is_empty()
-        && count.bytes().all(|byte| byte.is_ascii_digit())
-}
-
-/// Typed evidence prefixes accepted by the ledger gate.
-///
-/// Each prefix must be followed by at least one non-whitespace character.
-/// This list aligns with the cargo-allow interop contract documented in
-/// `docs/interop/sibling-tools.md`.
-const TYPED_EVIDENCE_PREFIXES: &[&str] = &[
-    "test:",
-    "doc:",
-    "spec:",
-    "adr:",
-    "ripr:",
-    "unsafe-review:",
-    "coverage:",
-    "issue:",
-    "pr:",
-    "baseline-init:",
-];
-
-fn looks_like_typed_evidence(value: &str) -> bool {
-    TYPED_EVIDENCE_PREFIXES.iter().any(|prefix| {
-        value
-            .strip_prefix(prefix)
-            .is_some_and(|rest| rest.chars().any(|c: char| !c.is_whitespace()))
-    })
 }
 fn check_calibration() -> Result<(), String> {
     let manifest = calibration_manifest::validate()?;
@@ -22240,7 +22076,10 @@ status = "empty"
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
 
-        let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+        let result = unsafe_review_ledger::check_unsafe_review_ledger(
+            &path,
+            unsafe_review_ledger::LedgerKind::Baseline,
+        );
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         result
@@ -22265,7 +22104,10 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
 
-        let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+        let result = unsafe_review_ledger::check_unsafe_review_ledger(
+            &path,
+            unsafe_review_ledger::LedgerKind::Baseline,
+        );
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         result
@@ -22289,7 +22131,10 @@ evidence = "issue: manual-review"
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
 
-        let result = check_unsafe_review_ledger(&path, LedgerKind::Suppression);
+        let result = unsafe_review_ledger::check_unsafe_review_ledger(
+            &path,
+            unsafe_review_ledger::LedgerKind::Suppression,
+        );
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         assert!(
@@ -22320,7 +22165,10 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
 
-        let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+        let result = unsafe_review_ledger::check_unsafe_review_ledger(
+            &path,
+            unsafe_review_ledger::LedgerKind::Baseline,
+        );
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         assert!(result.err().unwrap_or_default().contains("exact counted"));
@@ -22346,7 +22194,10 @@ review_after = "2026-08-01"
         )
         .map_err(|err| format!("write ledger failed: {err}"))?;
 
-        let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+        let result = unsafe_review_ledger::check_unsafe_review_ledger(
+            &path,
+            unsafe_review_ledger::LedgerKind::Baseline,
+        );
 
         fs::remove_file(&path).map_err(|err| format!("remove ledger failed: {err}"))?;
         let err = result.err().unwrap_or_default();
@@ -22389,7 +22240,10 @@ review_after = "2026-08-01"
             fs::write(&path, &content)
                 .map_err(|err| format!("write ledger failed for prefix '{prefix}': {err}"))?;
 
-            let result = check_unsafe_review_ledger(&path, LedgerKind::Baseline);
+            let result = unsafe_review_ledger::check_unsafe_review_ledger(
+                &path,
+                unsafe_review_ledger::LedgerKind::Baseline,
+            );
 
             fs::remove_file(&path)
                 .map_err(|err| format!("remove ledger failed for prefix '{prefix}': {err}"))?;
