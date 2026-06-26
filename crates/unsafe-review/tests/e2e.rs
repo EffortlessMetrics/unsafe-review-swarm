@@ -3088,6 +3088,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
 
     let tokmd_packets = parse_json(&fs::read_to_string(out_dir.join("tokmd-packets.json"))?)?;
+    assert_eq!(tokmd_packets["schema"], "tokmd.packets/v1");
     assert_eq!(tokmd_packets["schema_version"], "tokmd-packets/v1");
     assert_eq!(tokmd_packets["mode"], "tokmd_packet_bundle");
     assert_eq!(tokmd_packets["source"], "first_pr");

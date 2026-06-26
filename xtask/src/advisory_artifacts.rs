@@ -2180,6 +2180,7 @@ fn check_tokmd_packets_artifact(
     let value = super::parse_json_file(&path)?;
     let comment_plan = super::parse_json_file(&dir.join("comment-plan.json"))?;
     let comment_plan_projection = tokmd_comment_plan_projection(&comment_plan)?;
+    super::require_json_str(&value, "schema", "tokmd.packets/v1", "tokmd-packets.json")?;
     super::require_json_str(
         &value,
         "schema_version",
