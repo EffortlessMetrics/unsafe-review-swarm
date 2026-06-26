@@ -23057,6 +23057,7 @@ review_after = "2026-08-01"
     fn write_empty_tokmd_packets_artifact(dir: &Path) -> Result<(), String> {
         let comment_plan_input = tokmd_comment_plan_input_fixture(dir)?;
         let value = serde_json::json!({
+            "schema": "tokmd.packets/v1",
             "schema_version": "tokmd-packets/v1",
             "tool": "unsafe-review",
             "tool_version": "0.2.1-test",
@@ -23441,6 +23442,7 @@ review_after = "2026-08-01"
         let handoff = manual_candidate_handoff_fixture();
         let comment_plan_input = tokmd_comment_plan_input_fixture(dir)?;
         let value = serde_json::json!({
+            "schema": "tokmd.packets/v1",
             "schema_version": "tokmd-packets/v1",
             "tool": "unsafe-review",
             "tool_version": "0.2.1-test",
