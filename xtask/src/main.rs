@@ -31,6 +31,7 @@ mod dogfood_usefulness;
 mod evidence_loss_challenges;
 mod external_pilots;
 mod first_hour;
+mod fixture_surfaces;
 mod fuzz_artifact_checks;
 mod markdown;
 mod public_badges;
@@ -496,12 +497,12 @@ const CI_LANE_STATUSES: &[&str] = &["advisory", "required", "deferred", "retired
 
 const FIXTURE_REQUIRED_FILES: &[&str] = &["Cargo.toml", "change.diff", "src/lib.rs"];
 
-const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
+pub(crate) const FIXTURE_EXPECTED_CARDS_EXCEPTIONS: &[&str] = &[
     "duplicate_raw_pointer_reads",
     "raw_pointer_alignment_line_drift",
 ];
 
-const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
+pub(crate) const FIXTURE_PACKAGE_PREFIX_EXCEPTIONS: &[(&str, &str)] =
     &[("raw_pointer_alignment_line_drift", "raw-pointer-alignment")];
 const MANUAL_CANDIDATE_EXAMPLE_DIR: &str = "docs/examples/manual-candidates";
 const MANUAL_CANDIDATE_SMOKE_FIXTURE_DIR: &str =
@@ -865,10 +866,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
             public_badges::check_generated_projection()?;
             check_policy()?;
             check_support_tiers()?;
-            check_fixtures()?;
+            fixture_surfaces::check_fixtures()?;
             check_calibration()?;
-            check_fixture_surface_parity()?;
-            check_surface_determinism()?;
+            fixture_surfaces::check_fixture_surface_parity()?;
+            fixture_surfaces::check_surface_determinism()?;
             real_pr_corpus::check()?;
             corpus_partitions::check()?;
             evidence_loss_challenges::check()?;
@@ -890,7 +891,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckPackageBoundary => check_package_boundary(),
         commands::XtaskCommand::CheckCiLanes => check_ci_lanes(),
         commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
-        commands::XtaskCommand::CheckFixtures => check_fixtures(),
+        commands::XtaskCommand::CheckFixtures => fixture_surfaces::check_fixtures(),
         commands::XtaskCommand::CheckCalibration => check_calibration(),
         commands::XtaskCommand::CheckDogfood => check_dogfood(),
         commands::XtaskCommand::CheckFuzz => fuzz_artifact_checks::check_manual_fuzz_harness(),
@@ -918,8 +919,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckStanceDecisions => stance_checks::check_stance_decisions(),
         commands::XtaskCommand::CheckStanceCoverage => stance_checks::check_stance_coverage(),
         commands::XtaskCommand::CheckSpecCoverage => stance_checks::check_spec_coverage(),
-        commands::XtaskCommand::CheckFixtureSurfaceParity => check_fixture_surface_parity(),
-        commands::XtaskCommand::CheckSurfaceDeterminism => check_surface_determinism(),
+        commands::XtaskCommand::CheckFixtureSurfaceParity => fixture_surfaces::check_fixture_surface_parity(),
+        commands::XtaskCommand::CheckSurfaceDeterminism => fixture_surfaces::check_surface_determinism(),
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
@@ -3201,207 +3202,6 @@ fn looks_like_typed_evidence(value: &str) -> bool {
             .is_some_and(|rest| rest.chars().any(|c: char| !c.is_whitespace()))
     })
 }
-
-fn check_fixtures() -> Result<(), String> {
-    let dirs = fixture_dirs(Path::new("fixtures"))?;
-    if dirs.is_empty() {
-        return Err("fixtures directory has no fixture cases".to_string());
-    }
-    check_fixture_exception_ledgers(&dirs)?;
-    for dir in &dirs {
-        check_fixture(dir)?;
-    }
-    println!("check-fixtures: ok ({} fixtures)", dirs.len());
-    Ok(())
-}
-
-/// Verify that committed surface goldens (`expected.lsp.json`,
-/// `expected.repair-queue.json`) are byte-identical to a fresh rendering of
-/// each calibration fixture that has `surface_goldens` set.
-///
-/// The gate is deterministic: both surfaces contain no `tool_version`,
-/// `generated_at`, or wall-clock timestamp, so re-rendering produces the same
-/// bytes on every run.
-fn check_fixture_surface_parity() -> Result<(), String> {
-    let manifest = calibration_manifest::validate()?;
-    let workspace_root = workspace_path("");
-    let mut checked = 0usize;
-    let mut mismatches: Vec<String> = Vec::new();
-
-    for (fixture, case) in &manifest.fixture_cases {
-        if case.surface_goldens.is_empty() {
-            continue;
-        }
-        for surface in &case.surface_goldens {
-            let filename = surface_golden_filename(surface);
-            let committed_path = workspace_path(&format!("fixtures/{fixture}/{filename}"));
-            let committed = read_to_string(&committed_path).map_err(|err| {
-                format!(
-                    "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
-                     committed golden `{filename}` missing or unreadable: {err}. \
-                     Run `cargo run -p xtask -- bless-goldens` to generate it."
-                )
-            })?;
-
-            let rendered = unsafe_review_core::render_fixture_surface_from_workspace(
-                &workspace_root,
-                fixture,
-                surface,
-            )
-            .map_err(|err| {
-                format!(
-                    "check-fixture-surface-parity: fixture `{fixture}` surface `{surface}`: \
-                     render failed: {err}"
-                )
-            })?;
-
-            if committed != rendered {
-                let first_diff = first_differing_line(&committed, &rendered);
-                mismatches.push(format!(
-                    "  fixture `{fixture}` surface `{surface}` ({filename}): {first_diff}"
-                ));
-            }
-            checked += 1;
-        }
-    }
-
-    if !mismatches.is_empty() {
-        return Err(format!(
-            "check-fixture-surface-parity: {} surface golden(s) do not match rendered output \
-             (run `cargo run -p xtask -- bless-goldens` to regenerate):\n{}",
-            mismatches.len(),
-            mismatches.join("\n")
-        ));
-    }
-
-    println!("check-fixture-surface-parity: ok ({checked} surface goldens verified)");
-    Ok(())
-}
-
-const SURFACE_DETERMINISM_RUNS: usize = 3;
-
-/// Verify that canonical fixture surfaces render to byte-identical output across
-/// repeated generation in one process.
-fn check_surface_determinism() -> Result<(), String> {
-    let manifest = calibration_manifest::validate()?;
-    let workspace_root = workspace_path("");
-    let mut checked = 0usize;
-    let mut mismatches: Vec<String> = Vec::new();
-
-    for (fixture, case) in &manifest.fixture_cases {
-        if case.surface_goldens.is_empty() {
-            continue;
-        }
-        for surface in &case.surface_goldens {
-            let baseline = unsafe_review_core::render_fixture_surface_from_workspace(
-                &workspace_root,
-                fixture,
-                surface,
-            )
-            .map_err(|err| {
-                format!(
-                    "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
-                     initial render failed: {err}"
-                )
-            })?;
-
-            for run_idx in 2..=SURFACE_DETERMINISM_RUNS {
-                let candidate = unsafe_review_core::render_fixture_surface_from_workspace(
-                    &workspace_root,
-                    fixture,
-                    surface,
-                )
-                .map_err(|err| {
-                    format!(
-                        "check-surface-determinism: fixture `{fixture}` surface `{surface}`: \
-                             render {run_idx} failed: {err}"
-                    )
-                })?;
-                if baseline != candidate {
-                    let first_diff = first_differing_line(&baseline, &candidate);
-                    mismatches.push(format!(
-                        "  fixture `{fixture}` surface `{surface}` render {run_idx}: {first_diff}"
-                    ));
-                    break;
-                }
-            }
-            checked += 1;
-        }
-    }
-
-    if !mismatches.is_empty() {
-        return Err(format!(
-            "check-surface-determinism: {} surface render(s) drifted across repeated generation:\n{}",
-            mismatches.len(),
-            mismatches.join("\n")
-        ));
-    }
-
-    println!(
-        "check-surface-determinism: ok ({checked} surface render(s), {SURFACE_DETERMINISM_RUNS} passes each)"
-    );
-    Ok(())
-}
-
-/// Return the committed golden filename for a surface name.
-fn surface_golden_filename(surface: &str) -> &'static str {
-    match surface {
-        "lsp" => "expected.lsp.json",
-        "repair-queue" => "expected.repair-queue.json",
-        "comment-plan" => "expected.comment-plan.json",
-        _ => "expected.unknown.json",
-    }
-}
-
-/// Describe the first line where two multi-line strings differ.
-fn first_differing_line(committed: &str, rendered: &str) -> String {
-    let committed_lines: Vec<&str> = committed.lines().collect();
-    let rendered_lines: Vec<&str> = rendered.lines().collect();
-    let len = committed_lines.len().max(rendered_lines.len());
-    for i in 0..len {
-        let a = committed_lines.get(i).copied().unwrap_or("<missing>");
-        let b = rendered_lines.get(i).copied().unwrap_or("<missing>");
-        if a != b {
-            return format!(
-                "first diff at line {}: committed={a:?} rendered={b:?}",
-                i + 1
-            );
-        }
-    }
-    "content differs but all lines appear equal (trailing newline difference?)".to_string()
-}
-
-fn check_fixture_exception_ledgers(dirs: &[PathBuf]) -> Result<(), String> {
-    let mut fixture_paths = BTreeMap::new();
-    for dir in dirs {
-        let name = fixture_dir_name(dir)?.to_string();
-        fixture_paths.insert(name, dir);
-    }
-
-    for fixture in FIXTURE_EXPECTED_CARDS_EXCEPTIONS {
-        let Some(dir) = fixture_paths.get(*fixture) else {
-            return Err(format!(
-                "expected-card exception fixture `{fixture}` does not exist"
-            ));
-        };
-        if dir.join("expected.cards.json").is_file() {
-            return Err(format!(
-                "expected-card exception fixture `{fixture}` has expected.cards.json"
-            ));
-        }
-    }
-
-    for (fixture, _prefix) in FIXTURE_PACKAGE_PREFIX_EXCEPTIONS {
-        if !fixture_paths.contains_key(*fixture) {
-            return Err(format!(
-                "package-prefix exception fixture `{fixture}` does not exist"
-            ));
-        }
-    }
-
-    Ok(())
-}
-
 fn check_calibration() -> Result<(), String> {
     let manifest = calibration_manifest::validate()?;
 
@@ -6507,7 +6307,7 @@ fn reject_positive_overclaims(path: &Path, text: &str) -> Result<(), String> {
     Ok(())
 }
 
-fn check_fixture(dir: &Path) -> Result<(), String> {
+pub(crate) fn check_fixture(dir: &Path) -> Result<(), String> {
     let name = fixture_dir_name(dir)?;
     if !is_snake_case_name(name) {
         return Err(format!(
@@ -9814,7 +9614,7 @@ pub(crate) fn repo_path(relative: &str) -> PathBuf {
     workspace_path(relative)
 }
 
-fn fixture_dirs(dir: &Path) -> Result<Vec<PathBuf>, String> {
+pub(crate) fn fixture_dirs(dir: &Path) -> Result<Vec<PathBuf>, String> {
     let mut dirs = Vec::new();
     let entries =
         fs::read_dir(dir).map_err(|err| format!("read {} failed: {err}", dir.display()))?;
@@ -9892,7 +9692,7 @@ pub(crate) fn markdown_table_columns(line: &str) -> Vec<&str> {
     columns
 }
 
-fn fixture_dir_name(path: &Path) -> Result<&str, String> {
+pub(crate) fn fixture_dir_name(path: &Path) -> Result<&str, String> {
     path.file_name()
         .and_then(std::ffi::OsStr::to_str)
         .ok_or_else(|| format!("{} has a non-UTF-8 fixture directory name", path.display()))
@@ -10738,7 +10538,7 @@ jobs:
     #[test]
     fn fixture_exception_ledgers_reference_current_fixtures() -> Result<(), String> {
         let dirs = fixture_dirs(&workspace_path("fixtures"))?;
-        check_fixture_exception_ledgers(&dirs)
+        fixture_surfaces::check_fixture_exception_ledgers(&dirs)
     }
 
     #[test]
