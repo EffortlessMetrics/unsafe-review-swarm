@@ -98,6 +98,19 @@ For analyzer behavior changes only:
 - [ ] Relevant targeted tests
 - [ ] ripr/unsafe-review/source-exception artifacts checked if applicable
 
+## Builder cleanup
+
+If this PR ran an agent builder (worktree, separate target/cache, or any
+relocated build output), report the state so residue is visible before it
+saturates the workbench drive (see #1607 and
+`docs/contributing/BUILD_CACHE_SETUP.md`):
+
+- [ ] not applicable — no agent builder ran
+- [ ] temporary worktree removed (or clean and intentionally retained)
+- [ ] no stray `target/` or relocated cache outputs left under worktrees
+- [ ] if `CARGO_TARGET_DIR` / `CARGO_HOME` were relocated, the path and
+      reason are recorded (not silently switched)
+
 ## Rollback
 
 -
