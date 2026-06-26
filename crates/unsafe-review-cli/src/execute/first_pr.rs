@@ -1710,6 +1710,12 @@ pub(super) fn render_tokmd_packets_artifact(
         })
         .count();
     let value = json!({
+        // Canonical tokmd packet-bundle schema id (tokmd-swarm
+        // crates/tokmd/schemas/tokmd-packets.schema.json requires
+        // `schema == "tokmd.packets/v1"`). `schema_version` is retained for
+        // backward-compat with older consumers; the schema allows extra
+        // properties (`additionalProperties: true`).
+        "schema": "tokmd.packets/v1",
         "schema_version": "tokmd-packets/v1",
         "tool": "unsafe-review",
         "tool_version": env!("CARGO_PKG_VERSION"),
