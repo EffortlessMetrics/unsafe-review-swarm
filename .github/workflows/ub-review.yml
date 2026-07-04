@@ -35,16 +35,29 @@ jobs:
           # Full history so ub-review can diff base..head.
           fetch-depth: 0
           persist-credentials: false
+      # Mirror the live in-job lane's mode/provider inputs (preset bun-ub,
+      # mode intelligent-ci, provider-policy primary-with-fallback, MiniMax-M3
+      # primary with deepseek-v4-flash fallback, tool-bundle core) so canary
+      # evidence validates the code path that would actually be promoted —
+      # only the posting posture (artifact-only) and the pin differ.
       - name: Run ub-review (canary pin, artifact-only)
         uses: EffortlessMetrics/ub-review@f0620c358f4a9032d3f832fda92488fd198ab6e9
         with:
           profile: gh-runner
+          preset: bun-ub
+          mode: intelligent-ci
           posting: artifact-only
           fail-on-gate: 'false'
+          tool-bundle: core
+          provider-policy: primary-with-fallback
           minimax-api-key: ${{ secrets.MINIMAX_API_KEY }}
+          minimax-model: MiniMax-M3
+          opencode-api-key: ${{ secrets.OPENCODE }}
+          opencode-model: deepseek-v4-flash
           base: origin/${{ github.base_ref }}
           head: HEAD
           out: target/ub-review
+          github-summary: true
       - name: Upload artifacts
         if: always()
         uses: actions/upload-artifact@v7
