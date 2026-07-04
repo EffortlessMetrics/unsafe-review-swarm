@@ -211,35 +211,35 @@ The live swarm `ci.yml` is one tight CI gate, not a pile of parallel required
 checks. It is a single gate job whose runner is chosen by a minimal capacity
 router (self-hosted primary, `ubuntu-latest` overflow — see section 7); the
 router is advisory and not a required check, so there is still exactly one job
-that gates the merge and one required status check. That gate job has exactly
-two layers:
+that gates the merge and one required status check. The gate job carries only
+the deterministic layer; the advisory LLM layer runs as its own standalone
+workflow:
 
 ```text
-mandatory deterministic core floor (the hard gate)
+mandatory deterministic core floor (the hard gate, ci.yml)
   cargo run --locked -p xtask -- check-pr
 
-advisory LLM layer (rides along in the same job)
-  EffortlessMetrics/ub-review intelligent-ci review
+advisory LLM layer (standalone non-blocking workflow, ub-review.yml)
+  EffortlessMetrics/ub-review review (gh-runner profile)
 ```
 
 The deterministic core floor is the only hard blocker and the only required
 status check. ub-review wraps it as an additive layer: it does not replace the
-deterministic tools, it reviews on top of their evidence. It selects the
-PR-relevant extra sensors and runs bounded LLM lanes so heavy checks do not run
-on every PR. The value is strong gating from a tight central set plus only what
-the LLM picks as relevant.
+deterministic tools, it reviews on top of their evidence in a separate
+workflow that never gates the merge (see "Standalone advisory ub-review lane"
+below). The value is strong gating from a tight central set plus advisory LLM
+review that costs the gate nothing.
 
 Single required check:
 
 ```text
 The job is named "Unsafe Review Rust Result" for branch-protection continuity.
 Its conclusion reflects ONLY the deterministic core verdict (the final assert
-step fails iff `xtask check-pr` exited non-zero). ub-review is advisory and can
-never flip that result.
+step fails iff `xtask check-pr` exited non-zero). ub-review runs in a separate
+advisory workflow and can never flip that result.
 ```
 
-Step shape inside the one job (launch the LLM lanes off fast context, do not
-gate them on the slower deterministic build):
+Step shape inside the one gate job:
 
 ```text
 0. route (advisory, ubuntu-latest, not a required check): pick the gate runner —
@@ -248,15 +248,36 @@ gate them on the slower deterministic build):
 1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.95.0
    with rustfmt + clippy, Swatinem/rust-cache@v2
 2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
-   --check plus repo/PR facts written to target/ci-core/precontext.md, and the
-   core gate launched in the background sharing the workspace target dir (cargo's
-   target-lock serialises overlap with ub-review's cargo work safely, so it
-   overlaps the lanes without doubling disk on either runner kind)
-3. advisory ub-review: reuses the warmed toolchain/cache (setup-rust:false),
-   fed the precontext via pr-thread-context, posting review, fail-on-gate:false,
-   continue-on-error
-4. final assert: wait for the background core gate, surface it in the job
+   --check plus repo/PR facts written to target/ci-core/precontext.md as a
+   durable run record, and the core gate launched in the background sharing the
+   workspace target dir (cargo's target-lock serialises overlap safely)
+3. final assert: wait for the background core gate, surface it in the job
    summary, and fail the job iff its exit code != 0
+```
+
+Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
+
+```text
+- pull_request (opened, reopened, ready_for_review, synchronize), same-repo
+  non-draft PRs only: fork PRs cannot read the MINIMAX_API_KEY org secret,
+  drafts would burn advisory LLM budget early, and the deterministic core
+  gate still runs for forks and drafts
+- superseded runs are cancelled per PR (concurrency cancel-in-progress) so
+  rapid pushes do not stack redundant paid reviews
+- the EffortlessMetrics/ub-review action is pinned to an immutable commit SHA
+  (gh-runner profile, posting: review, fail-on-gate 'false')
+- the job is continue-on-error with a bounded timeout, and no
+  branch-protection rule names this workflow: it is NEVER a required check,
+  so LLM availability or opinion can never block the merge
+- workflow-level permissions are contents: read; pull-requests: write is
+  granted at the job level only, solely so ub-review can post its grouped
+  advisory PR review; the run also uploads its artifact bundle
+- pin bumps update policy/workflow-allowlist.toml in the same PR (a dependabot
+  pin bump alone cannot pass the deterministic gate, because the allowlist
+  pins the action SHA)
+- xtask check-ci-routing-contract enforces this shape: the advisory posture
+  markers must stay present in ub-review.yml, and an in-job ub-review step in
+  ci.yml is a forbidden marker (it would double-run the advisory review)
 ```
 
 May fail on:
@@ -284,19 +305,20 @@ source edits
 publish
 ```
 
-The advisory ub-review layer may post one grouped PR review (posting:review),
+The advisory ub-review lane may post one grouped PR review (posting:review),
 but it must not edit source, run witnesses, publish, or make blocking
 unsafe-correctness claims.
 
-Default permissions:
+Gate job permissions:
 
 ```yaml
 permissions:
   contents: read
 ```
 
-The single job adds `pull-requests: write` for one reason only: so the advisory
-ub-review step can post its grouped PR review. No other write token is granted.
+The gate job grants no write token. `pull-requests: write` lives only in the
+standalone advisory ub-review workflow, for one reason only: so ub-review can
+post its grouped advisory PR review.
 
 ### 4.2 `policy-contracts.yml` - source-of-truth gate
 
@@ -755,8 +777,9 @@ github (overflow): no idle trusted self-hosted capacity, missing runner-read
 
 The owned fleet absorbs the bulk; gh-hosted only handles bursts, capacity gaps,
 and forks. Fork PRs always overflow to gh-hosted (untrusted code can never run
-on trusted self-hosted runners) and additionally skip the advisory ub-review
-step (no org secrets); the deterministic core gate still runs for forks. There
+on trusted self-hosted runners); the standalone advisory ub-review workflow is
+separately guarded to same-repo PRs (no org secrets for forks), and the
+deterministic core gate still runs for forks. There
 is still exactly ONE job that gates the merge and ONE required check
 (`Unsafe Review Rust Result`); the router is advisory and never blocks. The gate
 branches disk/scratch handling on `runner_kind`: on gh-hosted overflow it frees
@@ -764,15 +787,13 @@ the big preinstalled SDKs (android/dotnet/ghc/CodeQL) when headroom is low; on
 self-hosted it leaves those gh-only paths alone, reports `df -h` headroom, and
 reuses the shared workspace target dir (cargo's target-lock serialises overlap),
 with shared-fleet scratch hygiene tracked in unsafe-review-swarm #1519.
-ub-review's runner profile rides whichever runner the gate lands on.
 
-Advisory LLM layer cost posture: ub-review runs intelligent-ci review with
-MiniMax-M3 as the primary provider and OpenCode `deepseek-v4-flash` as the
-fallback under `provider-policy: primary-with-fallback`. It is bounded by the
-job timeout, reuses the warmed toolchain and cargo cache (`setup-rust: false`),
-installs only the `core` sensor bundle, and lets its planner pick the
-PR-relevant extras. It is advisory (`fail-on-gate: false`, `continue-on-error`)
-and never blocks the merge.
+Advisory LLM layer cost posture: ub-review runs in the standalone
+`ub-review.yml` workflow on `ubuntu-latest` with the `gh-runner` profile and
+the `MINIMAX_API_KEY` org secret. It is bounded by its own job timeout and is
+advisory (`fail-on-gate: 'false'`, `continue-on-error`, never a required
+check), so it never blocks the merge and its runtime never extends the
+deterministic gate's wall-clock.
 
 Swarm may carry experimental, scheduled, or workflow-dispatch lanes while they
 are being proven, but a lane must be listed in
@@ -1207,10 +1228,9 @@ jobs:
 ```
 
 The live swarm `ci.yml` instead uses the single tight gate of section 4.1: one
-`ubuntu-latest` job whose mandatory deterministic floor is
+gate job whose mandatory deterministic floor is
 `cargo run --locked -p xtask -- check-pr` (the only required check, named
-"Unsafe Review Rust Result"), with advisory ub-review riding along in the same
-job. Its shape is:
+"Unsafe Review Rust Result"). Its shape is:
 
 ```yaml
 jobs:
@@ -1220,9 +1240,8 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      pull-requests: write
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -1234,27 +1253,64 @@ jobs:
         run: |
           # cargo fmt --check + repo/PR facts -> target/ci-core/precontext.md,
           # then launch `cargo run --locked -p xtask -- check-pr` in the
-          # background on an isolated CARGO_TARGET_DIR.
+          # background on the shared workspace target dir.
           ...
-      - name: UB Review (advisory)
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
-        continue-on-error: true
-        uses: EffortlessMetrics/ub-review@v0.1
-        with:
-          mode: intelligent-ci
-          posting: review
-          fail-on-gate: false
-          setup-rust: false
-          provider-policy: primary-with-fallback
-          minimax-model: MiniMax-M3
-          opencode-model: deepseek-v4-flash
-          pr-thread-context: target/ci-core/precontext.md
-          # ... secrets and remaining inputs ...
       - name: Assert core gate verdict
         if: ${{ always() }}
         run: |
           # fail iff the background core gate exited non-zero
           ...
+```
+
+The advisory ub-review lane is the separate standalone workflow of section
+4.1 ("Standalone advisory ub-review lane"):
+
+```yaml
+name: UB Review
+
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ub-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: UB Review (advisory)
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    permissions:
+      contents: read
+      # Only so ub-review can post its grouped advisory PR review.
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: EffortlessMetrics/ub-review@<pinned-commit-sha>
+        with:
+          profile: gh-runner
+          posting: review
+          fail-on-gate: 'false'
+          minimax-api-key: ${{ secrets.MINIMAX_API_KEY }}
+          base: origin/${{ github.base_ref }}
+          head: HEAD
+          out: target/ub-review
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: ub-review-artifacts
+          path: target/ub-review
 ```
 
 ## 17. Example advisory first-pr workflow
