@@ -87,11 +87,11 @@ path = ".github/workflows/droid-pr-review.yml"
 permissions = "contents: read, id-token: write, pull-requests: write"
 actions = [
   "actions/checkout@v7",
-  "Factory-AI/droid-action@150e8c231191631016a9563bf5d8388e36382de9",
+  "Factory-AI/droid-action@aaa1cd31dfe2c4fc1756af9ec386390cf4b8a56a",
 ]
 reason = "Owner-requested advisory Droid PR review bot. It configures Factory BYOK with MiniMax M3 via the Anthropic-compatible MiniMax endpoint, uses Droid's shallow review preset with low reasoning effort, disables Droid security review blocking, passes the scoped workflow GitHub token to Droid, grants id-token: write for the pinned Factory Droid validator OIDC path, runs only on non-draft pull requests, bounds the Droid action step with a timeout and continue-on-error so review-bot failures stay advisory, cancels superseded PR review runs per PR, clears ambient Anthropic globals, posts advisory review/security comments through Factory, and does not run unsafe-review witnesses, edit source, publish artifacts, or make unsafe-correctness claims."
 created = "2026-06-01"
-review_after = "2026-07-01"
+review_after = "2026-09-04"
 
 [[workflow]]
 id = "workflow-0009"
