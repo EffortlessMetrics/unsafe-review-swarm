@@ -4,7 +4,10 @@
 //! that `.github/workflows/ci.yml` keeps the single tight-gate CI contract:
 //! required markers for the one self-hosted-primary / gh-hosted-overflow gate,
 //! and forbidden markers that would reintroduce the retired size-routed
-//! multi-lane pile-of-checks.
+//! multi-lane pile-of-checks. Also validates that the standalone advisory
+//! ub-review lane (`.github/workflows/ub-review.yml`) keeps its non-blocking
+//! advisory posture: SHA-pinned action, continue-on-error, fail-on-gate off,
+//! and fork-guarded secret use.
 
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
 pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
@@ -16,9 +19,9 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     // self-hosted em-ci runner when the owned fleet has capacity, else
     // `ubuntu-latest` overflow (bursts, capacity gaps, fork PRs). The gate stays a
     // SINGLE job whose mandatory deterministic core floor (`xtask check-pr` plus the
-    // full suite) is the only hard blocker and the only required status check, with
-    // ub-review riding along as an advisory LLM layer that consumes the core results
-    // as grounding context. The router never blocks the merge and never size-routes.
+    // full suite) is the only hard blocker and the only required status check. The
+    // advisory ub-review LLM lane runs as its own standalone non-blocking workflow
+    // (validated below). The router never blocks the merge and never size-routes.
     for needle in [
         // One required check, stable name for branch protection.
         "name: Unsafe Review Rust Result",
@@ -45,22 +48,8 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
         "df -h",
         "core_exit",
         "Assert core gate verdict",
-        // Advisory ub-review layer in the same job, fed the fast precontext, with a
-        // concise advisory-failure status note.
-        "UB Review (advisory)",
-        "UB Review advisory status",
-        "EffortlessMetrics/ub-review@",
-        "mode: intelligent-ci",
-        "posting: review",
-        "fail-on-gate: false",
-        "setup-rust: false",
-        "provider-policy: primary-with-fallback",
-        "minimax-model: MiniMax-M3",
-        "opencode-model: deepseek-v4-flash",
-        "pr-thread-context: target/ci-core/precontext.md",
-        // Advisory layer must stay non-blocking and fork-safe.
-        "continue-on-error: true",
-        "github.event.pull_request.head.repo.fork == false",
+        // The router must stay fork-safe: fork PRs always overflow to gh-hosted.
+        "github.event.pull_request.head.repo.fork",
     ] {
         if !text.contains(needle) {
             return Err(format!(
@@ -90,10 +79,61 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
         "Unsafe Review Rust Small Result",
         "em-ci-rust:1.95",
         "docker run --rm",
+        // The advisory ub-review lane moved to the standalone ub-review.yml
+        // workflow; an in-job copy would double-run (and double-post) the
+        // advisory review on every PR.
+        "EffortlessMetrics/ub-review@",
     ] {
         if text.contains(forbidden) {
             return Err(format!(
-                "{path} must not reintroduce retired size-routed multi-lane marker: {forbidden}"
+                "{path} must not reintroduce retired CI shape marker: {forbidden}"
+            ));
+        }
+    }
+    check_ub_review_advisory_contract()
+}
+
+/// Validate the standalone advisory ub-review lane contract in
+/// `.github/workflows/ub-review.yml`: the action stays SHA-pinned, the job
+/// stays non-blocking (continue-on-error, fail-on-gate off, bounded timeout),
+/// and org-secret use stays guarded to same-repo PRs. The lane must never
+/// become a required check; branch protection names only
+/// "Unsafe Review Rust Result" from ci.yml.
+fn check_ub_review_advisory_contract() -> Result<(), String> {
+    let path = ".github/workflows/ub-review.yml";
+    let text =
+        std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
+    for needle in [
+        // SHA-pinned advisory action; a re-tag cannot silently change the lane.
+        "uses: EffortlessMetrics/ub-review@",
+        // Non-blocking advisory posture.
+        "continue-on-error: true",
+        "fail-on-gate: 'false'",
+        "timeout-minutes:",
+        // Same-repo guard: fork PRs cannot read the MINIMAX_API_KEY org secret.
+        "github.event.pull_request.head.repo.full_name == github.repository",
+        // Posts one grouped advisory review; the only reason for
+        // pull-requests: write in this workflow.
+        "posting: review",
+        "pull-requests: write",
+    ] {
+        if !text.contains(needle) {
+            return Err(format!(
+                "{path} missing required advisory ub-review lane marker: {needle}"
+            ));
+        }
+    }
+    for forbidden in [
+        // The advisory lane must never gain gate authority or extra tokens.
+        "fail-on-gate: 'true'",
+        "fail-on-gate: true",
+        "checks: write",
+        "contents: write",
+        "issues: write",
+    ] {
+        if text.contains(forbidden) {
+            return Err(format!(
+                "{path} must not carry blocking or write-scope marker: {forbidden}"
             ));
         }
     }

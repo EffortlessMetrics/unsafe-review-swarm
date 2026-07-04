@@ -10,12 +10,10 @@ name: CI
 # (`Unsafe Review Rust Result`); the router never blocks the merge and there is
 # no per-size routing (whatever idle trusted self-hosted runner catches it).
 #
-# The gate job itself is unchanged in shape: the deterministic core floor
-# (`xtask check-pr` plus the full suite) is the only hard blocker; ub-review
-# rides along in the SAME job as an advisory LLM layer. The LLM investigation
-# window (lanes analysing the diff, model calls) is the long pole and leaves the
-# runner CPU idle, so the full deterministic core gate runs concurrently and
-# tucks under that latency for free:
+# The gate job is the deterministic core floor (`xtask check-pr` plus the full
+# suite) and nothing else. The advisory ub-review LLM lane runs as its own
+# standalone non-blocking workflow (.github/workflows/ub-review.yml); it is not
+# part of this job and can never flip the gate verdict:
 #
 #   0. route (advisory, ubuntu-latest): pick self-hosted (idle trusted em-ci
 #      runner) else ubuntu-latest overflow; emit a runs-on value + runner_kind.
@@ -28,15 +26,9 @@ name: CI
 #      safely (no corruption; worst case a little extra wall-clock), so this
 #      avoids doubling disk with a second target dir and works on both runner
 #      kinds.
-#   3. ub-review (advisory) runs next, concurrent with the backgrounded core gate.
-#      It reuses the warmed toolchain/cache (setup-rust:false) and is fed the fast
-#      precontext via pr-thread-context.
-#   4. Advisory status: emit a concise, actionable note if the advisory lane failed
-#      or was skipped, so it reads as "advisory + actionable" rather than a bare X.
-#   5. Final assert: wait for the backgrounded core gate, surface its result in the
+#   3. Final assert: wait for the backgrounded core gate, surface its result in the
 #      job summary, and fail the job iff its exit code != 0. The single required
-#      check reflects ONLY the deterministic core verdict; ub-review never blocks
-#      the merge (continue-on-error + fail-on-gate:false).
+#      check reflects ONLY the deterministic core verdict.
 
 on:
   pull_request:
@@ -128,9 +120,9 @@ jobs:
 
   unsafe-review-rust-result:
     # Single required check. The job conclusion reflects ONLY the mandatory
-    # deterministic core gate (final assert step); the advisory ub-review step is
-    # continue-on-error and fail-on-gate:false so it can never flip this result.
-    # The job name is kept stable for branch protection.
+    # deterministic core gate (final assert step). The advisory ub-review lane
+    # lives in the standalone ub-review.yml workflow and can never flip this
+    # result. The job name is kept stable for branch protection.
     #
     # runs-on is decided by the router: a self-hosted label array when the owned
     # fleet has idle trusted capacity, else "ubuntu-latest" overflow. fromJSON
@@ -142,12 +134,10 @@ jobs:
     timeout-minutes: 60
     permissions:
       contents: read
-      # Needed only so the advisory ub-review step can post its grouped PR review.
-      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
-          # Full history so ub-review can diff base..head; the core gate is happy with it too.
+          # Full history for the diff-scoped test skip and base comparisons.
           fetch-depth: 0
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.95.0
@@ -158,11 +148,14 @@ jobs:
       # disk/scratch handling is runner-kind aware: on gh-hosted overflow we free
       # the big preinstalled SDKs when headroom is low; on self-hosted we leave the
       # gh-only paths alone (they are not present) and instead report headroom and
-      # reuse the shared workspace target dir. The cheap repo/PR facts are written
-      # immediately so the LLM lanes start off them; the full deterministic core
-      # gate (fmt + clippy + test + check-pr) is launched in the background sharing
-      # the workspace target dir (cargo's lock serialises any overlap safely) and
-      # its verdict is the only thing that gates the merge.
+      # reuse the shared workspace target dir. The cheap repo/PR facts are
+      # written first as a durable run record; the full deterministic core
+      # gate (fmt + clippy + test + check-pr) is launched in the background
+      # sharing the workspace target dir (cargo's lock serialises any overlap
+      # safely) and its verdict is the only thing that gates the merge. The
+      # precontext facts and floor-time signal below stay advisory: they feed
+      # the standalone ub-review workflow's cost-receipt composition and the
+      # job summary, never the gate verdict.
       - name: Fast precontext and launch core gate
         env:
           RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
@@ -194,7 +187,7 @@ jobs:
             fi
           fi
           {
-            echo "# Deterministic precontext for ub-review"
+            echo "# Deterministic core-gate context"
             echo
             echo "- core gate (gates the merge; running concurrently): the full"
             echo "  deterministic suite —"
@@ -212,9 +205,9 @@ jobs:
           # required_floor_wall_seconds. It is purely advisory and never gates the
           # merge; failures here are non-fatal (|| true).
           date +%s > target/ci-core/gate_start || true
-          # Launch the full deterministic core gate in the background, sharing the
-          # workspace target dir (cargo's lock serialises any overlap with
-          # ub-review's cargo work safely). The && chain short-circuits, so the
+          # Launch the full deterministic core gate in the background, sharing
+          # the workspace target dir (cargo's lock serialises any overlap
+          # safely). The && chain short-circuits, so the
           # recorded exit code is the first failing command's, or 0 if all pass.
           # Per-step timing (#1515): each step prints its elapsed seconds so the
           # core.log (and thus the job summary tail) shows which step dominates.
@@ -241,62 +234,12 @@ jobs:
             echo "$?" > target/ci-core/core_exit
           ) > target/ci-core/core.log 2>&1 &
           echo "launched background core gate (pid $!): fmt + clippy + [test?] + check-pr"
-      # ADVISORY LLM layer, in this same job, concurrent with the backgrounded core
-      # gate (the CPU-bound build runs under the network-bound LLM latency).
-      # setup-rust:false reuses the toolchain installed above. intelligent-ci posts a
-      # grouped PR review and emits its gate manifest, but fail-on-gate:false +
-      # continue-on-error keep it advisory: it must not fail the merge. The fast
-      # precontext is fed via pr-thread-context so the LLM lanes review on top of the
-      # deterministic context. MiniMax-M3 primary, OpenCode deepseek-v4-flash fallback.
-      # Skipped on fork PRs (no access to org secrets); the core gate still runs for
-      # forks. !cancelled() lets the advisory review post even when the core gate fails.
-      - name: UB Review (advisory)
-        id: ubreview
-        if: ${{ !cancelled() && github.event_name == 'pull_request' && github.event.pull_request.head.repo.fork == false }}
-        continue-on-error: true
-        # Pinned to the structured-ingestion commit SHA (immutable) so a re-tag cannot silently
-        # change unsafe-review's gate. Bump deliberately; keep the allowlist in sync.
-        # SHA 4053bc0df7cd5918f8c6f80ceb3f714a572789d7 — #363 structured gate.json ingestion
-        # (routes by schema, no markdown scraping) + #365 inline path:line review comments.
-        uses: EffortlessMetrics/ub-review@d5a6f88ec115a5ad5c8fe57648c5e0d456618a39
-        with:
-          preset: bun-ub
-          mode: intelligent-ci
-          posting: review
-          fail-on-gate: false
-          setup-rust: false
-          tool-bundle: core
-          provider-policy: primary-with-fallback
-          minimax-api-key: ${{ secrets.MINIMAX_API_KEY }}
-          minimax-model: MiniMax-M3
-          opencode-api-key: ${{ secrets.OPENCODE }}
-          opencode-model: deepseek-v4-flash
-          base: origin/${{ github.base_ref }}
-          pr-thread-context: target/ci-core/precontext.md
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          github-summary: true
-      # Advisory-failure UX: keep the advisory lane legibly "advisory + actionable".
-      # When ub-review fails or is skipped, emit a concise note (what, why, fix) to
-      # the job summary instead of a bare red X, so the gate's signal stays trusted.
-      - name: UB Review advisory status
-        if: ${{ always() }}
-        env:
-          UB_OUTCOME: ${{ steps.ubreview.outcome }}
-        run: |
-          set -u
-          case "${UB_OUTCOME}" in
-            success)
-              echo "ub-review advisory lane completed; see the grouped PR review." >> "$GITHUB_STEP_SUMMARY" ;;
-            skipped|"")
-              echo "ub-review advisory lane skipped (fork PR without org secrets, or non-PR event); deterministic gate verdict stands." >> "$GITHUB_STEP_SUMMARY" ;;
-            *)
-              echo "ub-review advisory lane failed (${UB_OUTCOME}): check MINIMAX_API_KEY/OPENCODE secrets and provider/model availability (provider-policy primary-with-fallback, MiniMax-M3 primary, deepseek-v4-flash fallback), then re-run. Deterministic gate verdict stands." >> "$GITHUB_STEP_SUMMARY" ;;
-          esac
       # Join + final gate assert. Wait for the backgrounded core gate to finish,
       # surface its result in the job summary, and fail the job iff it exited
-      # non-zero. The single required check reflects ONLY this deterministic verdict;
-      # ub-review's outcome is irrelevant here, so LLM availability or opinion never
-      # blocks the merge.
+      # non-zero. The single required check reflects ONLY this deterministic
+      # verdict; the advisory ub-review lane runs in the standalone
+      # ub-review.yml workflow, so LLM availability or opinion never blocks the
+      # merge.
       - name: Assert core gate verdict
         if: ${{ always() }}
         env:
