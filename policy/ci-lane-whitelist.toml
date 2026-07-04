@@ -21,6 +21,16 @@ status = "advisory"
 review_after = "2026-07-18"
 
 [[lane]]
+id = "ub-review-canary"
+owner = "repo-infra / ci"
+intent = "Exercise the next EffortlessMetrics/ub-review pin candidate as a standalone artifact-only canary on real PR diffs, so bumping the load-bearing in-job ub-review-advisory pin lands with run evidence instead of tag faith"
+proof_obligation = "the standalone workflow .github/workflows/ub-review.yml (workflow-0012) runs the pin-candidate EffortlessMetrics/ub-review commit SHA with posting artifact-only so it posts no PR review or comment (the grouped advisory review stays owned by the in-job ub-review-advisory lane), holds contents: read only, stays advisory (continue-on-error, fail-on-gate false) so it can never gate the merge, skips fork and draft PRs, cancels superseded runs per PR to bound cost, uploads its artifact bundle as pin-bump evidence, and runs no witnesses, source edits, comment posting, or publishing"
+cost_estimate = "medium"
+trigger_policy = "pull_request(opened, reopened, ready_for_review, synchronize) for non-fork, non-draft PRs"
+status = "advisory"
+review_after = "2026-08-04"
+
+[[lane]]
 id = "policy-contracts"
 owner = "repo-infra"
 intent = "Validate source-of-truth ledgers and links"

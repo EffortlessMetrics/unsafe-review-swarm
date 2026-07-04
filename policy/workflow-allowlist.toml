@@ -145,3 +145,16 @@ actions = [
 reason = "Advisory scheduled fuzz run over the `analyze` target (fuzz/fuzz_targets/analyze.rs). Runs `cargo +nightly-2026-06-01 fuzz run analyze -- -max_total_time=120s` on a weekly schedule (Monday 04:17 UTC, offset from corpus-backstop) and workflow_dispatch only. cargo-fuzz requires nightly, so the workflow pins the rust-toolchain installer action to an immutable SHA and installs dated toolchain nightly-2026-06-01 (no other workflow uses nightly; this is the sole exception). The job is continue-on-error so a crash or nightly-toolchain breakage never fails the advisory lane, while the fuzz step itself still reports its true outcome. Uploads crash repros (if any) and a summary as a 30-day artifact. Never a required PR gate, never triggers on pull_request or push, no witness execution, no source edits, no comment posting, no write permissions. Diagnostic robustness input only — not a memory-safety proof, UB-free claim, Miri-clean claim, coverage claim, or merge blocker. See #1807 and docs/FUZZING.md."
 created = "2026-06-21"
 review_after = "2026-08-21"
+
+[[workflow]]
+id = "workflow-0012"
+path = ".github/workflows/ub-review.yml"
+permissions = "contents: read"
+actions = [
+  "actions/checkout@v7",
+  "EffortlessMetrics/ub-review@f0620c358f4a9032d3f832fda92488fd198ab6e9",
+  "actions/upload-artifact@v7",
+]
+reason = "Advisory standalone ub-review canary lane (ci-lane ledger: ub-review-canary). The load-bearing grouped advisory PR review stays inside ci.yml (workflow-0001) pinned to the current ub-review SHA; this workflow deliberately pins the NEXT pin candidate to an immutable commit SHA (f0620c358f4a9032d3f832fda92488fd198ab6e9) and runs it artifact-only on non-fork, non-draft pull requests, so a future in-job pin bump is backed by real-PR run evidence instead of tag faith. posting: artifact-only means it posts no PR review or comment and therefore needs no write permission (contents: read only, the least-privilege counterpart of the in-job lane's pull-requests: write). continue-on-error plus fail-on-gate false keep it advisory so it can never block the merge; superseded runs are cancelled per PR to bound canary cost; the job times out at 25 minutes. It uploads the ub-review artifact bundle for inspection. No witness execution, no source edits, no comment posting, no publishing, and no memory-safety, UB-free, Miri-clean, site-execution, or calibrated claims."
+created = "2026-07-04"
+review_after = "2026-08-04"

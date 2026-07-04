@@ -1,0 +1,54 @@
+name: UB Review Canary
+
+# Advisory standalone canary lane for the NEXT EffortlessMetrics/ub-review pin.
+# The load-bearing grouped advisory PR review stays inside ci.yml
+# (workflow-0001, lane ub-review-advisory), pinned to the current SHA. This
+# workflow deliberately pins the pin-bump candidate SHA and runs it
+# artifact-only on real PR diffs, so bumping the in-job pin lands with run
+# evidence instead of tag faith. It posts nothing (posting: artifact-only),
+# holds no write permission, and can never block the merge (continue-on-error
+# + fail-on-gate: false). Ledgers: policy/ci-lane-whitelist.toml
+# (ub-review-canary) and policy/workflow-allowlist.toml (workflow-0012).
+on:
+  pull_request:
+    types: [opened, reopened, ready_for_review, synchronize]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ub-review-canary-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  review:
+    name: UB Review canary (advisory)
+    # Non-fork only (org secrets are unavailable to forks) and non-draft only
+    # (bound canary cost to reviewable PRs).
+    if: github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.draft == false
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    continue-on-error: true
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # Full history so ub-review can diff base..head.
+          fetch-depth: 0
+          persist-credentials: false
+      - name: Run ub-review (canary pin, artifact-only)
+        uses: EffortlessMetrics/ub-review@f0620c358f4a9032d3f832fda92488fd198ab6e9
+        with:
+          profile: gh-runner
+          posting: artifact-only
+          fail-on-gate: 'false'
+          minimax-api-key: ${{ secrets.MINIMAX_API_KEY }}
+          base: origin/${{ github.base_ref }}
+          head: HEAD
+          out: target/ub-review
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: ub-review-canary-artifacts
+          path: target/ub-review
+          if-no-files-found: warn
