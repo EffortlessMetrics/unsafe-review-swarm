@@ -52,7 +52,7 @@ cargo run --locked -p unsafe-review -- first-pr \
 
 Fuzzing is manual, not part of the PR gate: `cargo fuzz run analyze` (see `docs/FUZZING.md`). Toolchain is pinned (`rust-toolchain.toml`): Rust 1.95.0, edition 2024.
 
-CI has exactly one required check: the deterministic core gate (the command sequence above). An advisory ub-review LLM lane rides along in the same job and never blocks the merge. Do not turn advisory unsafe-review findings into default CI failures; read `docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md` before editing CI, workflows, or PR-artifact surfaces.
+CI has exactly one required check: the deterministic core gate (the command sequence above). An advisory ub-review LLM lane runs as its own standalone non-blocking workflow (`.github/workflows/ub-review.yml`) and never blocks the merge. Action pins in workflows are mirrored in `policy/workflow-allowlist.toml` — a pin bump must update the ledger in the same PR or the gate fails. Do not turn advisory unsafe-review findings into default CI failures; read `docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md` before editing CI, workflows, or PR-artifact surfaces.
 
 Commit subjects follow `area: summary` (e.g. `cli:`, `analysis:`, `docs(specs):`, `sync:`, `ci:`), lowercase, imperative.
 
