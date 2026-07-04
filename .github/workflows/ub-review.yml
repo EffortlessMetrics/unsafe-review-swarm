@@ -4,10 +4,12 @@ name: UB Review
 # deterministic core gate in ci.yml is the ONLY merge blocker; this workflow
 # layers LLM review on top and can never flip that verdict: the job is
 # continue-on-error, the action runs with fail-on-gate 'false', and no
-# branch-protection rule names this workflow. Runs only for same-repo PRs
-# (fork PRs cannot read the MINIMAX_API_KEY org secret); the core gate in
-# ci.yml still runs for forks. pull-requests: write exists ONLY so ub-review
-# can post its grouped advisory PR review. Advisory only: no witness
+# branch-protection rule names this workflow. Runs only for same-repo,
+# non-draft PRs (fork PRs cannot read the MINIMAX_API_KEY org secret, and
+# drafts would burn advisory LLM budget early); the core gate in ci.yml still
+# runs for forks and drafts. Superseded runs are cancelled per PR to bound
+# advisory cost. pull-requests: write is granted at the job level only, so
+# ub-review can post its grouped advisory PR review. Advisory only: no witness
 # execution, no source edits, no memory-safety, UB-free, or Miri-clean claims.
 #
 # This workflow replaces the retired in-job ub-review step that previously
@@ -19,19 +21,25 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
 
 concurrency:
   group: ub-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: false
+  # Advisory lane: a review of a superseded head is pure cost, cancel it.
+  cancel-in-progress: true
 
 jobs:
   review:
     name: UB Review (advisory)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 25
     continue-on-error: true
+    permissions:
+      contents: read
+      # Only so ub-review can post its grouped advisory PR review.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:

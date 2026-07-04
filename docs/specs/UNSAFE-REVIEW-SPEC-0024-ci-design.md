@@ -259,16 +259,19 @@ Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
 
 ```text
 - pull_request (opened, reopened, ready_for_review, synchronize), same-repo
-  PRs only: fork PRs cannot read the MINIMAX_API_KEY org secret, and the
-  deterministic core gate still runs for forks
+  non-draft PRs only: fork PRs cannot read the MINIMAX_API_KEY org secret,
+  drafts would burn advisory LLM budget early, and the deterministic core
+  gate still runs for forks and drafts
+- superseded runs are cancelled per PR (concurrency cancel-in-progress) so
+  rapid pushes do not stack redundant paid reviews
 - the EffortlessMetrics/ub-review action is pinned to an immutable commit SHA
   (gh-runner profile, posting: review, fail-on-gate 'false')
 - the job is continue-on-error with a bounded timeout, and no
   branch-protection rule names this workflow: it is NEVER a required check,
   so LLM availability or opinion can never block the merge
-- permissions are contents: read plus pull-requests: write, the latter only so
-  ub-review can post its grouped advisory PR review; the run also uploads its
-  artifact bundle
+- workflow-level permissions are contents: read; pull-requests: write is
+  granted at the job level only, solely so ub-review can post its grouped
+  advisory PR review; the run also uploads its artifact bundle
 - pin bumps update policy/workflow-allowlist.toml in the same PR (a dependabot
   pin bump alone cannot pass the deterministic gate, because the allowlist
   pins the action SHA)
@@ -1238,7 +1241,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
           persist-credentials: false
@@ -1271,15 +1274,24 @@ on:
 
 permissions:
   contents: read
-  pull-requests: write
+
+concurrency:
+  group: ub-review-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
 
 jobs:
   review:
     name: UB Review (advisory)
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: >-
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      github.event.pull_request.draft == false
     runs-on: ubuntu-latest
     timeout-minutes: 25
     continue-on-error: true
+    permissions:
+      contents: read
+      # Only so ub-review can post its grouped advisory PR review.
+      pull-requests: write
     steps:
       - uses: actions/checkout@v7
         with:
