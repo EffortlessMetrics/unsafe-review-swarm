@@ -43,6 +43,8 @@ pub(crate) enum XtaskCommand {
     CheckCorpusPartitions,
     CheckEvidenceLossChallenges,
     CheckExternalPilots,
+    ExternalPilotUsefulness,
+    LspSmoke,
     CheckLocal(Vec<String>),
     CheckLocalRun(String),
     DogfoodExec(Vec<String>),
@@ -179,6 +181,12 @@ impl XtaskCommand {
                     .ok_or_else(|| "check-local-run requires a check id".to_string())?;
                 Ok(Self::CheckLocalRun(id))
             }
+            Some("external-pilot-usefulness") => parse_no_extra(
+                args,
+                "external-pilot-usefulness",
+                Self::ExternalPilotUsefulness,
+            ),
+            Some("lsp-smoke") => parse_no_extra(args, "lsp-smoke", Self::LspSmoke),
             Some("dogfood-exec") => {
                 // All trailing args are forwarded to the DogfoodExec arg parser.
                 Ok(Self::DogfoodExec(args.to_vec()))

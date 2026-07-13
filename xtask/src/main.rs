@@ -37,6 +37,7 @@ mod external_pilots;
 mod first_hour;
 mod fixture_surfaces;
 mod fuzz_artifact_checks;
+mod lsp_smoke;
 mod markdown;
 mod public_badges;
 mod public_surfaces;
@@ -892,6 +893,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             fuzz_artifact_checks::check_manual_fuzz_harness()?;
             fuzz_artifact_checks::check_tracked_generated_artifacts()?;
             self_unsafe::check_self_unsafe()?;
+            lsp_smoke::run(&root)?;
             println!("check-pr: ok");
             Ok(())
         }
@@ -950,6 +952,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
             check_local::run(&raw_args, &|id, quiet| run_named_check(id, quiet))
         }
         commands::XtaskCommand::CheckLocalRun(id) => run_named_check(&id, false),
+        commands::XtaskCommand::ExternalPilotUsefulness => external_pilots::write_rollup(),
+        commands::XtaskCommand::LspSmoke => lsp_smoke::run(&root),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
