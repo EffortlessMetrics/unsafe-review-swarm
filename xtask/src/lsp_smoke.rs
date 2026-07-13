@@ -9,6 +9,11 @@ use serde_json::{Value, json};
 
 const INITIALIZE_ID: u64 = 1;
 const SHUTDOWN_ID: u64 = 2;
+const HOVER_ID: u64 = 3;
+const CODE_ACTION_ID: u64 = 4;
+const PACKET_ID: u64 = 5;
+const WITNESS_ROUTE_ID: u64 = 6;
+const WITNESS_COMMAND_ID: u64 = 7;
 const MESSAGE_TIMEOUT: Duration = Duration::from_secs(20);
 
 pub(crate) fn run(workspace_root: &Path) -> Result<(), String> {
@@ -118,7 +123,84 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
         }),
     )?;
     let diagnostics = wait_for_method(&messages_rx, "textDocument/publishDiagnostics")?;
-    validate_diagnostics_notification(&diagnostics)?;
+    let (card_id, position) = validate_diagnostics_notification(&diagnostics)?;
+    let source_uri = file_uri(&fixture_root.join("src/lib.rs"));
+
+    write_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": HOVER_ID,
+            "method": "textDocument/hover",
+            "params": {
+                "textDocument": {"uri": source_uri.clone()},
+                "position": position.clone()
+            }
+        }),
+    )?;
+    let hover = wait_for_id(&messages_rx, HOVER_ID)?;
+    validate_hover_response(&hover, &card_id)?;
+
+    write_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": CODE_ACTION_ID,
+            "method": "textDocument/codeAction",
+            "params": {
+                "textDocument": {"uri": source_uri},
+                "range": {"start": position.clone(), "end": position},
+                "context": {"diagnostics": []}
+            }
+        }),
+    )?;
+    let code_actions = wait_for_id(&messages_rx, CODE_ACTION_ID)?;
+    validate_code_actions_response(&code_actions, &card_id)?;
+
+    write_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": PACKET_ID,
+            "method": "workspace/executeCommand",
+            "params": {
+                "command": "unsafe-review.collectAgentPacket",
+                "arguments": [{"card_id": card_id}]
+            }
+        }),
+    )?;
+    let packet = wait_for_id(&messages_rx, PACKET_ID)?;
+    validate_packet_response(&packet, &card_id)?;
+
+    write_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": WITNESS_ROUTE_ID,
+            "method": "workspace/executeCommand",
+            "params": {
+                "command": "unsafe-review.explainWitnessRoute",
+                "arguments": [{"card_id": card_id}]
+            }
+        }),
+    )?;
+    let witness_route = wait_for_id(&messages_rx, WITNESS_ROUTE_ID)?;
+    validate_witness_route_response(&witness_route, &card_id)?;
+
+    write_message(
+        &mut stdin,
+        &json!({
+            "jsonrpc": "2.0",
+            "id": WITNESS_COMMAND_ID,
+            "method": "workspace/executeCommand",
+            "params": {
+                "command": "unsafe-review.collectWitnessCommand",
+                "arguments": [{"card_id": card_id}]
+            }
+        }),
+    )?;
+    let witness_command = wait_for_id(&messages_rx, WITNESS_COMMAND_ID)?;
+    validate_witness_command_response(&witness_command, &card_id)?;
 
     write_message(
         &mut stdin,
@@ -176,20 +258,107 @@ fn validate_initialize_response(response: &Value) -> Result<(), String> {
     Ok(())
 }
 
-fn validate_diagnostics_notification(notification: &Value) -> Result<(), String> {
+fn validate_diagnostics_notification(notification: &Value) -> Result<(String, Value), String> {
     let diagnostics = notification["params"]["diagnostics"]
         .as_array()
         .ok_or_else(|| "publishDiagnostics has no diagnostics array".to_string())?;
     let diagnostic = diagnostics
         .first()
         .ok_or_else(|| "LSP smoke expected a diagnostic from raw_pointer_alignment".to_string())?;
+    let card_id = diagnostic["data"]["card_id"]
+        .as_str()
+        .ok_or_else(|| "published diagnostic has no canonical card_id".to_string())?
+        .to_owned();
+    let position = diagnostic["range"]["start"].clone();
     if diagnostic["source"] != "unsafe-review"
-        || diagnostic["data"]["card_id"].as_str().is_none()
         || diagnostic["data"]["operation_family"].as_str().is_none()
         || diagnostic["data"]["coverage"].is_null()
+        || position["line"].as_u64().is_none()
+        || position["character"].as_u64().is_none()
     {
         return Err(format!(
             "published diagnostic lacks canonical ReviewCard data: {diagnostic}"
+        ));
+    }
+    Ok((card_id, position))
+}
+
+fn validate_hover_response(response: &Value, card_id: &str) -> Result<(), String> {
+    let contents = response["result"]["contents"]["value"]
+        .as_str()
+        .ok_or_else(|| format!("hover response has no markdown contents: {response}"))?;
+    if !contents.contains(card_id) || !contents.contains("not memory-safety proof") {
+        return Err(format!(
+            "hover response lost canonical identity or trust boundary: {response}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_code_actions_response(response: &Value, card_id: &str) -> Result<(), String> {
+    let actions = response["result"]
+        .as_array()
+        .ok_or_else(|| format!("code-action response has no action array: {response}"))?;
+    if actions.is_empty()
+        || actions.iter().any(|action| action.get("edit").is_some())
+        || !actions.iter().any(|action| {
+            action["command"] == "unsafe-review.collectAgentPacket"
+                && action["arguments"][0]["card_id"] == card_id
+        })
+    {
+        return Err(format!(
+            "code-action response is not command-only or lost card identity: {response}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_packet_response(response: &Value, card_id: &str) -> Result<(), String> {
+    let packet_text = response["result"]
+        .as_str()
+        .ok_or_else(|| format!("agent-packet command returned no packet: {response}"))?;
+    let packet: Value = serde_json::from_str(packet_text)
+        .map_err(|error| format!("agent-packet command returned invalid JSON: {error}"))?;
+    if packet["card_id"] != card_id
+        || packet["repair_scope"] != "this card only"
+        || !packet["confirmation_cue"].is_object()
+        || !packet["do_not_do"].is_array()
+        || !packet["trust_boundary"]
+            .as_str()
+            .is_some_and(|boundary| boundary.contains("not UB-free status"))
+    {
+        return Err(format!(
+            "agent packet is incomplete or unbounded for {card_id}: {packet}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_witness_route_response(response: &Value, card_id: &str) -> Result<(), String> {
+    if response["result"]["kind"] != "unsafe-review.witness_route"
+        || response["result"]["card_id"] != card_id
+        || response["result"]["route"].as_str().is_none()
+        || !response["result"]["trust_boundary"]
+            .as_str()
+            .is_some_and(|boundary| boundary.contains("not a site-execution claim"))
+    {
+        return Err(format!(
+            "witness-route response lost bounded receipt guidance: {response}"
+        ));
+    }
+    Ok(())
+}
+
+fn validate_witness_command_response(response: &Value, card_id: &str) -> Result<(), String> {
+    if response["result"]["kind"] != "unsafe-review.witness_command"
+        || response["result"]["card_id"] != card_id
+        || response["result"]["command"].as_str().is_none()
+        || !response["result"]["trust_boundary"]
+            .as_str()
+            .is_some_and(|boundary| boundary.contains("not a site-execution claim"))
+    {
+        return Err(format!(
+            "witness-command response lost verification boundary: {response}"
         ));
     }
     Ok(())
