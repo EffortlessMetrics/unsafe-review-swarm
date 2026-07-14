@@ -1,0 +1,31 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1900"
+kind = "maintenance"
+objective = "Invalid fixture with a repository-wide scheduling field."
+user_outcome = "The checker must keep queue state in GitHub."
+claim_boundary = "Structural validation only."
+priority = "high"
+
+[scope]
+included = ["The invalid fixture"]
+excluded = ["Portfolio scheduling"]
+
+[[invariant]]
+id = "INV-1"
+text = "A work spec does not choose the next issue."
+
+[[acceptance]]
+id = "AC-1"
+text = "The checker rejects priority."
+proof = ["rtk cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "checker"
+expected = "The checker rejects scheduler fields."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep priority in GitHub project metadata."
+
+[rollback]
+strategy = "Delete the fixture after the negative test is no longer needed."

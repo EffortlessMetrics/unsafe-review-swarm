@@ -1,0 +1,45 @@
+# Issue-linked work specification, schema version 1.
+# This is one bounded delivery contract, not a queue entry or default goal.
+schema_version = "1"
+issue = "https://github.com/<owner>/<repo>/issues/<number>"
+kind = "correctness" # correctness | ux | interop | robustness | maintenance | research
+objective = "..."
+user_outcome = "..."
+claim_boundary = "..."
+
+[scope]
+included = ["..."]
+excluded = ["..."]
+
+[[invariant]]
+id = "INV-1"
+text = "..."
+
+[[acceptance]]
+id = "AC-1"
+text = "..."
+proof = ["rtk cargo test -p ..."]
+
+[[integration]]
+surface = "..."
+expected = "..."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "..."
+
+[rollback]
+strategy = "..."
+
+# Optional context; these fields do not schedule or prioritize work.
+dependencies = []
+blockers = []
+affected_files = []
+affected_symbols = []
+linked_specs = []
+linked_adrs = []
+
+[compatibility]
+posture = "..."
+
+# Add a [delivery] table with `pr` and/or `closeout` HTTPS links after delivery.
