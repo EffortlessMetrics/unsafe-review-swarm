@@ -1,16 +1,24 @@
 schema_version = "1.0"
 
 id = "UNSAFE-REVIEW-GOAL-0001"
-title = "External adoption, delivery, and generalization"
+title = "unsafe-review project charter"
 status = "active"
 owner = "repo-infra"
 created = "2026-07-12"
 
 objective = """
-Make unsafe-review a trustworthy, low-noise, build-free unsafe-evidence layer
-that maintainers can adopt through the CLI or public GitHub Action, while
-preserving the advisory ReviewCard boundary and measuring usefulness outside
-the authoring loop.
+Preserve unsafe-review as a syntax-first, build-free, advisory unsafe-evidence
+layer whose product semantics derive from the canonical ReviewCard model.
+Maintain the no-proof, no-UB-free, no-Miri-clean, no-default-posting,
+no-source-edit, and no-default-blocking boundaries. Publication remains parked
+until the owner explicitly reopens it.
+
+This manifest is a neutral project charter required by the current cargo-allow
+profile. It records durable repository truth and graph links; it does not select
+a default issue, schedule a team, mirror the GitHub portfolio, or identify the
+current Codex operation. GitHub issues, project metadata, PRs, and receipts own
+requested work, priority, dependencies, disposition, implementation, and
+verification state.
 """
 
 linked_proposal = "UNSAFE-REVIEW-PROP-0002"
@@ -18,115 +26,3 @@ linked_spec = "UNSAFE-REVIEW-SPEC-0020"
 linked_support_tier = "UNSAFE-REVIEW-SUPPORT-0001"
 linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
 linked_plan_status = "active"
-
-[[work_item]]
-id = "public-action"
-status = "blocked"
-title = "Make the public root Action real and externally smoke it"
-blocker_reason = "Publication lane is parked by the owner; keep Action work local and defer external immutable-ref smoke and v1 movement until publication is explicitly reopened."
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-pr",
-  "gh workflow run smoke-action.yml",
-]
-
-[[work_item]]
-id = "next-patch-release"
-status = "blocked"
-title = "Promote the accumulated swarm work and cut the next patch release"
-blocker_reason = "Publication lane is parked by the owner; do not promote source, publish crates, create release tags, or move v1 in the current improvement lane."
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo test --workspace --locked",
-  "cargo run --locked -p xtask -- check-pr",
-]
-
-[[work_item]]
-id = "tokmd-acceptance"
-status = "ready"
-title = "Complete tokmd packet compatibility across all required presets"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-pr",
-  "tokmd render --from-packets",
-]
-
-[[work_item]]
-id = "external-validation"
-status = "ready"
-title = "Measure usefulness across holdouts, evidence-loss challenges, and external PRs"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-external-pilots",
-  "cargo run --locked -p xtask -- check-evidence-loss-challenges",
-]
-
-[[work_item]]
-id = "cargo-allow-dogfood"
-status = "ready"
-title = "Keep the cargo-allow spec-system graph truthful during the parity window"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo-allow check --profile spec-system --mode audit",
-  "cargo-allow worklist --profile spec-system --format json",
-]
-
-[[work_item]]
-id = "cargo-allow-541-repro"
-status = "ready"
-title = "Keep the current cargo-allow reproduction and one-class follow-ups truthful"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-real-pr-corpus",
-  "cargo run --locked -p xtask -- check-pr",
-]
-
-[[work_item]]
-id = "consumer-contract-map"
-status = "ready"
-title = "Audit canonical ReviewCard fields across every consumer"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-spec-coverage",
-  "cargo test --workspace --locked",
-]
-
-[[work_item]]
-id = "evidence-loss-challenges"
-status = "ready"
-title = "Expand pinned evidence-loss transformations without recall claims"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-evidence-loss-challenges",
-  "cargo run --locked -p xtask -- check-pr",
-]
-
-[[work_item]]
-id = "hostile-input-fail-closed"
-status = "ready"
-title = "Make malformed, interrupted, and unwritable inputs fail explicitly"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo test --workspace --locked",
-  "cargo run --locked -p xtask -- check-pr",
-]
-
-[[work_item]]
-id = "external-pilot-usefulness"
-status = "ready"
-title = "Measure usefulness on read-only external pilots and rotating holdouts"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo run --locked -p xtask -- check-external-pilots",
-  "cargo run --locked -p xtask -- external-pilot-usefulness",
-]
-
-[[work_item]]
-id = "agent-ide-loop"
-status = "ready"
-title = "Validate diagnostic, explanation, bounded packet, and receipt projections"
-linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
-proof_commands = [
-  "cargo test --workspace --locked",
-  "cargo run --locked -p xtask -- check-pr",
-]

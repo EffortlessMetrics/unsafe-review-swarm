@@ -24,7 +24,7 @@ false product claims, broken first-use paths, or ambiguous next-work guidance.
 The repo MUST provide docs automation that checks or generates:
 
 - source-of-truth artifact graph,
-- active goal and work-item proof commands,
+- optional project-charter links and issue-linked work-spec proof commands,
 - lane trackers and implementation plans,
 - spec lifecycle dashboard,
 - agent operating contract,
@@ -77,7 +77,8 @@ git diff --check
 - If a public README claims a product boundary, it must include no-proof/no-UB-free/no-Miri-clean wording.
 - If a crate README references a local asset, `cargo package --list` must include it.
 - If a doc-artifact ledger references a file, that file must exist.
-- If a work item is active or ready, it must list proof commands.
+- If an issue-linked work item is represented in a governed artifact, it must
+  list proof commands; a neutral project charter does not need work items.
 
 ## Follow-up
 

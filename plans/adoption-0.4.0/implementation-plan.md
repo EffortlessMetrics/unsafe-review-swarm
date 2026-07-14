@@ -19,9 +19,10 @@ advisory claim boundary.
 ## Current lane posture
 
 The publication-facing portions of this plan are intentionally parked while
-the swarm repository is improved locally. The active goal manifest is the
-routing authority for this posture: `public-action` and `next-patch-release`
-are blocked until the owner explicitly reopens publication. Do not publish
+the swarm repository is improved locally. The project charter records the
+durable publication boundary; GitHub issue/PR metadata owns queue and
+disposition state. Publication work remains parked until the owner explicitly
+reopens it. Do not publish
 crates, promote source, create or move release tags, move `v1`, or run the
 prebuilt-binary lane as part of the current work.
 
@@ -33,8 +34,8 @@ handoff.
 
 ## Work sequence
 
-1. Keep the `.allow` graph truthful and maintain one active goal; legacy
-   `.rails` remains archive-only.
+1. Keep the `.allow` graph and neutral project charter truthful; legacy `.rails`
+   remains archive-only. Do not mirror the GitHub issue portfolio in the repo.
 2. Reconcile local first-use, tokmd, and consumer-contract work without
    requiring a public release or external Action ref.
 3. Reproduce known current-code product gaps, then run rotating holdouts,
@@ -69,8 +70,9 @@ git diff --check
 
 - `.allow` and cargo-allow are the only active governance route; `.rails` is
   archive-only and no checker or agent instruction routes new work there.
-- Publication work is explicitly parked in the active goal and can resume from
-  the linked delivery artifacts without changing governance authority.
+- Publication work is explicitly parked by the durable charter boundary and can
+  resume from the linked delivery artifacts without changing governance
+  authority.
 - The swarm has current producer/consumer contracts, pinned corpus evidence,
   fail-closed regression coverage, and read-only usefulness receipts suitable
   for a later release cutline review.

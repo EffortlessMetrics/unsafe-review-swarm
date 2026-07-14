@@ -23,11 +23,14 @@ Contributors, release maintainers, and agents consume docs/, plans/, policy/, an
 
 ## Success criteria
 
-A linked artifact chain exists from proposal to spec to plan to active goals, with support-tier and policy mappings for enforceability.
+A linked artifact chain exists from proposal to spec to plan to neutral project
+charter(s), with support-tier and policy mappings for enforceability. Requested
+work remains in GitHub issues rather than a mirrored repository queue.
 
 ## Proposed shape
 
-Adopt explicit templates, active goals, artifact ledgers, and policy workflow checks.
+Adopt explicit templates, neutral project charters, artifact ledgers, and policy
+workflow checks; do not make the artifact graph a team scheduler.
 
 ## Alternatives considered
 

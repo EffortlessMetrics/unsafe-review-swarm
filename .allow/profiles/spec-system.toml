@@ -15,9 +15,10 @@ artifact_ledger = ".allow/artifacts/doc-artifacts.toml"
 ledger_required = true
 templates_required = true
 support_tiers_required = true
-# New repositories start with a placeholder active goal. Set this to true after
-# registering the proposal, spec, plan, support-tier, and active-goal artifacts
-# that the active goal should link to in `.allow/artifacts/doc-artifacts.toml`.
+# The current cargo-allow release names this compatibility slot
+# `active_goal_required`. In this repository it validates a neutral project
+# charter, not a default issue, queue, or controller operation. A future
+# cargo-allow profile may make this optional or support multiple charters.
 active_goal_required = true
 closeout_required_for_done_items = true
 

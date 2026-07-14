@@ -6,7 +6,7 @@ When proposing or implementing source-of-truth changes, keep durable rails in re
 
 Primary durable scope for this repository:
 
-- `.allow/` cargo-allow spec-system graph and active goal
+- `.allow/` cargo-allow spec-system graph and neutral project charter(s)
 - `docs/` source-of-truth artifacts
 - `plans/` implementation plans
 - `policy/` enforcement ledgers and references
@@ -31,7 +31,7 @@ These directories may exist for external tools, but this lane does not migrate, 
 
 ## Directory Intent
 
-- `.allow/goals/`: current and archived goal metadata.
+- `.allow/goals/`: neutral project charters and archived charter metadata.
 - `.allow/artifacts/`: registered proposal/spec/plan/support/closeout graph.
 - `.allow/profiles/`: cargo-allow spec-system configuration.
 - `.rails/`: legacy parity snapshot; do not route new work here.
@@ -42,9 +42,12 @@ These directories may exist for external tools, but this lane does not migrate, 
 - `docs/status/`: support posture, objective audits, dogfood lane status, and closeout-facing status notes.
 - `policy/`: live baselines, suppressions, ledgers, and policy references.
 
-Prefer focused work items under the active `.allow` goal rather than parallel
-trackers. Keep durable graph links in `.allow/artifacts/doc-artifacts.toml` so
-cargo-allow can validate them.
+Keep requested work in GitHub issues and project metadata rather than mirroring
+the portfolio into a repository-wide goal. Use issue-linked work specifications
+for implementable contracts when a behavior change needs machine-readable
+acceptance criteria. Keep durable graph links in
+`.allow/artifacts/doc-artifacts.toml` so cargo-allow can validate them; its
+worklist is a structural diagnostic, not a team scheduler.
 
 ## Spec lifecycle and management
 
@@ -81,10 +84,10 @@ index) and amnesia (deleted history).
 
 One fact lives in one canonical spec; other docs link to it rather than
 restating it. A restated fact is a second truth surface that drifts. (This is
-why no separate "operating ledger" doc was added: `CLAUDE.md`, `AGENTS.md`, and
-`.allow/goals/active.toml` and the cargo-allow worklist already are the
-cold-entry control panel; duplicating
-them would drift.)
+why no separate "operating ledger" doc was added: `CLAUDE.md`, `AGENTS.md`,
+the neutral `.allow` charter, and GitHub issue metadata are the cold-entry
+control surfaces; duplicating the issue portfolio in the repository would
+drift.)
 
 ### Specs are directional, not binding
 

@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Read first
 
 - `AGENTS.md` — the agent operating contract. It governs command style (prefix local commands with `rtk`), repository roles, worktree/branch hygiene, model routing (cheap discovery/verification, mid-tier implementation, top-tier arbitration — project subagent roles in `.claude/agents/`), PR queue discipline, and product boundaries. This file summarizes; AGENTS.md wins on conflict.
-- Source-of-truth stack for choosing and scoping work: `.allow/goals/active.toml` → cargo-allow worklist → linked plan/spec in `docs/specs/`. `.rails` is a parity-window archive, not current authority. Make one PR-sized change and run the proof commands the plan item lists.
+- Source-of-truth stack for durable contracts: `.allow` project charter and cargo-allow graph → linked plan/spec in `docs/specs/`. GitHub issues and project metadata own the work portfolio; `.rails` is a parity-window archive, not current authority. Make one PR-sized change and run the proof commands in its accepted contract.
 
 ## Repository roles
 

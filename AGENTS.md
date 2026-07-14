@@ -85,13 +85,14 @@ its status is clean.
 
 Use the repo source-of-truth stack:
 
-1. Read `.allow/goals/active.toml` and the cargo-allow worklist.
-2. Read the linked plan item.
-3. Read the linked spec.
+1. Read the selected GitHub issue and its current dependency/disposition metadata.
+2. Read the `.allow` project charter and cargo-allow audit/worklist as durable
+   graph evidence, never as a default task selector.
+3. Read the linked plan/spec and any issue-linked work specification.
 4. Read the linked proposal only for context.
 5. Make one PR-sized change.
 6. Update support tiers or policy ledgers only if the claim/policy changes.
-7. Run the proof commands listed in the plan item.
+7. Run the proof commands named by the accepted issue/spec/plan contract.
 8. Do not invent missing claims. If proof is missing, keep the claim advisory/experimental.
 9. Do not use `.jules`, `.codex`, `.rails`, or product runtime output directories as current unsafe-review source-of-truth state. `.rails` is a parity-window archive only.
 10. Do not stop at "human merge required" unless the repo has that policy in a current source-of-truth file.
@@ -209,8 +210,9 @@ For Codex Web or other generated PR batches:
 2. Inspect the stated intent and actual diff.
 3. Verify the change is scoped to the PR title and does not create a second
    analyzer truth outside `ReviewCard`.
-4. Check whether the change advances the active `.allow` goal/worklist,
-   a documented projection contract, or a narrow maintainability/test goal. If
+4. Check whether the change advances the selected GitHub issue and its accepted
+   contract, the durable `.allow` graph, a documented projection contract, or a
+   narrow maintainability/test goal. If
    it creates a useful new rail, land the rail in the source-of-truth stack with
    the same PR or a clearly linked follow-up.
 5. Run the narrow validation first, then broader repo gates when practical.

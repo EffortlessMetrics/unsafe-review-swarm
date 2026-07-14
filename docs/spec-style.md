@@ -6,18 +6,22 @@ The repository keeps a full source-of-truth stack:
 roadmap -> proposal -> spec -> ADR -> implementation plan -> PRs -> proof -> support/policy -> closeout
 ```
 
-The durable control plane for this stack is repo-owned state rooted in `.rails/` and linked repository artifacts (for example `docs/`, `plans/`, and `policy/`).
+The durable control plane for this stack is the cargo-allow spec-system graph
+rooted in `.allow/` and linked repository artifacts (for example `docs/`,
+`plans/`, and `policy/`).
 
 When contributors refer to source-of-truth "rails" in this repository, they mean
-this existing `.rails/` plus linked-docs control plane. Do not add a
-parallel durable root such as `.rails/` unless a future accepted spec changes the
-namespace.
+the `.allow/` graph plus its linked-docs control plane. The legacy `.rails/`
+tree is a read-only parity archive during the migration window; do not route
+new work there or create another editable governance root.
 
 ## Durable vs external state
 
 Durable rails in this repository:
 
-- `.rails/` for active lane coordination metadata.
+- `.allow/` for neutral project charter(s), the linked artifact graph, and
+  cargo-allow spec-system metadata.
+- `.rails/` as a read-only parity archive during the migration window.
 - `docs/` for human-facing specs, proposals, ADRs, and contributor guidance.
 - `policy/` for live enforcement ledgers and reference maps.
 - `plans/` for PR-sized implementation sequencing.
