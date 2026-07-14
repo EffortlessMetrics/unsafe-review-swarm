@@ -657,8 +657,9 @@ implementer pinned to mid). Use them instead of inlining those jobs into the
 orchestrator.
 
 The operating contract is in `AGENTS.md`. The source-of-truth stack is:
-`.rails/goals/active.toml` → linked plan item → linked spec in
-`docs/specs/`. One PR-sized change, then run the proof commands from the plan item.
+`.allow/goals/active.toml` → cargo-allow worklist → linked plan item → linked
+spec in `docs/specs/`. `.rails` is retained only for the bounded parity window.
+One PR-sized change, then run the proof commands from the plan item.
 
 The trust boundary for this tool: advisory, no proof, no UB-free claim, no
 Miri-clean claim, no site-execution claim, no calibrated precision/recall, no

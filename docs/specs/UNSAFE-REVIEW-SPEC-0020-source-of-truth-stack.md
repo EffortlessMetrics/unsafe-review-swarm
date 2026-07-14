@@ -26,15 +26,16 @@ The repository needs a machine-linked contract stack for why/what/how/now/proof 
 
 The repository MUST maintain linked artifacts: proposal, spec, optional ADR, implementation plan, active goal manifest, support tiers, and policy ledgers.
 
-The repository-facing policy and orchestration surface is `xtask` plus the
-source-of-truth ledgers. Upstream tools are implementation substrates; they do
-not become durable repo authority until an accepted spec, plan item, support
-tier, or policy ledger records the wrapper, proof command, and claim boundary.
+The repository-facing governance surface is cargo-allow's `spec-system`
+profile and `.allow/` graph. It owns proposal/spec/plan/active-goal/
+support-tier/closeout linkage and emits the source-tree audit/worklist.
+`xtask` remains the repository-facing implementation and policy proof surface.
+The legacy `.rails/` tree is retained as a read-only parity snapshot until the
+migration closeout and must not route new work.
 
-The coordination directory is `.rails/` — a portable, "Rust on Rails"-named
-convention (renamed from the earlier `.unsafe-review-spec/`). The naming
-rationale and the rule against storing durable state in tool namespaces
-(`.codex/`, `.spec/`, `.claude/`, `.jules/`) live in `.rails/README.md`.
+The rule against storing durable state in tool namespaces (`.codex/`, `.spec/`,
+`.claude/`, `.jules/`) remains in `AGENTS.md` and the migration guidance in
+`docs/contributing/spec-rails.md`.
 
 ## Non-goals
 

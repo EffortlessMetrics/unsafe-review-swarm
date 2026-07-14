@@ -9671,6 +9671,14 @@ jobs:
     }
 
     #[test]
+    fn support_tier_parser_ignores_cargo_allow_header() {
+        assert_eq!(
+            support_tier_from_row("| Surface | Tier | Claim | Proof command | Notes |"),
+            None
+        );
+    }
+
+    #[test]
     fn support_tier_rows_reject_placeholder_proof_cells() -> Result<(), String> {
         let text = "| Capability | Tier | Surface | Proof | Known limits |\n\
                     |---|---|---|---|---|\n\

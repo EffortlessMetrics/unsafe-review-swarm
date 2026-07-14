@@ -24,7 +24,8 @@ path = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md"
 mode = "check"
 sources = [
   "policy/doc-artifacts.toml",
-  ".rails/goals/active.toml",
+  ".allow/artifacts/doc-artifacts.toml",
+  ".allow/goals/active.toml",
   "docs/specs",
   "docs/handoffs",
 ]
@@ -41,11 +42,13 @@ kind = "operator_front_door"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-START-HERE.md"
 mode = "check"
 sources = [
-  ".rails/goals/active.toml",
+  ".allow/goals/active.toml",
+  ".allow/artifacts/doc-artifacts.toml",
   "docs/specs",
 ]
 must_include = [
-  ".rails/goals/active.toml",
+  ".allow/goals/active.toml",
+  "cargo-allow worklist",
   "linked plan",
   "linked spec",
   "linked proposal",

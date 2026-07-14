@@ -112,12 +112,13 @@ xtask is the repo-facing policy surface.
 Upstream tools are engine-room substrates.
 ```
 
-CI policy must be encoded in `xtask`, policy ledgers, and source-of-truth docs
-instead of scattering repository authority across workflow YAML, one-off shell
-scripts, or direct upstream-tool invocations. Workflows may invoke upstream
-tools, but a repo contract change is accepted only when the stable `xtask` or
-policy surface names what is being proved, when it runs, and which claims it
-does not make.
+CI policy must be encoded in the cargo-allow spec-system graph, `xtask`, policy
+ledgers, and source-of-truth docs instead of scattering repository authority
+across workflow YAML, one-off shell scripts, or direct upstream-tool
+invocations. Cargo-allow owns proposal/spec/plan/active-goal/support-tier/
+closeout linkage; `xtask` owns implementation and policy proof. Workflows may
+invoke both tools, but each lane must name what is being proved, when it runs,
+and which claims it does not make.
 
 ## 3. Default CI contract
 
@@ -331,20 +332,25 @@ protect spec, policy, package-boundary, docs-automation, goal, and CI-lane ledge
 Runs:
 
 ```text
+cargo-allow doctor --profile spec-system
+cargo-allow check --profile spec-system --mode audit
+cargo-allow worklist --profile spec-system --format json
 check-doc-artifacts
 check-docs-automation
-check-goals
+check-goals (legacy parity window)
 check-package-boundary
 check-ci-lanes
 check-policy
 ```
 
 During the swarm CI budget window, pull-request runs are path-scoped to
-source-of-truth rails:
+source-of-truth artifacts and the legacy parity snapshot:
 
 ```text
 policy/**
+.allow/**
 .rails/**
+plans/**
 docs/specs/**
 docs/status/**
 .github/workflows/**

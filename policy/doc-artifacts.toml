@@ -1,5 +1,8 @@
 schema_version = "1.0"
 
+# Legacy parity ledger during migration. Current governance linkage is owned by
+# .allow/artifacts/doc-artifacts.toml and cargo-allow's spec-system profile.
+
 [[artifact]]
 id = "UNSAFE-REVIEW-PROP-0002"
 kind = "proposal"

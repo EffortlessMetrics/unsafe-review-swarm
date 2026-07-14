@@ -1,4 +1,4 @@
-# Contributing: source-of-truth rails
+# Contributing: source-of-truth migration
 
 When proposing or implementing source-of-truth changes, keep durable rails in repo-owned namespaces and keep tool-runtime state separate.
 
@@ -6,7 +6,7 @@ When proposing or implementing source-of-truth changes, keep durable rails in re
 
 Primary durable scope for this repository:
 
-- `.rails/`
+- `.allow/` cargo-allow spec-system graph and active goal
 - `docs/` source-of-truth artifacts
 - `plans/` implementation plans
 - `policy/` enforcement ledgers and references
@@ -20,7 +20,7 @@ Do not store durable source-of-truth artifacts under:
 - `.claude/`
 - `.jules/`
 
-These directories may exist for external tools, but this lane does not migrate, rewrite, or depend on them as owned state.
+These directories may exist for external tools, but this lane does not migrate, rewrite, or depend on them as owned state. `.rails/` is also retained as a read-only parity archive during the migration window.
 
 ## Practical rules
 
@@ -31,8 +31,10 @@ These directories may exist for external tools, but this lane does not migrate, 
 
 ## Directory Intent
 
-- `.rails/goals/`: active and archived goal metadata.
-- `.rails/lanes/`: focused lane trackers and implementation sequencing.
+- `.allow/goals/`: current and archived goal metadata.
+- `.allow/artifacts/`: registered proposal/spec/plan/support/closeout graph.
+- `.allow/profiles/`: cargo-allow spec-system configuration.
+- `.rails/`: legacy parity snapshot; do not route new work here.
 - `docs/proposals/`: why a workstream exists, alternatives, and success criteria.
 - `docs/specs/`: behavior and evidence requirements.
 - `docs/adr/`: durable architecture decisions.
@@ -40,9 +42,9 @@ These directories may exist for external tools, but this lane does not migrate, 
 - `docs/status/`: support posture, objective audits, dogfood lane status, and closeout-facing status notes.
 - `policy/`: live baselines, suppressions, ledgers, and policy references.
 
-Prefer focused lane trackers under `.rails/lanes/` rather than one
-global active queue. Keep durable rails indexed through `.rails/index.toml`
-when they need stable machine discovery.
+Prefer focused work items under the active `.allow` goal rather than parallel
+trackers. Keep durable graph links in `.allow/artifacts/doc-artifacts.toml` so
+cargo-allow can validate them.
 
 ## Spec lifecycle and management
 
@@ -69,7 +71,8 @@ When a spec is replaced, mark it `superseded` and link the replacement; do not
 delete it. The detailed specs, lanes, ADRs, and closeouts are the full
 provenance — how the design got here — and are preserved. Current truth is
 carried forward by the maintained ledgers (`docs/status/SUPPORT_TIERS.md` for
-claim→proof, `.rails/index.toml` and `.rails/goals/` for active state), which
+claim→proof and `.allow/artifacts/doc-artifacts.toml` plus `.allow/goals/` for
+active state), which
 link down into the detail. Re-organize by maintaining those ledgers over the
 preserved detail, never by deleting lanes — that avoids both archaeology (no
 index) and amnesia (deleted history).
@@ -79,7 +82,8 @@ index) and amnesia (deleted history).
 One fact lives in one canonical spec; other docs link to it rather than
 restating it. A restated fact is a second truth surface that drifts. (This is
 why no separate "operating ledger" doc was added: `CLAUDE.md`, `AGENTS.md`, and
-`.rails/goals/active.toml` already are the cold-entry control panel; duplicating
+`.allow/goals/active.toml` and the cargo-allow worklist already are the
+cold-entry control panel; duplicating
 them would drift.)
 
 ### Specs are directional, not binding
