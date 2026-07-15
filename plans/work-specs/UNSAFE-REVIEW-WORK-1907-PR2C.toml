@@ -1,0 +1,69 @@
+# Issue-linked work specification for the live LSP projection migration.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1907"
+kind = "correctness"
+objective = "Make live LSP diagnostics consume the canonical EditorDiagnostic DTO through a transport-only adapter."
+user_outcome = "Live diagnostics preserve the same card semantics, UTF-16 range, class-derived severity, and structured diagnostic data as saved lsp.json."
+claim_boundary = "This slice proves live diagnostic projection parity; it does not claim VS Code parity, freshness, exact card binding, packet delivery, structured actions, repair candidates, analyzer accuracy, safety, execution, or hosted CI success."
+
+[scope]
+included = [
+    "Build live diagnostics from the diagnostics-only project_editor_diagnostics output rather than re-deriving semantic fields from ReviewCard",
+    "Map canonical path, range, severity, code, source, message, and serialized DTO data into LSP transport types",
+    "Preserve the existing actionable-card filtering and URI grouping behavior",
+    "Add a regression test comparing live diagnostic fields and data with the canonical DTO",
+]
+excluded = [
+    "Saved projection, VS Code adapter, hover/action binding, analysis freshness, packet delivery, repair candidates, and end-to-end validation",
+    "Changes to ReviewCard classification or canonical DTO semantics",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "EditorDiagnostic is the sole semantic producer for live diagnostic range, severity, code, source, message, and data; the CLI only performs URI and LSP wrapper conversion."
+
+[[invariant]]
+id = "INV-2"
+text = "Live diagnostics retain the existing actionable-card filter and remain read-only and advisory."
+
+[[invariant]]
+id = "INV-3"
+text = "The live LSP path does not execute witnesses, create edits, mutate source, block policy, or claim safety proof."
+
+[[acceptance]]
+id = "AC-1907-2C-1"
+text = "Live diagnostics serialize the same canonical EditorDiagnostic data used by the saved projection."
+proof = ["rtk cargo test -p unsafe-review-cli lsp --locked", "rtk cargo test -p unsafe-review-core lsp --locked"]
+
+[[acceptance]]
+id = "AC-1907-2C-2"
+text = "Live diagnostic range and severity come from canonical DTO values, including UTF-16 positions and class-derived severity."
+proof = ["rtk cargo test -p unsafe-review-cli lsp --locked", "rtk cargo run --locked -p xtask -- check-fixture-surface-parity"]
+
+[[acceptance]]
+id = "AC-1907-2C-3"
+text = "Non-actionable cards remain filtered from live diagnostics and no saved, VS Code, freshness, action, packet, or repair behavior changes in this slice."
+proof = ["rtk cargo test -p unsafe-review-cli lsp --locked", "rtk git diff --name-only", "rtk git diff --check"]
+
+[[integration]]
+surface = "1907-pr2b-saved-projection"
+expected = "Live LSP and saved lsp.json consume the same owned EditorDiagnostic values from project_editor."
+
+[[integration]]
+surface = "live-lsp-transport"
+expected = "The CLI maps canonical paths and editor positions into URI and tower-lsp wrapper types without semantic reinterpretation."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Compare the complete serialized DTO in live Diagnostic.data, use the diagnostics-only canonical producer, and run LSP fixture parity and determinism checks."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Keep saved and VS Code files outside this PR and retain the existing actionable filter regression tests."
+
+[compatibility]
+posture = "Existing live Diagnostic.data keys remain available while the payload is additively expanded to the complete canonical EditorDiagnostic DTO; consumers must ignore added fields, and exact schema versioning remains a later contract."
+
+[rollback]
+strategy = "Revert the live transport adapter, parity regression, and this supplemental work spec; the merged saved projection and canonical DTO remain available for a later live migration."

@@ -510,6 +510,17 @@ pub fn project_editor(output: &AnalyzeOutput) -> lsp::EditorProjection {
     lsp::project_editor(output)
 }
 
+/// Project only the canonical editor diagnostics without constructing hovers
+/// or code actions that a caller does not need.
+pub fn project_editor_diagnostics(output: &AnalyzeOutput) -> Vec<lsp::EditorDiagnostic> {
+    lsp::project_editor_diagnostics(output)
+}
+
+/// Project only actionable canonical editor diagnostics for live transport.
+pub fn project_actionable_editor_diagnostics(output: &AnalyzeOutput) -> Vec<lsp::EditorDiagnostic> {
+    lsp::project_actionable_editor_diagnostics(output)
+}
+
 /// Render the rich hover markdown for a single [`ReviewCard`] as the live LSP
 /// server would produce it.
 ///

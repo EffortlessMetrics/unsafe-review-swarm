@@ -80,6 +80,17 @@ pub(crate) fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
     }
 }
 
+pub(crate) fn project_editor_diagnostics(output: &AnalyzeOutput) -> Vec<EditorDiagnostic> {
+    diagnostics_for(output)
+}
+
+pub(crate) fn project_actionable_editor_diagnostics(
+    output: &AnalyzeOutput,
+) -> Vec<EditorDiagnostic> {
+    let statuses = comment_plan::card_statuses(output);
+    diagnostics_for_with_status(output, &statuses, true)
+}
+
 #[derive(Serialize)]
 struct LspProjection<'a> {
     schema_version: &'a str,
@@ -96,7 +107,6 @@ struct LspProjection<'a> {
 
 impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     fn from(output: &'a AnalyzeOutput) -> Self {
-        let statuses = comment_plan::card_statuses(output);
         Self {
             schema_version: &output.schema_version,
             tool: &output.tool,
@@ -104,18 +114,7 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             policy: output.policy.as_str(),
             scope: scope_label(output),
             status: status_for(output),
-            diagnostics: output
-                .cards
-                .iter()
-                .map(|card| {
-                    let status = statuses
-                        .get(&card.id)
-                        .copied()
-                        .unwrap_or(CommentPlanStatus::NotEligible);
-                    let snapshot = output.coverage_snapshot.get(&card.id.0);
-                    EditorDiagnostic::from_with_status(card, status, snapshot)
-                })
-                .collect(),
+            diagnostics: diagnostics_for(output),
             hovers: output.cards.iter().map(LspHover::from).collect(),
             code_actions: output
                 .cards
@@ -125,6 +124,31 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             trust_boundary: TRUST_BOUNDARY,
         }
     }
+}
+
+fn diagnostics_for(output: &AnalyzeOutput) -> Vec<EditorDiagnostic> {
+    let statuses = comment_plan::card_statuses(output);
+    diagnostics_for_with_status(output, &statuses, false)
+}
+
+fn diagnostics_for_with_status(
+    output: &AnalyzeOutput,
+    statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
+    actionable_only: bool,
+) -> Vec<EditorDiagnostic> {
+    output
+        .cards
+        .iter()
+        .filter(|card| !actionable_only || card.class.is_actionable())
+        .map(|card| {
+            let status = statuses
+                .get(&card.id)
+                .copied()
+                .unwrap_or(CommentPlanStatus::NotEligible);
+            let snapshot = output.coverage_snapshot.get(&card.id.0);
+            EditorDiagnostic::from_with_status(card, status, snapshot)
+        })
+        .collect()
 }
 
 /// Canonical, card-scoped diagnostic data for editor and agent projections.

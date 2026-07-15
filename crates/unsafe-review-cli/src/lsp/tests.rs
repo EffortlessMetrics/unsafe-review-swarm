@@ -4,11 +4,12 @@ use std::path::{Path, PathBuf};
 
 use serde_json::{Value, json};
 use tower_lsp_server::ls_types::{
-    CodeActionOrCommand, CodeActionProviderCapability, ExecuteCommandOptions, HoverContents,
-    HoverProviderCapability, Position,
+    CodeActionOrCommand, CodeActionProviderCapability, DiagnosticSeverity, ExecuteCommandOptions,
+    HoverContents, HoverProviderCapability, Position,
 };
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewClass, Scope, analyze,
+    project_editor, project_editor_diagnostics,
 };
 
 use super::actions::{code_actions_for, execute_card_command};
@@ -182,6 +183,58 @@ fn diagnostic_for_card_carries_card_id_and_trust_boundary() -> Result<(), Box<dy
             .as_str()
             .unwrap_or("")
             .contains("cargo +nightly miri test read_header")
+    );
+    Ok(())
+}
+
+#[test]
+fn live_diagnostic_projects_the_canonical_editor_diagnostic() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let canonical = project_editor_diagnostics(&output)
+        .into_iter()
+        .find(|diagnostic| diagnostic.card_id == output.cards[0].id.0)
+        .ok_or("expected canonical diagnostic")?;
+    let saved = project_editor(&output)
+        .diagnostics
+        .into_iter()
+        .find(|diagnostic| diagnostic.card_id == canonical.card_id)
+        .ok_or("expected saved canonical diagnostic")?;
+    assert_eq!(
+        serde_json::to_value(&canonical)?,
+        serde_json::to_value(&saved)?,
+        "diagnostics-only and saved projections must share the canonical DTO"
+    );
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let live = diagnostics
+        .values()
+        .flatten()
+        .find(|diagnostic| diagnostic_card_id(diagnostic).as_deref() == Some(&canonical.card_id))
+        .ok_or("expected live diagnostic")?;
+    let data = live
+        .data
+        .as_ref()
+        .ok_or("live diagnostic should carry canonical data")?;
+
+    assert_eq!(data, &serde_json::to_value(&canonical)?);
+    assert_eq!(live.code, Some(canonical.code.clone().into()));
+    assert_eq!(live.message, canonical.message);
+    assert_eq!(live.source.as_deref(), Some(canonical.source.as_str()));
+    let expected_severity = match canonical.severity {
+        2 => Some(DiagnosticSeverity::WARNING),
+        3 => Some(DiagnosticSeverity::INFORMATION),
+        4 => Some(DiagnosticSeverity::HINT),
+        _ => None,
+    };
+    assert_eq!(live.severity, expected_severity);
+    assert_eq!(live.range.start.line as usize, canonical.range.start.line);
+    assert_eq!(
+        live.range.start.character as usize,
+        canonical.range.start.character
+    );
+    assert_eq!(live.range.end.line as usize, canonical.range.end.line);
+    assert_eq!(
+        live.range.end.character as usize,
+        canonical.range.end.character
     );
     Ok(())
 }
