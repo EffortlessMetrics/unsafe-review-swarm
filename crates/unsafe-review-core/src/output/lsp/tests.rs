@@ -371,6 +371,40 @@ fn lsp_non_actionable_classes_produce_hint_severity() {
     }
 }
 
+#[test]
+fn canonical_editor_diagnostic_exposes_card_semantics() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let card = &output.cards[0];
+    let statuses = crate::output::comment_plan::card_statuses(&output);
+    let status = statuses
+        .get(&card.id)
+        .copied()
+        .ok_or("fixture card should have a comment-plan status")?;
+    let diagnostic = super::projection::EditorDiagnostic::from_with_status(
+        card,
+        status,
+        output.coverage_snapshot.get(&card.id.0),
+    );
+
+    assert_eq!(diagnostic.card_id, card.id.0);
+    assert_eq!(diagnostic.code, card.class.as_str());
+    assert_eq!(diagnostic.severity, card.class.lsp_severity());
+    assert_eq!(diagnostic.operation, card.operation.expression);
+    assert_eq!(diagnostic.operation_family, card.operation.family.as_str());
+    assert_eq!(diagnostic.coverage.baseline_state, "new");
+    assert_eq!(diagnostic.coverage.outcome_movement, "regressed");
+    assert_eq!(diagnostic.coverage.comment_plan_status, "selected");
+    assert_eq!(diagnostic.coverage.agent_lsp_readiness, "ready");
+    assert!(diagnostic.trust_boundary.contains("not UB-free status"));
+    Ok(())
+}
+
+#[test]
+fn editor_range_width_uses_utf16_code_units() {
+    assert_eq!(super::projection::utf16_width("ascii"), 5);
+    assert_eq!(super::projection::utf16_width("a😀b"), 4);
+}
+
 fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")

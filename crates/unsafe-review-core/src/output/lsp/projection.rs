@@ -21,7 +21,7 @@ pub struct EditorProjection {
     pub policy: String,
     pub scope: String,
     pub status: EditorStatus,
-    pub diagnostics: Vec<EditorDiagnostic>,
+    pub diagnostics: Vec<serde_json::Value>,
     pub hovers: Vec<EditorHover>,
     pub code_actions: Vec<EditorCodeAction>,
     pub trust_boundary: String,
@@ -37,7 +37,6 @@ pub struct EditorStatus {
     pub trust_boundary: String,
 }
 
-pub type EditorDiagnostic = serde_json::Value;
 pub type EditorHover = serde_json::Value;
 pub type EditorCodeAction = serde_json::Value;
 
@@ -93,7 +92,7 @@ struct LspProjection<'a> {
     policy: &'static str,
     scope: &'static str,
     status: LspStatus,
-    diagnostics: Vec<LspDiagnostic<'a>>,
+    diagnostics: Vec<EditorDiagnostic<'a>>,
     hovers: Vec<LspHover<'a>>,
     code_actions: Vec<LspCodeAction<'a>>,
     trust_boundary: &'static str,
@@ -118,7 +117,7 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
                         .copied()
                         .unwrap_or(CommentPlanStatus::NotEligible);
                     let snapshot = output.coverage_snapshot.get(&card.id.0);
-                    LspDiagnostic::from_with_status(card, status, snapshot)
+                    EditorDiagnostic::from_with_status(card, status, snapshot)
                 })
                 .collect(),
             hovers: output.cards.iter().map(LspHover::from).collect(),
@@ -132,32 +131,38 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     }
 }
 
+/// Canonical, card-scoped diagnostic data for editor and agent projections.
+///
+/// This borrowed DTO deliberately contains review semantics rather than LSP
+/// transport details.  Saved LSP, live LSP, VS Code, and agent adapters can
+/// consume the same fields without independently deriving class, range,
+/// evidence, or readiness.  The DTO remains read-only and advisory.
 #[derive(Serialize)]
-struct LspDiagnostic<'a> {
-    card_id: &'a str,
-    path: String,
-    range: LspRange,
-    severity: usize,
-    source: &'static str,
-    code: &'static str,
-    message: String,
-    operation: &'a str,
-    operation_family: &'static str,
-    proof_path: &'static str,
-    hazards: Vec<&'static str>,
-    required_safety_conditions: Vec<LspSafetyCondition<'a>>,
-    evidence_summary: LspEvidenceSummary<'a>,
-    obligation_evidence: Vec<LspObligationEvidence<'a>>,
-    missing_evidence: Vec<&'a str>,
-    next_action: &'a str,
-    witness_routes: Vec<LspWitnessRoute<'a>>,
-    verify_commands: &'a [String],
-    coverage: LspCoverageBlock,
-    trust_boundary: &'static str,
+pub struct EditorDiagnostic<'a> {
+    pub card_id: &'a str,
+    pub path: String,
+    pub range: EditorRange,
+    pub severity: usize,
+    pub source: &'static str,
+    pub code: &'static str,
+    pub message: String,
+    pub operation: &'a str,
+    pub operation_family: &'static str,
+    pub proof_path: &'static str,
+    pub hazards: Vec<&'static str>,
+    pub required_safety_conditions: Vec<EditorSafetyCondition<'a>>,
+    pub evidence_summary: EditorEvidenceSummary<'a>,
+    pub obligation_evidence: Vec<EditorObligationEvidence<'a>>,
+    pub missing_evidence: Vec<&'a str>,
+    pub next_action: &'a str,
+    pub witness_routes: Vec<EditorWitnessRoute<'a>>,
+    pub verify_commands: &'a [String],
+    pub coverage: EditorCoverageBlock,
+    pub trust_boundary: &'static str,
 }
 
-impl<'a> LspDiagnostic<'a> {
-    fn from_with_status(
+impl<'a> EditorDiagnostic<'a> {
+    pub(crate) fn from_with_status(
         card: &'a ReviewCard,
         comment_plan_status: CommentPlanStatus,
         snapshot: Option<&SnapshotCoverage>,
@@ -196,16 +201,16 @@ impl<'a> LspDiagnostic<'a> {
             required_safety_conditions: card
                 .obligations
                 .iter()
-                .map(|obligation| LspSafetyCondition {
+                .map(|obligation| EditorSafetyCondition {
                     key: &obligation.key,
                     description: &obligation.description,
                 })
                 .collect(),
-            evidence_summary: LspEvidenceSummary::from(card),
+            evidence_summary: EditorEvidenceSummary::from(card),
             obligation_evidence: card
                 .obligation_evidence
                 .iter()
-                .map(LspObligationEvidence::from)
+                .map(EditorObligationEvidence::from)
                 .collect(),
             missing_evidence: card
                 .missing
@@ -213,28 +218,28 @@ impl<'a> LspDiagnostic<'a> {
                 .map(|missing| missing.message.as_str())
                 .collect(),
             next_action: &card.next_action.summary,
-            witness_routes: card.routes.iter().map(LspWitnessRoute::from).collect(),
+            witness_routes: card.routes.iter().map(EditorWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
-            coverage: LspCoverageBlock::from(coverage_block),
+            coverage: EditorCoverageBlock::from(coverage_block),
             trust_boundary: TRUST_BOUNDARY,
         }
     }
 }
 
 #[derive(Serialize)]
-struct LspCoverageBlock {
-    contract_coverage: &'static str,
-    guard_coverage: &'static str,
-    test_reach_coverage: &'static str,
-    witness_receipt_coverage: &'static str,
-    manual_context: &'static str,
-    baseline_state: &'static str,
-    outcome_movement: &'static str,
-    comment_plan_status: &'static str,
-    agent_lsp_readiness: &'static str,
+pub struct EditorCoverageBlock {
+    pub contract_coverage: &'static str,
+    pub guard_coverage: &'static str,
+    pub test_reach_coverage: &'static str,
+    pub witness_receipt_coverage: &'static str,
+    pub manual_context: &'static str,
+    pub baseline_state: &'static str,
+    pub outcome_movement: &'static str,
+    pub comment_plan_status: &'static str,
+    pub agent_lsp_readiness: &'static str,
 }
 
-impl From<CoverageBlock> for LspCoverageBlock {
+impl From<CoverageBlock> for EditorCoverageBlock {
     fn from(block: CoverageBlock) -> Self {
         Self {
             contract_coverage: block.contract_coverage.as_str(),
@@ -251,38 +256,38 @@ impl From<CoverageBlock> for LspCoverageBlock {
 }
 
 #[derive(Serialize)]
-struct LspSafetyCondition<'a> {
-    key: &'a str,
-    description: &'a str,
+pub struct EditorSafetyCondition<'a> {
+    pub key: &'a str,
+    pub description: &'a str,
 }
 
 #[derive(Serialize)]
-struct LspEvidenceSummary<'a> {
-    contract: LspSimpleEvidence<'a>,
-    discharge: LspSimpleEvidence<'a>,
-    reach: LspReachEvidence<'a>,
-    witness: LspSimpleEvidence<'a>,
-    reach_limitation: &'static str,
+pub struct EditorEvidenceSummary<'a> {
+    pub contract: EditorSimpleEvidence<'a>,
+    pub discharge: EditorSimpleEvidence<'a>,
+    pub reach: EditorReachEvidence<'a>,
+    pub witness: EditorSimpleEvidence<'a>,
+    pub reach_limitation: &'static str,
 }
 
-impl<'a> From<&'a ReviewCard> for LspEvidenceSummary<'a> {
+impl<'a> From<&'a ReviewCard> for EditorEvidenceSummary<'a> {
     fn from(card: &'a ReviewCard) -> Self {
         Self {
-            contract: LspSimpleEvidence {
+            contract: EditorSimpleEvidence {
                 present: card.contract.present,
                 state: present_label(card.contract.present),
                 summary: &card.contract.summary,
             },
-            discharge: LspSimpleEvidence {
+            discharge: EditorSimpleEvidence {
                 present: card.discharge.present,
                 state: present_label(card.discharge.present),
                 summary: &card.discharge.summary,
             },
-            reach: LspReachEvidence {
+            reach: EditorReachEvidence {
                 state: &card.reach.state,
                 summary: &card.reach.summary,
             },
-            witness: LspSimpleEvidence {
+            witness: EditorSimpleEvidence {
                 present: card.witness.present,
                 state: present_label(card.witness.present),
                 summary: &card.witness.summary,
@@ -293,49 +298,49 @@ impl<'a> From<&'a ReviewCard> for LspEvidenceSummary<'a> {
 }
 
 #[derive(Serialize)]
-struct LspSimpleEvidence<'a> {
-    present: bool,
-    state: &'static str,
-    summary: &'a str,
+pub struct EditorSimpleEvidence<'a> {
+    pub present: bool,
+    pub state: &'static str,
+    pub summary: &'a str,
 }
 
 #[derive(Serialize)]
-struct LspReachEvidence<'a> {
-    state: &'a str,
-    summary: &'a str,
+pub struct EditorReachEvidence<'a> {
+    pub state: &'a str,
+    pub summary: &'a str,
 }
 
 #[derive(Serialize)]
-struct LspObligationEvidence<'a> {
-    key: &'a str,
-    description: &'a str,
-    contract: LspEvidenceState<'a>,
-    discharge: LspEvidenceState<'a>,
-    reach: LspEvidenceState<'a>,
-    witness: LspEvidenceState<'a>,
+pub struct EditorObligationEvidence<'a> {
+    pub key: &'a str,
+    pub description: &'a str,
+    pub contract: EditorEvidenceState<'a>,
+    pub discharge: EditorEvidenceState<'a>,
+    pub reach: EditorEvidenceState<'a>,
+    pub witness: EditorEvidenceState<'a>,
 }
 
-impl<'a> From<&'a ObligationEvidence> for LspObligationEvidence<'a> {
+impl<'a> From<&'a ObligationEvidence> for EditorObligationEvidence<'a> {
     fn from(evidence: &'a ObligationEvidence) -> Self {
         Self {
             key: &evidence.obligation.key,
             description: &evidence.obligation.description,
-            contract: LspEvidenceState::from(&evidence.contract),
-            discharge: LspEvidenceState::from(&evidence.discharge),
-            reach: LspEvidenceState::from(&evidence.reach),
-            witness: LspEvidenceState::from(&evidence.witness),
+            contract: EditorEvidenceState::from(&evidence.contract),
+            discharge: EditorEvidenceState::from(&evidence.discharge),
+            reach: EditorEvidenceState::from(&evidence.reach),
+            witness: EditorEvidenceState::from(&evidence.witness),
         }
     }
 }
 
 #[derive(Serialize)]
-struct LspEvidenceState<'a> {
-    present: bool,
-    state: &'a str,
-    summary: &'a str,
+pub struct EditorEvidenceState<'a> {
+    pub present: bool,
+    pub state: &'a str,
+    pub summary: &'a str,
 }
 
-impl<'a> From<&'a EvidenceState> for LspEvidenceState<'a> {
+impl<'a> From<&'a EvidenceState> for EditorEvidenceState<'a> {
     fn from(state: &'a EvidenceState) -> Self {
         Self {
             present: state.present,
@@ -346,14 +351,14 @@ impl<'a> From<&'a EvidenceState> for LspEvidenceState<'a> {
 }
 
 #[derive(Serialize)]
-struct LspWitnessRoute<'a> {
-    kind: &'static str,
-    reason: &'a str,
-    command: Option<&'a str>,
-    required: bool,
+pub struct EditorWitnessRoute<'a> {
+    pub kind: &'static str,
+    pub reason: &'a str,
+    pub command: Option<&'a str>,
+    pub required: bool,
 }
 
-impl<'a> From<&'a WitnessRoute> for LspWitnessRoute<'a> {
+impl<'a> From<&'a WitnessRoute> for EditorWitnessRoute<'a> {
     fn from(route: &'a WitnessRoute) -> Self {
         Self {
             kind: route.kind.as_str(),
@@ -368,7 +373,7 @@ impl<'a> From<&'a WitnessRoute> for LspWitnessRoute<'a> {
 struct LspHover<'a> {
     card_id: &'a str,
     path: String,
-    position: LspPosition,
+    position: EditorPosition,
     contents: String,
     trust_boundary: &'static str,
 }
@@ -389,7 +394,7 @@ impl<'a> From<&'a ReviewCard> for LspHover<'a> {
 struct LspCodeAction<'a> {
     card_id: &'a str,
     path: String,
-    range: LspRange,
+    range: EditorRange,
     title: String,
     kind: &'static str,
     command: &'static str,
@@ -423,38 +428,46 @@ struct LspStatus {
     trust_boundary: &'static str,
 }
 
-#[derive(Serialize, Clone)]
-struct LspRange {
-    start: LspPosition,
-    end: LspPosition,
+#[derive(Debug, Clone, Serialize)]
+pub struct EditorRange {
+    pub start: EditorPosition,
+    pub end: EditorPosition,
 }
 
-#[derive(Serialize, Clone)]
-struct LspPosition {
-    line: usize,
-    character: usize,
+#[derive(Debug, Clone, Serialize)]
+pub struct EditorPosition {
+    pub line: usize,
+    pub character: usize,
 }
 
 fn present_label(present: bool) -> &'static str {
     if present { "present" } else { "missing" }
 }
 
-fn range_for(card: &ReviewCard) -> LspRange {
+pub(crate) fn range_for(card: &ReviewCard) -> EditorRange {
     let start = position_for(card);
-    let end = LspPosition {
+    let end = EditorPosition {
         line: start.line,
         character: start
             .character
-            .saturating_add(card.site.snippet.chars().count().max(1)),
+            .saturating_add(utf16_width(&card.site.snippet).max(1)),
     };
-    LspRange { start, end }
+    EditorRange { start, end }
 }
 
-fn position_for(card: &ReviewCard) -> LspPosition {
-    LspPosition {
+fn position_for(card: &ReviewCard) -> EditorPosition {
+    EditorPosition {
         line: card.site.location.line.saturating_sub(1),
         character: card.site.location.column.saturating_sub(1),
     }
+}
+
+/// Return the number of UTF-16 code units in `text`, as required by LSP
+/// positions.  Keeping this conversion beside the canonical editor range
+/// prevents saved projections and their future adapters from counting scalar
+/// values or bytes independently.
+pub(crate) fn utf16_width(text: &str) -> usize {
+    text.encode_utf16().count()
 }
 
 /// Return the LSP `DiagnosticSeverity` integer derived from the card's class.

@@ -2,7 +2,7 @@ use crate::domain::ReviewCard;
 use crate::util::path_display;
 
 use super::{
-    LspCodeAction, LspCodeActionPayload, LspPosition, LspRange, TRUST_BOUNDARY, range_for,
+    EditorPosition, EditorRange, LspCodeAction, LspCodeActionPayload, TRUST_BOUNDARY, range_for,
 };
 
 pub(super) fn for_card(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
@@ -29,7 +29,7 @@ pub(super) fn for_card(card: &ReviewCard) -> Vec<LspCodeAction<'_>> {
 fn agent_packet_action<'a>(
     card: &'a ReviewCard,
     path: &str,
-    range: &LspRange,
+    range: &EditorRange,
 ) -> LspCodeAction<'a> {
     LspCodeAction {
         card_id: &card.id.0,
@@ -55,7 +55,7 @@ fn agent_packet_action<'a>(
 fn witness_route_action<'a>(
     card: &'a ReviewCard,
     path: &str,
-    range: &LspRange,
+    range: &EditorRange,
 ) -> LspCodeAction<'a> {
     LspCodeAction {
         card_id: &card.id.0,
@@ -112,7 +112,7 @@ fn witness_command_action<'a>(
     card: &'a ReviewCard,
     command: &'a str,
     path: String,
-    range: LspRange,
+    range: EditorRange,
 ) -> LspCodeAction<'a> {
     LspCodeAction {
         card_id: &card.id.0,
@@ -135,10 +135,10 @@ fn witness_command_action<'a>(
     }
 }
 
-fn single_character_range(line: usize) -> LspRange {
+fn single_character_range(line: usize) -> EditorRange {
     let line = line.saturating_sub(1);
-    LspRange {
-        start: LspPosition { line, character: 0 },
-        end: LspPosition { line, character: 1 },
+    EditorRange {
+        start: EditorPosition { line, character: 0 },
+        end: EditorPosition { line, character: 1 },
     }
 }

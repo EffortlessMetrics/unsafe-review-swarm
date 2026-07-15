@@ -14,6 +14,11 @@ mod policy;
 mod util;
 
 pub use output::comment_plan::COMMENT_BODY_WORD_LIMIT;
+pub use output::lsp::{
+    EditorCoverageBlock, EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary,
+    EditorObligationEvidence, EditorPosition, EditorProjection, EditorRange, EditorReachEvidence,
+    EditorSafetyCondition, EditorSimpleEvidence, EditorWitnessRoute,
+};
 
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineInitResult, DiffSource, DiscoveryOptions,

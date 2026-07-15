@@ -1,0 +1,69 @@
+# Issue-linked work specification for the first canonical editor projection slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1907"
+kind = "correctness"
+objective = "Define one typed, card-scoped editor diagnostic DTO and one UTF-16 range conversion for later saved/live/VS Code adapters."
+user_outcome = "Editor consumers have a named semantic contract to consume instead of independently deriving identity, class, range, evidence, readiness, or trust-boundary fields."
+claim_boundary = "This slice defines and regression-tests the core DTO and range contract; it does not claim saved/live/VS Code migration, freshness, exact IDE binding, packet delivery, action parity, analyzer accuracy, safety, execution, or hosted CI success."
+
+[scope]
+included = [
+    "A public borrowed EditorDiagnostic DTO containing card identity, class code, canonical source range, class-derived severity, operation/family, hazards, obligations, evidence, missing evidence, next action, verification commands, coverage movement/baseline/comment/readiness, and trust boundary",
+    "Public typed range and position values using one UTF-16 code-unit width helper",
+    "Core regression tests for DTO field ownership and non-BMP UTF-16 width",
+]
+excluded = [
+    "Live LSP diagnostic construction or transport changes",
+    "Saved JSON schema or serialized field migration",
+    "VS Code adapter, hover/action binding, analysis freshness, packet delivery, repair candidates, and end-to-end validation",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "ReviewCard and existing domain producers remain the only semantic source; the DTO projects their values and does not reclassify cards."
+
+[[invariant]]
+id = "INV-2"
+text = "Severity is derived from ReviewClass::lsp_severity and range width is measured in UTF-16 code units; priority and byte/scalar widths are not substituted."
+
+[[invariant]]
+id = "INV-3"
+text = "The editor path remains read-only and advisory: no source edits, witness execution, automatic repair, blocking, or safety proof is introduced."
+
+[[acceptance]]
+id = "AC-1907-2A-1"
+text = "The typed DTO exposes the card ID, class code, class-derived severity, operation/family, coverage movement/baseline/comment/readiness, and trust boundary from the same ReviewCard."
+proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+
+[[acceptance]]
+id = "AC-1907-2A-2"
+text = "The canonical range helper counts UTF-16 code units, including non-BMP characters."
+proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+
+[[acceptance]]
+id = "AC-1907-2A-3"
+text = "No live LSP, VS Code, freshness, action, packet, or repair behavior is migrated in this slice."
+proof = ["rtk git diff --name-only", "rtk git diff --check"]
+
+[[integration]]
+surface = "1907-saved-live-vscode"
+expected = "Later projection adapters consume EditorDiagnostic and EditorRange rather than deriving editor semantics independently."
+
+[[integration]]
+surface = "1880-canonical-field-map"
+expected = "The DTO is the first runtime producer for the mapped editor fields; freshness and structured action fields remain explicit later-issue gaps."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the serialized EditorProjection boundary unchanged and defer adapter migrations to separate issue-linked PRs."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Use direct DTO and UTF-16 regression tests so later adapters can be checked against a stable core witness."
+
+[compatibility]
+posture = "Additive core type and range-contract exposure; existing saved JSON remains serialized from the same ReviewCard-derived values."
+
+[rollback]
+strategy = "Revert the DTO exposure, range helper, tests, and this work specification; later adapters remain unstarted and no runtime consumer depends on the type yet."

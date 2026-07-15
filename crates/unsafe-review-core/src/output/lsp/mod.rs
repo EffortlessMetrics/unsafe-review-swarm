@@ -6,8 +6,12 @@ use crate::api::AnalyzeOutput;
 use crate::domain::ReviewCard;
 use serde::Serialize;
 
-pub use projection::EditorProjection;
 pub(crate) use projection::project_editor;
+pub use projection::{
+    EditorCoverageBlock, EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary,
+    EditorObligationEvidence, EditorPosition, EditorProjection, EditorRange, EditorReachEvidence,
+    EditorSafetyCondition, EditorSimpleEvidence, EditorWitnessRoute,
+};
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     render_pretty(&project_editor(output))
