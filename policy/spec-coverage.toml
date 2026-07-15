@@ -22,28 +22,28 @@ single_truth = true
 [[field]]
 name = "coverage_movement"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
-surfaces = ["json", "agent"]
+surfaces = ["json", "agent", "lsp"]
 single_truth = true
 note = "policy_report does not project outcome_movement; it projects baseline_state only via its own derivation (see baseline_state entry)"
 
 [[field]]
 name = "baseline_state"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_baseline_state"
-surfaces = ["json", "agent", "policy_report"]
+surfaces = ["json", "agent", "policy_report", "lsp"]
 single_truth = true
 note = "All three surfaces (json, agent, policy_report) project CoverageBlock::derive with snapshot-slot movement. Policy classification (new_gap/baseline_known/suppressed/non_actionable) is carried by policy_report.policy_status and policy_report.policy_reason."
 
 [[field]]
 name = "agent_readiness"
 canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
-surfaces = ["json", "agent"]
+surfaces = ["json", "agent", "lsp"]
 single_truth = true
 note = "shared fn enforces parity across coverage block + agent packet; lsp does not expose per-card agent_readiness via compute_agent_lsp_readiness"
 
 [[field]]
 name = "comment_plan_status"
 canonical_source = "output/comment_plan/mod.rs::card_statuses"
-surfaces = ["json", "agent", "comment_plan"]
+surfaces = ["json", "agent", "comment_plan", "lsp"]
 single_truth = true
 
 [[field]]
@@ -58,3 +58,99 @@ canonical_source = "analysis/receipts.rs::ReceiptAuditReport"
 surfaces = ["receipt_audit"]
 single_truth = true
 note = "audit-time metadata, not a per-card field"
+
+[[field]]
+name = "card_identity"
+canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+single_truth = true
+note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
+
+[[field]]
+name = "site_location"
+canonical_source = "domain/operation.rs::UnsafeSite.location and owner (analysis/pipeline/card_builder.rs)"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+single_truth = true
+note = "File, range, owner, visibility, and changed-line state are card facts. Saved/live LSP and VS Code adapters project the same range; none may infer binding from nearby lines or hover prose."
+
+[[field]]
+name = "rule_class_code"
+canonical_source = "domain/classification.rs::ReviewClass::as_str"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+single_truth = true
+note = "The stable diagnostic code is the canonical class/rule code. Severity remains a separate ReviewClass projection; adapters must not replace either with priority or operation family."
+
+[[field]]
+name = "operation_family"
+canonical_source = "domain/operation.rs::UnsafeOperation.family.as_str()"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "ub_review"]
+single_truth = true
+note = "Operation family is card-owned and additive. It is descriptive context, not a replacement for class, severity, readiness, or repair applicability."
+
+[[field]]
+name = "review_class"
+canonical_source = "domain/classification.rs::ReviewClass (analysis/pipeline/card_builder.rs)"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+single_truth = true
+note = "ReviewClass owns class-derived severity and actionability. Saved LSP, live LSP, VS Code, agent, SARIF, and PR consumers must project it without reclassification."
+
+[[field]]
+name = "surfacing_disposition"
+canonical_source = "output/comment_plan/mod.rs::card_statuses (output/comment_plan/selection.rs)"
+surfaces = ["json", "comment_plan", "agent", "lsp", "pr_summary", "github_summary"]
+single_truth = true
+note = "Selected, not_selected, and not_eligible are reviewer-routing states. They must remain distinct from analyzer class and from human/agent readiness."
+
+[[field]]
+name = "next_action"
+canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "outcome"]
+single_truth = true
+note = "The summary and verify commands are card-owned handoff facts. Renderers may format them, but may not invent repairs or broaden their target."
+
+[[field]]
+name = "repair_applicability"
+canonical_source = "output/agent/queue.rs::repair_queue_projection (AgentQueueProjection)"
+surfaces = ["json", "repair_queue", "lsp", "agent", "pr_summary", "github_summary"]
+single_truth = true
+note = "Buckets, bounded allowed-repair hints, and readiness are derived from the shared repair projection. The repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
+
+[[field]]
+name = "freshness_identity"
+canonical_source = "#1908 AnalysisIdentity contract (canonical producer to be introduced after this map-only PR)"
+surfaces = ["json", "lsp", "agent"]
+single_truth = true
+note = "Saved LSP, live LSP, VS Code-consumed data, and agent packets need one truthful analysis identity. Current schema-version and refresh-generation placeholders are an uncovered seam recorded for #1908; this map does not claim freshness behavior exists."
+
+[[field]]
+name = "missing_evidence"
+canonical_source = "domain/review_card.rs::ReviewCard.missing"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent"]
+single_truth = true
+note = "Missing evidence is typed card data. Consumers may format it for humans or LLMs, but may not replace it with a prose-derived obligation, severity, or repair bucket."
+
+[[field]]
+name = "witness_receipt_coverage"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> WitnessReceiptCoverage"
+surfaces = ["json", "comment_plan", "repair_queue", "lsp", "agent", "pr_summary", "github_summary"]
+single_truth = true
+note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness."
+
+[[field]]
+name = "editor_action_contract"
+canonical_source = "#1909 structured command-only action contract (canonical producer to be introduced after this map-only PR)"
+surfaces = ["json", "lsp", "agent"]
+single_truth = true
+note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints."
+
+[[field]]
+name = "trust_boundary"
+canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "gate_manifest", "action", "ub_review"]
+single_truth = true
+note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
+
+# The editor adapter is intentionally represented by the existing `lsp`
+# surface vocabulary. The named consumers are saved lsp.json, live
+# unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
+# and PR artifacts; they are not independent semantic surfaces.

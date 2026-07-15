@@ -1,0 +1,76 @@
+# Issue-linked work specification for the canonical consumer map.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+kind = "correctness"
+objective = "Record one canonical producer and the complete consumer set for editor and agent fields before runtime projection changes."
+user_outcome = "Future LSP, VS Code, agent, queue, SARIF, and PR changes have one named semantic owner and visible follow-up seams."
+claim_boundary = "This map records ownership and uncovered seams; it does not prove projection parity, freshness, analyzer accuracy, safety, execution, or hosted CI success."
+
+[scope]
+included = [
+    "Canonical ownership for card identity, rule/class code, source location, severity, movement, baseline, comment status, readiness, missing evidence, next action, repair applicability, freshness identity, action contract, and trust boundary",
+    "Consumer mapping for cards.json, saved/live LSP, VS Code, agent packets, repair queue, SARIF, and PR artifacts using the repository's existing surface vocabulary",
+    "Explicit follow-up notes for freshness and structured action contracts that do not yet have runtime producers",
+]
+excluded = [
+    "Any ReviewCard, analyzer, LSP server, saved projection, VS Code adapter, agent packet, repair queue, or SARIF runtime behavior",
+    "Freshness implementation, CodeAction migration, packet delivery, repair candidate generation, and end-to-end validation",
+    "Publication, source promotion, issue closure, and hosted CI claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "ReviewCard and existing domain/output producers remain the semantic source of truth; this ledger never becomes a second implementation."
+
+[[invariant]]
+id = "INV-2"
+text = "Every listed editor or agent field has one named producer or an explicit owner-marked follow-up gap; adapters do not derive it independently."
+
+[[invariant]]
+id = "INV-3"
+text = "The advisory boundary remains unchanged: no safety, UB-free, Miri, site-execution, automatic-repair, or blocking claim is introduced."
+
+[[acceptance]]
+id = "AC-1"
+text = "The policy ledger names canonical producers and consumer surfaces for all fields required by #1907 through #1911."
+proof = ["rtk cargo run --locked -p xtask -- check-spec-coverage"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The map-only change contains no runtime implementation or fixture-output changes."
+proof = ["rtk git diff --check", "rtk git diff --name-only -- policy/spec-coverage.toml plans/work-specs/UNSAFE-REVIEW-WORK-1880.toml"]
+
+[[acceptance]]
+id = "AC-3"
+text = "Freshness and structured action ownership are visible as follow-up seams rather than being presented as implemented behavior."
+proof = ["rtk rg -n 'freshness_identity|editor_action_contract|canonical producer to be introduced' policy/spec-coverage.toml"]
+
+[[integration]]
+surface = "issue_1880"
+expected = "The map is the prerequisite contract for the narrow #1907 canonical editor projection slice."
+
+[[integration]]
+surface = "spec_0012_spec_0018_adr_0006"
+expected = "Saved/live editor projections remain ReviewCard-derived, UTF-16/range and class-severity rules remain explicit, and all actions remain command-only and advisory."
+
+[[integration]]
+surface = "future_1908_1909_1910_1911"
+expected = "Freshness, action, exact packet, and repair-candidate work must consume the named map owners and update only their bounded follow-up seams."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Use existing surface vocabulary and notes to name saved LSP, live LSP, VS Code, agent, queue, SARIF, and PR consumers without adding adapter-specific semantic axes."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Mark freshness and action contracts as future producers with explicit gaps; do not imply that current schema-version or bare-command behavior satisfies them."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Keep the patch to policy and work-spec files, then require targeted ledger proof before any implementation slice starts."
+
+[compatibility]
+posture = "Additive governance and policy documentation only; no serialized runtime output or public behavior changes."
+
+[rollback]
+strategy = "Remove the map additions and this issue-linked work spec; then recreate the map from current main before starting #1907."
