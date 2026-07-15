@@ -21,7 +21,7 @@ pub struct EditorProjection {
     pub policy: String,
     pub scope: String,
     pub status: EditorStatus,
-    pub diagnostics: Vec<serde_json::Value>,
+    pub diagnostics: Vec<EditorDiagnostic>,
     pub hovers: Vec<EditorHover>,
     pub code_actions: Vec<EditorCodeAction>,
     pub trust_boundary: String,
@@ -65,11 +65,7 @@ pub(crate) fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
             message: projection.status.message,
             trust_boundary: projection.status.trust_boundary.to_string(),
         },
-        diagnostics: projection
-            .diagnostics
-            .iter()
-            .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
-            .collect(),
+        diagnostics: projection.diagnostics,
         hovers: projection
             .hovers
             .iter()
@@ -92,7 +88,7 @@ struct LspProjection<'a> {
     policy: &'static str,
     scope: &'static str,
     status: LspStatus,
-    diagnostics: Vec<EditorDiagnostic<'a>>,
+    diagnostics: Vec<EditorDiagnostic>,
     hovers: Vec<LspHover<'a>>,
     code_actions: Vec<LspCodeAction<'a>>,
     trust_boundary: &'static str,
@@ -133,37 +129,37 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
 
 /// Canonical, card-scoped diagnostic data for editor and agent projections.
 ///
-/// This borrowed DTO deliberately contains review semantics rather than LSP
+/// This owned DTO deliberately contains review semantics rather than LSP
 /// transport details.  Saved LSP, live LSP, VS Code, and agent adapters can
 /// consume the same fields without independently deriving class, range,
 /// evidence, or readiness.  The DTO remains read-only and advisory.
-#[derive(Serialize)]
-pub struct EditorDiagnostic<'a> {
-    pub card_id: &'a str,
-    pub path: String,
-    pub range: EditorRange,
-    pub severity: usize,
-    pub source: &'static str,
-    pub code: &'static str,
-    pub message: String,
-    pub operation: &'a str,
-    pub operation_family: &'static str,
-    pub proof_path: &'static str,
-    pub hazards: Vec<&'static str>,
-    pub required_safety_conditions: Vec<EditorSafetyCondition<'a>>,
-    pub evidence_summary: EditorEvidenceSummary<'a>,
-    pub obligation_evidence: Vec<EditorObligationEvidence<'a>>,
-    pub missing_evidence: Vec<&'a str>,
-    pub next_action: &'a str,
-    pub witness_routes: Vec<EditorWitnessRoute<'a>>,
-    pub verify_commands: &'a [String],
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorDiagnostic {
+    pub card_id: String,
+    pub code: String,
     pub coverage: EditorCoverageBlock,
-    pub trust_boundary: &'static str,
+    pub evidence_summary: EditorEvidenceSummary,
+    pub hazards: Vec<String>,
+    pub message: String,
+    pub missing_evidence: Vec<String>,
+    pub next_action: String,
+    pub obligation_evidence: Vec<EditorObligationEvidence>,
+    pub operation: String,
+    pub operation_family: String,
+    pub path: String,
+    pub proof_path: String,
+    pub range: EditorRange,
+    pub required_safety_conditions: Vec<EditorSafetyCondition>,
+    pub severity: usize,
+    pub source: String,
+    pub trust_boundary: String,
+    pub verify_commands: Vec<String>,
+    pub witness_routes: Vec<EditorWitnessRoute>,
 }
 
-impl<'a> EditorDiagnostic<'a> {
+impl EditorDiagnostic {
     pub(crate) fn from_with_status(
-        card: &'a ReviewCard,
+        card: &ReviewCard,
         comment_plan_status: CommentPlanStatus,
         snapshot: Option<&SnapshotCoverage>,
     ) -> Self {
@@ -183,148 +179,153 @@ impl<'a> EditorDiagnostic<'a> {
         )
         .state;
         Self {
-            card_id: &card.id.0,
-            path: path_display(&card.site.location.file),
-            range: range_for(card),
-            severity: severity_for(card),
-            source: "unsafe-review",
-            code: card.class.as_str(),
+            card_id: card.id.0.clone(),
+            code: card.class.as_str().to_string(),
+            coverage: EditorCoverageBlock::from(coverage_block),
+            evidence_summary: EditorEvidenceSummary::from(card),
+            hazards: card
+                .hazards
+                .iter()
+                .map(|hazard| hazard.as_str().to_string())
+                .collect(),
             message: format!(
                 "{}: {}",
                 card.operation.family.as_str(),
                 card.next_action.summary
             ),
-            operation: &card.operation.expression,
-            operation_family: card.operation.family.as_str(),
-            proof_path: card.proof_path.as_str(),
-            hazards: card.hazards.iter().map(|hazard| hazard.as_str()).collect(),
-            required_safety_conditions: card
-                .obligations
+            missing_evidence: card
+                .missing
                 .iter()
-                .map(|obligation| EditorSafetyCondition {
-                    key: &obligation.key,
-                    description: &obligation.description,
-                })
+                .map(|missing| missing.message.clone())
                 .collect(),
-            evidence_summary: EditorEvidenceSummary::from(card),
+            next_action: card.next_action.summary.clone(),
             obligation_evidence: card
                 .obligation_evidence
                 .iter()
                 .map(EditorObligationEvidence::from)
                 .collect(),
-            missing_evidence: card
-                .missing
+            operation: card.operation.expression.clone(),
+            operation_family: card.operation.family.as_str().to_string(),
+            path: path_display(&card.site.location.file),
+            proof_path: card.proof_path.as_str().to_string(),
+            range: range_for(card),
+            required_safety_conditions: card
+                .obligations
                 .iter()
-                .map(|missing| missing.message.as_str())
+                .map(|obligation| EditorSafetyCondition {
+                    key: obligation.key.clone(),
+                    description: obligation.description.clone(),
+                })
                 .collect(),
-            next_action: &card.next_action.summary,
+            severity: severity_for(card),
+            source: "unsafe-review".to_string(),
+            trust_boundary: TRUST_BOUNDARY.to_string(),
+            verify_commands: card.next_action.verify_commands.clone(),
             witness_routes: card.routes.iter().map(EditorWitnessRoute::from).collect(),
-            verify_commands: &card.next_action.verify_commands,
-            coverage: EditorCoverageBlock::from(coverage_block),
-            trust_boundary: TRUST_BOUNDARY,
         }
     }
 }
 
-#[derive(Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorCoverageBlock {
-    pub contract_coverage: &'static str,
-    pub guard_coverage: &'static str,
-    pub test_reach_coverage: &'static str,
-    pub witness_receipt_coverage: &'static str,
-    pub manual_context: &'static str,
-    pub baseline_state: &'static str,
-    pub outcome_movement: &'static str,
-    pub comment_plan_status: &'static str,
-    pub agent_lsp_readiness: &'static str,
+    pub agent_lsp_readiness: String,
+    pub baseline_state: String,
+    pub comment_plan_status: String,
+    pub contract_coverage: String,
+    pub guard_coverage: String,
+    pub manual_context: String,
+    pub outcome_movement: String,
+    pub test_reach_coverage: String,
+    pub witness_receipt_coverage: String,
 }
 
 impl From<CoverageBlock> for EditorCoverageBlock {
     fn from(block: CoverageBlock) -> Self {
         Self {
-            contract_coverage: block.contract_coverage.as_str(),
-            guard_coverage: block.guard_coverage.as_str(),
-            test_reach_coverage: block.test_reach_coverage.as_str(),
-            witness_receipt_coverage: block.witness_receipt_coverage.as_str(),
-            manual_context: block.manual_context.as_str(),
-            baseline_state: block.baseline_state.as_str(),
-            outcome_movement: block.outcome_movement.as_str(),
-            comment_plan_status: block.comment_plan_status.as_str(),
-            agent_lsp_readiness: block.agent_lsp_readiness.as_str(),
+            contract_coverage: block.contract_coverage.as_str().to_string(),
+            guard_coverage: block.guard_coverage.as_str().to_string(),
+            test_reach_coverage: block.test_reach_coverage.as_str().to_string(),
+            witness_receipt_coverage: block.witness_receipt_coverage.as_str().to_string(),
+            manual_context: block.manual_context.as_str().to_string(),
+            baseline_state: block.baseline_state.as_str().to_string(),
+            outcome_movement: block.outcome_movement.as_str().to_string(),
+            comment_plan_status: block.comment_plan_status.as_str().to_string(),
+            agent_lsp_readiness: block.agent_lsp_readiness.as_str().to_string(),
         }
     }
 }
 
-#[derive(Serialize)]
-pub struct EditorSafetyCondition<'a> {
-    pub key: &'a str,
-    pub description: &'a str,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorSafetyCondition {
+    pub description: String,
+    pub key: String,
 }
 
-#[derive(Serialize)]
-pub struct EditorEvidenceSummary<'a> {
-    pub contract: EditorSimpleEvidence<'a>,
-    pub discharge: EditorSimpleEvidence<'a>,
-    pub reach: EditorReachEvidence<'a>,
-    pub witness: EditorSimpleEvidence<'a>,
-    pub reach_limitation: &'static str,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorEvidenceSummary {
+    pub contract: EditorSimpleEvidence,
+    pub discharge: EditorSimpleEvidence,
+    pub reach: EditorReachEvidence,
+    pub reach_limitation: String,
+    pub witness: EditorSimpleEvidence,
 }
 
-impl<'a> From<&'a ReviewCard> for EditorEvidenceSummary<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
+impl From<&ReviewCard> for EditorEvidenceSummary {
+    fn from(card: &ReviewCard) -> Self {
         Self {
             contract: EditorSimpleEvidence {
                 present: card.contract.present,
-                state: present_label(card.contract.present),
-                summary: &card.contract.summary,
+                state: present_label(card.contract.present).to_string(),
+                summary: card.contract.summary.clone(),
             },
             discharge: EditorSimpleEvidence {
                 present: card.discharge.present,
-                state: present_label(card.discharge.present),
-                summary: &card.discharge.summary,
+                state: present_label(card.discharge.present).to_string(),
+                summary: card.discharge.summary.clone(),
             },
             reach: EditorReachEvidence {
-                state: &card.reach.state,
-                summary: &card.reach.summary,
+                state: card.reach.state.clone(),
+                summary: card.reach.summary.clone(),
             },
             witness: EditorSimpleEvidence {
                 present: card.witness.present,
-                state: present_label(card.witness.present),
-                summary: &card.witness.summary,
+                state: present_label(card.witness.present).to_string(),
+                summary: card.witness.summary.clone(),
             },
-            reach_limitation: "static reach evidence is not proof that the unsafe site executed",
+            reach_limitation: "static reach evidence is not proof that the unsafe site executed"
+                .to_string(),
         }
     }
 }
 
-#[derive(Serialize)]
-pub struct EditorSimpleEvidence<'a> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorSimpleEvidence {
     pub present: bool,
-    pub state: &'static str,
-    pub summary: &'a str,
+    pub state: String,
+    pub summary: String,
 }
 
-#[derive(Serialize)]
-pub struct EditorReachEvidence<'a> {
-    pub state: &'a str,
-    pub summary: &'a str,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorReachEvidence {
+    pub state: String,
+    pub summary: String,
 }
 
-#[derive(Serialize)]
-pub struct EditorObligationEvidence<'a> {
-    pub key: &'a str,
-    pub description: &'a str,
-    pub contract: EditorEvidenceState<'a>,
-    pub discharge: EditorEvidenceState<'a>,
-    pub reach: EditorEvidenceState<'a>,
-    pub witness: EditorEvidenceState<'a>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorObligationEvidence {
+    pub contract: EditorEvidenceState,
+    pub description: String,
+    pub discharge: EditorEvidenceState,
+    pub key: String,
+    pub reach: EditorEvidenceState,
+    pub witness: EditorEvidenceState,
 }
 
-impl<'a> From<&'a ObligationEvidence> for EditorObligationEvidence<'a> {
-    fn from(evidence: &'a ObligationEvidence) -> Self {
+impl From<&ObligationEvidence> for EditorObligationEvidence {
+    fn from(evidence: &ObligationEvidence) -> Self {
         Self {
-            key: &evidence.obligation.key,
-            description: &evidence.obligation.description,
+            key: evidence.obligation.key.clone(),
+            description: evidence.obligation.description.clone(),
             contract: EditorEvidenceState::from(&evidence.contract),
             discharge: EditorEvidenceState::from(&evidence.discharge),
             reach: EditorEvidenceState::from(&evidence.reach),
@@ -333,37 +334,37 @@ impl<'a> From<&'a ObligationEvidence> for EditorObligationEvidence<'a> {
     }
 }
 
-#[derive(Serialize)]
-pub struct EditorEvidenceState<'a> {
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorEvidenceState {
     pub present: bool,
-    pub state: &'a str,
-    pub summary: &'a str,
+    pub state: String,
+    pub summary: String,
 }
 
-impl<'a> From<&'a EvidenceState> for EditorEvidenceState<'a> {
-    fn from(state: &'a EvidenceState) -> Self {
+impl From<&EvidenceState> for EditorEvidenceState {
+    fn from(state: &EvidenceState) -> Self {
         Self {
             present: state.present,
-            state: &state.state,
-            summary: &state.summary,
+            state: state.state.clone(),
+            summary: state.summary.clone(),
         }
     }
 }
 
-#[derive(Serialize)]
-pub struct EditorWitnessRoute<'a> {
-    pub kind: &'static str,
-    pub reason: &'a str,
-    pub command: Option<&'a str>,
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct EditorWitnessRoute {
+    pub command: Option<String>,
+    pub kind: String,
+    pub reason: String,
     pub required: bool,
 }
 
-impl<'a> From<&'a WitnessRoute> for EditorWitnessRoute<'a> {
-    fn from(route: &'a WitnessRoute) -> Self {
+impl From<&WitnessRoute> for EditorWitnessRoute {
+    fn from(route: &WitnessRoute) -> Self {
         Self {
-            kind: route.kind.as_str(),
-            reason: &route.reason,
-            command: route.command.as_deref(),
+            kind: route.kind.as_str().to_string(),
+            reason: route.reason.clone(),
+            command: route.command.clone(),
             required: route.required,
         }
     }
@@ -428,16 +429,16 @@ struct LspStatus {
     trust_boundary: &'static str,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorRange {
-    pub start: EditorPosition,
     pub end: EditorPosition,
+    pub start: EditorPosition,
 }
 
-#[derive(Debug, Clone, Serialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorPosition {
-    pub line: usize,
     pub character: usize,
+    pub line: usize,
 }
 
 fn present_label(present: bool) -> &'static str {

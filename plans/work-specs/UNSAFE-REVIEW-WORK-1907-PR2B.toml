@@ -1,0 +1,69 @@
+# Issue-linked work specification for the saved projection migration.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1907"
+kind = "correctness"
+objective = "Make the saved lsp.json projection store and serialize the canonical EditorDiagnostic DTO directly."
+user_outcome = "Saved editor diagnostics cannot silently re-derive or drift from the canonical card-scoped editor contract before live and VS Code adapters migrate."
+claim_boundary = "This slice proves saved projection ownership and wire-shape preservation; it does not claim live LSP migration, VS Code parity, freshness, exact IDE binding, packet delivery, action parity, analyzer accuracy, safety, execution, or hosted CI success."
+
+[scope]
+included = [
+    "Use owned EditorDiagnostic and nested editor contract values in EditorProjection",
+    "Serialize saved diagnostics directly from the canonical DTO without an intermediate JSON-value conversion",
+    "Preserve the existing lsp.json field shape and fixture output",
+    "Add a regression test comparing the typed DTO serialization with the saved diagnostic wire value",
+]
+excluded = [
+    "Live LSP construction or transport changes",
+    "VS Code adapter, hover/action binding, analysis freshness, packet delivery, repair candidates, and end-to-end validation",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "ReviewCard and the canonical EditorDiagnostic producer remain the only semantic source; saved serialization does not classify, prioritize, or reinterpret fields."
+
+[[invariant]]
+id = "INV-2"
+text = "The saved lsp.json wire shape remains compatible while the diagnostics collection is typed as EditorDiagnostic at the core projection boundary."
+
+[[invariant]]
+id = "INV-3"
+text = "The editor path remains read-only and advisory: no source edits, witness execution, automatic repair, blocking, or safety proof is introduced."
+
+[[acceptance]]
+id = "AC-1907-2B-1"
+text = "EditorProjection stores canonical EditorDiagnostic values directly and serializes the same diagnostic object emitted by the saved lsp.json renderer."
+proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+
+[[acceptance]]
+id = "AC-1907-2B-2"
+text = "Saved projection tests lock card identity, class code, severity, and the complete serialized diagnostic against the typed DTO."
+proof = ["rtk cargo test -p unsafe-review-core lsp --locked", "rtk cargo run --locked -p xtask -- check-fixture-surface-parity"]
+
+[[acceptance]]
+id = "AC-1907-2B-3"
+text = "No live LSP, VS Code, freshness, action, packet, or repair behavior is migrated in this slice."
+proof = ["rtk git diff --name-only", "rtk git diff --check"]
+
+[[integration]]
+surface = "1907-pr2a-canonical-dto"
+expected = "The saved projection consumes the merged EditorDiagnostic contract directly; later live and VS Code PRs consume the same type."
+
+[[integration]]
+surface = "saved-lsp-json"
+expected = "The existing serialized field names and values remain stable while the internal diagnostic collection becomes typed."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Compare typed DTO serialization with the saved wire value and run committed fixture surface goldens."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Keep live CLI and VS Code files outside the PR so overlapping migration work remains sequenced."
+
+[compatibility]
+posture = "Internal Rust representation becomes typed and owned; serialized lsp.json remains wire-compatible for current consumers."
+
+[rollback]
+strategy = "Revert the direct typed diagnostics field, owned DTO conversions, regression test, and this supplemental work spec; the merged PR2A DTO remains available for a later saved migration."
