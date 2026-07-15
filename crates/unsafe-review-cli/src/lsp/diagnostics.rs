@@ -4,71 +4,61 @@ use std::path::Path;
 use tower_lsp_server::ls_types::{
     Diagnostic, DiagnosticSeverity, NumberOrString, Position, Range, Uri,
 };
-use unsafe_review_core::{AnalyzeOutput, Priority, ReviewCard};
+use unsafe_review_core::{
+    AnalyzeOutput, EditorDiagnostic, ReviewCard, project_actionable_editor_diagnostics,
+};
 
 use super::uri::uri_from_path;
-
-mod data;
 
 pub(super) fn diagnostics_by_uri(
     root: &Path,
     output: &AnalyzeOutput,
 ) -> BTreeMap<Uri, Vec<Diagnostic>> {
     let mut map = BTreeMap::new();
-    for card in &output.cards {
-        if !card.class.is_actionable() {
-            continue;
-        }
-        let path = root.join(&card.site.location.file);
+    for diagnostic in project_actionable_editor_diagnostics(output) {
+        let path = root.join(&diagnostic.path);
         let Some(uri) = uri_from_path(path) else {
             continue;
         };
         map.entry(uri)
             .or_insert_with(Vec::new)
-            .push(diagnostic_from_card(card));
+            .push(diagnostic_from_editor_diagnostic(&diagnostic));
     }
     map
 }
 
-fn diagnostic_from_card(card: &ReviewCard) -> Diagnostic {
-    let line = card.site.location.line.saturating_sub(1) as u32;
-    let start = Position::new(line, card.site.location.column.saturating_sub(1) as u32);
-    let end = Position::new(line, start.character + lsp_width(&card.site.snippet));
+fn diagnostic_from_editor_diagnostic(diagnostic: &EditorDiagnostic) -> Diagnostic {
     Diagnostic {
-        range: Range::new(start, end),
-        severity: Some(diagnostic_severity(card)),
-        code: Some(NumberOrString::String(card.class.as_str().to_string())),
-        source: Some("unsafe-review".into()),
-        message: diagnostic_message(card),
-        data: Some(data::build_diagnostic_data(card)),
+        range: range_from_editor_diagnostic(diagnostic),
+        severity: lsp_severity(diagnostic.severity),
+        code: Some(NumberOrString::String(diagnostic.code.clone())),
+        source: Some(diagnostic.source.clone()),
+        message: diagnostic.message.clone(),
+        data: serde_json::to_value(diagnostic).ok(),
         ..Default::default()
     }
 }
 
-fn diagnostic_severity(card: &ReviewCard) -> DiagnosticSeverity {
-    if matches!(card.priority, Priority::High) {
-        DiagnosticSeverity::WARNING
-    } else {
-        DiagnosticSeverity::INFORMATION
-    }
-}
-
-fn diagnostic_message(card: &ReviewCard) -> String {
-    format!(
-        "{}: {}",
-        card.operation.family.as_str(),
-        card.next_action.summary
+fn range_from_editor_diagnostic(diagnostic: &EditorDiagnostic) -> Range {
+    Range::new(
+        Position::new(
+            diagnostic.range.start.line as u32,
+            diagnostic.range.start.character as u32,
+        ),
+        Position::new(
+            diagnostic.range.end.line as u32,
+            diagnostic.range.end.character as u32,
+        ),
     )
 }
 
-pub(super) fn lsp_width(text: &str) -> u32 {
-    text.lines()
-        .next()
-        .unwrap_or(text)
-        .chars()
-        .map(|c| c.len_utf16() as u32)
-        .sum::<u32>()
-        .max(1)
+fn lsp_severity(severity: usize) -> Option<DiagnosticSeverity> {
+    match severity {
+        2 => Some(DiagnosticSeverity::WARNING),
+        3 => Some(DiagnosticSeverity::INFORMATION),
+        4 => Some(DiagnosticSeverity::HINT),
+        _ => None,
+    }
 }
 
 pub(super) fn find_card_at_position<'a>(

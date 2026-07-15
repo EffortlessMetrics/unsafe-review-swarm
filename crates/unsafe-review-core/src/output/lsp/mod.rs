@@ -6,11 +6,13 @@ use crate::api::AnalyzeOutput;
 use crate::domain::ReviewCard;
 use serde::Serialize;
 
-pub(crate) use projection::project_editor;
 pub use projection::{
     EditorCoverageBlock, EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary,
     EditorObligationEvidence, EditorPosition, EditorProjection, EditorRange, EditorReachEvidence,
     EditorSafetyCondition, EditorSimpleEvidence, EditorWitnessRoute,
+};
+pub(crate) use projection::{
+    project_actionable_editor_diagnostics, project_editor, project_editor_diagnostics,
 };
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {

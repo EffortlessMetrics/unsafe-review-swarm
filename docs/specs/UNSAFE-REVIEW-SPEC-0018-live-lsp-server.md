@@ -177,7 +177,9 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 ## Diagnostics / hover / actions
 
 - One `ReviewCard` maps to one `Diagnostic`.
-- High priority maps to Warning; all others to Information.
+- Diagnostic severity derives from the `ReviewClass` class table shared with
+  SARIF: warning classes map to Warning, note classes to Information, and
+  non-actionable classes to Hint. Priority remains a ranking signal only.
 - No `Error` severity in v1.
 - Diagnostic ranges use UTF-16 character width.
 - Diagnostic `data` includes `card_id`, operation details, `operation_family`,
