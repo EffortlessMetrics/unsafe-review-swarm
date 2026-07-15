@@ -400,6 +400,33 @@ fn canonical_editor_diagnostic_exposes_card_semantics() -> Result<(), String> {
 }
 
 #[test]
+fn saved_projection_serializes_the_canonical_diagnostic_without_rederivation() -> Result<(), String>
+{
+    let output = fixture_output("raw_pointer_alignment")?;
+    let projection = project_editor(&output);
+    let rendered = parse_json(&render(&output))?;
+    let serialized = serde_json::to_value(&projection.diagnostics[0])
+        .map_err(|err| format!("canonical diagnostic serialization failed: {err}"))?;
+
+    assert_eq!(serialized, rendered["diagnostics"][0]);
+    assert_eq!(projection.diagnostics[0].card_id, output.cards[0].id.0);
+    assert_eq!(
+        projection.diagnostics[0].code,
+        output.cards[0].class.as_str()
+    );
+    assert_eq!(
+        projection.diagnostics[0].severity,
+        output.cards[0].class.lsp_severity()
+    );
+
+    let mut changed = projection.diagnostics[0].clone();
+    changed.next_action = "test-only saved DTO override".to_string();
+    assert_eq!(changed.next_action, "test-only saved DTO override");
+    assert_ne!(changed.next_action, output.cards[0].next_action.summary);
+    Ok(())
+}
+
+#[test]
 fn editor_range_width_uses_utf16_code_units() {
     assert_eq!(super::projection::utf16_width("ascii"), 5);
     assert_eq!(super::projection::utf16_width("a😀b"), 4);
