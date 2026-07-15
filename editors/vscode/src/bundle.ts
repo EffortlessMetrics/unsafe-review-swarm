@@ -27,18 +27,45 @@ export interface BundleRange {
   end: BundleRangePosition;
 }
 
+export interface BundleCoverage {
+  baselineState?: string;
+  movement?: string;
+  readiness?: string;
+  commentStatus?: string;
+  contractCoverage?: string;
+  guardCoverage?: string;
+  manualContext?: string;
+  testReachCoverage?: string;
+  witnessReceiptCoverage?: string;
+}
+
+export type BundleStructuredObject = Record<string, unknown>;
+
+export interface BundleWitnessRoute {
+  kind?: string;
+  reason?: string;
+  command?: string;
+  required?: boolean;
+}
+
 export interface BundleDiagnostic {
   cardId: string;
   code: string;
   message: string;
   path: string;
   range: BundleRange;
+  evidenceSummary?: BundleStructuredObject;
+  hazards?: string[];
+  obligationEvidence?: BundleStructuredObject[];
+  proofPath?: string;
+  requiredSafetyConditions?: BundleStructuredObject[];
   severity?: number;
   source?: string;
   trustBoundary?: string;
+  coverage?: BundleCoverage;
   nextAction?: string;
   missingEvidence?: string[];
-  witnessRoutes?: string[];
+  witnessRoutes?: BundleWitnessRoute[];
   verifyCommands?: string[];
   operation?: string;
   operationFamily?: string;
@@ -59,6 +86,7 @@ export interface BundleCodeActionPayload {
   file?: string;
   line?: number;
   name?: string;
+  proofPath?: string;
   trustBoundary?: string;
 }
 
@@ -172,21 +200,72 @@ function parseDiagnostics(value: unknown, warnings: string[]): BundleDiagnostic[
       warnings.push(`diagnostic #${i} has no message; skipped`);
       continue;
     }
+    const code = readString(entry["code"]);
+    if (code === undefined || code.length === 0) {
+      warnings.push(`diagnostic #${i} has no canonical rule code; skipped`);
+      continue;
+    }
     out.push({
       cardId,
-      code: readString(entry["code"]) ?? "",
+      code,
       message,
       path,
       range,
+      evidenceSummary: readObject(entry["evidence_summary"]),
+      hazards: readStringArray(entry["hazards"]),
+      obligationEvidence: readObjectArray(entry["obligation_evidence"]),
+      proofPath: readString(entry["proof_path"]),
+      requiredSafetyConditions: readObjectArray(entry["required_safety_conditions"]),
       severity: readNumber(entry["severity"]),
       source: readString(entry["source"]) ?? "unsafe-review",
       trustBoundary: readString(entry["trust_boundary"]),
+      coverage: parseCoverage(entry["coverage"]),
       nextAction: readString(entry["next_action"]),
       missingEvidence: readStringArray(entry["missing_evidence"]),
-      witnessRoutes: readStringArray(entry["witness_routes"]),
+      witnessRoutes: parseWitnessRoutes(entry["witness_routes"]),
       verifyCommands: readStringArray(entry["verify_commands"]),
       operation: readString(entry["operation"]),
       operationFamily: readString(entry["operation_family"]),
+    });
+  }
+  return out;
+}
+
+function parseCoverage(value: unknown): BundleCoverage | undefined {
+  if (!isRecord(value)) {
+    return undefined;
+  }
+  return {
+    baselineState: readString(value["baseline_state"]),
+    movement: readString(value["outcome_movement"]),
+    readiness: readString(value["agent_lsp_readiness"]),
+    commentStatus: readString(value["comment_plan_status"]),
+    contractCoverage: readString(value["contract_coverage"]),
+    guardCoverage: readString(value["guard_coverage"]),
+    manualContext: readString(value["manual_context"]),
+    testReachCoverage: readString(value["test_reach_coverage"]),
+    witnessReceiptCoverage: readString(value["witness_receipt_coverage"]),
+  };
+}
+
+function parseWitnessRoutes(value: unknown): BundleWitnessRoute[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  const out: BundleWitnessRoute[] = [];
+  for (const entry of value) {
+    if (typeof entry === "string") {
+      out.push({ kind: entry });
+      continue;
+    }
+    if (!isRecord(entry)) {
+      continue;
+    }
+    out.push({
+      kind: readString(entry["kind"]),
+      reason: readString(entry["reason"]),
+      command: readString(entry["command"]),
+      required: typeof entry["required"] === "boolean" ? entry["required"] : undefined,
     });
   }
   return out;
@@ -274,6 +353,7 @@ function parseCodeActionPayload(value: unknown): BundleCodeActionPayload | undef
     file: readString(value["file"]),
     line: readNumber(value["line"]),
     name: readString(value["name"]),
+    proofPath: readString(value["proof_path"]),
     trustBoundary: readString(value["trust_boundary"]),
   };
 }
@@ -312,6 +392,17 @@ function parsePosition(value: unknown): BundleRangePosition | undefined {
 
 function readString(value: unknown): string | undefined {
   return typeof value === "string" ? value : undefined;
+}
+
+function readObject(value: unknown): BundleStructuredObject | undefined {
+  return isRecord(value) ? value : undefined;
+}
+
+function readObjectArray(value: unknown): BundleStructuredObject[] | undefined {
+  if (!Array.isArray(value)) {
+    return undefined;
+  }
+  return value.filter(isRecord);
 }
 
 function readNumber(value: unknown): number | undefined {
@@ -368,6 +459,10 @@ export function capDiagnosticsPerFile(
     out.push(diag);
   }
   return out;
+}
+
+export function supportedDiagnosticSeverity(value: number | undefined): number | undefined {
+  return value === 2 || value === 3 || value === 4 ? value : undefined;
 }
 
 export function resolveWorkspaceFilePath(

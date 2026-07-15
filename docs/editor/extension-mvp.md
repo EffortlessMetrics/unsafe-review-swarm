@@ -97,14 +97,21 @@ The MVP refresh model is deliberately minimal:
 
 Diagnostics are taken directly from the saved projection. The MVP must:
 
-- preserve the `card_id` in `Diagnostic.code` (string),
-- use the projection's `severity` field (default `Information`),
+- preserve the canonical ReviewClass/rule `code` in `Diagnostic.code` (string),
+- retain `card_id` in the parsed adapter diagnostic and card-scoped action
+  payloads; exact diagnostic-to-card selection remains the separate #1910
+  binding lane,
+- use the projection's `severity` field and skip missing or unsupported
+  severity values with an output warning,
 - preserve `source` as the literal string `unsafe-review`,
 - preserve the message exactly as saved (it already includes the obligation,
   missing evidence, and next action),
 - preserve the saved range when present and reject (skip) entries whose
   range fields are missing or non-numeric. Line `0` is valid because the saved
   projection uses LSP-style zero-based ranges.
+- reject (skip) entries without a canonical rule code or supported severity,
+  and write an output warning rather than presenting an empty or invented
+  semantic value.
 
 The extension may cap diagnostics per file at `unsafeReview.maxDiagnosticsPerFile`
 to keep editor UI responsive on very noisy bundles; capping always discards

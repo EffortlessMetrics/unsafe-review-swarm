@@ -12,6 +12,7 @@ import {
   diagnosticsByFile,
   parseBundle,
   resolveWorkspaceFilePath,
+  supportedDiagnosticSeverity,
 } from "./bundle";
 
 const EXTENSION_ID = "unsafe-review";
@@ -229,7 +230,16 @@ function applyDiagnostics(
       continue;
     }
     const uri = vscode.Uri.file(absolute);
-    const diags = list.map((entry) => toVscodeDiagnostic(entry));
+    const diags = list.flatMap((entry) => {
+      const diagnostic = toVscodeDiagnostic(entry);
+      if (diagnostic === undefined) {
+        adapter?.output.appendLine(
+          `bundle warning: diagnostic ${entry.cardId} has unsupported severity ${String(entry.severity)}`,
+        );
+        return [];
+      }
+      return [diagnostic];
+    });
     adapter.diagnosticsCollection.set(uri, diags);
   }
 }
@@ -295,32 +305,34 @@ function clearBundleState(): void {
   adapter.codeActionsByPath = new Map();
 }
 
-function toVscodeDiagnostic(entry: BundleDiagnostic): vscode.Diagnostic {
+function toVscodeDiagnostic(entry: BundleDiagnostic): vscode.Diagnostic | undefined {
   const range = new vscode.Range(
     new vscode.Position(entry.range.start.line, entry.range.start.character),
     new vscode.Position(entry.range.end.line, entry.range.end.character),
   );
   const severity = severityFromBundle(entry.severity);
+  if (severity === undefined) {
+    return undefined;
+  }
   const diagnostic = new vscode.Diagnostic(range, entry.message, severity);
   diagnostic.source = entry.source ?? "unsafe-review";
   diagnostic.code = {
-    value: entry.cardId,
+    value: entry.code,
     target: vscode.Uri.parse("https://crates.io/crates/unsafe-review"),
   };
   return diagnostic;
 }
 
-function severityFromBundle(value: number | undefined): vscode.DiagnosticSeverity {
-  switch (value) {
-    case 1:
-      return vscode.DiagnosticSeverity.Error;
+function severityFromBundle(value: number | undefined): vscode.DiagnosticSeverity | undefined {
+  switch (supportedDiagnosticSeverity(value)) {
     case 2:
       return vscode.DiagnosticSeverity.Warning;
     case 4:
       return vscode.DiagnosticSeverity.Hint;
     case 3:
-    default:
       return vscode.DiagnosticSeverity.Information;
+    default:
+      return undefined;
   }
 }
 
