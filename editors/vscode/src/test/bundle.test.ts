@@ -1,4 +1,5 @@
 import { strict as assert } from "node:assert";
+import { readFile } from "node:fs/promises";
 import * as path from "node:path";
 import test from "node:test";
 
@@ -8,6 +9,7 @@ import {
   diagnosticsByFile,
   parseBundle,
   resolveWorkspaceFilePath,
+  supportedDiagnosticSeverity,
 } from "../bundle";
 
 const MINIMAL_BUNDLE = {
@@ -29,8 +31,22 @@ const MINIMAL_BUNDLE = {
       },
       severity: 3,
       source: "unsafe-review",
+      coverage: {
+        baseline_state: "new",
+        outcome_movement: "regressed",
+        agent_lsp_readiness: "ready",
+        comment_plan_status: "selected",
+      },
+      missing_evidence: ["alignment evidence"],
       next_action: "Add the alignment guard.",
-      witness_routes: ["miri"],
+      witness_routes: [
+        {
+          kind: "miri",
+          reason: "run a focused witness",
+          command: "cargo +nightly miri test read_header",
+          required: true,
+        },
+      ],
       verify_commands: ["cargo +nightly miri test read_header"],
       operation: "unsafe { ptr.cast::<Header>().read() }",
       operation_family: "raw_pointer_read",
@@ -57,6 +73,7 @@ const MINIMAL_BUNDLE = {
       payload: {
         card_id: "UR-foo",
         kind: "unsafe-review.agent_packet",
+        proof_path: "source_route_only",
         trust_boundary: "Static unsafe contract review only.",
       },
       arguments: [],
@@ -68,13 +85,66 @@ test("parseBundle returns diagnostics, hovers, and code actions", () => {
   const result = parseBundle(JSON.stringify(MINIMAL_BUNDLE));
   assert.equal(result.diagnostics.length, 1);
   assert.equal(result.diagnostics[0].cardId, "UR-foo");
+  assert.equal(result.diagnostics[0].code, "guard_missing");
+  assert.equal(result.diagnostics[0].severity, 3);
+  assert.deepEqual(result.diagnostics[0].range, MINIMAL_BUNDLE.diagnostics[0].range);
+  assert.deepEqual(result.diagnostics[0].missingEvidence, ["alignment evidence"]);
+  assert.deepEqual(result.diagnostics[0].witnessRoutes, [
+    {
+      kind: "miri",
+      reason: "run a focused witness",
+      command: "cargo +nightly miri test read_header",
+      required: true,
+    },
+  ]);
+  assert.deepEqual(result.diagnostics[0].coverage, {
+    baselineState: "new",
+    movement: "regressed",
+    readiness: "ready",
+    commentStatus: "selected",
+    contractCoverage: undefined,
+    guardCoverage: undefined,
+    manualContext: undefined,
+    testReachCoverage: undefined,
+    witnessReceiptCoverage: undefined,
+  });
   assert.equal(result.diagnostics[0].operation, "unsafe { ptr.cast::<Header>().read() }");
   assert.equal(result.hovers.length, 1);
   assert.equal(result.hovers[0].contents.includes("guard_missing"), true);
   assert.equal(result.codeActions.length, 1);
   assert.equal(result.codeActions[0].command, "unsafe-review.copyAgentPacket");
   assert.equal(result.codeActions[0].payload?.cardId, "UR-foo");
+  assert.equal(result.codeActions[0].payload?.proofPath, "source_route_only");
   assert.equal(result.warnings.length, 0);
+});
+
+test("parseBundle preserves the committed canonical saved diagnostic fields", async () => {
+  const fixturePath = path.resolve(
+    __dirname,
+    "../../../../fixtures/raw_pointer_alignment/expected.lsp.json",
+  );
+  const result = parseBundle(await readFile(fixturePath, "utf8"));
+  const diagnostic = result.diagnostics[0];
+  assert.ok(diagnostic);
+  assert.equal(diagnostic.code, "guard_missing");
+  assert.equal(diagnostic.severity, 2);
+  assert.equal(diagnostic.coverage?.baselineState, "new");
+  assert.equal(diagnostic.coverage?.movement, "regressed");
+  assert.equal(diagnostic.coverage?.readiness, "ready");
+  assert.equal(diagnostic.coverage?.contractCoverage, "present");
+  assert.equal(diagnostic.coverage?.guardCoverage, "missing");
+  assert.equal(diagnostic.coverage?.manualContext, "absent");
+  assert.equal(diagnostic.coverage?.testReachCoverage, "missing");
+  assert.equal(diagnostic.coverage?.witnessReceiptCoverage, "missing");
+  assert.equal(diagnostic.missingEvidence?.length, 2);
+  assert.equal(diagnostic.hazards?.length, 4);
+  assert.equal(diagnostic.obligationEvidence?.length, 5);
+  assert.equal(diagnostic.proofPath, "source_route_only");
+  assert.equal(diagnostic.requiredSafetyConditions?.length, 5);
+  assert.equal(diagnostic.range.start.line, 7);
+  assert.equal(diagnostic.range.start.character, 4);
+  assert.equal(diagnostic.range.end.character, 42);
+  assert.ok(diagnostic.cardId.startsWith("UR-raw-pointer-alignment-fixture"));
 });
 
 test("parseBundle rejects non-JSON", () => {
@@ -124,7 +194,7 @@ test("parseBundle accepts zero-based LSP ranges", () => {
   assert.equal(result.diagnostics[0].range.start.line, 0);
 });
 
-test("parseBundle skips diagnostics missing card_id, path, or message", () => {
+test("parseBundle skips diagnostics missing card_id, path, message, or code", () => {
   const broken = {
     ...MINIMAL_BUNDLE,
     diagnostics: [
@@ -141,10 +211,17 @@ test("parseBundle skips diagnostics missing card_id, path, or message", () => {
         path: "src/lib.rs",
         range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } },
       },
+      {
+        card_id: "UR-no-code",
+        message: "no rule code",
+        path: "src/lib.rs",
+        range: { start: { line: 1, character: 0 }, end: { line: 1, character: 5 } },
+      },
     ],
   };
   const result = parseBundle(JSON.stringify(broken));
   assert.equal(result.diagnostics.length, 1);
+  assert.equal(result.warnings.some((warning) => warning.includes("rule code")), true);
 });
 
 test("diagnosticsByFile groups by path", () => {
@@ -156,15 +233,44 @@ test("diagnosticsByFile groups by path", () => {
         {
           ...MINIMAL_BUNDLE.diagnostics[0],
           card_id: "UR-other",
-          path: "src/other.rs",
+          path: "src/lib.rs",
+          range: { start: { line: 8, character: 20 }, end: { line: 8, character: 30 } },
         },
       ],
     }),
   );
   const grouped = diagnosticsByFile(result.diagnostics);
-  assert.equal(grouped.size, 2);
-  assert.equal(grouped.get("src/lib.rs")?.length, 1);
-  assert.equal(grouped.get("src/other.rs")?.length, 1);
+  assert.equal(grouped.size, 1);
+  assert.deepEqual(
+    grouped.get("src/lib.rs")?.map((diagnostic) => diagnostic.cardId),
+    ["UR-foo", "UR-other"],
+  );
+});
+
+test("saved UTF-16 positions are preserved", () => {
+  const result = parseBundle(
+    JSON.stringify({
+      ...MINIMAL_BUNDLE,
+      diagnostics: [
+        {
+          ...MINIMAL_BUNDLE.diagnostics[0],
+          range: { start: { line: 0, character: 2 }, end: { line: 0, character: 5 } },
+        },
+      ],
+    }),
+  );
+  assert.equal(
+    result.diagnostics[0].range.end.character - result.diagnostics[0].range.start.character,
+    3,
+  );
+});
+
+test("supported diagnostic severity rejects forbidden and unknown values", () => {
+  assert.equal(supportedDiagnosticSeverity(2), 2);
+  assert.equal(supportedDiagnosticSeverity(3), 3);
+  assert.equal(supportedDiagnosticSeverity(4), 4);
+  assert.equal(supportedDiagnosticSeverity(1), undefined);
+  assert.equal(supportedDiagnosticSeverity(undefined), undefined);
 });
 
 test("capDiagnosticsPerFile caps per file and preserves order", () => {

@@ -1,0 +1,69 @@
+# Issue-linked work specification for the VS Code saved-projection parity migration.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1907"
+kind = "correctness"
+objective = "Make the VS Code saved-bundle parser and diagnostic adapter preserve canonical editor diagnostic fields without deriving a second semantic model."
+user_outcome = "The saved bundle consumed by VS Code retains card identity, rule code, canonical range, class-derived severity, movement, readiness, and missing evidence from the shared editor DTO."
+claim_boundary = "This slice proves saved-bundle parsing and diagnostic adapter parity; it does not claim live VS Code transport, freshness, exact hover/action binding, actual packet delivery, repair candidates, analyzer accuracy, safety, execution, or hosted CI success."
+
+[scope]
+included = [
+    "Parse all canonical coverage fields into typed VS Code bundle values",
+    "Preserve canonical card ID, rule code, range, severity, evidence, hazards, obligations, proof path, missing evidence, and structured witness routes through the bundle adapter",
+    "Map the canonical rule code into the VS Code diagnostic code and keep advisory severity restricted to Warning, Information, or Hint; skip unsupported severity values with an explicit bundle warning",
+    "Add parser regression coverage for the committed saved DTO, saved UTF-16 positions, adjacent same-file cards, structured canonical fields, and supported severity values",
+]
+excluded = [
+    "Live LSP transport, analysis freshness, exact hover/action binding, packet delivery, cap UX, and typed repair candidates",
+    "Automatic edits, WorkspaceEdit, witness execution, source mutation, policy blocking, and safety claims",
+    "Publication, release versioning, source promotion, and extension packaging/store submission",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The saved bundle parser preserves canonical editor fields and does not classify, prioritize, or reconstruct semantics from prose or proximity."
+
+[[invariant]]
+id = "INV-2"
+text = "VS Code diagnostic severity follows the canonical ReviewClass projection: Warning, Information, or Hint; the advisory adapter never emits Error for the default projection."
+
+[[invariant]]
+id = "INV-3"
+text = "The extension remains read-only and consumes only saved lsp.json data; this slice does not change exact hover/action selection or packet commands."
+
+[[acceptance]]
+id = "AC-1907-2D-1"
+text = "The bundle parser preserves card ID, rule code, range, severity, movement, readiness, and missing evidence from a canonical saved diagnostic."
+proof = ["npm --prefix editors/vscode test"]
+
+[[acceptance]]
+id = "AC-1907-2D-2"
+text = "The VS Code diagnostic adapter maps canonical rule code and supported advisory severity values without introducing an Error severity fallback."
+proof = ["npm --prefix editors/vscode run compile", "npm --prefix editors/vscode test"]
+
+[[acceptance]]
+id = "AC-1907-2D-3"
+text = "No live LSP, freshness, exact binding, packet, repair, source-edit, witness-execution, or policy behavior changes in this slice."
+proof = ["rtk git diff --name-only", "rtk git diff --check"]
+
+[[integration]]
+surface = "1907-pr2c-canonical-live-saved"
+expected = "The VS Code parser consumes the same saved EditorDiagnostic wire fields emitted by the merged canonical core projection and live parity contract."
+
+[[integration]]
+surface = "1910-exact-vscode-binding"
+expected = "Later exact binding work may use preserved card ID, range, and action payload fields without relying on line-proximity heuristics."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the parser typed and additive, assert the complete parity field set in the bundle test, and leave exact binding in #1910."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Map only supported canonical severity values and retain the advisory trust-boundary contract."
+
+[compatibility]
+posture = "Existing valid bundle fields remain accepted; coverage fields are additive, while entries missing canonical code are rejected during parsing and entries missing or having unsupported severity are skipped during adapter rendering with explicit warnings. The VS Code diagnostic code follows the canonical rule code, and card identity remains in parsed adapter data and card-scoped payloads for the later exact-binding lane."
+
+[rollback]
+strategy = "Revert the typed coverage parsing, diagnostic code/severity adapter changes, regression test, and this work spec; merged core and live/saved projection contracts remain available."
