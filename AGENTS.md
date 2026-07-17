@@ -45,6 +45,10 @@ absence of a selected issue is not permission to invent a repository-wide
 default task; inspect the live portfolio and leave durable work selection in
 GitHub issue/PR metadata.
 
+The repository may have an active multi-day improvement runway as portfolio
+context, but that runway is not a default task selector; every execution still
+starts from a live issue/PR and its accepted contract.
+
 Before routine swarm implementation, run the source sync guard:
 
 ```bash
