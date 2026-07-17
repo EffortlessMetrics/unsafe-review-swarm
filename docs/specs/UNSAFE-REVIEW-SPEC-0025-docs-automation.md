@@ -54,7 +54,6 @@ roots, checked/generated outputs, or source inputs for checked repo artifacts.
 ```bash
 cargo run --locked -p xtask -- check-docs-automation
 cargo run --locked -p xtask -- check-doc-artifacts
-cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-support-tiers
 cargo run --locked -p xtask -- check-pr
 git diff --check
@@ -67,9 +66,9 @@ git diff --check
 - `AGENTS.md` must preserve source/swarm routing, source-divergence preflight,
   source-of-truth stack, SPEC-0024 CI routing, and no-`.codex` durable-state
   wording.
-- `AGENTS.md` must preserve the active improvement runway, expected generated
-  PR batches, spec rails as forward drive, missing-rail alignment, and
-  configuration-obstacle handling for single-contributor review gates.
+- `AGENTS.md` must require live issue/PR selection before work begins, preserve
+  spec rails as forward drive, and keep configuration-obstacle handling for
+  single-contributor review gates.
 - `policy/docs-automation.toml` must keep external agent/tool roots awareness
   only, not owned or checked source-of-truth paths.
 - Active lane plans must preserve guardrail wording that matches the checked

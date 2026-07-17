@@ -337,7 +337,6 @@ cargo-allow check --profile spec-system --mode audit
 cargo-allow worklist --profile spec-system --format json
 check-doc-artifacts
 check-docs-automation
-check-goals (legacy parity window)
 check-package-boundary
 check-ci-lanes
 check-policy

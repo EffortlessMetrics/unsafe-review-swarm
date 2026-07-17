@@ -42,8 +42,6 @@ jobs:
         run: cargo run --locked -p xtask -- check-doc-artifacts
       - name: Check docs automation
         run: cargo run --locked -p xtask -- check-docs-automation
-      - name: Check legacy active goals during parity window
-        run: cargo run --locked -p xtask -- check-goals
       - name: Check package boundary
         run: cargo run --locked -p xtask -- check-package-boundary
       - name: Check CI lane ledger

@@ -60,7 +60,6 @@ cargo-allow doctor --profile spec-system
 cargo-allow check --profile spec-system --mode audit
 cargo-allow worklist --profile spec-system --format json
 cargo run --locked -p xtask -- check-doc-artifacts
-cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-pr
 cargo run --locked -p xtask -- source-divergence
 git diff --check
@@ -83,9 +82,9 @@ git diff --check
 
 ## Rollback
 
-Restore the previous active-goal routing and remove the `.allow` authority
-links while leaving the legacy `.rails` snapshot intact until the parity
-window has been reviewed.
+Remove the `.allow` authority links and restore the previous governance files
+only through an explicit owner-approved migration decision, while leaving the
+legacy `.rails` snapshot intact as read-only history.
 
 ## Claim boundary
 

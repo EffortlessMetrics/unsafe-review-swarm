@@ -95,7 +95,6 @@ unsafe-review analysis. The full lane contract is:
 ```text
 cargo run --locked -p xtask -- check-doc-artifacts
 cargo run --locked -p xtask -- check-docs-automation
-cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-package-boundary
 cargo run --locked -p xtask -- check-ci-lanes
 cargo run --locked -p xtask -- check-policy

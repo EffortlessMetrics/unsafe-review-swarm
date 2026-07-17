@@ -36,19 +36,14 @@ starts in source and is not release/public-surface/hotfix work, move the work
 to `unsafe-review-swarm` or stop and leave a handoff explaining the routing
 problem.
 
-When there is no narrower owner instruction, continue improving this codebase in
-`unsafe-review-swarm` along the current rails. Good default work includes
-ReviewCard correctness, evidence precision, artifact/schema verification,
-first-run UX, saved LSP/agent projections, dogfood calibration, tests,
-maintainability refactors, and source-of-truth spec alignment. Do not treat the
-absence of a new direction as a reason to pause if the work clearly advances one
-of those rails.
-
-Assume the repository has an active multi-day improvement runway. New Codex Web
-PR batches on `unsafe-review-swarm` are expected input, not a reason to change
-direction. Keep burning down generated PRs, tightening rails, and improving the
-codebase inside the current advisory ReviewCard-centered lane unless the owner
-explicitly changes the lane.
+After selecting a bounded issue from live GitHub state, continue that issue in
+`unsafe-review-swarm` along the accepted contract and current rails. Good issue
+scopes include ReviewCard correctness, evidence precision, artifact/schema
+verification, first-run UX, saved LSP/agent projections, dogfood calibration,
+tests, maintainability refactors, and source-of-truth spec alignment. The
+absence of a selected issue is not permission to invent a repository-wide
+default task; inspect the live portfolio and leave durable work selection in
+GitHub issue/PR metadata.
 
 Before routine swarm implementation, run the source sync guard:
 

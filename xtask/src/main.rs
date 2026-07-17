@@ -1210,7 +1210,6 @@ fn check_policy() -> Result<(), String> {
     check_doc_artifacts()?;
     check_docs_automation()?;
     public_surfaces::check()?;
-    source_truth_ledgers::check_goals()?;
     source_truth_ledgers::check_package_boundary()?;
     ci_lanes::check()?;
     ci_routing_contract::check_ci_routing_contract()?;

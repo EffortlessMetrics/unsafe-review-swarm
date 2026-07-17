@@ -32,8 +32,9 @@ It is chosen over a per-repo `.<repo>-spec` name because it is:
   clash with tool/session namespaces (see the rule below).
 
 This directory was renamed from `.unsafe-review-spec/`. The legacy `check-goals`
-and related checks remain during the bounded parity window, but current agent
-contracts and active-goal routing point at `.allow/`.
+command remains available only for explicit parity investigation; it is not part
+of `check-pr`, policy CI, or agent work selection. Current agent contracts point
+at `.allow/`, and no active-goal file selects the repository's next issue.
 
 ## Source-of-Truth Rule
 
