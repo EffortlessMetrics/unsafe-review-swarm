@@ -48,6 +48,8 @@ GitHub issue/PR metadata.
 Assume the repository has an active multi-day improvement runway. Treat that
 runway only as portfolio context, not as a default task selector; every
 execution still starts from a live issue/PR and its accepted contract.
+PR batches on `unsafe-review-swarm` are expected input, but they do not choose
+the current issue; live GitHub metadata and the accepted work contract do.
 
 Before routine swarm implementation, run the source sync guard:
 
