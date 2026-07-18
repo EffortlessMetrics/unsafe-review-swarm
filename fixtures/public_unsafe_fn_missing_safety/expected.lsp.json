@@ -1,4 +1,11 @@
 {
+  "analysis": {
+    "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+    "generation": 0,
+    "tool_version": "0.3.8",
+    "scope": "diff",
+    "state": "current"
+  },
   "schema_version": "0.1",
   "tool": "unsafe-review",
   "mode": "read_only_projection",

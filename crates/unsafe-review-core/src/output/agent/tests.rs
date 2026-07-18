@@ -1521,15 +1521,47 @@ fn file_range_scan_returns_envelope_with_correct_shape() -> Result<(), String> {
     assert_eq!(packets.len(), 1, "one card should produce one packet");
     assert_eq!(packets[0]["mode"], "bounded_repair_packet");
     assert_eq!(packets[0]["card_id"], card.id.0);
+    assert_eq!(value["analysis"]["analysis_id"], "test-range-scan");
 
     let staleness = &value["staleness_marker"];
-    assert!(staleness["refresh_generation"].is_string());
-    assert!(staleness["analyzed_base"].is_string());
+    assert!(staleness["refresh_generation"].is_u64());
+    assert!(staleness.get("analyzed_base").is_none());
 
     let do_not_do = value["do_not_do"]
         .as_array()
         .ok_or("do_not_do should be an array")?;
     assert!(!do_not_do.is_empty());
+    Ok(())
+}
+
+#[test]
+fn output_range_scan_carries_analysis_identity() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let root =
+        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../../fixtures/raw_pointer_alignment");
+    let envelope_json = crate::api::collect_context_range(
+        &output,
+        &root,
+        std::path::Path::new("src/lib.rs"),
+        1,
+        1000,
+        false,
+    );
+    let value = parse_json(&envelope_json)?;
+    assert_eq!(
+        value["analysis"]["analysis_id"],
+        output.analysis_identity.analysis_id
+    );
+    assert_eq!(
+        value["analysis"]["generation"],
+        output.analysis_identity.generation
+    );
+    assert_eq!(value["packets"][0]["analysis"], value["analysis"]);
+    assert_eq!(
+        value["staleness_marker"]["refresh_generation"],
+        output.analysis_identity.generation
+    );
+    assert!(value["staleness_marker"].get("analyzed_base").is_none());
     Ok(())
 }
 

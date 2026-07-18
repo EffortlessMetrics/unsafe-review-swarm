@@ -1,0 +1,56 @@
+# Issue-linked work specification for the #1908 analysis-identity contract.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1908"
+kind = "correctness"
+objective = "Define one truthful per-analysis identity and project it unchanged into saved LSP and agent envelopes without changing ReviewCard semantics."
+user_outcome = "Consumers can distinguish two analysis runs without mistaking a schema version, card ID, or content hash for freshness proof."
+claim_boundary = "This slice identifies the analysis run that produced an artifact. It does not claim document currentness, safety, completeness, analyzer accuracy, unsaved-buffer analysis, failure/partial/capped state, live document-version linkage, or stale-transition correctness."
+
+[identity]
+meaning = "Opaque identity of one completed AnalyzeOutput construction. It is a freshness signal, not a content identity or safety guarantee."
+generation = "Monotonic within one process and analysis producer; it is not used as a document version."
+analysis_id = "Includes the process-local generation and a run nonce so separate invocations do not reuse the schema-version placeholder or a content-only hash."
+unknown_facts = "base_commit, head_commit, document_version, and file_digest remain absent until their actual producer facts are available."
+state = "current means the analysis construction completed; it does not mean the source is current at consumption time. Later PRs add stale, failed, partial, and capped states."
+
+[scope]
+included = [
+    "Add a core AnalysisIdentity owned by AnalyzeOutput",
+    "Replace the agent range-scan schema-version refresh_generation placeholder",
+    "Project the same identity into saved LSP and agent packets",
+    "Add distinct-run, cross-surface equality, omission, and ReviewCard-invariance tests",
+    "Align the freshness_identity producer entry in policy/spec-coverage.toml",
+]
+excluded = [
+    "Live LSP document versions, didChange stale transitions, unsaved-buffer analysis, and refresh scheduling",
+    "Failed, partial, capped, refreshing, or retained-stale result states",
+    "Pull diagnostics, progress, cancellation, exact VS Code binding, packet delivery, repair candidates, and analyzer behavior",
+    "Automatic edits, witness execution, policy blocking, safety, currentness, completeness, or precision claims",
+]
+
+[[invariant]]
+id = "AC-1908-PR1-1"
+text = "Two completed analysis constructions receive distinguishable analysis identities; the schema version is never used as freshness identity."
+proof = ["cargo test -p unsafe-review-core agent --locked", "cargo test -p unsafe-review-core lsp --locked"]
+
+[[invariant]]
+id = "AC-1908-PR1-2"
+text = "Saved LSP and agent projections from one AnalyzeOutput carry byte-equivalent identity fields."
+proof = ["cargo test -p unsafe-review-core agent --locked", "cargo test -p unsafe-review-cli lsp --locked"]
+
+[[invariant]]
+id = "AC-1908-PR1-3"
+text = "Unavailable base, head, document version, and file digest facts are omitted rather than guessed, and identity changes do not alter ReviewCard IDs or card semantics."
+proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-review-core agent --locked"]
+
+[integration]
+surface = "1907-canonical-editor-projection"
+expected = "Analysis identity is an additive envelope around the ReviewCard-derived saved projection; EditorDiagnostic semantics remain unchanged."
+
+[rollback]
+strategy = "Revert the AnalysisIdentity producer, saved-LSP/agent envelope fields, ledger alignment, tests, and this work specification; existing card semantics and pre-1908 consumers remain available."
+
+[risks]
+identity_nondeterminism = "Freshness identity intentionally changes across completed runs; fixture surface rendering injects a deterministic test identity so committed semantic goldens remain reproducible."
+wire_compatibility = "Identity is additive and old consumers may ignore the new envelope; no existing card field is renamed or reinterpreted."
+claim_drift = "Keep currentness, state transitions, document versions, and failure semantics in later #1908 PRs."

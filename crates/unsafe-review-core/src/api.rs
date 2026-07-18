@@ -1,5 +1,6 @@
 use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
+use crate::freshness::AnalysisIdentity;
 use crate::input::workspace;
 use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
@@ -14,6 +15,15 @@ use std::path::{Path, PathBuf};
 pub enum Scope {
     Diff,
     Repo,
+}
+
+impl Scope {
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Self::Diff => "diff",
+            Self::Repo => "repo",
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -246,6 +256,7 @@ pub struct Summary {
 
 #[derive(Clone, Debug)]
 pub struct AnalyzeOutput {
+    pub analysis_identity: AnalysisIdentity,
     pub schema_version: String,
     pub tool: String,
     pub root: PathBuf,
@@ -699,15 +710,16 @@ pub fn collect_context_range(
         .collect();
 
     let statuses = comment_plan::card_statuses(output);
-    agent::render_range_scan(
+    agent::render_range_scan_with_identity(
         queried_display,
         line_start,
         line_end,
         changed_only,
         &file_cards,
-        &output.schema_version,
+        None,
         &statuses,
         &output.coverage_snapshot,
+        output.analysis_identity.clone(),
     )
 }
 

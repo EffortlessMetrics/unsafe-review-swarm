@@ -11,6 +11,7 @@ use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, ManualContext,
     OutcomeMovement, ReviewCard, WitnessReceiptCoverage,
 };
+use crate::freshness::AnalysisIdentity;
 use crate::output::confirmation::ConfirmationCue;
 use crate::policy::SnapshotCoverage;
 use serde::Serialize;
@@ -103,6 +104,8 @@ fn agent_lsp_readiness_str(readiness: AgentLspReadiness) -> &'static str {
 
 #[derive(Serialize)]
 pub(super) struct AgentPacket<'a> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    analysis: Option<AnalysisIdentity>,
     schema_version: &'static str,
     tool: &'static str,
     mode: &'static str,
@@ -151,6 +154,15 @@ impl<'a> AgentPacket<'a> {
         comment_plan_status: CommentPlanStatus,
         snapshot: Option<&SnapshotCoverage>,
     ) -> Self {
+        Self::from_with_analysis(card, comment_plan_status, snapshot, None)
+    }
+
+    pub(super) fn from_with_analysis(
+        card: &'a ReviewCard,
+        comment_plan_status: CommentPlanStatus,
+        snapshot: Option<&SnapshotCoverage>,
+        analysis: Option<AnalysisIdentity>,
+    ) -> Self {
         let repairs = packet_repair_projection(card);
         let mut coverage_block = card.coverage_block();
         coverage_block.comment_plan_status = comment_plan_status;
@@ -172,6 +184,7 @@ impl<'a> AgentPacket<'a> {
         coverage_block.agent_lsp_readiness =
             agent_state_to_lsp_readiness(repairs.agent_readiness.state);
         Self {
+            analysis,
             schema_version: "0.1",
             tool: "unsafe-review",
             mode: "bounded_repair_packet",

@@ -8,20 +8,13 @@ use super::packet::AgentPacket;
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
 use crate::domain::coverage::BaselineState;
 use crate::domain::{CardId, CommentPlanStatus, ReviewCard};
+use crate::freshness::AnalysisIdentity;
 use crate::policy::SnapshotCoverage;
 use serde::Serialize;
 use std::collections::{BTreeMap, HashMap};
 
 /// The `mode` string stamped on the envelope (SPEC-0033).
 const MODE: &str = "file_range_scan";
-
-/// A monotonic counter used as the `staleness_marker.refresh_generation`.
-///
-/// In the current implementation this is derived from the analysis-output
-/// `schema_version`.  A future build-time or runtime generation counter could
-/// replace this; the contract is: two reads with different generation values
-/// mean different analysis runs, so stale diagnostics can be detected.
-const SCHEMA_VERSION: &str = "0.1";
 
 /// The `staleness_marker` field (SPEC-0033).
 ///
@@ -31,9 +24,10 @@ const SCHEMA_VERSION: &str = "0.1";
 #[derive(Serialize)]
 pub(super) struct StalenessMaker<'a> {
     /// Monotonic generation id — increments with each new analysis.
-    refresh_generation: &'static str,
-    /// The analyzed base that the generation covers (schema version tag).
-    analyzed_base: &'a str,
+    refresh_generation: u64,
+    /// The analyzed base that the generation covers, when known.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    analyzed_base: Option<&'a str>,
 }
 
 /// The top-level `file_range_scan` envelope (SPEC-0033).
@@ -59,6 +53,7 @@ pub(super) struct FileRangeScanEnvelope<'a> {
     /// Advisory signal: never a safety guarantee.
     empty_means: &'static str,
     staleness_marker: StalenessMaker<'a>,
+    analysis: Option<AnalysisIdentity>,
     do_not_do: &'static [&'static str],
 }
 
@@ -67,15 +62,16 @@ impl<'a> FileRangeScanEnvelope<'a> {
         clippy::too_many_arguments,
         reason = "file range + cards + base + statuses + snapshot are all needed together; extracting a struct would add churn at call sites without simplifying the logic"
     )]
-    pub(super) fn build(
+    pub(super) fn build_with_identity(
         queried_file: String,
         queried_line_start: u32,
         queried_line_end: u32,
         changed_only: bool,
         cards: Vec<&'a ReviewCard>,
-        analyzed_base: &'a str,
+        analyzed_base: Option<&'a str>,
         statuses: &HashMap<CardId, CommentPlanStatus>,
         coverage_snapshot: &BTreeMap<String, SnapshotCoverage>,
+        analysis: Option<AnalysisIdentity>,
     ) -> Self {
         let packets = cards
             .into_iter()
@@ -85,11 +81,11 @@ impl<'a> FileRangeScanEnvelope<'a> {
                     .copied()
                     .unwrap_or(CommentPlanStatus::NotEligible);
                 let snapshot = coverage_snapshot.get(&card.id.0);
-                AgentPacket::from_with_status(card, status, snapshot)
+                AgentPacket::from_with_analysis(card, status, snapshot, analysis.clone())
             })
             .collect();
         Self {
-            schema_version: SCHEMA_VERSION,
+            schema_version: "0.1",
             tool: "unsafe-review",
             mode: MODE,
             policy: "advisory",
@@ -101,9 +97,10 @@ impl<'a> FileRangeScanEnvelope<'a> {
             packets,
             empty_means: "no reviewable seam overlaps those lines — never that those lines are safe",
             staleness_marker: StalenessMaker {
-                refresh_generation: SCHEMA_VERSION,
+                refresh_generation: analysis.as_ref().map_or(0, |value| value.generation),
                 analyzed_base,
             },
+            analysis,
             do_not_do: DO_NOT_DO,
         }
     }

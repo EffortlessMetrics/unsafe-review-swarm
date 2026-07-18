@@ -8,6 +8,7 @@ mod analysis;
 pub mod api;
 mod candidate;
 mod domain;
+pub mod freshness;
 mod input;
 mod output;
 mod policy;
@@ -41,6 +42,7 @@ pub use api::{
     render_usefulness_telemetry, render_usefulness_telemetry_with_cost, render_witness_plan,
     validate_witness_receipts,
 };
+pub use freshness::{AnalysisIdentity, AnalysisState};
 
 /// Compute the SHA-256 hex digest of raw bytes.
 ///

@@ -244,6 +244,7 @@ mod tests {
     #[test]
     fn unsafe_review_plus_does_not_double_count_open_actionable_gaps() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(1, "test-1", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -303,6 +304,7 @@ mod tests {
     #[test]
     fn baseline_aware_badge_uses_new_and_worsened_gaps_not_full_debt() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(2, "test-2", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -366,6 +368,7 @@ mod tests {
     #[test]
     fn baseline_aware_badge_includes_worsened_gaps() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(3, "test-3", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -418,6 +421,7 @@ mod tests {
     #[test]
     fn plus_badge_brownfield_worsened_not_silently_dropped() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(4, "test-4", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -478,6 +482,7 @@ mod tests {
     #[test]
     fn resolved_gaps_signal_baseline_is_present() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(5, "test-5", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -516,6 +521,7 @@ mod tests {
     #[test]
     fn no_baseline_fallback_uses_raw_open_actionable_gaps() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(6, "test-6", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
@@ -560,6 +566,7 @@ mod tests {
     #[test]
     fn baseline_aware_badge_payloads_are_overclaim_free() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: crate::freshness::AnalysisIdentity::for_test(7, "test-7", "repo"),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: PathBuf::from("."),
