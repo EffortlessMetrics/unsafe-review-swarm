@@ -731,8 +731,8 @@ fn render_human(
     for check in &executed {
         let (marker, detail) = match outcomes.iter().find(|(id, _)| *id == check.spec.id) {
             Some((_, Ok(()))) => ("pass", String::new()),
-            Some((_, Err(message))) => ("FAIL", format!("  — {}", first_line(message))),
-            None => ("????", "  — selected but not executed".to_string()),
+            Some((_, Err(message))) => ("FAIL", format!(" — {}", first_line(message))),
+            None => ("????", " — selected but not executed".to_string()),
         };
         lines.push_str(&format!(
             "  [{marker}] {} — {} ({}){detail}\n",

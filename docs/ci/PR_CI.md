@@ -122,11 +122,11 @@ conservative full set rather than an empty selection.
 | Changed-path category | Example paths | Additional checks selected |
 |---|---|---|
 | always (any diff) | — | `check-docs`, `check-policy`, `check-self-unsafe` |
-| docs | `docs/**`, `README.md`, `AGENTS.md` | generated-projection, `check-support-tiers` |
-| fixtures / calibration | `fixtures/**`, `policy/calibration.toml` | generated-projection, `check-fixtures`, `check-calibration`, `check-fixture-surface-parity`, `check-surface-determinism` |
-| corpus | `docs/dogfood/**` | `check-real-pr-corpus`, `check-corpus-partitions`, `check-evidence-loss-challenges`, `check-external-pilots`, `check-dogfood` |
+| docs | `docs/**`, `README.md`, `AGENTS.md`, `CLAUDE.md`, `CHANGELOG.md` | generated-projection (no standalone command), `check-support-tiers` |
+| fixtures / calibration | `fixtures/**`, `policy/calibration.toml` | generated-projection (no standalone command), `check-fixtures`, `check-calibration`, `check-fixture-surface-parity`, `check-surface-determinism` |
+| corpus | `docs/dogfood/**` | generated-projection (no standalone command), `check-real-pr-corpus`, `check-corpus-partitions`, `check-evidence-loss-challenges`, `check-external-pilots`, `check-dogfood` |
 | policy / workflow | `policy/**`, `.github/**` | always set (policy ledger + allowlists) |
-| fuzz | `fuzz/**` | `check-fuzz`, tracked fuzz artifacts |
+| fuzz | `fuzz/**` | `check-fuzz`, fuzz-tracked-artifacts (no standalone command) |
 | product Rust | `crates/**/*.rs` | conservative full set |
 | xtask | `xtask/**` | conservative full set |
 | unknown | anything unmapped | conservative full set |
