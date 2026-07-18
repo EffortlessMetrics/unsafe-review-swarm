@@ -23,7 +23,7 @@ kind = "spec_status_dashboard"
 path = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md"
 mode = "check"
 sources = [
-  "policy/doc-artifacts.toml",
+  ".allow/artifacts/doc-artifacts.toml",
   ".allow/artifacts/doc-artifacts.toml",
   ".allow/goals/active.toml",
   "docs/specs",
@@ -105,7 +105,7 @@ path = "docs/README.md"
 mode = "check"
 sources = [
   "docs",
-  "policy/doc-artifacts.toml",
+  ".allow/artifacts/doc-artifacts.toml",
 ]
 must_include = [
   "First-use",

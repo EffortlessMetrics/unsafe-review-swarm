@@ -9,7 +9,7 @@ goals or route agents here.
 This directory stores the historical coordination state for unsafe-review
 development and release lanes.
 
-- Namespace index: `.rails/index.toml`
+- Historical namespace index: `.rails/index.toml` (parity only)
 - Current goal: `.allow/goals/active.toml`
 - Historical goals: `.rails/goals/archive/`
 - Lane trackers: `.rails/lanes/`
@@ -49,9 +49,9 @@ documented output locations.
 
 Do not store durable repo operating state in external tool namespaces such as
 `.codex/`, `.spec/`, `.claude/`, or `.jules/`. Those directories may exist for
-tool/session state, but unsafe-review's durable coordination state belongs in
-`.rails/`, `docs/`, `plans/`, `policy/`, and documented handoff or
-status surfaces.
+tool/session state, but unsafe-review's durable governance graph belongs in
+`.allow/`. This archive may retain historical parity data, while operational
+selection belongs to live GitHub issues and pull requests.
 
 `AGENTS.md` is the agent-facing entrypoint for these rules. Keep it aligned
 with `.allow` when repo operation style changes, but do not move durable

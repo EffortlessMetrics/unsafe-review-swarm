@@ -1,23 +1,21 @@
 //! Source-of-truth ledger gates (`check-goals`, `check-package-boundary`) and
-//! the shared `.rails/index.toml` index parsers they (and `spec_status`) build on.
+//! the explicit parity-only `.rails/index.toml` index parser used by `check-goals`.
 //!
 //! Extracted from `main.rs` as part of #1806 (xtask modularization). Validates
 //! `.rails/goals/active.toml` (schema, work items, lane/artifact cross-refs) and
 //! `policy/package-boundary.toml` (package classification + Cargo.toml presence),
-//! and exposes `source_truth_index_ids` / `source_truth_index_artifacts` for
-//! `.rails/index.toml`, which `check_doc_artifacts_impl` and `spec_status` also use.
+//! and exposes `source_truth_index_ids` for the explicit parity check.
 
 use crate::{
-    ACTIVE_GOAL_MANIFEST, DOC_ARTIFACT_LEDGER, DocArtifactEntry, GOAL_WORK_ITEM_STATUSES,
-    PACKAGE_BOUNDARY_LEDGER, PACKAGE_CLASSIFICATIONS, SOURCE_OF_TRUTH_INDEX,
-    check_doc_artifacts_impl, parse_toml_file, require_file, require_known, require_toml_string,
-    required_table_string, required_toml_string, toml_array, toml_str_array, toml_table,
+    ACTIVE_GOAL_MANIFEST, GOAL_WORK_ITEM_STATUSES, PACKAGE_BOUNDARY_LEDGER,
+    PACKAGE_CLASSIFICATIONS, SOURCE_OF_TRUTH_INDEX, parse_toml_file, require_file, require_known,
+    require_toml_string, required_table_string, required_toml_string, toml_array, toml_str_array,
+    toml_table,
 };
-use std::collections::{BTreeMap, BTreeSet};
+use std::collections::BTreeSet;
 use std::path::Path;
 
 pub(crate) fn check_goals() -> Result<(), String> {
-    let artifact_ids = check_doc_artifacts_impl()?;
     let source_index = parse_toml_file(Path::new(SOURCE_OF_TRUTH_INDEX))?;
     let indexed_artifact_ids = source_truth_index_ids(&source_index, "artifact")?;
     let indexed_lane_ids = source_truth_index_ids(&source_index, "lane")?;
@@ -71,13 +69,6 @@ pub(crate) fn check_goals() -> Result<(), String> {
         )?;
         for key in ["proposal", "spec"] {
             if let Some(linked_id) = table.get(key).and_then(toml::Value::as_str)
-                && !artifact_ids.contains(linked_id)
-            {
-                return Err(format!(
-                    "{ACTIVE_GOAL_MANIFEST} work_item `{id}` references {key} `{linked_id}` not listed in {DOC_ARTIFACT_LEDGER}"
-                ));
-            }
-            if let Some(linked_id) = table.get(key).and_then(toml::Value::as_str)
                 && !indexed_artifact_ids.contains(linked_id)
             {
                 return Err(format!(
@@ -126,38 +117,6 @@ pub(crate) fn source_truth_index_ids(
         required_table_string(table, "owner", SOURCE_OF_TRUTH_INDEX, kind, idx)?;
     }
     Ok(ids)
-}
-
-pub(crate) fn source_truth_index_artifacts(
-    value: &toml::Value,
-) -> Result<BTreeMap<String, DocArtifactEntry>, String> {
-    let entries = toml_array(value, "artifact", SOURCE_OF_TRUTH_INDEX)?;
-    let mut artifacts = BTreeMap::new();
-    for (idx, entry) in entries.iter().enumerate() {
-        let table = toml_table(entry, SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        let id = required_table_string(table, "id", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        if artifacts.contains_key(id) {
-            return Err(format!(
-                "{SOURCE_OF_TRUTH_INDEX} contains duplicate artifact id `{id}`"
-            ));
-        }
-        let kind = required_table_string(table, "kind", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        let path = required_table_string(table, "path", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        let status =
-            required_table_string(table, "status", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        let owner = required_table_string(table, "owner", SOURCE_OF_TRUTH_INDEX, "artifact", idx)?;
-        require_file(path)?;
-        artifacts.insert(
-            id.to_string(),
-            DocArtifactEntry {
-                kind: kind.to_string(),
-                path: path.to_string(),
-                status: status.to_string(),
-                owner: owner.to_string(),
-            },
-        );
-    }
-    Ok(artifacts)
 }
 
 pub(crate) fn check_package_boundary() -> Result<(), String> {
