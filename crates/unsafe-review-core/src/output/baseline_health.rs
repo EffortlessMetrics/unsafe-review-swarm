@@ -6,11 +6,12 @@
 //!
 //! Repo-controlled strings (`card_id`, `detail`, `snapshot_load_error`, dates) reach
 //! these renderers verbatim from ledger/snapshot files and ReviewCard identities.
-//! [`escape_control_chars`] neutralizes ESC/C0/C1 control characters, CR/LF, the Unicode
-//! line/paragraph separators, bidirectional-format controls, and zero-width characters
-//! before they hit a human terminal (terminal-injection hardening); JSON rendering is
-//! untouched — `serde_json` already escapes control characters per the JSON spec, and
-//! JSON consumers need the exact original value, not a display-safe one.
+//! [`escape_control_chars`] neutralizes ESC/C0/C1 control characters and the full family
+//! of invisible Unicode format/bidi/separator characters (line/paragraph separators,
+//! bidirectional controls, and zero-width / default-ignorable characters) before they hit
+//! a human terminal (terminal-injection hardening); JSON rendering is untouched —
+//! `serde_json` already escapes control characters per the JSON spec, and JSON consumers
+//! need the exact original value, not a display-safe one.
 
 use crate::policy::baseline_health::{BaselineHealthReport, BaselineRefreshPlan};
 use serde::Serialize;
@@ -18,51 +19,55 @@ use serde::Serialize;
 const STATUS_TRUST_BOUNDARY: &str = "Advisory baseline-ledger health report only. It scans repository source and policy files to classify existing SPEC-0030 baseline/coverage-movement signals per ledger entry and writes nothing; a baseline pass is a no-new-debt statement only, not a proof of memory safety, not UB-free status, not Miri-clean status, and not a site-execution claim.";
 const REFRESH_TRUST_BOUNDARY: &str = "Advisory dry-run refresh preview only; it leaves repository policy, source, and snapshot state unchanged, writing a plan artifact only when --out is explicitly given. The plan previews what a future, separately-approved apply mode could change — it is not applied here, and it is not a safety, UB-free, Miri-clean, or site-execution claim.";
 
-/// Escape ESC (`0x1B`), every other C0 control byte, DEL (`0x7F`), C1 control bytes
-/// (`0x80`..=`0x9F`), CR/LF, the Unicode line/paragraph separators (`U+2028`, `U+2029`),
-/// Unicode bidirectional-format controls, and zero-width characters as `\xNN`/`\u{NNNN}`
-/// before printing repo-controlled text to a human terminal (terminal-injection
-/// hardening, issue #1893 review finding). These families matter because a malicious
-/// ledger/snapshot string can otherwise use `U+2028`/`U+2029` as a hard line break to
-/// split a rendered row (the same vector as CR/LF), RTL/LTR overrides or isolates
-/// (`U+202A`..=`U+202E`, `U+2066`..=`U+2069`) to visually reorder one, or zero-width
-/// characters (`U+200B`..=`U+200D`, `U+FEFF`) to hide or misalign one — spoofing the
-/// health/plan output the operator reads. JSON rendering must never call this — it would
-/// corrupt the value JSON consumers expect to round-trip.
+/// Escape ESC (`0x1B`), every other C0 control byte, DEL (`0x7F`), and C1 control bytes
+/// (`0x80`..=`0x9F`) as `\xNN`, and the full family of invisible Unicode
+/// format/bidi/separator characters as `\u{NNNN}`, before printing repo-controlled text
+/// to a human terminal (terminal-injection hardening, issue #1893 review finding). A
+/// malicious ledger/snapshot string can otherwise use a line/paragraph separator
+/// (`U+2028`/`U+2029`) as a hard line break to split a rendered row (the CR/LF vector),
+/// a bidi override/embedding/isolate (`U+061C`, `U+200E`/`U+200F`, `U+202A`..=`U+202E`,
+/// `U+2066`..=`U+2069`) to visually reorder one, or a zero-width / default-ignorable
+/// character (`U+00AD`, `U+200B`..=`U+200D`, `U+2060`, `U+FEFF`, `U+FFF9`..=`U+FFFB`) to
+/// hide or misalign one — spoofing the health/plan output the operator reads.
+/// [`is_display_dangerous`] enumerates the whole family in one place so the hardening
+/// does not need a fresh entry per newly-noticed code point. JSON rendering must never
+/// call this — it would corrupt the value JSON consumers expect to round-trip.
 fn escape_control_chars(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
         let code = ch as u32;
-        let is_control = code <= 0x1F || code == 0x7F || (0x80..=0x9F).contains(&code);
-        let is_bidi_or_zero_width = matches!(
-            ch,
-            '\u{200B}'
-                | '\u{200C}'
-                | '\u{200D}'
-                | '\u{FEFF}'
-                // Unicode line/paragraph separators most terminals render as a hard
-                // line break — same row-splitting vector as CR/LF.
-                | '\u{2028}'
-                | '\u{2029}'
-                | '\u{202A}'
-                | '\u{202B}'
-                | '\u{202C}'
-                | '\u{202D}'
-                | '\u{202E}'
-                | '\u{2066}'
-                | '\u{2067}'
-                | '\u{2068}'
-                | '\u{2069}'
-        );
-        if is_control {
+        if code <= 0x1F || code == 0x7F || (0x80..=0x9F).contains(&code) {
             out.push_str(&format!("\\x{code:02x}"));
-        } else if is_bidi_or_zero_width {
+        } else if is_display_dangerous(ch) {
             out.push_str(&format!("\\u{{{code:04x}}}"));
         } else {
             out.push(ch);
         }
     }
     out
+}
+
+/// `true` for the invisible Unicode format/bidi/separator characters a repo-controlled
+/// string could use to spoof terminal layout (bidi reordering, zero-width hiding, or a
+/// hard line/paragraph break). Kept as one exhaustive predicate — the complete
+/// bidi-control family (`U+061C`, `U+200E`, `U+200F`, `U+202A`..=`U+202E`,
+/// `U+2066`..=`U+2069`), the zero-width / default-ignorable set (`U+00AD`,
+/// `U+200B`..=`U+200D`, `U+2060`, `U+FEFF`), the line/paragraph separators
+/// (`U+2028`/`U+2029`), and the interlinear-annotation controls
+/// (`U+FFF9`..=`U+FFFB`) — so new members are added here rather than scattered across
+/// call sites.
+fn is_display_dangerous(ch: char) -> bool {
+    matches!(ch,
+        '\u{00AD}'                 // soft hyphen
+        | '\u{061C}'               // arabic letter mark (bidi)
+        | '\u{200B}'..='\u{200F}'  // zero-width space/non-joiner/joiner, LRM, RLM
+        | '\u{2028}' | '\u{2029}'  // line / paragraph separator
+        | '\u{202A}'..='\u{202E}'  // bidi embeddings + overrides
+        | '\u{2060}'               // word joiner
+        | '\u{2066}'..='\u{2069}'  // bidi isolates
+        | '\u{FEFF}'               // zero-width no-break space / BOM
+        | '\u{FFF9}'..='\u{FFFB}'  // interlinear annotation anchor/separator/terminator
+    )
 }
 
 #[derive(Serialize)]
@@ -304,16 +309,20 @@ mod tests {
             escaped,
             "a\\u{202e}b\\u{200b}c\\u{2066}d\\u{2028}e\\u{2029}f"
         );
+        // The whole invisible format/bidi/separator family must be escaped, not just the
+        // members noticed in any one review round — see `is_display_dangerous`.
         for spoof in [
-            '\u{202e}', '\u{202d}', '\u{202a}', '\u{2066}', '\u{2069}', '\u{200b}', '\u{200c}',
-            '\u{200d}', '\u{feff}', '\u{2028}', '\u{2029}',
+            '\u{00ad}', '\u{061c}', '\u{200b}', '\u{200c}', '\u{200d}', '\u{200e}', '\u{200f}',
+            '\u{2028}', '\u{2029}', '\u{202a}', '\u{202b}', '\u{202c}', '\u{202d}', '\u{202e}',
+            '\u{2060}', '\u{2066}', '\u{2067}', '\u{2068}', '\u{2069}', '\u{feff}', '\u{fff9}',
+            '\u{fffa}', '\u{fffb}',
         ] {
-            assert!(
-                !escaped.contains(spoof),
-                "bidi/zero-width {spoof:?} must not survive escaping"
-            );
             let one = escape_control_chars(&spoof.to_string());
             assert_eq!(one, format!("\\u{{{:04x}}}", spoof as u32), "for {spoof:?}");
+            assert!(
+                !one.contains(spoof),
+                "invisible control {spoof:?} must not survive escaping"
+            );
         }
     }
 

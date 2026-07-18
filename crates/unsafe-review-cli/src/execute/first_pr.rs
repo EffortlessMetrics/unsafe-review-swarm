@@ -158,9 +158,12 @@ fn print_baseline_onboarding_handoff(terminal_command: &str, root: &Path) {
 }
 
 /// Bounded, advisory-only `pr` warning (issue #1893 §Integration). Reuses
-/// `baseline_status` verbatim — no second movement model. Any classification error
-/// (e.g. a malformed suppression ledger) is swallowed: this is a one-line hint, not a
-/// gate, and must never fail the primary `pr` command.
+/// `baseline_status` verbatim — no second movement model. This is a one-line hint, not a
+/// gate, and must never fail the primary `pr` command. A classification *error* (e.g. an
+/// unparseable baseline ledger, a broken suppression ledger, or a source-scan failure)
+/// is itself surfaced as a non-blocking warning rather than swallowed — a ledger that
+/// cannot even be classified is exactly when the operator most needs the pointer to
+/// `baseline status`, so silence there would hide the problem, not reduce noise.
 fn print_baseline_health_warning(root: &Path) {
     if !root
         .join("policy")
@@ -169,8 +172,15 @@ fn print_baseline_health_warning(root: &Path) {
     {
         return;
     }
-    let Ok(report) = baseline_status(root) else {
-        return;
+    let report = match baseline_status(root) {
+        Ok(report) => report,
+        Err(_) => {
+            println!(
+                "  warning: baseline ledger could not be classified — run `{}`",
+                baseline_status_command(root)
+            );
+            return;
+        }
     };
     if !report.counts.is_fully_healthy() {
         println!(
