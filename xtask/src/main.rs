@@ -18,6 +18,7 @@ mod accuracy_labels;
 mod advisory_artifacts;
 mod calibration_constants;
 mod calibration_manifest;
+mod check_local;
 mod ci_lanes;
 mod ci_routing_contract;
 mod cleanup_auditor;
@@ -943,6 +944,9 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
         commands::XtaskCommand::CheckExternalPilots => external_pilots::check(),
+        commands::XtaskCommand::CheckLocal(raw_args) => {
+            check_local::run(&raw_args, &run_named_check)
+        }
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
@@ -954,9 +958,51 @@ fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
     !matches!(command, commands::XtaskCommand::Help)
 }
 
+/// Map a `check_local::CATALOG` id to the `check-pr` component that runs it.
+///
+/// Returns `None` for an unrecognized id. Splitting recognition (this function)
+/// from execution ([`run_named_check`]) lets a test assert every catalog id has
+/// a dispatch arm without executing the heavyweight checks — the guard against
+/// `CATALOG`/dispatch drift. Keep this arm-for-arm in sync with the `CheckPr`
+/// match arm and `check_local::CATALOG`.
+fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
+    let check: fn() -> Result<(), String> = match id {
+        "docs" => check_docs,
+        "generated-projection" => public_badges::check_generated_projection,
+        "policy" => check_policy,
+        "support-tiers" => check_support_tiers,
+        "fixtures" => fixture_surfaces::check_fixtures,
+        "calibration" => check_calibration,
+        "fixture-surface-parity" => fixture_surfaces::check_fixture_surface_parity,
+        "surface-determinism" => fixture_surfaces::check_surface_determinism,
+        "real-pr-corpus" => real_pr_corpus::check,
+        "corpus-partitions" => corpus_partitions::check,
+        "evidence-loss-challenges" => evidence_loss_challenges::check,
+        "external-pilots" => external_pilots::check,
+        "dogfood" => check_dogfood,
+        "fuzz-manual-harness" => fuzz_artifact_checks::check_manual_fuzz_harness,
+        "fuzz-tracked-artifacts" => fuzz_artifact_checks::check_tracked_generated_artifacts,
+        "self-unsafe" => self_unsafe::check_self_unsafe,
+        _ => return None,
+    };
+    Some(check)
+}
+
+/// Execute a single `check-pr` component by its `check_local::CATALOG` id.
+///
+/// This is the execution seam for `check-local`: the selection logic lives in
+/// `check_local` (pure, unit-tested) and this dispatch maps each catalog id to
+/// the same function `check-pr` invokes, so the two can never drift in behavior.
+fn run_named_check(id: &str) -> Result<(), String> {
+    match dispatch_check(id) {
+        Some(check) => check(),
+        None => Err(format!("check-local: unknown check id `{id}`")),
+    }
+}
+
 fn print_help() {
     println!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-work-specs, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-usefulness, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-work-specs, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-usefulness, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
     );
 }
 
@@ -9245,6 +9291,24 @@ fn is_forbidden_generated_path(path: &str) -> bool {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
+
+    #[test]
+    fn every_check_local_catalog_id_has_a_dispatch_arm() {
+        // Guards against `check_local::CATALOG` and `dispatch_check` drifting:
+        // every catalog id must resolve to a dispatch arm (no execution needed).
+        for spec in check_local::CATALOG {
+            assert!(
+                dispatch_check(spec.id).is_some(),
+                "no dispatch arm for check-local catalog id `{}`",
+                spec.id
+            );
+        }
+    }
+
+    #[test]
+    fn dispatch_check_rejects_unknown_id() {
+        assert!(dispatch_check("not-a-real-check").is_none());
+    }
 
     fn registry_view<'a>(
         families: &'a BTreeSet<String>,

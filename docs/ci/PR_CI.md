@@ -87,6 +87,83 @@ Default analyzer and artifact lanes must not request write tokens. A workflow
 that can post comments, mutate branches, publish crates, or write releases must
 be specified as a separate trusted lane before it is introduced.
 
+## Local development proof tier (`check-local`)
+
+`check-pr` is the comprehensive gate and the only merge-readiness proof. Full
+local runs can be slow, contend on shared Cargo caches, or time out in agent
+worktrees, so contributors sometimes improvise partial command sets and report
+"green" without stating which proof was omitted. `check-local` replaces that
+improvisation with an honest, fast, *partial* tier that is structurally unable
+to masquerade as the full gate:
+
+```text
+cargo run --locked -p xtask -- check-local
+cargo run --locked -p xtask -- check-local --format json --out target/check-local.json
+```
+
+It inspects the current diff, maps every changed path to a category, runs the
+deterministic `check-pr` components relevant to those categories, and emits a
+receipt (`unsafe-review/check-local/v1`) listing every executed and skipped
+check with the reason it was selected or omitted. The receipt always carries
+`"full_gate_required": true` and a `next_command` pointing back at `check-pr`.
+
+`check-local` is a shift-left aid, not a weaker replacement gate. A skipped
+check is never represented as passed, and `check-local` changes no branch
+protection or hosted CI requirement.
+
+### Proof-map
+
+Every deterministic component of `check-pr` maps to a selection rule. The three
+`always` checks run on every diff because a path-based skip would be unsafe;
+the rest are selected by changed-path category. Any product-Rust or `xtask/`
+change, an unrecognized path, or an empty/unavailable diff forces the
+conservative full set rather than an empty selection.
+
+| Changed-path category | Example paths | Additional checks selected |
+|---|---|---|
+| always (any diff) | — | `check-docs`, `check-policy`, `check-self-unsafe` |
+| docs | `docs/**`, `README.md`, `AGENTS.md` | generated-projection, `check-support-tiers` |
+| fixtures / calibration | `fixtures/**`, `policy/calibration.toml` | generated-projection, `check-fixtures`, `check-calibration`, `check-fixture-surface-parity`, `check-surface-determinism` |
+| corpus | `docs/dogfood/**` | `check-real-pr-corpus`, `check-corpus-partitions`, `check-evidence-loss-challenges`, `check-external-pilots`, `check-dogfood` |
+| policy / workflow | `policy/**`, `.github/**` | always set (policy ledger + allowlists) |
+| fuzz | `fuzz/**` | `check-fuzz`, tracked fuzz artifacts |
+| product Rust | `crates/**/*.rs` | conservative full set |
+| xtask | `xtask/**` | conservative full set |
+| unknown | anything unmapped | conservative full set |
+
+The canonical proof-map lives in `xtask/src/check_local.rs::CATALOG`; the
+`run_named_check` dispatch in `xtask/src/main.rs` maps each catalog id to the
+same function `check-pr` runs, so the two can never drift.
+
+### Reporting discipline
+
+`check-local` passing is **not** `check-pr` passing. When reporting local
+verification, name the tier explicitly — "`check-local` (partial) passed" — and
+never record it as "`check-pr` passed". The full gate is still required before
+merge:
+
+```text
+cargo run --locked -p xtask -- check-pr
+```
+
+### Agent and worktree cache guidance
+
+`check-local` reads the repository and shells out to `git`; several checks build
+or read from `target/`. In concurrent agent worktrees, point each checkout at a
+checkout-local target directory so path-bearing tools and cached binaries do not
+collide across worktrees:
+
+```text
+export CARGO_TARGET_DIR="$PWD/target"
+```
+
+Prefer a per-worktree `CARGO_TARGET_DIR` (or the default checkout-local
+`target/`) over a shared absolute cache to avoid stale path-bearing binaries and
+Cargo lock contention. Clean task-owned target directories when a worktree is
+retired. When a diff touches product Rust or `xtask/` routing, `check-local`
+runs the conservative full set anyway, so on those changes prefer running
+`check-pr` directly rather than paying for the full set twice.
+
 ## Policy contracts lane
 
 The policy contracts lane validates the source-of-truth rails without running

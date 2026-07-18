@@ -94,7 +94,8 @@ For analyzer behavior changes only:
 ## Validation
 
 -
-- [ ] Local `cargo run --locked -p xtask -- check-pr`
+- [ ] Optional shift-left `cargo run --locked -p xtask -- check-local` (partial tier — NOT a substitute for `check-pr`)
+- [ ] Local `cargo run --locked -p xtask -- check-pr` (required full gate)
 - [ ] Relevant targeted tests
 - [ ] ripr/unsafe-review/source-exception artifacts checked if applicable
 
