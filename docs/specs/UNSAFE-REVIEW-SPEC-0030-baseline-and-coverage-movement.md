@@ -213,6 +213,13 @@ as a warning in both human and JSON output) — in that state `resolved` means
 scan failure (a genuinely unparseable ledger, a broken suppression ledger, a
 source-scan error) still fails `baseline status` outright.
 
+Classification precedence puts every entry-only bucket ahead of the
+scan-dependent `resolved` bucket: `review_due` (a past `review_after`, derivable
+from the entry and `today` alone) is evaluated before `resolved`, so a degraded,
+scan-unavailable run cannot mask a due entry as `resolved` — inflating that count,
+flipping the ledger to "fully healthy", and suppressing the bounded `pr` warning
+the `review_due` signal is meant to raise.
+
 Human and JSON output project from the same report, so both always report
 identical bucket counts and entry identities. `unsafe-review baseline refresh
 --dry-run [--root .] [--out dir]` builds a deterministic per-entry action plan

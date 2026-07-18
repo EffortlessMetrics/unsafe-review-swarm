@@ -262,9 +262,10 @@ pub fn classify(input: &BaselineHealthInput<'_>) -> BaselineHealthReport {
 
 /// Classify a single ledger entry. Precedence (first match wins), top to bottom:
 /// duplicate > identity_unmatched (bad card_id shape OR missing/empty
-/// owner/reason/evidence OR malformed review_after) > suppression_overlap > resolved >
-/// review_due > snapshot_missing_or_invalid > active_worsened > active_improved >
-/// active_unchanged.
+/// owner/reason/evidence OR malformed review_after) > suppression_overlap > review_due >
+/// resolved > snapshot_missing_or_invalid > active_worsened > active_improved >
+/// active_unchanged. review_due precedes resolved because it depends only on the entry
+/// (`review_after` vs `today`), so a degraded, scan-unavailable run cannot mask it.
 fn classify_entry<'a>(
     entry: &RawLedgerEntry,
     occurrences: &BTreeMap<&str, usize>,
@@ -296,12 +297,13 @@ fn classify_entry<'a>(
             "card_id is also recorded in the active suppression ledger".to_string(),
         );
     }
-    let Some(card) = current_by_id.get(id) else {
-        return (
-            HealthBucket::Resolved,
-            "baseline entry's card no longer appears in the current scan".to_string(),
-        );
-    };
+    // ReviewDue is derivable from the entry alone (`review_after` vs `today`) and does
+    // not depend on the card scan, so it precedes the scan-dependent Resolved check.
+    // Otherwise, under the degraded `card_scan_error` state (`current_cards` emptied by
+    // the caller), a structurally-valid, past-`review_after` entry would be masked as
+    // `resolved` — inflating that count, flipping `is_fully_healthy()` to true, and
+    // silently suppressing the bounded `pr` warning that ReviewDue is meant to raise
+    // (issue #1893 review finding).
     if let Some(review_after) = entry.review_after.as_deref()
         && review_after < input.today
     {
@@ -313,6 +315,12 @@ fn classify_entry<'a>(
             ),
         );
     }
+    let Some(card) = current_by_id.get(id) else {
+        return (
+            HealthBucket::Resolved,
+            "baseline entry's card no longer appears in the current scan".to_string(),
+        );
+    };
     let Some(snapshot_map) = input.snapshot else {
         return (
             HealthBucket::SnapshotMissingOrInvalid,
@@ -766,6 +774,36 @@ mod tests {
 
         assert_eq!(report.counts.resolved, 1);
         assert_eq!(report.entries[0].bucket, HealthBucket::Resolved);
+    }
+
+    #[test]
+    fn review_due_precedes_resolved_when_scan_is_unavailable() {
+        // Degraded scan: `current_cards` is empty exactly as the caller leaves it when
+        // `card_scan_error` is set. A structurally-valid entry with a past `review_after`
+        // must classify as ReviewDue, not Resolved — the entry-only signal must not be
+        // masked by the unavailable scan (issue #1893 review finding). Without the
+        // precedence fix this entry would land in `resolved`, inflating that count and
+        // suppressing the bounded `pr` warning.
+        let mut entry = raw_entry(
+            "UR-due-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+        );
+        entry.review_after = Some("2020-01-01".to_string());
+        let entries = vec![entry];
+        let suppression = empty_suppression();
+        let cards: Vec<ReviewCard> = Vec::new();
+
+        let report = classify(&BaselineHealthInput {
+            today: TODAY,
+            current_cards: &cards,
+            ledger_entries: &entries,
+            suppression_ids: &suppression,
+            snapshot: None,
+            snapshot_load_error: None,
+        });
+
+        assert_eq!(report.counts.review_due, 1, "{:?}", report.entries);
+        assert_eq!(report.counts.resolved, 0);
+        assert_eq!(report.entries[0].bucket, HealthBucket::ReviewDue);
     }
 
     #[test]

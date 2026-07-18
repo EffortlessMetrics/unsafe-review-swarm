@@ -6,11 +6,11 @@
 //!
 //! Repo-controlled strings (`card_id`, `detail`, `snapshot_load_error`, dates) reach
 //! these renderers verbatim from ledger/snapshot files and ReviewCard identities.
-//! [`escape_control_chars`] neutralizes ESC/C0/C1 control characters, CR/LF, Unicode
-//! bidirectional-format controls, and zero-width characters before they hit a human
-//! terminal (terminal-injection hardening); JSON rendering is untouched — `serde_json`
-//! already escapes control characters per the JSON spec, and JSON consumers need the
-//! exact original value, not a display-safe one.
+//! [`escape_control_chars`] neutralizes ESC/C0/C1 control characters, CR/LF, the Unicode
+//! line/paragraph separators, bidirectional-format controls, and zero-width characters
+//! before they hit a human terminal (terminal-injection hardening); JSON rendering is
+//! untouched — `serde_json` already escapes control characters per the JSON spec, and
+//! JSON consumers need the exact original value, not a display-safe one.
 
 use crate::policy::baseline_health::{BaselineHealthReport, BaselineRefreshPlan};
 use serde::Serialize;
@@ -19,15 +19,16 @@ const STATUS_TRUST_BOUNDARY: &str = "Advisory baseline-ledger health report only
 const REFRESH_TRUST_BOUNDARY: &str = "Advisory dry-run refresh preview only; it leaves repository policy, source, and snapshot state unchanged, writing a plan artifact only when --out is explicitly given. The plan previews what a future, separately-approved apply mode could change — it is not applied here, and it is not a safety, UB-free, Miri-clean, or site-execution claim.";
 
 /// Escape ESC (`0x1B`), every other C0 control byte, DEL (`0x7F`), C1 control bytes
-/// (`0x80`..=`0x9F`), CR/LF, Unicode bidirectional-format controls, and zero-width
-/// characters as `\xNN`/`\u{NNNN}` before printing repo-controlled text to a human
-/// terminal (terminal-injection hardening, issue #1893 review finding). The bidi and
-/// zero-width families matter because a malicious ledger/snapshot string can otherwise
-/// use RTL/LTR overrides or isolates (`U+202A`..=`U+202E`, `U+2066`..=`U+2069`) to
-/// visually reorder a rendered row, or zero-width characters (`U+200B`..=`U+200D`,
-/// `U+FEFF`) to hide or misalign one — spoofing the health/plan output the operator
-/// reads. JSON rendering must never call this — it would corrupt the value JSON
-/// consumers expect to round-trip.
+/// (`0x80`..=`0x9F`), CR/LF, the Unicode line/paragraph separators (`U+2028`, `U+2029`),
+/// Unicode bidirectional-format controls, and zero-width characters as `\xNN`/`\u{NNNN}`
+/// before printing repo-controlled text to a human terminal (terminal-injection
+/// hardening, issue #1893 review finding). These families matter because a malicious
+/// ledger/snapshot string can otherwise use `U+2028`/`U+2029` as a hard line break to
+/// split a rendered row (the same vector as CR/LF), RTL/LTR overrides or isolates
+/// (`U+202A`..=`U+202E`, `U+2066`..=`U+2069`) to visually reorder one, or zero-width
+/// characters (`U+200B`..=`U+200D`, `U+FEFF`) to hide or misalign one — spoofing the
+/// health/plan output the operator reads. JSON rendering must never call this — it would
+/// corrupt the value JSON consumers expect to round-trip.
 fn escape_control_chars(value: &str) -> String {
     let mut out = String::with_capacity(value.len());
     for ch in value.chars() {
@@ -39,6 +40,10 @@ fn escape_control_chars(value: &str) -> String {
                 | '\u{200C}'
                 | '\u{200D}'
                 | '\u{FEFF}'
+                // Unicode line/paragraph separators most terminals render as a hard
+                // line break — same row-splitting vector as CR/LF.
+                | '\u{2028}'
+                | '\u{2029}'
                 | '\u{202A}'
                 | '\u{202B}'
                 | '\u{202C}'
@@ -292,13 +297,16 @@ mod tests {
 
     #[test]
     fn escape_control_chars_neutralizes_bidi_and_zero_width() {
-        // RTL override + zero-width space + a bidi isolate — all real terminal-spoofing
-        // vectors a malicious ledger/snapshot string could carry.
-        let escaped = escape_control_chars("a\u{202e}b\u{200b}c\u{2066}d");
-        assert_eq!(escaped, "a\\u{202e}b\\u{200b}c\\u{2066}d");
+        // RTL override + zero-width space + a bidi isolate + line/paragraph separators —
+        // all real terminal-spoofing vectors a malicious ledger/snapshot string carries.
+        let escaped = escape_control_chars("a\u{202e}b\u{200b}c\u{2066}d\u{2028}e\u{2029}f");
+        assert_eq!(
+            escaped,
+            "a\\u{202e}b\\u{200b}c\\u{2066}d\\u{2028}e\\u{2029}f"
+        );
         for spoof in [
             '\u{202e}', '\u{202d}', '\u{202a}', '\u{2066}', '\u{2069}', '\u{200b}', '\u{200c}',
-            '\u{200d}', '\u{feff}',
+            '\u{200d}', '\u{feff}', '\u{2028}', '\u{2029}',
         ] {
             assert!(
                 !escaped.contains(spoof),
