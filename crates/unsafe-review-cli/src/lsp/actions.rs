@@ -1,15 +1,30 @@
 use serde_json::{Value, json};
-use tower_lsp_server::ls_types::{CodeActionOrCommand, Command, Diagnostic, Position};
-use unsafe_review_core::{AnalyzeOutput, CardId, ReviewCard, collect_context};
+use tower_lsp_server::ls_types::{
+    CodeAction, CodeActionDisabled, CodeActionKind, CodeActionOrCommand, Command, Diagnostic,
+    Position,
+};
+use unsafe_review_core::{
+    AnalyzeOutput, CardId, EditorActionApplicability, EditorActionArguments, actions_for_card,
+    collect_context,
+};
 
 use super::TRUST_BOUNDARY;
-use super::diagnostics::find_card_at_position;
+use super::diagnostics::{diagnostic_card_id, range_contains};
 use super::{CMD_OPEN_TEST, CMD_PACKET, CMD_REFRESH, CMD_WITNESS_COMMAND, CMD_WITNESS_ROUTE};
+
+#[derive(Clone, Copy, Default)]
+pub(super) struct ActionClientSupport {
+    pub(super) literals: bool,
+    pub(super) disabled: bool,
+    pub(super) data: bool,
+    pub(super) preferred: bool,
+}
 
 pub(super) fn code_actions_for(
     output: Option<&AnalyzeOutput>,
     diagnostics: &[Diagnostic],
     pos: Position,
+    support: ActionClientSupport,
 ) -> Vec<CodeActionOrCommand> {
     let mut actions = vec![CodeActionOrCommand::Command(Command {
         title: "Refresh unsafe-review diagnostics".into(),
@@ -19,55 +34,61 @@ pub(super) fn code_actions_for(
     let Some(output) = output else {
         return actions;
     };
-    let Some(card) = find_card_at_position(output, diagnostics, pos) else {
-        return actions;
-    };
-    actions.extend(card_code_actions(card));
-    actions
-}
-
-fn card_code_actions(card: &ReviewCard) -> Vec<CodeActionOrCommand> {
-    let card_id = card.id.0.clone();
-    let mut actions = vec![
-        command_action(
-            format!("Copy unsafe-review packet for {card_id}"),
-            CMD_PACKET,
-            json!({"card_id": card_id}),
-        ),
-        command_action(
-            format!("Explain unsafe-review witness route for {}", card.id.0),
-            CMD_WITNESS_ROUTE,
-            json!({"card_id": card.id.0}),
-        ),
-    ];
-    if card.routes.iter().any(|route| route.command.is_some()) {
-        actions.push(command_action(
-            format!("Copy witness command for {} (does not run)", card.id.0),
-            CMD_WITNESS_COMMAND,
-            json!({"card_id": card.id.0}),
-        ));
+    let mut matched = diagnostics
+        .iter()
+        .filter(|diagnostic| range_contains(diagnostic.range, pos))
+        .filter_map(|diagnostic| diagnostic_card_id(diagnostic).map(|id| (id, diagnostic)))
+        .collect::<Vec<_>>();
+    matched.sort_by(|(left, _), (right, _)| left.cmp(right));
+    matched.dedup_by(|(left, _), (right, _)| left == right);
+    for (card_id, diagnostic) in matched {
+        let Ok(contracts) = actions_for_card(output, &card_id) else {
+            continue;
+        };
+        if !support.literals {
+            actions.extend(contracts.into_iter().filter_map(|contract| {
+                contract.applicability.is_available().then(|| {
+                    CodeActionOrCommand::Command(Command {
+                        title: contract.title,
+                        command: contract.command.command,
+                        arguments: serde_json::to_value(contract.command.arguments)
+                            .ok()
+                            .map(|argument| vec![argument]),
+                    })
+                })
+            }));
+            continue;
+        }
+        actions.extend(contracts.into_iter().filter_map(|contract| {
+            let arguments = serde_json::to_value(&contract.command.arguments).ok()?;
+            let data = serde_json::to_value(&contract).ok()?;
+            let disabled = match &contract.applicability {
+                EditorActionApplicability::Available => None,
+                EditorActionApplicability::Disabled { reason, .. } => Some(CodeActionDisabled {
+                    reason: reason.clone(),
+                }),
+            };
+            if disabled.is_some() && !support.disabled {
+                return None;
+            }
+            let command = disabled.is_none().then(|| Command {
+                title: contract.title.clone(),
+                command: contract.command.command.clone(),
+                arguments: Some(vec![arguments]),
+            });
+            Some(CodeActionOrCommand::CodeAction(CodeAction {
+                title: contract.title,
+                kind: Some(CodeActionKind::from(contract.kind)),
+                diagnostics: Some(vec![diagnostic.clone()]),
+                edit: None,
+                command,
+                is_preferred: support.preferred.then_some(contract.is_preferred),
+                disabled,
+                data: support.data.then_some(data),
+            }))
+        }));
     }
-    if let Some(test) = card.related_tests.first() {
-        actions.push(command_action(
-            format!("Open related test `{}`", test.name),
-            CMD_OPEN_TEST,
-            json!({
-                "card_id": card.id.0,
-                "file": test.file,
-                "line": test.line,
-                "name": test.name
-            }),
-        ));
-    }
     actions
-}
-
-fn command_action(title: impl Into<String>, command: &str, argument: Value) -> CodeActionOrCommand {
-    CodeActionOrCommand::Command(Command {
-        title: title.into(),
-        command: command.into(),
-        arguments: Some(vec![argument]),
-    })
 }
 
 pub(super) fn execute_card_command(
@@ -75,7 +96,11 @@ pub(super) fn execute_card_command(
     arguments: &[Value],
     output: &AnalyzeOutput,
 ) -> Option<Value> {
-    let card_id = command_card_id(arguments)?;
+    let typed: EditorActionArguments = serde_json::from_value(arguments.first()?.clone()).ok()?;
+    if typed.analysis != output.analysis_identity {
+        return None;
+    }
+    let card_id = typed.card_id;
     let card = output.cards.iter().find(|card| card.id.0 == card_id)?;
     match command {
         CMD_PACKET => collect_context(output, &CardId(card_id)).map(Value::String),
@@ -112,10 +137,28 @@ pub(super) fn execute_card_command(
     }
 }
 
-fn command_card_id(arguments: &[Value]) -> Option<String> {
-    arguments
-        .first()
-        .and_then(|argument| argument.get("card_id"))
-        .and_then(Value::as_str)
-        .map(ToOwned::to_owned)
+pub(super) fn validate_command_arguments(
+    command: &str,
+    arguments: &[Value],
+    output: &AnalyzeOutput,
+) -> Result<(), &'static str> {
+    if arguments.len() != 1 {
+        return Err("invalid_action_arguments");
+    }
+    let typed: EditorActionArguments =
+        serde_json::from_value(arguments[0].clone()).map_err(|_err| "invalid_action_arguments")?;
+    if typed.analysis != output.analysis_identity {
+        return Err("stale_analysis");
+    }
+    if !output.cards.iter().any(|card| card.id.0 == typed.card_id) {
+        return Err("unknown_card");
+    }
+    let actions = actions_for_card(output, &typed.card_id).map_err(|_err| "unknown_card")?;
+    if !actions
+        .iter()
+        .any(|action| action.command.command == command && action.applicability.is_available())
+    {
+        return Err("action_unavailable");
+    }
+    Ok(())
 }

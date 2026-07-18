@@ -66,11 +66,18 @@ pub(super) fn find_card_at_position<'a>(
     diagnostics: &[Diagnostic],
     pos: Position,
 ) -> Option<&'a ReviewCard> {
-    let diagnostic = diagnostics
-        .iter()
-        .find(|diagnostic| range_contains(diagnostic.range, pos))?;
+    let diagnostic = find_diagnostic_at_position(diagnostics, pos)?;
     let card_id = diagnostic_card_id(diagnostic)?;
     output.cards.iter().find(|card| card.id.0 == card_id)
+}
+
+pub(super) fn find_diagnostic_at_position(
+    diagnostics: &[Diagnostic],
+    pos: Position,
+) -> Option<&Diagnostic> {
+    diagnostics
+        .iter()
+        .find(|diagnostic| range_contains(diagnostic.range, pos))
 }
 
 pub(super) fn diagnostic_card_id(diagnostic: &Diagnostic) -> Option<String> {
@@ -80,6 +87,19 @@ pub(super) fn diagnostic_card_id(diagnostic: &Diagnostic) -> Option<String> {
         .and_then(|data| data.get("card_id"))
         .and_then(serde_json::Value::as_str)
         .map(ToOwned::to_owned)
+}
+
+pub(super) fn canonical_request_diagnostics(
+    cached: Vec<Diagnostic>,
+    requested: &[Diagnostic],
+) -> Vec<Diagnostic> {
+    if requested.is_empty() {
+        return cached;
+    }
+    cached
+        .into_iter()
+        .filter(|cached| requested.iter().any(|item| item == cached))
+        .collect()
 }
 
 pub(super) fn range_contains(range: Range, pos: Position) -> bool {

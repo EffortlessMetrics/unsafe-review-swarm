@@ -14,8 +14,8 @@ use super::Backend;
 
 impl Backend {
     pub(super) async fn refresh(&self) {
-        let generation = self.next_refresh_generation().await;
         let _guard = self.refresh_in_flight.lock().await;
+        let generation = self.begin_refresh().await;
         let root = self.root.lock().await.clone();
         let cfg = self.config.lock().await.clone();
         let Some(diff) = self.diff_source(&root, &cfg).await else {
@@ -59,7 +59,11 @@ impl Backend {
                 return;
             }
         };
-        if !self.is_current_generation(generation).await {
+        let by_uri = diagnostics_by_uri(&root, &output);
+        let Some((clear_uris, publish_batches)) = self
+            .install_refresh_result(output, by_uri, document_versions, generation)
+            .await
+        else {
             self.client
                 .log_message(
                     MessageType::INFO,
@@ -67,11 +71,7 @@ impl Backend {
                 )
                 .await;
             return;
-        }
-        let by_uri = diagnostics_by_uri(&root, &output);
-        let (clear_uris, publish_batches) = self
-            .install_refresh_result(output, by_uri, document_versions)
-            .await;
+        };
         for (uri, version) in clear_uris {
             self.client.publish_diagnostics(uri, vec![], version).await;
         }
@@ -122,14 +122,11 @@ impl Backend {
         }
     }
 
-    async fn next_refresh_generation(&self) -> u64 {
+    async fn begin_refresh(&self) -> u64 {
         let mut generation = self.refresh_generation.lock().await;
         *generation += 1;
+        self.live_snapshot.lock().await.current = false;
         *generation
-    }
-
-    async fn is_current_generation(&self, generation: u64) -> bool {
-        *self.refresh_generation.lock().await == generation
     }
 
     async fn install_refresh_result(
@@ -137,10 +134,15 @@ impl Backend {
         output: AnalyzeOutput,
         by_uri: BTreeMap<Uri, Vec<Diagnostic>>,
         versions: BTreeMap<Uri, i32>,
-    ) -> (
+        generation: u64,
+    ) -> Option<(
         Vec<(Uri, Option<i32>)>,
         Vec<(Uri, Vec<Diagnostic>, Option<i32>)>,
-    ) {
+    )> {
+        let current_generation = self.refresh_generation.lock().await;
+        if *current_generation != generation {
+            return None;
+        }
         let current: BTreeSet<_> = by_uri.keys().cloned().collect();
         let clear_uris = {
             let mut previous = self.last_diagnostic_uris.lock().await;
@@ -161,9 +163,11 @@ impl Backend {
                 (uri.clone(), diagnostics.clone(), versions.get(uri).copied())
             })
             .collect::<Vec<_>>();
-        *self.latest_analysis.lock().await = Some(output);
-        *self.latest_diagnostics.lock().await = by_uri;
-        (clear_uris, publish_batches)
+        let mut snapshot = self.live_snapshot.lock().await;
+        snapshot.analysis = Some(output);
+        snapshot.diagnostics = by_uri;
+        snapshot.current = true;
+        Some((clear_uris, publish_batches))
     }
 
     async fn clear_stale_diagnostics(&self) {
@@ -171,8 +175,12 @@ impl Backend {
             let mut previous = self.last_diagnostic_uris.lock().await;
             clear_uris_for_failure(&mut previous)
         };
-        *self.latest_analysis.lock().await = None;
-        self.latest_diagnostics.lock().await.clear();
+        {
+            let mut snapshot = self.live_snapshot.lock().await;
+            snapshot.analysis = None;
+            snapshot.diagnostics.clear();
+            snapshot.current = false;
+        }
         for uri in clear_uris {
             let version = self.document_version(&uri).await;
             self.client.publish_diagnostics(uri, vec![], version).await;
@@ -188,6 +196,7 @@ impl Backend {
     /// UB-free, and it must never claim the (possibly absent) diagnostics are
     /// current.
     pub(super) async fn mark_diagnostics_failed(&self, context: &str) {
+        self.live_snapshot.lock().await.current = false;
         self.client
             .show_message(
                 MessageType::WARNING,
@@ -201,7 +210,8 @@ impl Backend {
     }
 
     pub(super) async fn mark_diagnostics_stale(&self) {
-        self.next_refresh_generation().await;
+        let _guard = self.refresh_in_flight.lock().await;
+        self.begin_refresh().await;
         self.clear_stale_diagnostics().await;
         self.client
             .log_message(
