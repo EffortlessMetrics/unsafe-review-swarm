@@ -1,0 +1,74 @@
+# UNSAFE-REVIEW-WORK-1915
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
+kind = "robustness"
+objective = "Create a live-state release cutline draft and blocker matrix without freezing or publishing a candidate."
+user_outcome = "Release qualification has one refreshable contract that distinguishes required evidence, deferred work, and owner-gated publication steps."
+claim_boundary = "This artifact structures release qualification intent and dispositions; it does not prove implementation correctness, installed-product readiness, publication authorization, or any unsafe-code safety property."
+dependencies = ["#1899 portfolio semantics", "#1900 issue-linked work specs"]
+blockers = ["Required editor/agent and installed-product evidence is not yet complete.", "Candidate semver is intentionally not frozen in this draft."]
+affected_files = ["plans/release-cutline/UNSAFE-REVIEW-CUTLINE-1915.toml", "docs/status/RELEASE_CUTLINE.md"]
+affected_symbols = []
+linked_specs = ["UNSAFE-REVIEW-SPEC-0020"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Live swarm/source SHA snapshot and source-divergence posture",
+    "Required, deferred, and owner-gated release item dispositions",
+    "Draft machine-readable cutline and human qualification summary",
+]
+excluded = [
+    "Candidate version freeze or dependency freeze",
+    "Source promotion, tag movement, publication, GitHub Release, or public v1",
+    "Implementation of any listed product or editor issue",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The cutline is a qualification contract and never becomes a repository-wide scheduler or default goal."
+
+[[invariant]]
+id = "INV-2"
+text = "Publication, source promotion, tags, GitHub Release, and public v1 remain owner-gated and outside this draft."
+
+[[acceptance]]
+id = "AC-1"
+text = "The draft records exact swarm/source SHAs, source-divergence posture, and an unresolved semver rationale."
+proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The cutline names required and deferred release inputs without claiming that open prerequisites are complete."
+proof = ["rtk cargo run --locked -p xtask -- check-doc-artifacts", "rtk cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-3"
+text = "The machine-readable cutline is registered in the durable .allow graph and its human summary states the freeze and rollback rules."
+proof = ["rtk cargo-allow check --profile spec-system --mode audit", "rtk git diff --check"]
+
+[[integration]]
+surface = "cargo_allow"
+expected = "The cutline and work spec are registered as draft plan_item compatibility artifacts with source-tree links."
+
+[[integration]]
+surface = "pr_body"
+expected = "A follow-up freeze PR can report stable cutline item IDs and proof results without rewriting this draft."
+
+[[integration]]
+surface = "release_handoff"
+expected = "The human summary names what must be refreshed before freeze and keeps publication outside the current authority boundary."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep candidate, semver, and freeze status explicit instead of inferring them from historical branch names."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Require a follow-up freeze PR with exact proofs and owner decision before any irreversible release action."
+
+[compatibility]
+posture = "Additive qualification artifact; no analyzer, runtime, public schema, release, or publication behavior changes."
+
+[rollback]
+strategy = "Supersede the draft cutline with a dated audit artifact and remove only this issue's draft links; do not change source history, tags, publication state, or public v1."
