@@ -42,6 +42,7 @@ const XTASK_COMMANDS: &[&str] = &[
     "check-spec-status",
     "check-surface-determinism",
     "source-divergence",
+    "workflow-pin-sync",
 ];
 
 pub(crate) fn check() -> Result<(), String> {
