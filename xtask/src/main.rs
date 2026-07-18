@@ -996,12 +996,8 @@ fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
 /// the same function `check-pr` invokes, so the two can never drift in behavior.
 fn run_named_check(id: &str, quiet: bool) -> Result<(), String> {
     if quiet {
-        let executable = std::env::args_os()
-            .next()
-            .map(PathBuf::from)
-            .filter(|path| path.is_file())
-            .or_else(|| std::env::current_exe().ok().filter(|path| path.is_file()))
-            .ok_or_else(|| "check-local: failed to resolve xtask executable".to_string())?;
+        let executable = std::env::current_exe()
+            .map_err(|err| format!("check-local: failed to resolve xtask executable: {err}"))?;
         let output = Command::new(&executable)
             .arg("check-local-run")
             .arg(id)
