@@ -311,6 +311,33 @@ declaration summary, when at least one `unsafe_declaration`-family
   every underlying card keeps its own id, class, and policy status in
   `cards.json` and the card table above; this section only bounds what is
   printed inline
+target-feature summary, when at least one `target_feature`-family
+  ReviewCard is present (issue #1894)
+  bounded, deterministic groups of `target_feature` ReviewCards by source
+  file, review class, and a normalized attribute shape -- presentation-only,
+  projected from the same `CoverageBlock::derive` data every other
+  baseline-movement surface uses; never a second classifier and never a
+  discharge
+  architecture/feature literals (e.g. `enable = "avx2"` vs `enable =
+  "neon"`) are group metadata, never group identity; two cards group
+  together only when their file, class, baseline movement, full
+  contract/guard/test-reach/witness-receipt coverage state, and next action
+  are all identical
+  each group row reports: file, shared class, total sites, deduplicated
+  feature-literal metadata, and a representative card-id sample capped at
+  `target_feature_summary::TARGET_FEATURE_SUMMARY_REPRESENTATIVE_LIMIT` with
+  a "+N more (see `cards.json`)" pointer to the complete membership
+  groups with a `new`/`worsened` baseline posture MUST sort ahead of other
+  groups so a changed obligation cannot be hidden behind unchanged
+  repetition volume
+  omitted entirely when there are no `target_feature` cards -- a quiet PR
+  must not gain a new empty section
+  every underlying card keeps its own id, class, and policy status in
+  `cards.json` and the card table above; this section only bounds what is
+  printed inline
+  the comment-plan (SPEC-0022/0032) selects at most one representative per
+  group for an inline comment slot; every other member is recorded in
+  `not_selected[]` with reason_code `grouped_repetition` -- never dropped
 missing evidence summary
 witness route summary
   rows project ReviewCard id, primary route, route reason, and route command

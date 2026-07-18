@@ -30,6 +30,7 @@ use std::collections::HashMap;
 pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPlanStatus> {
     use self::model::comment_budget_key;
     use self::selection::{importance_rank, should_plan_comment};
+    use crate::output::target_feature_summary;
     use std::collections::BTreeSet;
 
     // Must match MAX_PLANNED_COMMENTS in model.rs — kept in sync by the
@@ -40,12 +41,21 @@ pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPl
     let mut statuses: HashMap<CardId, CommentPlanStatus> =
         HashMap::with_capacity(output.cards.len());
 
+    // Non-representative members of a `target_feature`-repetition group
+    // (issue #1894) are excluded from the eligibility/budget flow here in
+    // the same way `model::CommentPlan` excludes them, and read from the
+    // exact same `grouped_repetition_card_ids` set, so this coverage-block
+    // status can never drift from comment-plan.json's `not_selected[]`
+    // disposition (SPEC-0029 single-truth).
+    let repetition_omitted = target_feature_summary::grouped_repetition_card_ids(output);
+
     let (mut eligible, ineligible): (
         Vec<&crate::domain::ReviewCard>,
         Vec<&crate::domain::ReviewCard>,
     ) = output
         .cards
         .iter()
+        .filter(|card| !repetition_omitted.contains(card.id.0.as_str()))
         .partition(|card| should_plan_comment(card));
     eligible.sort_by(|a, b| {
         importance_rank(a)
@@ -70,6 +80,13 @@ pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPl
     }
     for card in ineligible {
         statuses.insert(card.id.clone(), CommentPlanStatus::NotEligible);
+    }
+    for card in output
+        .cards
+        .iter()
+        .filter(|card| repetition_omitted.contains(card.id.0.as_str()))
+    {
+        statuses.insert(card.id.clone(), CommentPlanStatus::NotSelected);
     }
     statuses
 }

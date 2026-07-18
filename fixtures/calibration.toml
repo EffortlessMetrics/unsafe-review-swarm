@@ -540,6 +540,7 @@ required_core_fixtures = [
   "static_lifetime_mut_ref_not_static_mut",
   "target_feature_safety_docs",
   "target_feature_missing_safety_docs",
+  "target_feature_simd_dispatch_repetition",
   "attributed_unsafe_fn_no_duplicate",
   "inline_unsafe_raw_pointer_deref_no_duplicate",
   "unsafe_fn_call_wrapper",
@@ -5886,6 +5887,16 @@ kind = "positive"
 claim = "target-feature declarations without safety docs report missing caller-contract evidence"
 support_tier = "Core operation smoke slice"
 expected_cards = 1
+expected_class = "contract_missing"
+expected_operation_family = "target_feature"
+expected_hazard = "target_feature"
+
+[[cases]]
+fixture = "target_feature_simd_dispatch_repetition"
+kind = "positive"
+claim = "a SIMD-dispatch file with three undocumented target_feature arch variants plus one documented, differently-classed variant emits four target_feature cards for the target-feature-summary grouping projection (issue #1894)"
+support_tier = "Core operation smoke slice"
+expected_cards = 4
 expected_class = "contract_missing"
 expected_operation_family = "target_feature"
 expected_hazard = "target_feature"

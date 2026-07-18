@@ -96,6 +96,18 @@ pub(super) const MAX_COMMENT_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetRea
     code: "budget_exhausted",
     message: "comment-plan max of three candidates reached",
 };
+/// Applied to a `target_feature` card that is a non-representative member of
+/// a target-feature-repetition group (issue #1894): at most one
+/// representative per equivalent group (same file, class, movement,
+/// coverage state, and next action; architecture/feature literal only
+/// differs) is eligible for an inline comment slot. The rest are recorded
+/// here rather than silently dropped -- they stay in `cards.json` and
+/// `not_selected[]`; see the target-feature summary for the selected
+/// representative and `underlying_card_ids` for the full group membership.
+pub(super) const GROUPED_REPETITION_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "grouped_repetition",
+    message: "grouped with an equivalent repetitive target_feature site; see the target-feature summary for the selected representative",
+};
 
 // Selection reasons referencing coverage gap (SPEC-0032).
 const SELECTED_CONTRACT_MISSING_HIGH_CONFIDENCE: ReviewBudgetReason = ReviewBudgetReason {
