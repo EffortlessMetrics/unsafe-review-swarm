@@ -46,6 +46,7 @@ pub(crate) enum XtaskCommand {
     CheckLocal(Vec<String>),
     CheckLocalRun(String),
     DogfoodExec(Vec<String>),
+    WorkflowPinSync(Vec<String>),
 }
 
 impl XtaskCommand {
@@ -181,6 +182,10 @@ impl XtaskCommand {
             Some("dogfood-exec") => {
                 // All trailing args are forwarded to the DogfoodExec arg parser.
                 Ok(Self::DogfoodExec(args.to_vec()))
+            }
+            Some("workflow-pin-sync") => {
+                // All trailing args are forwarded to the WorkflowPinSync arg parser.
+                Ok(Self::WorkflowPinSync(args.to_vec()))
             }
             Some(other) => Err(format!("unknown xtask command `{other}`")),
         }

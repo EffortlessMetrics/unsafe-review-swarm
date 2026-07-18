@@ -50,7 +50,9 @@ pub(crate) fn check_workflow_allowlist(
     Ok(())
 }
 
-fn workflow_policy_entries(allowlist: &Path) -> Result<Vec<WorkflowPolicyEntry>, String> {
+pub(crate) fn workflow_policy_entries(
+    allowlist: &Path,
+) -> Result<Vec<WorkflowPolicyEntry>, String> {
     let value = parse_toml_file(allowlist)?;
     let path_display = allowlist.display().to_string();
     let entries = value
