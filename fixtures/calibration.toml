@@ -41,6 +41,7 @@ required_core_fixtures = [
   "public_unsafe_fn_safety_colon_docs",
   "pub_crate_unsafe_fn_missing_safety",
   "documented_private_unsafe_fn",
+  "unsafe_declaration_volume_summary",
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "maybeuninit_assume_init",
@@ -1007,6 +1008,16 @@ claim = "documented private unsafe fn with SAFETY comment but no call-shaped tes
 support_tier = "Contract evidence mining"
 expected_cards = 1
 expected_class = "unsafe_unreached"
+expected_operation_family = "unsafe_declaration"
+expected_hazard = "unknown"
+
+[[cases]]
+fixture = "unsafe_declaration_volume_summary"
+kind = "positive"
+claim = "a declaration-heavy file with four unsafe_declaration owner-contract cards emits four cards (two contract_missing, two unsafe_unreached) for the declaration-summary grouping projection (issue #1895)"
+support_tier = "Contract evidence mining"
+expected_cards = 4
+expected_class = "contract_missing"
 expected_operation_family = "unsafe_declaration"
 expected_hazard = "unknown"
 

@@ -4,6 +4,7 @@ use crate::domain::{OperationFamily, ReviewCard};
 use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
+use crate::output::declaration_summary::{self, DeclarationGroup};
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY, UNKNOWN_OWNER,
 };
@@ -100,6 +101,7 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
     render_counts_table(&mut out, "Route", route_counts(output));
 
     render_related_sink_clusters(&mut out, output);
+    render_declaration_summary(&mut out, output);
 
     out.push_str("## Cards\n\n");
     if output.cards.is_empty() {
@@ -370,9 +372,67 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     render_pr_summary_build_this_first_lead(&mut out, ranked.first().copied());
     render_pr_summary_reviewer_cockpit(&mut out, ranked.first().copied());
     render_pr_summary_card_table(&mut out, &ranked);
+    render_declaration_summary(&mut out, output);
     render_pr_summary_witness_plan(&mut out, &ranked);
     render_pr_summary_trust_boundary(&mut out);
     out
+}
+
+/// Bounded, deterministic volume summary for `unsafe_declaration`-family
+/// owner/contract cards (issue #1895).
+///
+/// This is a presentation-only grouping projected from the same
+/// `ReviewCard`/`CoverageBlock` data as every other surface -- it does not
+/// mutate, drop, or reclassify a card, and it is not a second truth surface.
+/// The full per-declaration inventory stays in `cards.json` and the card
+/// table above. Renders nothing when there are no `unsafe_declaration`
+/// cards, so quiet PRs stay quiet.
+fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
+    let groups = declaration_summary::declaration_groups(output);
+    if groups.is_empty() {
+        return;
+    }
+
+    out.push_str("\n## Declaration summary\n\n");
+    out.push_str(
+        "Grouped from existing `unsafe_declaration` ReviewCards by source file. This is a report-only volume summary, not a new classifier and not a discharge -- every declaration keeps its own card, class, and policy status in `cards.json` and the card table above. Files with a new or worsened declaration are always listed ahead of inherited-only files.\n\n",
+    );
+    out.push_str(
+        "| File | Total | New/worsened | Inherited | Contract missing | Contract present | Representative cards |\n",
+    );
+    out.push_str("|---|---:|---:|---:|---:|---:|---|\n");
+    for group in &groups {
+        out.push_str(&format!(
+            "| `{}` | {} | {} | {} | {} | {} | {} |\n",
+            md_cell(&group.module_or_file),
+            group.total,
+            group.new_or_worsened,
+            group.inherited,
+            group.contract_missing,
+            group.contract_present,
+            render_declaration_representatives(group),
+        ));
+    }
+    out.push('\n');
+}
+
+/// Render a group's bounded representative card IDs plus a "+N more" pointer
+/// to the full membership when the group exceeds the representative cap.
+/// Never dumps the complete `underlying_card_ids` list inline.
+fn render_declaration_representatives(group: &DeclarationGroup) -> String {
+    if group.representatives.is_empty() {
+        return "`none`".to_string();
+    }
+    let mut rendered = group
+        .representatives
+        .iter()
+        .map(|id| format!("`{}`", md_cell(id)))
+        .collect::<Vec<_>>();
+    let remaining = group.total.saturating_sub(group.representatives.len());
+    if remaining > 0 {
+        rendered.push(format!("+{remaining} more (see `cards.json`)"));
+    }
+    rendered.join(", ")
 }
 
 /// Presentation-only ranking for pr-summary: cards that are one executable
@@ -1479,20 +1539,31 @@ mod tests {
             "operation card must be listed individually in the card table; rendered:\n{rendered}"
         );
 
-        // Owner card is NOT listed individually — it is grouped. The owner card's
-        // card ID must not appear as a standalone table row (it appears in the
-        // grouped summary row instead). We check the owner card ID is absent as
-        // an individual row entry rather than checking for the family name, which
-        // legitimately appears in the grouped row.
+        // Owner card is NOT listed individually in the CARD TABLE — it is
+        // grouped there. The owner card's card ID must not appear as a
+        // standalone table row within that section (it appears in the
+        // grouped summary row instead). We check the owner card ID is absent
+        // as an individual row entry rather than checking for the family
+        // name, which legitimately appears in the grouped row. Scoped to the
+        // "## Card table" section only: the "## Declaration summary" section
+        // (issue #1895) legitimately prints the same owner card ID as a
+        // bounded representative, which is a different, intentional surface.
         let owner_card_id = output
             .cards
             .iter()
             .find(|c| is_owner_contract_card(c))
             .map(|c| c.id.to_string())
             .ok_or_else(|| "fixture must have an owner card".to_string())?;
+        let card_table_section = rendered
+            .split("## Card table")
+            .nth(1)
+            .and_then(|rest| rest.split("\n## ").next())
+            .ok_or_else(|| {
+                "rendered pr-summary must contain a ## Card table section".to_string()
+            })?;
         assert!(
-            !rendered.contains(&format!("| `{owner_card_id}` |")),
-            "owner card must not appear as an individual table row; rendered:\n{rendered}"
+            !card_table_section.contains(&format!("| `{owner_card_id}` |")),
+            "owner card must not appear as an individual table row in the card table; card table section:\n{card_table_section}"
         );
 
         // The grouped summary line must be present in the card table.
