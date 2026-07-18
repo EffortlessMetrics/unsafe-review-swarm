@@ -19,7 +19,8 @@ impl Backend {
         let root = self.root.lock().await.clone();
         let cfg = self.config.lock().await.clone();
         let Some(diff) = self.diff_source(&root, &cfg).await else {
-            self.clear_stale_diagnostics().await;
+            self.mark_diagnostics_failed("unsafe-review could not determine a diff source")
+                .await;
             return;
         };
         let document_versions = self.document_versions().await;
@@ -46,13 +47,15 @@ impl Backend {
             Ok(Err(err)) => {
                 self.log_refresh_error("unsafe-review analysis failed", &err.to_string())
                     .await;
-                self.clear_stale_diagnostics().await;
+                self.mark_diagnostics_failed("unsafe-review analysis failed")
+                    .await;
                 return;
             }
             Err(err) => {
                 self.log_refresh_error("unsafe-review analysis task failed", &err.to_string())
                     .await;
-                self.clear_stale_diagnostics().await;
+                self.mark_diagnostics_failed("unsafe-review analysis task failed")
+                    .await;
                 return;
             }
         };
@@ -174,6 +177,27 @@ impl Backend {
             let version = self.document_version(&uri).await;
             self.client.publish_diagnostics(uri, vec![], version).await;
         }
+    }
+
+    /// Surface a failed refresh to the editor without pretending the file is
+    /// clean. A failed analysis must never look identical to a successful
+    /// analysis that found zero cards, so this deliberately does NOT touch
+    /// `latest_analysis`, `latest_diagnostics`, or any published diagnostics —
+    /// the last successful result (if any) stays visible. `context` is a
+    /// freshness signal only: it must never claim the file is safe, proven, or
+    /// UB-free, and it must never claim the (possibly absent) diagnostics are
+    /// current.
+    pub(super) async fn mark_diagnostics_failed(&self, context: &str) {
+        self.client
+            .show_message(
+                MessageType::WARNING,
+                format!(
+                    "unsafe-review: {context}. Diagnostics shown (if any) are from the \
+                     last successful analysis and are not current; an empty or unchanged \
+                     result does not mean this file is safe or clean."
+                ),
+            )
+            .await;
     }
 
     pub(super) async fn mark_diagnostics_stale(&self) {
