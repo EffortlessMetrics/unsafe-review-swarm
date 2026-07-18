@@ -74,3 +74,30 @@ operation_family = "transmute"
 class = "baseline_known"
 baseline_state = "worsened"
 outcome_movement = "regressed"
+
+[[challenge]]
+id = "remove-availability-guard-unchecked-constructor"
+kind = "fixture-transform"
+source_fixture = "fixtures/unchecked_constructor_availability_assert_guard"
+diff = "change.diff"
+transformation = "remove-availability-guard"
+baseline_card_id = "UR-unchecked-constructor-availability-assert-guard-src-lib-rs-new-operation-unsafe_fn_call-new-unchecked-b211f8034905-unknown-c1"
+baseline_contract_coverage = "present"
+baseline_guard_coverage = "present"
+baseline_test_reach_coverage = "missing"
+baseline_witness_receipt_coverage = "missing"
+no_new_debt_exit_code = 1
+
+[challenge.expected]
+cards = 1
+new_gaps = 0
+worsened_gaps = 1
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 1
+selected_count = 0
+not_selected_count = 1
+operation_family = "unsafe_fn_call"
+class = "baseline_known"
+baseline_state = "worsened"
+outcome_movement = "regressed"
