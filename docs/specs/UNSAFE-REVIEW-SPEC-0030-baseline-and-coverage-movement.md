@@ -221,7 +221,13 @@ policy, source, and snapshot state unchanged, writing a plan artifact only when
 `--out` is explicitly given; `--dry-run` is required and there is no apply mode
 (see Non-goals). `advance_review_after` and `add_new_debt` are always flagged as
 requiring a separate, explicit decision, never auto-applied; no resolved entry is
-silently removed by this preview.
+silently removed by this preview. When `card_scan_error` is set (the degraded,
+scan-unavailable state above), every scan-dependent `resolved` entry is planned
+as `conflict`, never `mark_resolved`: an unverifiable disappearance must require
+human resolution and must never be presented as a confirmed deletion. Buckets
+that do not depend on the card scan (`identity_unmatched`,
+`duplicate_or_conflicting_entry`, `suppression_overlap`) keep their normal
+`conflict` action.
 
 `unsafe-review pr` (not `first-pr`) surfaces a bounded one-line warning naming
 the exact `baseline status` command when the ledger has any entry outside the

@@ -481,20 +481,31 @@ pub struct BaselineRefreshPlan {
 /// Build the refresh-preview plan from an already-classified health report. Pure
 /// function of `report` — same input always yields the same plan (dry-run determinism,
 /// issue #1893 acceptance criterion).
+///
+/// When [`BaselineHealthReport::card_scan_error`] is set, the repo-wide card scan could
+/// not run, so `current_cards` was empty for classification and every `resolved` bucket
+/// means "unverifiable", not "confirmed gone" (see the field docs). A degraded scan must
+/// therefore never recommend `mark_resolved` — that would present an unverifiable entry
+/// as a confirmed deletion. Scan-dependent `resolved` entries are downgraded to
+/// `conflict` (human resolution required) in that case, matching the honest output-layer
+/// caveat. Buckets that never depend on card data
+/// (`identity_unmatched`/`duplicate_or_conflicting_entry`/`suppression_overlap` and their
+/// non-`resolved` actions) are unaffected.
 pub fn build_refresh_plan(report: &BaselineHealthReport) -> BaselineRefreshPlan {
+    let scan_unavailable = report.card_scan_error.is_some();
     let mut summary = RefreshPlanSummary::default();
     let entries = report
         .entries
         .iter()
         .map(|entry| {
-            let action = action_for(entry.bucket);
+            let (action, detail) = plan_action_for(entry, scan_unavailable);
             summary.record(action);
             RefreshPlanEntry {
                 card_id: entry.card_id.clone(),
                 bucket: entry.bucket,
                 action,
                 auto_eligible: auto_eligible_for(action),
-                detail: entry.detail.clone(),
+                detail,
             }
         })
         .collect();
@@ -503,6 +514,22 @@ pub fn build_refresh_plan(report: &BaselineHealthReport) -> BaselineRefreshPlan 
         entries,
         summary,
     }
+}
+
+/// Resolve the refresh action and plan detail for one classified entry, accounting for a
+/// degraded (scan-unavailable) run. Only `resolved` entries are affected by
+/// `scan_unavailable`: a `resolved` bucket produced without a working card scan is
+/// unverifiable, so it plans as `conflict`, never `mark_resolved`.
+fn plan_action_for(entry: &BaselineHealthEntry, scan_unavailable: bool) -> (RefreshAction, String) {
+    if scan_unavailable && entry.bucket == HealthBucket::Resolved {
+        return (
+            RefreshAction::Conflict,
+            "card scan was unavailable, so this entry's disappearance is unverified — human \
+             resolution required; it is not a confirmed deletion"
+                .to_string(),
+        );
+    }
+    (action_for(entry.bucket), entry.detail.clone())
 }
 
 #[cfg(test)]
@@ -971,6 +998,68 @@ mod tests {
                  (no silent deletion / no silent debt acceptance)"
             );
         }
+    }
+
+    #[test]
+    fn scan_unavailable_downgrades_resolved_to_conflict_never_mark_resolved() {
+        // A `resolved` bucket produced while the card scan could not run is
+        // unverifiable — the refresh plan must recommend `conflict`, never
+        // `mark_resolved`, so a degraded scan cannot present a confirmed deletion.
+        let resolved_entry = BaselineHealthEntry {
+            card_id:
+                "UR-x-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                    .to_string(),
+            bucket: HealthBucket::Resolved,
+            detail: "baseline entry's card no longer appears in the current scan".to_string(),
+        };
+        let mut counts = BaselineHealthCounts::default();
+        counts.record(HealthBucket::Resolved);
+        let report = BaselineHealthReport {
+            today: TODAY.to_string(),
+            entries: vec![resolved_entry],
+            counts,
+            snapshot_load_error: None,
+            card_scan_error: Some("analyze failed: boom".to_string()),
+        };
+
+        let plan = build_refresh_plan(&report);
+        assert_eq!(plan.entries.len(), 1);
+        assert_eq!(plan.entries[0].action, RefreshAction::Conflict);
+        assert!(!plan.entries[0].auto_eligible);
+        assert_eq!(plan.summary.mark_resolved, 0);
+        assert_eq!(plan.summary.conflict, 1);
+        assert!(
+            plan.entries[0].detail.contains("unverified"),
+            "plan detail must explain the entry is unverified, not confirmed gone: {:?}",
+            plan.entries[0]
+        );
+    }
+
+    #[test]
+    fn resolved_still_maps_to_mark_resolved_when_scan_succeeded() {
+        // Control: with no card_scan_error, a genuine `resolved` entry still previews
+        // `mark_resolved` (the scan ran and the card was really absent).
+        let resolved_entry = BaselineHealthEntry {
+            card_id:
+                "UR-y-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                    .to_string(),
+            bucket: HealthBucket::Resolved,
+            detail: "baseline entry's card no longer appears in the current scan".to_string(),
+        };
+        let mut counts = BaselineHealthCounts::default();
+        counts.record(HealthBucket::Resolved);
+        let report = BaselineHealthReport {
+            today: TODAY.to_string(),
+            entries: vec![resolved_entry],
+            counts,
+            snapshot_load_error: None,
+            card_scan_error: None,
+        };
+
+        let plan = build_refresh_plan(&report);
+        assert_eq!(plan.entries[0].action, RefreshAction::MarkResolved);
+        assert_eq!(plan.summary.mark_resolved, 1);
+        assert_eq!(plan.summary.conflict, 0);
     }
 
     #[test]

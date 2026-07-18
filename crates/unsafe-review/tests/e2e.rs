@@ -8472,6 +8472,103 @@ review_after = "2099-01-01"
     Ok(())
 }
 
+// issue #1893 review round 3 (CodeRabbit): when the repo-wide card scan could not run
+// (`card_scan_error` is set), a `resolved` bucket means "unverifiable", not "confirmed
+// gone." `baseline refresh --dry-run` must therefore NOT preview `mark_resolved` for any
+// such entry — an unavailable scan must never present an unverifiable entry as a
+// confirmed deletion. The degraded run is forced exactly as the sibling test above: one
+// strictly-invalid ledger row aborts the strict card scan, so a second valid-shape entry
+// (whose card cannot be located while the scan is down) lands in `resolved` and must be
+// planned as `conflict`.
+#[test]
+fn baseline_refresh_never_marks_resolved_when_card_scan_is_unavailable()
+-> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-degraded-refresh-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    // First entry: fails the exact counted UR-*-cN shape, so the strict loader used by
+    // `pipeline::analyze` hard-fails the repo-wide scan (sets card_scan_error). Second
+    // entry: a valid-shape identity whose card cannot be located while the scan is down,
+    // so it is classified `resolved` in the degraded state.
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "not-a-valid-counted-identity"
+owner = "core/policy"
+reason = "hand-edited, broke the shape"
+evidence = "fixture"
+review_after = "2099-01-01"
+
+[[entries]]
+card_id = "UR-degraded-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "valid-shape entry, unverifiable while scan is down"
+evidence = "fixture"
+review_after = "2099-01-01"
+"#,
+    )?;
+
+    // Confirm the degraded state: `baseline status` still succeeds and surfaces
+    // card_scan_error, with the valid-shape entry landing in `resolved`.
+    let status = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let status = parse_json(&stdout_text(&status)?)?;
+    assert!(
+        status["card_scan_error"].is_string(),
+        "degraded run must set card_scan_error: {status}"
+    );
+    assert_eq!(
+        status["counts"]["resolved"], 1,
+        "valid-shape entry must land in resolved while the scan is down: {status}"
+    );
+
+    // The refresh plan for the same degraded state must never recommend mark_resolved.
+    let out_dir = temp.path().join("degraded-refresh-plan");
+    fs::create_dir_all(&out_dir)?;
+    run_success([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--dry-run"),
+        os("--out"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let plan = parse_json(&fs::read_to_string(
+        out_dir.join("baseline-refresh-plan.json"),
+    )?)?;
+    assert_eq!(
+        plan["summary"]["mark_resolved"], 0,
+        "a scan-unavailable run must never preview mark_resolved: {plan}"
+    );
+    let resolved_entry = plan["entries"]
+        .as_array()
+        .ok_or("plan entries should be an array")?
+        .iter()
+        .find(|entry| entry["bucket"] == "resolved")
+        .ok_or_else(|| format!("plan must contain the resolved-bucket entry: {plan}"))?;
+    assert_eq!(
+        resolved_entry["action"], "conflict",
+        "resolved entry under an unavailable scan must plan as conflict, not mark_resolved: {plan}"
+    );
+    assert_eq!(resolved_entry["auto_eligible"], false, "{plan}");
+
+    Ok(())
+}
+
 // issue #1893 review finding: `suppression_overlap` must only fire for a *currently
 // active* suppression entry, reusing the same expiry semantics as `policy report`'s
 // `expired_suppressions` (no second expiry model). An expired suppression entry for
