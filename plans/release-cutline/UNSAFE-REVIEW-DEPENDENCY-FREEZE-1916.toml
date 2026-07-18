@@ -1,0 +1,71 @@
+# UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
+status = "draft_not_active"
+activation = "requires_owner_decision_after_targeted_dependency_proof"
+freeze_scope = "candidate_dependency_inputs_only"
+security_exception = "allowed_with_focused_issue_and_pr"
+publication = "owner_gated_out_of_scope"
+rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
+
+[swarm]
+commit = "fb441124740681df8fbec853bce6a0f7698630cd"
+lockfile_sha256 = "d8ba9f7081cb37ce3ca612e7f72750217f5cb79ae79d90940204f9a157283902"
+ra_ap_syntax = "0.0.338"
+ignore = "0.4.26"
+signal_hook = "0.4.4"
+
+[source]
+commit = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
+lockfile_sha256 = "63edc764a500fffcc20d78f4a960aae204a04597befdbdc1cf86b3a06d6da1dd"
+ra_ap_syntax = "0.0.336"
+ignore = "0.4.26"
+signal_hook = "0.3.18"
+
+[[candidate_input]]
+id = "SOURCE-548"
+surface = "ra_ap_syntax"
+version = "0.0.341"
+status = "owner_gated_targeted_proof_required"
+reset_receipts = ["parser/input tests", "detector contracts", "fixture/calibration parity", "surface determinism", "real-PR/evidence-loss corpus where relevant", "full check-pr"]
+
+[[candidate_input]]
+id = "SOURCE-547"
+surface = "ignore"
+version = "0.4.27"
+status = "owner_gated_directly_affected_tests_required"
+reset_receipts = ["workspace tests", "clippy", "check-pr", "discovery/path tests"]
+
+[[candidate_input]]
+id = "SOURCE-515"
+surface = "signal-hook"
+version = "0.4.4"
+status = "owner_gated_directly_affected_tests_required"
+reset_receipts = ["workspace tests", "clippy", "check-pr", "signal-handling tests"]
+
+[[candidate_input]]
+id = "SOURCE-545"
+surface = "github_actions"
+version = "paired pins"
+status = "blocked_until_workflow_allowlist_pair_is_repaired"
+reset_receipts = ["check-policy", "Unsafe Review Rust Result", "hosted CI"]
+
+[[deferred_input]]
+id = "SWARM-1874-1875"
+reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path."
+
+[[deferred_input]]
+id = "SWARM-1620"
+reason = "RSS/self-unsafe telemetry remains parked outside the candidate absent its separate owner decision."
+
+[[rule]]
+id = "EXCEPTION-1"
+text = "Reject non-security dependency additions after activation; a security or Rust/MSRV-critical exception must name security impact, semver impact, invalidated proof, and required reruns in a focused issue/PR."
+
+[[rule]]
+id = "EXCEPTION-2"
+text = "Any accepted dependency change resets the affected qualification receipts and requires a refreshed lockfile SHA before closeout."
+
+[[rule]]
+id = "BOUNDARY-1"
+text = "This draft records reproducibility inputs; it does not claim dependency safety, release readiness, source promotion, publication, tag movement, or public v1."

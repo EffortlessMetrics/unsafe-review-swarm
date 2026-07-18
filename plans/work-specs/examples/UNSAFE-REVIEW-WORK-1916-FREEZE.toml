@@ -1,0 +1,70 @@
+# UNSAFE-REVIEW-WORK-1916-FREEZE
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
+kind = "robustness"
+objective = "Record exact current swarm/source dependency identities and the candidate-specific exception/reset contract without activating the freeze."
+user_outcome = "Release qualification can identify exactly which lockfile and dependency inputs were tested and what evidence must be invalidated by an accepted exception."
+claim_boundary = "This is a reproducibility and process contract; it does not prove dependency safety, release readiness, installed-product readiness, publication authorization, or any unsafe-code safety property."
+dependencies = ["#1915 release cutline", "#1943 dependency queue audit and action-pin repair"]
+blockers = ["Activation remains owner-gated until the chosen source candidate path and targeted dependency proof are complete."]
+affected_files = ["plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml", "docs/status/DEPENDENCY_FREEZE.md"]
+affected_symbols = []
+linked_specs = ["UNSAFE-REVIEW-SPEC-0020", "UNSAFE-REVIEW-SPEC-0024"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Exact swarm/source commits and Cargo.lock SHA-256 identities",
+    "Current candidate dependency versions and deferred inputs",
+    "Candidate-specific security/MSRV exception and affected-receipt reset rules",
+]
+excluded = [
+    "Activating a dependency freeze or rejecting routine security response",
+    "Merging source dependency PRs or promoting swarm history",
+    "Source promotion, publication, tags, GitHub Release, or public v1",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The freeze record remains draft_not_active until an explicit owner decision activates the candidate-specific boundary."
+
+[[invariant]]
+id = "INV-2"
+text = "Any accepted dependency exception invalidates its affected qualification receipts and requires a refreshed lockfile identity."
+
+[[acceptance]]
+id = "AC-1"
+text = "The record contains exact live swarm/source commits, lockfile SHA-256 values, and named dependency versions."
+proof = ["rtk git diff --check"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The issue-linked artifacts are registered and structurally valid without creating a scheduler or active freeze gate."
+proof = ["rtk cargo run --locked -p xtask -- check-work-specs", "rtk cargo run --locked -p xtask -- check-doc-artifacts", "rtk cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-3"
+text = "The snapshot keeps source divergence and publication boundaries explicit."
+proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+
+[[integration]]
+surface = "release_cutline"
+expected = "The cutline can consume this record only after a later owner-approved activation and fresh targeted proof."
+
+[[integration]]
+surface = "qualification_receipts"
+expected = "The exception rule identifies which evidence must be rerun after an accepted dependency change."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Use draft_not_active and owner-gated wording so a reproducibility snapshot cannot silently become a repository-wide freeze."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Record exact hashes and reset rules instead of relying on branch names or stale issue prose."
+
+[compatibility]
+posture = "Additive release-prep documentation and work-spec artifacts; no analyzer, runtime, CI enforcement, source, or publication behavior changes."
+
+[rollback]
+strategy = "Supersede the draft snapshot with a refreshed lockfile record; remove only this issue's links without changing source history or publication state."
