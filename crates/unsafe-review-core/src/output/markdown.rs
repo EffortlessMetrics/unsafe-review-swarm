@@ -5,6 +5,7 @@ use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
 use crate::output::declaration_summary::{self, DeclarationGroup};
+use crate::output::target_feature_summary::{self, TargetFeatureGroup};
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY, UNKNOWN_OWNER,
 };
@@ -102,6 +103,7 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
 
     render_related_sink_clusters(&mut out, output);
     render_declaration_summary(&mut out, output);
+    render_target_feature_summary(&mut out, output);
 
     out.push_str("## Cards\n\n");
     if output.cards.is_empty() {
@@ -373,6 +375,7 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     render_pr_summary_reviewer_cockpit(&mut out, ranked.first().copied());
     render_pr_summary_card_table(&mut out, &ranked);
     render_declaration_summary(&mut out, output);
+    render_target_feature_summary(&mut out, output);
     render_pr_summary_witness_plan(&mut out, &ranked);
     render_pr_summary_trust_boundary(&mut out);
     out
@@ -421,6 +424,63 @@ fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
 /// to the full membership when the group exceeds the representative cap.
 /// Never dumps the complete `underlying_card_ids` list inline.
 fn render_declaration_representatives(group: &DeclarationGroup) -> String {
+    if group.representatives.is_empty() {
+        return "`none`".to_string();
+    }
+    let mut rendered = group
+        .representatives
+        .iter()
+        .map(|id| format!("`{}`", md_cell(id)))
+        .collect::<Vec<_>>();
+    let remaining = group.total.saturating_sub(group.representatives.len());
+    if remaining > 0 {
+        rendered.push(format!("+{remaining} more (see `cards.json`)"));
+    }
+    rendered.join(", ")
+}
+
+/// Bounded, deterministic grouping summary for `target_feature`-family
+/// `ReviewCard`s (issue #1894).
+///
+/// This is a presentation-only projection derived from the same
+/// `ReviewCard`/`CoverageBlock` data as every other surface -- it does not
+/// mutate, drop, or reclassify a card, and it is not a second truth surface.
+/// The complete per-site inventory (every id, class, and policy status)
+/// stays in `cards.json`. Renders nothing when there are no `target_feature`
+/// cards, so quiet PRs stay quiet. Grouping is report-only volume reduction:
+/// it is not a classifier, not a discharge, and not a soundness claim about
+/// the grouped sites -- architecture/feature literals are metadata, not
+/// group identity, and cards whose obligation, class, movement, baseline
+/// state, receipt state, or next action differ never collapse together.
+fn render_target_feature_summary(out: &mut String, output: &AnalyzeOutput) {
+    let groups = target_feature_summary::target_feature_groups(output);
+    if groups.is_empty() {
+        return;
+    }
+
+    out.push_str("\n## Target-feature summary\n\n");
+    out.push_str(
+        "Grouped from existing `target_feature` ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals such as `avx2` or `neon` are metadata, not group identity). This is a report-only volume summary, not a new classifier and not a discharge -- every site keeps its own card, class, and policy status in `cards.json` (the complete per-site inventory). Cards whose obligation, class, movement, baseline state, receipt state, or next action differ never collapse into the same group.\n\n",
+    );
+    out.push_str("| File | Class | Sites | Feature variants | Representative cards |\n");
+    out.push_str("|---|---|---:|---|---|\n");
+    for group in &groups {
+        out.push_str(&format!(
+            "| `{}` | `{}` | {} | {} | {} |\n",
+            md_cell(&group.module_or_file),
+            group.class,
+            group.total,
+            render_backtick_string_list(&group.features, 4),
+            render_target_feature_representatives(group),
+        ));
+    }
+    out.push('\n');
+}
+
+/// Render a group's bounded representative card IDs plus a "+N more" pointer
+/// to the full membership when the group exceeds the representative cap.
+/// Never dumps the complete `underlying_card_ids` list inline.
+fn render_target_feature_representatives(group: &TargetFeatureGroup) -> String {
     if group.representatives.is_empty() {
         return "`none`".to_string();
     }

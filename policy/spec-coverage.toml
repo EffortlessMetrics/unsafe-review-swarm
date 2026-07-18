@@ -151,6 +151,13 @@ single_truth = true
 note = "Presentation-only grouping (issue #1895) of unsafe_declaration-family ReviewCards by source file. total/new_or_worsened/inherited/contract_missing/contract_present/representatives are all counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier and cards.json remains the complete per-declaration inventory."
 
 [[field]]
+name = "target_feature_summary_group"
+canonical_source = "output/target_feature_summary.rs::target_feature_groups (derived from ReviewCard.operation.family, domain/coverage.rs::CoverageBlock::derive class/baseline_state/coverage slots, and a normalized attribute shape)"
+surfaces = ["pr_summary", "comment_plan"]
+single_truth = true
+note = "Presentation-only grouping (issue #1894) of target_feature-family ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals are metadata, not identity). Groups never collapse cards whose obligation, class, movement, baseline state, receipt state, or next action differ. total/representatives/underlying_card_ids are counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier, cards.json remains the complete per-site inventory, and the comment-plan's grouped_repetition selection reads the identical group membership so the two surfaces cannot drift on which card is the representative."
+
+[[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
 surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "gate_manifest", "action", "ub_review"]

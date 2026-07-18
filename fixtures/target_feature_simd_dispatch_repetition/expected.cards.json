@@ -1,0 +1,424 @@
+[
+  {
+    "id": "UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-avx2-operation-target_feature-target-feature-95df7e2b4bed-target_feature-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 10,
+      "column": 1,
+      "kind": "operation",
+      "owner": "sum_avx2",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "#[target_feature(enable = \"avx2\")]"
+    },
+    "operation": "#[target_feature(enable = \"avx2\")]",
+    "operation_family": "target_feature",
+    "hazards": [
+      "target_feature"
+    ],
+    "obligations": [
+      "callers only execute this path on supported hardware"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "target-feature",
+        "description": "callers only execute this path on supported hardware",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `sum_avx2` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `sum_avx2` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[target_feature(enable = \"avx2\")]`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-avx2-operation-target_feature-target-feature-95df7e2b4bed-target_feature-c1` still maps to `#[target_feature(enable = \"avx2\")]` at `src/lib.rs:10:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-sse2-operation-target_feature-target-feature-88dd4a92b072-target_feature-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 15,
+      "column": 1,
+      "kind": "operation",
+      "owner": "sum_sse2",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "#[target_feature(enable = \"sse2\")]"
+    },
+    "operation": "#[target_feature(enable = \"sse2\")]",
+    "operation_family": "target_feature",
+    "hazards": [
+      "target_feature"
+    ],
+    "obligations": [
+      "callers only execute this path on supported hardware"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "target-feature",
+        "description": "callers only execute this path on supported hardware",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `sum_sse2` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `sum_sse2` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[target_feature(enable = \"sse2\")]`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-sse2-operation-target_feature-target-feature-88dd4a92b072-target_feature-c1` still maps to `#[target_feature(enable = \"sse2\")]` at `src/lib.rs:15:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_selected",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-neon-operation-target_feature-target-feature-10bcbd8e8835-target_feature-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 20,
+      "column": 1,
+      "kind": "operation",
+      "owner": "sum_neon",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "#[target_feature(enable = \"neon\")]"
+    },
+    "operation": "#[target_feature(enable = \"neon\")]",
+    "operation_family": "target_feature",
+    "hazards": [
+      "target_feature"
+    ],
+    "obligations": [
+      "callers only execute this path on supported hardware"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "target-feature",
+        "description": "callers only execute this path on supported hardware",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `sum_neon` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `sum_neon` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[target_feature(enable = \"neon\")]`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-neon-operation-target_feature-target-feature-10bcbd8e8835-target_feature-c1` still maps to `#[target_feature(enable = \"neon\")]` at `src/lib.rs:20:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_selected",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-avx512-operation-target_feature-target-feature-e5d998882154-target_feature-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 30,
+      "column": 1,
+      "kind": "operation",
+      "owner": "sum_avx512",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "#[target_feature(enable = \"avx512f\")]"
+    },
+    "operation": "#[target_feature(enable = \"avx512f\")]",
+    "operation_family": "target_feature",
+    "hazards": [
+      "target_feature"
+    ],
+    "obligations": [
+      "callers only execute this path on supported hardware"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "target-feature",
+        "description": "callers only execute this path on supported hardware",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `sum_avx512` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "No static test mention of owner `sum_avx512` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `#[target_feature(enable = \"avx512f\")]`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-target-feature-simd-dispatch-repetition-src-lib-rs-sum-avx512-operation-target_feature-target-feature-e5d998882154-target_feature-c1` still maps to `#[target_feature(enable = \"avx512f\")]` at `src/lib.rs:30:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  }
+]

@@ -225,6 +225,7 @@ const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
     "owner-contract obligation covered by a more-specific operation card at the same region",
     "comment-plan max of three candidates reached",
     "not selected by current inline comment policy",
+    "grouped with an equivalent repetitive target_feature site; see the target-feature summary for the selected representative",
 ];
 const COMMENT_PLAN_NON_SELECTION_REASON_CODES: &[&str] = &[
     "outside_changed_hunk",
@@ -234,6 +235,7 @@ const COMMENT_PLAN_NON_SELECTION_REASON_CODES: &[&str] = &[
     "covered_by_specific_operation_card",
     "budget_exhausted",
     "not_selected_by_policy",
+    "grouped_repetition",
 ];
 const KNOWN_PROOF_PATHS: &[&str] = &[
     "observable_red_green",
@@ -6689,6 +6691,7 @@ fn check_comment_plan_artifact(
     }
     let mut not_selected_card_ids = BTreeSet::new();
     let mut changed_card_ids = comment_card_ids.clone();
+    let target_feature_repetition_omitted = target_feature_repetition_omitted_ids(card_projections);
     if let Some(not_selected) = comment_plan.get("not_selected") {
         let Some(not_selected) = not_selected.as_array() else {
             return Err("comment-plan.json not_selected must be an array".to_string());
@@ -6797,6 +6800,7 @@ fn check_comment_plan_artifact(
                     changed_line,
                     card_projections,
                     changed_card_ids: &changed_card_ids,
+                    target_feature_repetition_omitted: &target_feature_repetition_omitted,
                 },
             )?;
             require_comment_plan_repair_projection(
@@ -8498,6 +8502,101 @@ fn expected_selection_reason_code(_card: &CardProjection) -> &'static str {
     "top_actionable_card"
 }
 
+/// Mirrors `unsafe_review_core::output::target_feature_summary::GroupKey`
+/// equivalence (issue #1894), computed from the `cards.json`-derived
+/// `CardProjection` fields available in this artifact checker. Two
+/// `target_feature` cards are equivalent only when their file, class,
+/// baseline movement, full coverage-slot state, and next action are all
+/// identical; architecture/feature literals in the operation expression are
+/// normalized away first (metadata, not group identity).
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
+struct TargetFeatureGroupKey {
+    path: String,
+    class_name: String,
+    baseline_state: String,
+    contract_coverage: String,
+    guard_coverage: String,
+    test_reach_coverage: String,
+    witness_receipt_coverage: String,
+    next_action: String,
+    shape: String,
+}
+
+fn target_feature_group_key(card: &CardProjection) -> TargetFeatureGroupKey {
+    TargetFeatureGroupKey {
+        path: card.path.clone(),
+        class_name: card.class_name.clone(),
+        baseline_state: card.baseline_state.clone(),
+        contract_coverage: card.contract_coverage.clone(),
+        guard_coverage: card.guard_coverage.clone(),
+        test_reach_coverage: card.test_reach_coverage.clone(),
+        witness_receipt_coverage: card.witness_receipt_coverage.clone(),
+        next_action: card.next_action.clone(),
+        shape: normalized_target_feature_shape(&card.operation),
+    }
+}
+
+/// Mirrors `target_feature_summary::normalized_shape`: replaces every quoted
+/// string literal (the architecture/feature list) with a placeholder so
+/// `enable = "avx2"` and `enable = "neon"` normalize identically.
+fn normalized_target_feature_shape(expression: &str) -> String {
+    let mut shape = String::with_capacity(expression.len());
+    let mut in_quotes = false;
+    for ch in expression.chars() {
+        if ch == '"' {
+            in_quotes = !in_quotes;
+            shape.push('"');
+            if in_quotes {
+                shape.push('*');
+            }
+            continue;
+        }
+        if in_quotes {
+            continue;
+        }
+        shape.push(ch);
+    }
+    shape.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+/// The set of `target_feature` card ids that are non-representative members
+/// of an equivalence group (`target_feature_group_key` collision with
+/// `group.len() > 1`) -- every id in the group except the first by
+/// `(line, id)` order, mirroring
+/// `target_feature_summary::grouped_repetition_card_ids`. Computed once per
+/// artifact check so the O(n) grouping pass does not repeat per
+/// `not_selected` entry.
+fn target_feature_repetition_omitted_ids(
+    card_projections: &BTreeMap<String, CardProjection>,
+) -> BTreeSet<String> {
+    let mut by_key: BTreeMap<TargetFeatureGroupKey, Vec<&CardProjection>> = BTreeMap::new();
+    for card in card_projections.values() {
+        if card.operation_family != "target_feature" {
+            continue;
+        }
+        by_key
+            .entry(target_feature_group_key(card))
+            .or_default()
+            .push(card);
+    }
+
+    let mut omitted = BTreeSet::new();
+    for mut cards in by_key.into_values() {
+        if cards.len() <= 1 {
+            continue;
+        }
+        cards.sort_by(|left, right| {
+            left.line
+                .cmp(&right.line)
+                .then_with(|| left.id.cmp(&right.id))
+        });
+        for card in cards.into_iter().skip(1) {
+            omitted.insert(card.id.clone());
+        }
+    }
+    omitted
+}
+
 fn expected_non_selection_reason(
     card: &CardProjection,
     planned_count: usize,
@@ -8505,7 +8604,11 @@ fn expected_non_selection_reason(
     changed_line: bool,
     card_projections: &BTreeMap<String, CardProjection>,
     changed_card_ids: &BTreeSet<String>,
+    target_feature_repetition_omitted: &BTreeSet<String>,
 ) -> &'static str {
+    if target_feature_repetition_omitted.contains(&card.id) {
+        return "grouped with an equivalent repetitive target_feature site; see the target-feature summary for the selected representative";
+    }
     if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
         "owner-contract obligation covered by a more-specific operation card at the same region"
     } else {
@@ -8558,7 +8661,11 @@ fn expected_non_selection_reason_code(
     changed_line: bool,
     card_projections: &BTreeMap<String, CardProjection>,
     changed_card_ids: &BTreeSet<String>,
+    target_feature_repetition_omitted: &BTreeSet<String>,
 ) -> &'static str {
+    if target_feature_repetition_omitted.contains(&card.id) {
+        return "grouped_repetition";
+    }
     if owner_card_covered_by_specific_operation(card, card_projections, changed_card_ids) {
         "covered_by_specific_operation_card"
     } else {
@@ -8602,6 +8709,7 @@ struct NonSelectionReasonContext<'a> {
     changed_line: bool,
     card_projections: &'a BTreeMap<String, CardProjection>,
     changed_card_ids: &'a BTreeSet<String>,
+    target_feature_repetition_omitted: &'a BTreeSet<String>,
 }
 
 fn require_expected_non_selection_reason_pair(
@@ -8617,6 +8725,7 @@ fn require_expected_non_selection_reason_pair(
         context.changed_line,
         context.card_projections,
         context.changed_card_ids,
+        context.target_feature_repetition_omitted,
     );
     let expected_reason_code = expected_non_selection_reason_code(
         card,
@@ -8625,6 +8734,7 @@ fn require_expected_non_selection_reason_pair(
         context.changed_line,
         context.card_projections,
         context.changed_card_ids,
+        context.target_feature_repetition_omitted,
     );
     if actual_reason == expected_reason && actual_reason_code == expected_reason_code {
         return Ok(());
@@ -10880,6 +10990,7 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                 changed_line: true,
                 card_projections: &projections,
                 changed_card_ids: &changed_card_ids,
+                target_feature_repetition_omitted: &BTreeSet::new(),
             },
         )
     }
@@ -10900,6 +11011,7 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                 changed_line: true,
                 card_projections: &projections,
                 changed_card_ids: &changed_card_ids,
+                target_feature_repetition_omitted: &BTreeSet::new(),
             },
         )?;
 
@@ -10913,6 +11025,7 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                 changed_line: true,
                 card_projections: &projections,
                 changed_card_ids: &changed_card_ids,
+                target_feature_repetition_omitted: &BTreeSet::new(),
             },
         ))?;
         if !err.contains("reason pair") {

@@ -168,6 +168,7 @@ Selected `selection_reason_code` values use this closed vocabulary:
 - `owner-contract obligation covered by a more-specific operation card at the same region`
 - `comment-plan max of three candidates reached`
 - `not selected by current inline comment policy`
+- `grouped with an equivalent repetitive target_feature site; see the target-feature summary for the selected representative`
 
 Summary and `not_selected[].reason_code` values use this closed vocabulary:
 
@@ -179,6 +180,15 @@ Summary and `not_selected[].reason_code` values use this closed vocabulary:
 - `covered_by_specific_operation_card`
 - `budget_exhausted`
 - `not_selected_by_policy`
+- `grouped_repetition`
+
+`grouped_repetition` (issue #1894) applies only to `target_feature` cards
+that are non-representative members of a target-feature-summary repetition
+group (SPEC-0011 §3.2): same file, class, baseline movement, coverage
+state, and next action, with architecture/feature literal treated as
+metadata rather than group identity. At most one representative per group
+reaches `comments[]`; the card is never dropped from `cards.json` or
+`not_selected[]`.
 
 ## 6. Relevance and actionability
 
