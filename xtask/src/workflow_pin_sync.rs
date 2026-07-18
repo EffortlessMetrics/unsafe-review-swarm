@@ -282,20 +282,57 @@ fn apply_repairs(toml_text: &str, repairs: &[Repair]) -> Result<String, String> 
             })?;
 
         let block_text = &mut updated[block_idx];
-        if block_text.contains(&new_needle) {
+        // Scope every check and the replacement to the `actions = [ … ]` array,
+        // so a quoted old pin appearing in a comment or the `reason` string is
+        // never rewritten and never mistaken for an already-applied no-op.
+        let (start, end) = actions_array_range(block_text).ok_or_else(|| {
+            format!(
+                "workflow-pin-sync: could not locate the actions array in the `{}` block; refusing to write",
+                repair.workflow
+            )
+        })?;
+        let actions_slice = &block_text[start..end];
+        if actions_slice.contains(&new_needle) {
             // Already applied (e.g. a repeat run): nothing to do for this repair.
             continue;
         }
-        if !block_text.contains(&old_needle) {
+        if !actions_slice.contains(&old_needle) {
             return Err(format!(
-                "workflow-pin-sync: expected pin `{}` not found in the `{}` block; refusing to write (drift may have changed since classification)",
+                "workflow-pin-sync: expected pin `{}` not found in the `{}` actions array; refusing to write (drift may have changed since classification)",
                 repair.old_pin, repair.workflow
             ));
         }
-        *block_text = block_text.replacen(&old_needle, &new_needle, 1);
+        let repaired_actions = actions_slice.replacen(&old_needle, &new_needle, 1);
+        let mut rebuilt = String::with_capacity(block_text.len() + new_needle.len());
+        rebuilt.push_str(&block_text[..start]);
+        rebuilt.push_str(&repaired_actions);
+        rebuilt.push_str(&block_text[end..]);
+        *block_text = rebuilt;
     }
 
     Ok(updated.concat())
+}
+
+/// Byte range of the *content* between the `[` and `]` of the `actions = [ … ]`
+/// array within a single `[[workflow]]` block. The `actions` key is matched
+/// only at the start of a line (after indentation), so an `actions = [` that
+/// appears inside a quoted `reason` string is not mistaken for the array.
+/// Action strings never contain `[`/`]`, so the first `]` after the opening `[`
+/// closes the array.
+fn actions_array_range(block_text: &str) -> Option<(usize, usize)> {
+    let mut offset = 0usize;
+    for line in split_keep_newline(block_text) {
+        let trimmed = line.trim_start();
+        if let Some(rest) = trimmed.strip_prefix("actions")
+            && rest.trim_start().starts_with('=')
+        {
+            let open = offset + block_text[offset..].find('[')?;
+            let close = open + block_text[open..].find(']')?;
+            return Some((open + 1, close));
+        }
+        offset += line.len();
+    }
+    None
 }
 
 struct TomlBlock {
@@ -756,6 +793,43 @@ mod tests {
     }
 
     // apply_repairs with no repairs reproduces the input verbatim.
+    #[test]
+    fn apply_repairs_only_edits_the_actions_array_not_comments_or_reason() -> Result<(), String> {
+        // The old pin also appears in a comment and in the `reason` string; only
+        // the `actions` entry may change, and the write must stay idempotent.
+        let old_pin = sha_pin("actions/checkout", 'a');
+        let new_pin = sha_pin("actions/checkout", 'b');
+        let toml_text = format!(
+            "[[workflow]]\n\
+             path = \".github/workflows/ci.yml\"\n\
+             permissions = \"contents: read\"\n\
+             # bumped from \"{old_pin}\"\n\
+             actions = [\n  \"{old_pin}\",\n]\n\
+             reason = \"mirrors \\\"{old_pin}\\\" for supply-chain integrity ledgering\"\n\
+             created = \"2026-01-01\"\n\
+             review_after = \"2026-12-31\"\n"
+        );
+        let repair = Repair {
+            workflow: ".github/workflows/ci.yml".to_string(),
+            old_pin: old_pin.clone(),
+            new_pin: new_pin.clone(),
+        };
+
+        let updated = apply_repairs(&toml_text, std::slice::from_ref(&repair))?;
+        // The actions entry moved to the new pin.
+        assert!(updated.contains(&format!("  \"{new_pin}\",")));
+        assert!(!updated.contains(&format!("  \"{old_pin}\",")));
+        // The comment and reason still carry the old pin text verbatim.
+        assert!(updated.contains(&format!("# bumped from \"{old_pin}\"")));
+        assert!(updated.contains(&format!("mirrors \\\"{old_pin}\\\"")));
+
+        // Idempotent: the new pin present only in a comment must not fool the
+        // no-op check, but here it is genuinely applied, so re-running is stable.
+        let twice = apply_repairs(&updated, std::slice::from_ref(&repair))?;
+        assert_eq!(twice, updated);
+        Ok(())
+    }
+
     #[test]
     fn apply_repairs_with_no_repairs_is_a_no_op() -> Result<(), String> {
         let toml_text = sample_allowlist_toml(&[(
