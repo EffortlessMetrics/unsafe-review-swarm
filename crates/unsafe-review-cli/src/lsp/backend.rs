@@ -6,9 +6,9 @@ use tokio::sync::Mutex;
 use tower_lsp_server::jsonrpc::Result as LspResult;
 use tower_lsp_server::ls_types::{
     CodeActionOrCommand, CodeActionParams, Diagnostic, DidChangeTextDocumentParams,
-    DidOpenTextDocumentParams, DidSaveTextDocumentParams, ExecuteCommandParams, Hover, HoverParams,
-    InitializeParams, InitializeResult, InitializedParams, MessageType,
-    TextDocumentContentChangeEvent, Uri,
+    DidCloseTextDocumentParams, DidOpenTextDocumentParams, DidSaveTextDocumentParams,
+    ExecuteCommandParams, Hover, HoverParams, InitializeParams, InitializeResult,
+    InitializedParams, MessageType, TextDocumentContentChangeEvent, Uri,
 };
 use tower_lsp_server::{Client, LanguageServer};
 use unsafe_review_core::AnalyzeOutput;
@@ -111,6 +111,14 @@ impl LanguageServer for Backend {
         if refresh_on_change {
             self.refresh().await;
         }
+    }
+
+    async fn did_close(&self, params: DidCloseTextDocumentParams) {
+        self.documents
+            .lock()
+            .await
+            .remove(&params.text_document.uri);
+        self.mark_diagnostics_stale().await;
     }
 
     async fn did_save(&self, _params: DidSaveTextDocumentParams) {

@@ -24,6 +24,10 @@ impl DocumentStore {
         }
     }
 
+    pub(super) fn remove(&mut self, uri: &Uri) {
+        self.docs.remove(uri);
+    }
+
     pub(super) fn version(&self, uri: &Uri) -> Option<i32> {
         self.docs.get(uri).map(|document| document.version)
     }
@@ -51,6 +55,9 @@ mod tests {
 
         store.update_version(&uri, 8);
         assert_eq!(store.version(&uri), Some(8));
+
+        store.remove(&uri);
+        assert_eq!(store.version(&uri), None);
         Ok(())
     }
 

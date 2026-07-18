@@ -15,6 +15,7 @@ unknown_facts = "A didSave notification does not contain a version in the curren
 [scope]
 included = [
     "Track document text and version in the LSP document store",
+    "Remove tracked document state when the client closes a document",
     "Publish known document versions with diagnostics and diagnostic clears",
     "Clear cached diagnostics and analysis immediately on didChange",
     "Keep saved-file-only analysis and existing refresh scheduling unchanged",
