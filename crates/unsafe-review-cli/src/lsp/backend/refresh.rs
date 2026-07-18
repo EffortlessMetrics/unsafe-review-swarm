@@ -22,6 +22,7 @@ impl Backend {
             self.clear_stale_diagnostics().await;
             return;
         };
+        let document_versions = self.document_versions().await;
         let input = AnalyzeInput {
             root: root.clone(),
             scope: if cfg.mode == "diff" {
@@ -65,7 +66,9 @@ impl Backend {
             return;
         }
         let by_uri = diagnostics_by_uri(&root, &output);
-        let (clear_uris, publish_batches) = self.install_refresh_result(output, by_uri).await;
+        let (clear_uris, publish_batches) = self
+            .install_refresh_result(output, by_uri, document_versions)
+            .await;
         for (uri, version) in clear_uris {
             self.client.publish_diagnostics(uri, vec![], version).await;
         }
@@ -130,11 +133,11 @@ impl Backend {
         &self,
         output: AnalyzeOutput,
         by_uri: BTreeMap<Uri, Vec<Diagnostic>>,
+        versions: BTreeMap<Uri, i32>,
     ) -> (
         Vec<(Uri, Option<i32>)>,
         Vec<(Uri, Vec<Diagnostic>, Option<i32>)>,
     ) {
-        let versions = self.document_versions().await;
         let current: BTreeSet<_> = by_uri.keys().cloned().collect();
         let clear_uris = {
             let mut previous = self.last_diagnostic_uris.lock().await;
@@ -174,6 +177,7 @@ impl Backend {
     }
 
     pub(super) async fn mark_diagnostics_stale(&self) {
+        self.next_refresh_generation().await;
         self.clear_stale_diagnostics().await;
         self.client
             .log_message(
