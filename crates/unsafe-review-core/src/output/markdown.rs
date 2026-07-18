@@ -1749,6 +1749,119 @@ mod tests {
         Ok(())
     }
 
+    // issue #1894: ties the `target_feature_simd_dispatch_repetition` fixture
+    // to the rendered grouped projection AND the comment-plan's
+    // `grouped_repetition` selection end-to-end, so a regression in either
+    // surface (or in the post-eligibility representative-selection refactor,
+    // finding 1) is caught by a real run rather than only by synthetic unit
+    // fixtures.
+    #[test]
+    fn target_feature_summary_renders_grouped_projection_for_the_fixture() -> Result<(), String> {
+        let pr = render_pr_summary(&fixture_output("target_feature_simd_dispatch_repetition")?);
+        assert!(
+            pr.contains("## Target-feature summary"),
+            "pr-summary must render the target-feature summary section:\n{pr}"
+        );
+        // Three undocumented arch variants (avx2/sse2/neon) share file, class,
+        // coverage state, and normalized shape -> one grouped row, 3 sites.
+        assert!(
+            pr.contains("| `src/lib.rs` | `contract_missing` | 3 |"),
+            "grouped contract_missing row must report 3 sites:\n{pr}"
+        );
+        for feature in ["avx2", "sse2", "neon"] {
+            assert!(
+                pr.contains(feature),
+                "feature-variant metadata must list `{feature}`:\n{pr}"
+            );
+        }
+        // The documented avx512 site has a different class (unsafe_unreached)
+        // and a satisfied obligation; it must never collapse into the
+        // contract_missing group.
+        assert!(
+            pr.contains("| `src/lib.rs` | `unsafe_unreached` | 1 |"),
+            "the differently-classed site must render its own singleton row:\n{pr}"
+        );
+        assert!(
+            pr.contains("avx512f"),
+            "the singleton row must list its own feature variant:\n{pr}"
+        );
+
+        let repo = render_repo_posture(&repo_fixture_output(
+            "target_feature_simd_dispatch_repetition",
+        )?);
+        assert!(
+            repo.contains("## Target-feature summary"),
+            "repo posture must render the target-feature summary section:\n{repo}"
+        );
+
+        let quiet = render_pr_summary(&fixture_output("raw_pointer_alignment")?);
+        assert!(
+            !quiet.contains("## Target-feature summary"),
+            "a fixture with no target_feature cards must not render the section:\n{quiet}"
+        );
+
+        // Issue #1894 finding 1: grouping is applied strictly after
+        // eligibility, on the eligible members' importance-rank order --
+        // exactly one representative (avx2, the only tiebreak-relevant
+        // ordering here is line order since priority/confidence/coverage
+        // are tied) is selected; the other two equivalent sites are
+        // recorded `grouped_repetition`; the differently-classed avx512
+        // site is excluded for its own unrelated reason.
+        let output = fixture_output("target_feature_simd_dispatch_repetition")?;
+        let plan_json = crate::output::comment_plan::render(&output);
+        let plan: serde_json::Value = serde_json::from_str(&plan_json)
+            .map_err(|err| format!("comment-plan JSON parse failed: {err}"))?;
+        let comments = plan["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+        assert_eq!(
+            comments.len(),
+            1,
+            "exactly one representative must be selected: {plan_json}"
+        );
+        assert!(
+            comments[0]["operation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("avx2"),
+            "the representative must be the avx2 site: {}",
+            comments[0]
+        );
+        let not_selected = plan["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        let grouped: Vec<&serde_json::Value> = not_selected
+            .iter()
+            .filter(|card| card["reason_code"] == "grouped_repetition")
+            .collect();
+        assert_eq!(
+            grouped.len(),
+            2,
+            "sse2 and neon must be recorded grouped_repetition, and nothing else: {not_selected:?}"
+        );
+        for entry in &grouped {
+            let operation = entry["operation"].as_str().unwrap_or("");
+            assert!(
+                operation.contains("sse2") || operation.contains("neon"),
+                "unexpected grouped_repetition entry: {entry}"
+            );
+        }
+        let avx512_entry = not_selected
+            .iter()
+            .find(|card| {
+                card["operation"]
+                    .as_str()
+                    .is_some_and(|op| op.contains("avx512"))
+            })
+            .ok_or_else(|| "avx512 site must be in not_selected".to_string())?;
+        assert_ne!(
+            avx512_entry["reason_code"], "grouped_repetition",
+            "the differently-classed avx512 site must never be tagged grouped_repetition: {avx512_entry}"
+        );
+
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
