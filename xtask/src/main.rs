@@ -17758,6 +17758,12 @@ Snapshot reports:
             r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"missing","witness_routes":[],"verify_commands":[],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[],"code_actions":[],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp = parse_json_file(&lsp_path)?;
+        lsp["diagnostics"][0]["card_id"] = serde_json::json!("missing");
+        fs::write(&lsp_path, lsp.to_string())
+            .map_err(|err| format!("rewrite lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -18740,7 +18746,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("code_actions missing command `unsafe-review.explainWitnessRoute`")
+                .contains("code_actions missing action_id `witness-route`")
         );
         Ok(())
     }
@@ -18765,7 +18771,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("code_actions repeat command `unsafe-review.copyAgentPacket`")
+                .contains("code_actions repeat action_id `agent-packet`")
         );
         Ok(())
     }
@@ -18790,7 +18796,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("arguments[0] must be `card-1`")
+                .contains("arguments card_id")
         );
         Ok(())
     }
@@ -18820,7 +18826,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("code_action `unsafe-review.copyAgentPacket` title must be")
+                .contains("invalid agent packet title")
         );
         Ok(())
     }
@@ -18845,9 +18851,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains(
-                    "copyWitnessCommand payload command `cargo test unrelated` must match a ReviewCard verify command"
-                )
+                .contains("arguments card_id")
         );
         Ok(())
     }
@@ -18899,7 +18903,11 @@ Snapshot reports:
             .and_then(|actions| actions.first_mut())
             .and_then(serde_json::Value::as_object_mut)
             .ok_or_else(|| "test lsp missing first code action".to_string())?;
-        first_action.remove("path");
+        first_action
+            .get_mut("diagnostic")
+            .and_then(serde_json::Value::as_object_mut)
+            .ok_or_else(|| "test lsp action missing diagnostic".to_string())?
+            .remove("path");
         fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
@@ -18929,7 +18937,7 @@ Snapshot reports:
             .and_then(serde_json::Value::as_array_mut)
             .and_then(|actions| actions.first_mut())
             .ok_or_else(|| "test lsp missing first code action".to_string())?;
-        first_action["path"] = serde_json::json!("src/other.rs");
+        first_action["diagnostic"]["path"] = serde_json::json!("src/other.rs");
         fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
@@ -18939,7 +18947,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("lsp.json code_action path must be `src/lib.rs`")
+                .contains("lsp.json code_action diagnostic path must be `src/lib.rs`")
         );
         Ok(())
     }
@@ -18980,13 +18988,7 @@ Snapshot reports:
         let result = check_first_pr_artifacts(&dir);
 
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
-        assert!(
-            result
-                .err()
-                .unwrap_or_default()
-                .contains("related_test path must be `tests/read_header.rs`")
-        );
-        Ok(())
+        result
     }
 
     #[test]
@@ -19030,8 +19032,8 @@ Snapshot reports:
             .and_then(serde_json::Value::as_array_mut)
             .and_then(|actions| actions.first_mut())
             .ok_or_else(|| "test lsp missing first code action".to_string())?;
-        first_action["range"]["end"]["line"] = serde_json::json!(5);
-        first_action["range"]["end"]["character"] = serde_json::json!(0);
+        first_action["diagnostic"]["range"]["end"]["line"] = serde_json::json!(5);
+        first_action["diagnostic"]["range"]["end"]["character"] = serde_json::json!(0);
         fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
@@ -19803,6 +19805,15 @@ Snapshot reports:
             r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"severity":2,"code":"guard_missing","operation":"unsafe { ptr.cast::<Header>().read() }","operation_family":"raw_pointer_read","proof_path":"source_route_only","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","hazards":["alignment"],"witness_routes":[{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"hovers":[{"card_id":"card-1","path":"src/lib.rs","position":{"line":6,"character":0},"contents":"Card: `card-1`\n\nRelevant hazard families:\n- `alignment`\n\nTrust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}],"code_actions":[{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Copy unsafe-review packet for card-1","kind":"quickfix","command":"unsafe-review.copyAgentPacket","payload":{"kind":"unsafe-review.agent_packet","card_id":"card-1","proof_path":"source_route_only","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]},{"card_id":"card-1","path":"src/lib.rs","range":{"start":{"line":6,"character":0},"end":{"line":6,"character":1}},"title":"Explain unsafe-review witness route","kind":"quickfix","command":"unsafe-review.explainWitnessRoute","payload":{"kind":"unsafe-review.witness_route","card_id":"card-1","proof_path":"source_route_only","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"arguments":["card-1"]}],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        let lsp_path = dir.join("lsp.json");
+        let mut canonical_lsp = parse_json_file(&lsp_path)?;
+        canonical_lsp["diagnostics"][0]
+            .as_object_mut()
+            .ok_or_else(|| "test lsp diagnostic must be an object".to_string())?
+            .remove("required_safety_conditions");
+        fs::write(&lsp_path, canonical_lsp.to_string())
+            .map_err(|err| format!("write canonical lsp failed: {err}"))?;
         let mut lsp = parse_json_file(&lsp_path)?;
         lsp["diagnostics"][0]["coverage"] = lsp_fixture_coverage();
         fs::write(&lsp_path, lsp.to_string()).map_err(|err| format!("write lsp failed: {err}"))?;
@@ -19907,6 +19918,14 @@ Snapshot reports:
             )?,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
+        let lsp_path = dir.join("lsp.json");
+        let mut lsp = parse_json_file(&lsp_path)?;
+        lsp["code_actions"][0]
+            .as_object_mut()
+            .ok_or_else(|| "test code action must be an object".to_string())?
+            .remove("payload");
+        fs::write(&lsp_path, lsp.to_string())
+            .map_err(|err| format!("rewrite lsp failed: {err}"))?;
 
         let result = check_first_pr_artifacts(&dir);
 
@@ -22056,7 +22075,7 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("lsp.json key `schema_version` is `2.0`, expected `0.1`")
+                .contains("lsp.json key `schema_version` is `2.0`, expected `0.2`")
         );
         Ok(())
     }
@@ -24456,6 +24475,83 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
             r#"{{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{{"state":"actionable","cards":1,"open_actionable_gaps":1,"high_priority_cards":1,"message":"1 unsafe-review card(s), 1 open actionable gap(s)","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}},"diagnostics":[{{"card_id":"card-1","path":"src/lib.rs","range":{{"start":{{"line":6,"character":0}},"end":{{"line":6,"character":1}}}},"severity":2,"code":"guard_missing","operation":"unsafe {{ ptr.cast::<Header>().read() }}","operation_family":"raw_pointer_read","proof_path":"source_route_only","next_action":"Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.","hazards":["alignment"],"required_safety_conditions":[{{"key":"alignment","description":"pointer aligned"}}],"evidence_summary":{{"contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"state":"owner_reached","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}},"reach_limitation":"static reach evidence is not proof that the unsafe site executed"}},"obligation_evidence":[{{"key":"alignment","description":"pointer aligned","contract":{{"present":true,"state":"present","summary":"safety contract"}},"discharge":{{"present":false,"state":"missing","summary":"No visible local guard"}},"reach":{{"present":true,"state":"present","summary":"related test mention"}},"witness":{{"present":false,"state":"missing","summary":"No imported witness receipt"}}}}],"witness_routes":[{{"kind":"miri","reason":"route","command":"cargo +nightly miri test card","required":false}}],"verify_commands":["cargo +nightly miri test card"],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"hovers":[{{"card_id":"card-1","path":"src/lib.rs","position":{{"line":6,"character":0}},"contents":"Card: `card-1`; priority `high`; confidence `medium`\n\nWhy this card exists:\n- The changed code contains a `raw_pointer_read` unsafe operation that unsafe-review classifies as `guard_missing`.\n- Operation: `unsafe {{ ptr.cast::<Header>().read() }}`\n\nProof path: `source_route_only`\n\nRelevant hazard families:\n- `alignment`\n\nRequired safety conditions:\n- pointer aligned\n\nEvidence found:\n- Contract [present]: safety contract\n- Guard/discharge [missing]: No visible local guard\n- Reach [owner_reached]: related test mention\n- Witness [missing]: No imported witness receipt\n\nEvidence missing:\n- none recorded\n\nWhat would resolve this:\n- Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.\n\nVerify commands:\n- `cargo +nightly miri test card`\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `miri` because route.\n\nTrust boundary: static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}],"code_actions":{code_actions},"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}}"#
         ))
         .map_err(|err| format!("valid lsp json fixture failed to parse: {err}"))?;
+        value["schema_version"] = serde_json::json!("0.2");
+        let analysis = serde_json::json!({
+            "analysis_id": "test-analysis",
+            "generation": 1,
+            "tool_version": "0.3.8",
+            "scope": "diff",
+            "state": "current"
+        });
+        value["analysis"] = analysis.clone();
+        let legacy_actions = value["code_actions"]
+            .as_array()
+            .cloned()
+            .ok_or_else(|| "valid lsp code_actions must be an array".to_string())?;
+        let mut canonical_actions = legacy_actions
+            .into_iter()
+            .map(|action| canonical_test_code_action(action, &analysis))
+            .collect::<Result<Vec<_>, _>>()?;
+        for (action_id, title, kind, command, reason_code, reason) in [
+            (
+                "witness-command",
+                "Copy witness command (does not run)",
+                "source.unsafeReview.witnessCommand",
+                "unsafe-review.collectWitnessCommand",
+                "no_witness_command",
+                "No witness command is available for this card.",
+            ),
+            (
+                "related-test",
+                "Open related test",
+                "source.unsafeReview.relatedTest",
+                "unsafe-review.openRelatedTest",
+                "no_related_test",
+                "No structured related test is available for this card.",
+            ),
+        ] {
+            if canonical_actions
+                .iter()
+                .any(|action| action["action_id"] == action_id)
+            {
+                continue;
+            }
+            let diagnostic = canonical_actions
+                .first()
+                .and_then(|action| action.get("diagnostic"))
+                .cloned()
+                .ok_or_else(|| "test lsp needs a diagnostic-backed action".to_string())?;
+            let applicability = if action_id == "witness-command" {
+                serde_json::json!({ "state": "available" })
+            } else {
+                serde_json::json!({
+                    "state": "disabled",
+                    "reason_code": reason_code,
+                    "reason": reason,
+                })
+            };
+            canonical_actions.push(serde_json::json!({
+                "action_id": action_id,
+                "title": title,
+                "kind": kind,
+                "diagnostic": diagnostic,
+                "payload": {
+                    "action_id": action_id,
+                    "card_id": "card-1",
+                    "analysis": analysis,
+                    "agent_readiness": "ready_for_agent",
+                },
+                "command": {
+                    "command": command,
+                    "arguments": { "card_id": "card-1", "analysis": analysis },
+                },
+                "applicability": applicability,
+                "is_preferred": false,
+                "command_only": true,
+                "trust_boundary": "static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result",
+            }));
+        }
+        value["code_actions"] = serde_json::Value::Array(canonical_actions);
         let hover_contents = value["hovers"][0]["contents"]
             .as_str()
             .ok_or_else(|| "valid lsp hover contents must be a string".to_string())?
@@ -24471,6 +24567,99 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         value["diagnostics"][0]["missing_evidence"] = serde_json::json!([]);
         value["diagnostics"][0]["coverage"] = lsp_fixture_coverage();
         Ok(value.to_string())
+    }
+
+    fn canonical_test_code_action(
+        action: serde_json::Value,
+        analysis: &serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        let legacy_command = action["command"]
+            .as_str()
+            .ok_or_else(|| "legacy test code_action command must be a string".to_string())?;
+        let (action_id, command, kind) = match legacy_command {
+            "unsafe-review.copyAgentPacket" => (
+                "agent-packet",
+                "unsafe-review.collectAgentPacket",
+                "quickfix.unsafeReview.agentPacket",
+            ),
+            "unsafe-review.explainWitnessRoute" => (
+                "witness-route",
+                legacy_command,
+                "source.unsafeReview.witnessRoute",
+            ),
+            "unsafe-review.copyWitnessCommand" => (
+                "witness-command",
+                "unsafe-review.collectWitnessCommand",
+                "source.unsafeReview.witnessCommand",
+            ),
+            "unsafe-review.openRelatedTest" => (
+                "related-test",
+                legacy_command,
+                "source.unsafeReview.relatedTest",
+            ),
+            other => return Err(format!("unknown legacy test code_action command `{other}`")),
+        };
+        let card_id = action["card_id"]
+            .as_str()
+            .ok_or_else(|| "legacy test code_action must have card_id".to_string())?;
+        let argument_card_id = action["arguments"]
+            .as_array()
+            .and_then(|values| values.first())
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or(card_id);
+        let mut arguments = serde_json::json!({
+            "card_id": argument_card_id,
+            "analysis": analysis,
+        });
+        if action_id == "related-test" {
+            for field in ["file", "line", "name"] {
+                if let Some(value) = action.get("payload").and_then(|value| value.get(field)) {
+                    arguments[field] = value.clone();
+                }
+            }
+        } else if action_id == "witness-command" {
+            if let Some(command) = action.get("payload").and_then(|value| value.get("command")) {
+                arguments["command"] = command.clone();
+            }
+        }
+        let title = match action_id {
+            "agent-packet" => "Copy bounded unsafe-review agent packet".to_string(),
+            "related-test" if action["title"] == "Open unrelated test" => {
+                "Open unrelated test".to_string()
+            }
+            "related-test" => arguments
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .map_or_else(
+                    || "Open related test".to_string(),
+                    |name| format!("Open related test `{name}`"),
+                ),
+            _ => action["title"].as_str().unwrap_or_default().to_string(),
+        };
+        Ok(serde_json::json!({
+            "action_id": action_id,
+            "title": title,
+            "kind": kind,
+            "diagnostic": {
+                "card_id": card_id,
+                "path": if action_id == "related-test" { serde_json::json!("src/lib.rs") } else { action["path"].clone() },
+                "range": if action_id == "related-test" { serde_json::json!({"start":{"line":6,"character":0},"end":{"line":6,"character":1}}) } else { action["range"].clone() },
+            },
+            "payload": {
+                "action_id": action_id,
+                "card_id": card_id,
+                "analysis": analysis,
+                "agent_readiness": "ready_for_agent",
+            },
+            "command": {
+                "command": command,
+                "arguments": arguments,
+            },
+            "applicability": { "state": "available" },
+            "is_preferred": false,
+            "command_only": true,
+            "trust_boundary": "static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result",
+        }))
     }
 
     fn write_valid_zero_card_first_pr_artifacts(dir: &Path) -> Result<(), String> {
@@ -24501,7 +24690,7 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
         .map_err(|err| format!("write witness plan failed: {err}"))?;
         fs::write(
             dir.join("lsp.json"),
-            r#"{"schema_version":"0.1","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","status":{"state":"quiet","cards":0,"open_actionable_gaps":0,"high_priority_cards":0,"message":"No unsafe-review cards for this scope","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[],"hovers":[],"code_actions":[],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
+            r#"{"schema_version":"0.2","tool":"unsafe-review","mode":"read_only_projection","policy":"advisory","scope":"diff","analysis":{"analysis_id":"test-analysis-zero","generation":1,"tool_version":"0.3.8","scope":"diff","state":"current"},"status":{"state":"quiet","cards":0,"open_actionable_gaps":0,"high_priority_cards":0,"message":"No unsafe-review cards for this scope","trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"},"diagnostics":[],"hovers":[],"code_actions":[],"trust_boundary":"static unsafe contract review, not a proof of memory safety, not UB-free status, and not a Miri result"}"#,
         )
         .map_err(|err| format!("write lsp failed: {err}"))?;
         fs::write(

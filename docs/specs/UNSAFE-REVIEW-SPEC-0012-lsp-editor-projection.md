@@ -62,8 +62,10 @@ than deriving them from titles. The closed card-action IDs are `agent-packet`,
 Unavailable route, witness-command, or related-test capabilities are omitted or
 represented with the canonical disabled reason; an enabled action must not
 execute to an unexplained null. Human-review actions remain non-preferred and
-must not imply automatic repair authority. PR1 defines this contract without
-changing the legacy saved wire shape; adapter migration is sequenced separately.
+must not imply automatic repair authority. Saved `lsp.json` schema 0.2 carries
+the canonical action objects and full analysis identity. Consumers may render
+legacy 0.1 actions for compatibility, but must not mix the two action shapes or
+recover executable 0.2 semantics from titles and positional arguments.
 
 Every diagnostic and card-scoped action must carry the relevant `card_id` and
 the static-review trust boundary. Diagnostic data must include the operation

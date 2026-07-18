@@ -11,7 +11,6 @@ use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::{Deserialize, Serialize};
 
-mod code_actions;
 mod hover;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -25,7 +24,7 @@ pub struct EditorProjection {
     pub status: EditorStatus,
     pub diagnostics: Vec<EditorDiagnostic>,
     pub hovers: Vec<EditorHover>,
-    pub code_actions: Vec<EditorCodeAction>,
+    pub code_actions: Vec<super::EditorActionContract>,
     pub trust_boundary: String,
 }
 
@@ -40,7 +39,6 @@ pub struct EditorStatus {
 }
 
 pub type EditorHover = serde_json::Value;
-pub type EditorCodeAction = serde_json::Value;
 
 /// Render the rich hover markdown for a single [`ReviewCard`].
 ///
@@ -74,11 +72,7 @@ pub(crate) fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
             .iter()
             .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
             .collect(),
-        code_actions: projection
-            .code_actions
-            .iter()
-            .map(|item| serde_json::to_value(item).unwrap_or(serde_json::Value::Null))
-            .collect(),
+        code_actions: projection.code_actions,
         trust_boundary: projection.trust_boundary.to_string(),
     }
 }
@@ -97,7 +91,7 @@ pub(crate) fn project_actionable_editor_diagnostics(
 #[derive(Serialize)]
 struct LspProjection<'a> {
     analysis: &'a AnalysisIdentity,
-    schema_version: &'a str,
+    schema_version: &'static str,
     tool: &'a str,
     mode: &'static str,
     policy: &'static str,
@@ -105,7 +99,7 @@ struct LspProjection<'a> {
     status: LspStatus,
     diagnostics: Vec<EditorDiagnostic>,
     hovers: Vec<LspHover<'a>>,
-    code_actions: Vec<LspCodeAction<'a>>,
+    code_actions: Vec<super::EditorActionContract>,
     trust_boundary: &'static str,
 }
 
@@ -113,7 +107,7 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     fn from(output: &'a AnalyzeOutput) -> Self {
         Self {
             analysis: &output.analysis_identity,
-            schema_version: &output.schema_version,
+            schema_version: "0.2",
             tool: &output.tool,
             mode: "read_only_projection",
             policy: output.policy.as_str(),
@@ -124,7 +118,15 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             code_actions: output
                 .cards
                 .iter()
-                .flat_map(code_actions::for_card)
+                .map(|card| {
+                    super::actions_for_card(output, &card.id.0).unwrap_or_else(|error| {
+                        panic!(
+                            "canonical saved LSP actions must project for card `{}`: {error}",
+                            card.id.0
+                        )
+                    })
+                })
+                .flatten()
                 .collect(),
             trust_boundary: TRUST_BOUNDARY,
         }
@@ -418,34 +420,6 @@ impl<'a> From<&'a ReviewCard> for LspHover<'a> {
             trust_boundary: TRUST_BOUNDARY,
         }
     }
-}
-
-#[derive(Serialize)]
-struct LspCodeAction<'a> {
-    card_id: &'a str,
-    path: String,
-    range: EditorRange,
-    title: String,
-    kind: &'static str,
-    command: &'static str,
-    payload: LspCodeActionPayload<'a>,
-    arguments: Vec<String>,
-}
-
-#[derive(Serialize)]
-struct LspCodeActionPayload<'a> {
-    kind: &'static str,
-    card_id: &'a str,
-    proof_path: &'static str,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    file: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    line: Option<usize>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    name: Option<&'a str>,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    command: Option<&'a str>,
-    trust_boundary: &'static str,
 }
 
 #[derive(Serialize)]

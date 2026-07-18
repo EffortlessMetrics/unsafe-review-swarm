@@ -81,6 +81,9 @@ export interface BundleHover {
 
 export interface BundleCodeActionPayload {
   cardId?: string;
+  actionId?: string;
+  analysis?: BundleStructuredObject;
+  readiness?: string;
   kind?: string;
   command?: string;
   file?: string;
@@ -91,10 +94,16 @@ export interface BundleCodeActionPayload {
 }
 
 export interface BundleCodeAction {
+  actionId?: string;
   title: string;
-  command: string;
+  command?: string;
+  commandArguments?: BundleStructuredObject;
   path: string;
   range?: BundleRange;
+  kind?: string;
+  isPreferred?: boolean;
+  commandOnly?: boolean;
+  disabled?: { reasonCode: string; reason: string };
   payload?: BundleCodeActionPayload;
 }
 
@@ -130,13 +139,19 @@ export function parseBundle(text: string): ParsedBundle {
   }
 
   const warnings: string[] = [];
+  const schemaVersion = readString(raw["schema_version"]);
+  if (schemaVersion !== "0.1" && schemaVersion !== "0.2") {
+    throw new BundleParseError(`unsupported lsp.json schema_version: ${schemaVersion ?? "missing"}`);
+  }
 
   const trustBoundary = readString(raw["trust_boundary"]) ?? DEFAULT_TRUST_BOUNDARY;
   const status = parseStatus(raw["status"], trustBoundary);
 
   const diagnostics = parseDiagnostics(raw["diagnostics"], warnings);
   const hovers = parseHovers(raw["hovers"], warnings);
-  const codeActions = parseCodeActions(raw["code_actions"], warnings);
+  const codeActions = parseCodeActions(
+    raw["code_actions"], warnings, schemaVersion, raw["analysis"], diagnostics, trustBoundary,
+  );
 
   return {
     status,
@@ -309,7 +324,14 @@ function parseHovers(value: unknown, warnings: string[]): BundleHover[] {
   return out;
 }
 
-function parseCodeActions(value: unknown, warnings: string[]): BundleCodeAction[] {
+function parseCodeActions(
+  value: unknown,
+  warnings: string[],
+  schemaVersion: string,
+  bundleAnalysis: unknown,
+  diagnostics: BundleDiagnostic[],
+  bundleTrustBoundary: string,
+): BundleCodeAction[] {
   if (value === undefined || value === null) {
     return [];
   }
@@ -325,6 +347,24 @@ function parseCodeActions(value: unknown, warnings: string[]): BundleCodeAction[
       continue;
     }
     const title = readString(entry["title"]);
+    const actionId = readString(entry["action_id"]);
+    if (schemaVersion === "0.2") {
+      if (actionId === undefined) {
+        warnings.push(`code_action #${i} uses legacy shape in 0.2 bundle; skipped`);
+        continue;
+      }
+      const canonical = parseCanonicalCodeAction(
+        entry, i, warnings, bundleAnalysis, diagnostics, bundleTrustBoundary,
+      );
+      if (canonical !== undefined) {
+        out.push(canonical);
+      }
+      continue;
+    }
+    if (actionId !== undefined) {
+      warnings.push(`code_action #${i} uses canonical shape in 0.1 bundle; skipped`);
+      continue;
+    }
     const command = readString(entry["command"]);
     const path = readString(entry["path"]);
     if (title === undefined || command === undefined || path === undefined) {
@@ -338,8 +378,179 @@ function parseCodeActions(value: unknown, warnings: string[]): BundleCodeAction[
       range: parseRange(entry["range"]),
       payload: parseCodeActionPayload(entry["payload"]),
     });
+    warnings.push(`code_action #${i} uses legacy 0.1 action shape`);
   }
   return out;
+}
+
+function parseCanonicalCodeAction(
+  entry: Record<string, unknown>,
+  index: number,
+  warnings: string[],
+  bundleAnalysis: unknown,
+  diagnostics: BundleDiagnostic[],
+  bundleTrustBoundary: string,
+): BundleCodeAction | undefined {
+  const actionId = readString(entry["action_id"]);
+  const title = readString(entry["title"]);
+  const kind = readString(entry["kind"]);
+  const diagnostic = isRecord(entry["diagnostic"]) ? entry["diagnostic"] : undefined;
+  const payload = isRecord(entry["payload"]) ? entry["payload"] : undefined;
+  const command = isRecord(entry["command"]) ? entry["command"] : undefined;
+  const applicability = isRecord(entry["applicability"]) ? entry["applicability"] : undefined;
+  const cardId = diagnostic === undefined ? undefined : readString(diagnostic["card_id"]);
+  const path = diagnostic === undefined ? undefined : readString(diagnostic["path"]);
+  const range = diagnostic === undefined ? undefined : parseRange(diagnostic["range"]);
+  const payloadCardId = payload === undefined ? undefined : readString(payload["card_id"]);
+  const payloadActionId = payload === undefined ? undefined : readString(payload["action_id"]);
+  const commandOnly = entry["command_only"] === true;
+  const payloadAnalysis = payload === undefined ? undefined : payload["analysis"];
+  const argumentsValue = command === undefined || !isRecord(command["arguments"])
+    ? undefined : command["arguments"];
+  const argumentAnalysis = argumentsValue?.["analysis"];
+  const argumentCardId = argumentsValue === undefined ? undefined : readString(argumentsValue["card_id"]);
+  const readiness = payload === undefined ? undefined : readString(payload["agent_readiness"]);
+  const commandId = command === undefined ? undefined : readString(command["command"]);
+  const actionTrustBoundary = readString(entry["trust_boundary"]);
+  const vocabulary = canonicalActionVocabulary(actionId, readiness);
+  const matchingDiagnostic = diagnostics.find((item) =>
+    item.cardId === cardId && item.path === path && range !== undefined && rangesEqual(item.range, range),
+  );
+  if (
+    actionId === undefined || title === undefined || kind === undefined || cardId === undefined ||
+    path === undefined || range === undefined || payload === undefined || command === undefined ||
+    payloadCardId !== cardId || payloadActionId !== actionId || argumentCardId !== cardId || !commandOnly ||
+    vocabulary === undefined || vocabulary.command !== commandId || vocabulary.kind !== kind ||
+    entry["is_preferred"] !== false || matchingDiagnostic === undefined ||
+    actionTrustBoundary === undefined || actionTrustBoundary !== bundleTrustBoundary ||
+    JSON.stringify(payloadAnalysis) !== JSON.stringify(bundleAnalysis) ||
+    JSON.stringify(argumentAnalysis) !== JSON.stringify(bundleAnalysis)
+  ) {
+    warnings.push(`code_action #${index} has inconsistent canonical identity; skipped`);
+    return undefined;
+  }
+  const state = applicability === undefined ? undefined : readString(applicability["state"]);
+  if (state !== "available" && state !== "disabled") {
+    warnings.push(`code_action #${index} has invalid applicability; skipped`);
+    return undefined;
+  }
+  const reasonCode = readString(applicability?.["reason_code"]);
+  const reason = readString(applicability?.["reason"]);
+  if (state === "disabled" && (reasonCode === undefined || reason === undefined)) {
+    warnings.push(`code_action #${index} has incomplete disabled applicability; skipped`);
+    return undefined;
+  }
+  const expectedDisabledReason = canonicalDisabledReason(actionId);
+  if (state === "disabled" && (expectedDisabledReason === undefined ||
+    reasonCode !== expectedDisabledReason.reasonCode || reason !== expectedDisabledReason.reason)) {
+    warnings.push(`code_action #${index} has non-canonical disabled applicability; skipped`);
+    return undefined;
+  }
+  const disabled = state === "disabled" ? { reasonCode: reasonCode!, reason: reason! } : undefined;
+  if (state === "available" && actionId === "witness-route" && !matchingDiagnostic.witnessRoutes?.length) {
+    warnings.push(`code_action #${index} has no matching witness route; skipped`);
+    return undefined;
+  }
+  if (state === "disabled" && actionId === "witness-route" && matchingDiagnostic.witnessRoutes?.length) {
+    warnings.push(`code_action #${index} disables an available witness route; skipped`);
+    return undefined;
+  }
+  const matchingWitnessCommand = matchingDiagnostic.witnessRoutes
+    ?.map((route) => route.command)
+    .find((candidate) => candidate !== undefined && candidate.length > 0);
+  if (state === "disabled" && actionId === "witness-command" && matchingWitnessCommand !== undefined) {
+    warnings.push(`code_action #${index} disables an available witness command; skipped`);
+    return undefined;
+  }
+  if (state === "available" && actionId === "related-test") {
+    const file = argumentsValue === undefined ? undefined : readString(argumentsValue["file"]);
+    const name = argumentsValue === undefined ? undefined : readString(argumentsValue["name"]);
+    const line = argumentsValue === undefined ? undefined : readNumber(argumentsValue["line"]);
+    if (file === undefined || file.length === 0 || name === undefined || name.length === 0 ||
+      line === undefined || !Number.isInteger(line) || line <= 0) {
+      warnings.push(`code_action #${index} has incomplete related-test capability; skipped`);
+      return undefined;
+    }
+  }
+  const commandArguments = { ...argumentsValue };
+  if (actionId === "witness-command") {
+    const witnessCommand = matchingWitnessCommand;
+    if (state === "available" && witnessCommand === undefined) {
+      warnings.push(`code_action #${index} has no matching witness command; skipped`);
+      return undefined;
+    }
+    if (witnessCommand !== undefined) {
+      commandArguments["command"] = witnessCommand;
+    }
+  }
+  return {
+    actionId,
+    title,
+    kind,
+    command: readString(command["command"]),
+    commandArguments,
+    path,
+    range,
+    isPreferred: false,
+    commandOnly,
+    disabled,
+    payload: {
+      actionId: payloadActionId,
+      cardId: payloadCardId,
+      analysis: isRecord(payload["analysis"]) ? payload["analysis"] : undefined,
+      readiness,
+      trustBoundary: actionTrustBoundary,
+      file: isRecord(command["arguments"]) ? readString(command["arguments"]["file"]) : undefined,
+      line: isRecord(command["arguments"]) ? readNumber(command["arguments"]["line"]) : undefined,
+      name: isRecord(command["arguments"]) ? readString(command["arguments"]["name"]) : undefined,
+    },
+  };
+}
+
+function canonicalDisabledReason(
+  actionId: string | undefined,
+): { reasonCode: string; reason: string } | undefined {
+  switch (actionId) {
+    case "witness-route":
+      return { reasonCode: "no_witness_route", reason: "No witness route is available for this card." };
+    case "witness-command":
+      return { reasonCode: "no_witness_command", reason: "No witness command is available for this card." };
+    case "related-test":
+      return { reasonCode: "no_related_test", reason: "No structured related test is available for this card." };
+    default:
+      return undefined;
+  }
+}
+
+function canonicalActionVocabulary(
+  actionId: string | undefined,
+  readiness: string | undefined,
+): { command: string; kind: string } | undefined {
+  if (!["ready_for_agent", "requires_human_review", "requires_witness_receipt", "unsupported"].includes(readiness ?? "")) {
+    return undefined;
+  }
+  switch (actionId) {
+    case "agent-packet":
+      return {
+        command: "unsafe-review.collectAgentPacket",
+        kind: readiness === "ready_for_agent"
+          ? "quickfix.unsafeReview.agentPacket"
+          : "source.unsafeReview.reviewContext",
+      };
+    case "witness-route":
+      return { command: "unsafe-review.explainWitnessRoute", kind: "source.unsafeReview.witnessRoute" };
+    case "witness-command":
+      return { command: "unsafe-review.collectWitnessCommand", kind: "source.unsafeReview.witnessCommand" };
+    case "related-test":
+      return { command: "unsafe-review.openRelatedTest", kind: "source.unsafeReview.relatedTest" };
+    default:
+      return undefined;
+  }
+}
+
+function rangesEqual(left: BundleRange, right: BundleRange): boolean {
+  return left.start.line === right.start.line && left.start.character === right.start.character &&
+    left.end.line === right.end.line && left.end.character === right.end.character;
 }
 
 function parseCodeActionPayload(value: unknown): BundleCodeActionPayload | undefined {

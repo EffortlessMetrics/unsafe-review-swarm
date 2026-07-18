@@ -9465,7 +9465,12 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
     reject_manual_candidate_markers(&lsp, "lsp.json")?;
     let card_projections = &summary.card_projections;
     let card_ids = card_projections.keys().cloned().collect::<BTreeSet<_>>();
-    super::require_json_str(&lsp, "schema_version", "0.1", "lsp.json")?;
+    let schema_version = super::require_non_empty_json_str(&lsp, "schema_version", "lsp.json")?;
+    if schema_version != "0.2" {
+        return Err(format!(
+            "lsp.json key `schema_version` is `{schema_version}`, expected `0.2`"
+        ));
+    }
     super::require_json_str(&lsp, "tool", "unsafe-review", "lsp.json")?;
     super::require_json_str(&lsp, "mode", "read_only_projection", "lsp.json")?;
     super::require_json_str(&lsp, "policy", "advisory", "lsp.json")?;
@@ -9583,51 +9588,105 @@ fn check_lsp_artifact(dir: &Path, summary: &AdvisoryArtifactSummary) -> Result<(
         }
     }
 
-    let mut code_action_commands = BTreeSet::new();
+    let analysis = lsp
+        .get("analysis")
+        .filter(|value| value.is_object())
+        .ok_or_else(|| "lsp.json is missing analysis identity".to_string())?;
+    super::require_non_empty_json_str(analysis, "analysis_id", "lsp.json analysis")?;
+    super::json_usize_at(analysis, "/generation", "lsp.json analysis")?;
+    super::require_non_empty_json_str(analysis, "tool_version", "lsp.json analysis")?;
+    super::require_json_str(analysis, "scope", &summary.scope, "lsp.json analysis")?;
+    super::require_json_str(analysis, "state", "current", "lsp.json analysis")?;
+    let mut code_action_ids = BTreeSet::new();
     for action in super::json_array_at(&lsp, "/code_actions", "lsp.json")? {
-        let action_card_id = require_known_card_id(action, "lsp.json code_action", &card_ids)?;
-        super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
-        check_lsp_range(action, "lsp.json code_action")?;
+        let action_id =
+            super::require_non_empty_json_str(action, "action_id", "lsp.json code_action")?;
+        let diagnostic = action
+            .get("diagnostic")
+            .ok_or_else(|| "lsp.json code_action is missing diagnostic".to_string())?;
+        let action_card_id =
+            require_known_card_id(diagnostic, "lsp.json code_action diagnostic", &card_ids)?;
+        super::require_non_empty_json_str(diagnostic, "path", "lsp.json code_action diagnostic")?;
+        check_lsp_range(diagnostic, "lsp.json code_action diagnostic")?;
         let title = super::require_non_empty_json_str(action, "title", "lsp.json code_action")?;
-        super::require_json_str(action, "kind", "quickfix", "lsp.json code_action")?;
-        let Some(command) = action.get("command").and_then(serde_json::Value::as_str) else {
-            return Err("lsp.json code_action is missing command".to_string());
-        };
-        if command.trim().is_empty() {
-            return Err("lsp.json code_action command must not be empty".to_string());
-        }
+        let kind = super::require_non_empty_json_str(action, "kind", "lsp.json code_action")?;
+        let command_object = action
+            .get("command")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| "lsp.json code_action command must be an object".to_string())?;
+        let command = super::require_non_empty_json_str(
+            command_object,
+            "command",
+            "lsp.json code_action command",
+        )?;
+        let arguments = command_object
+            .get("arguments")
+            .filter(|value| value.is_object())
+            .ok_or_else(|| {
+                "lsp.json code_action command arguments must be an object".to_string()
+            })?;
         let Some(card_projection) = card_projections.get(action_card_id) else {
             return Err(format!(
                 "lsp.json code_action references unknown card id `{action_card_id}`"
             ));
         };
-        check_lsp_code_action_location(action, card_projection, command)?;
-        let action_key = (action_card_id.to_string(), command.to_string());
-        if !code_action_commands.insert(action_key) {
+        check_lsp_projection_location(
+            diagnostic,
+            card_projection,
+            "lsp.json code_action diagnostic",
+            "/range/start/line",
+        )?;
+        let saved_diagnostic = super::json_array_at(&lsp, "/diagnostics", "lsp.json")?
+            .iter()
+            .find(|candidate| candidate.get("card_id").and_then(serde_json::Value::as_str) == Some(action_card_id))
+            .ok_or_else(|| format!("lsp.json code_action diagnostic has no saved diagnostic for card id `{action_card_id}`"))?;
+        if diagnostic.get("path") != saved_diagnostic.get("path")
+            || diagnostic.get("range") != saved_diagnostic.get("range")
+        {
             return Err(format!(
-                "lsp.json code_actions repeat command `{command}` for card id `{action_card_id}`"
+                "lsp.json code_action diagnostic must exactly match the saved diagnostic for card id `{action_card_id}`"
+            ));
+        }
+        let action_key = (action_card_id.to_string(), action_id.to_string());
+        if !code_action_ids.insert(action_key) {
+            return Err(format!(
+                "lsp.json code_actions repeat action_id `{action_id}` for card id `{action_card_id}`"
             ));
         }
         reject_lsp_code_action_edit_fields(action, "lsp.json code_action")?;
-        let arguments = super::json_array_at(action, "/arguments", "lsp.json code_action")?;
-        require_lsp_code_action_title(action_card_id, command, title, action)?;
+        if action
+            .get("trust_boundary")
+            .and_then(serde_json::Value::as_str)
+            != Some(boundary)
+        {
+            return Err(
+                "lsp.json code_action trust_boundary must equal the top-level trust_boundary"
+                    .to_string(),
+            );
+        }
+        require_lsp_code_action_title(action_id, command, title, arguments)?;
         check_lsp_code_action_payload(
             action,
+            action_id,
             action_card_id,
             command,
+            kind,
             card_projection,
             &card_ids,
             arguments,
+            analysis,
         )?;
     }
     for card_id in &card_ids {
-        for command in [
-            "unsafe-review.copyAgentPacket",
-            "unsafe-review.explainWitnessRoute",
+        for action_id in [
+            "agent-packet",
+            "witness-route",
+            "witness-command",
+            "related-test",
         ] {
-            if !code_action_commands.contains(&(card_id.to_string(), command.to_string())) {
+            if !code_action_ids.contains(&(card_id.to_string(), action_id.to_string())) {
                 return Err(format!(
-                    "lsp.json code_actions missing command `{command}` for card id `{card_id}`"
+                    "lsp.json code_actions missing action_id `{action_id}` for card id `{card_id}`"
                 ));
             }
         }
@@ -9713,31 +9772,41 @@ fn require_lsp_status_count(
 }
 
 fn require_lsp_code_action_title(
-    action_card_id: &str,
+    action_id: &str,
     command: &str,
     title: &str,
-    action: &serde_json::Value,
+    arguments: &serde_json::Value,
 ) -> Result<(), String> {
-    let expected = match command {
-        "unsafe-review.copyAgentPacket" => {
-            format!("Copy unsafe-review packet for {action_card_id}")
-        }
-        "unsafe-review.explainWitnessRoute" => "Explain unsafe-review witness route".to_string(),
-        "unsafe-review.openRelatedTest" => {
-            let payload = action
-                .get("payload")
-                .ok_or_else(|| "lsp.json code_action is missing payload".to_string())?;
-            let name =
-                super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
-            format!("Open related test {name}")
-        }
-        "unsafe-review.copyWitnessCommand" => "Copy witness command (does not run)".to_string(),
+    let expected = match action_id {
+        "agent-packet" => None,
+        "witness-route" => Some("Explain unsafe-review witness route".to_string()),
+        "witness-command" => Some("Copy witness command (does not run)".to_string()),
+        "related-test" => Some(
+            arguments
+                .get("name")
+                .and_then(serde_json::Value::as_str)
+                .map_or_else(
+                    || "Open related test".to_string(),
+                    |name| format!("Open related test `{name}`"),
+                ),
+        ),
         _ => {
             return Err(format!(
-                "lsp.json code_action command `{command}` is not verifier-known"
+                "lsp.json code_action action_id `{action_id}` is not verifier-known"
             ));
         }
     };
+    if action_id == "agent-packet" {
+        if title == "Copy bounded unsafe-review agent packet"
+            || title == "Copy bounded unsafe-review review context (human review required)"
+        {
+            return Ok(());
+        }
+        return Err(format!(
+            "lsp.json code_action `{command}` has invalid agent packet title `{title}`"
+        ));
+    }
+    let expected = expected.expect("non-packet actions have exact titles");
     if title == expected {
         Ok(())
     } else {
@@ -9804,41 +9873,6 @@ fn check_lsp_projection_location(
     }
 
     Ok(())
-}
-
-fn check_lsp_code_action_location(
-    action: &serde_json::Value,
-    card: &CardProjection,
-    command: &str,
-) -> Result<(), String> {
-    if command == "unsafe-review.openRelatedTest" {
-        let payload = action
-            .get("payload")
-            .ok_or_else(|| "lsp.json code_action is missing payload".to_string())?;
-        let file = super::require_non_empty_json_str(
-            payload,
-            "file",
-            "lsp.json code_action related_test payload",
-        )?;
-        let line = super::json_usize_at(
-            payload,
-            "/line",
-            "lsp.json code_action related_test payload",
-        )?;
-        let path = super::require_non_empty_json_str(action, "path", "lsp.json code_action")?;
-        require_expected_value(path, file, "lsp.json code_action related_test path")?;
-        let zero_based_line =
-            super::json_usize_at(action, "/range/start/line", "lsp.json code_action")?;
-        let one_based_line = zero_based_line + 1;
-        if one_based_line != line {
-            return Err(format!(
-                "lsp.json code_action related_test line must point at payload line {line}; got {one_based_line}"
-            ));
-        }
-        return Ok(());
-    }
-
-    check_lsp_projection_location(action, card, "lsp.json code_action", "/range/start/line")
 }
 
 fn require_lsp_diagnostic_card_projection(
@@ -10184,11 +10218,14 @@ fn check_lsp_diagnostic_witness_commands(diagnostic: &serde_json::Value) -> Resu
 
 fn check_lsp_code_action_payload(
     action: &serde_json::Value,
+    action_id: &str,
     action_card_id: &str,
     command: &str,
+    kind: &str,
     card_projection: &CardProjection,
     card_ids: &BTreeSet<String>,
-    arguments: &[serde_json::Value],
+    arguments: &serde_json::Value,
+    analysis: &serde_json::Value,
 ) -> Result<(), String> {
     let Some(payload) = action.get("payload") else {
         return Err("lsp.json code_action is missing payload".to_string());
@@ -10202,105 +10239,227 @@ fn check_lsp_code_action_payload(
             "lsp.json code_action payload card_id `{payload_card_id}` does not match action card_id `{action_card_id}`"
         ));
     }
-    let expected_kind = match command {
-        "unsafe-review.copyAgentPacket" => {
-            require_lsp_code_action_arguments(command, arguments, &[action_card_id.to_string()])?;
-            "unsafe-review.agent_packet"
-        }
-        "unsafe-review.explainWitnessRoute" => {
-            require_lsp_code_action_arguments(command, arguments, &[action_card_id.to_string()])?;
-            "unsafe-review.witness_route"
-        }
-        "unsafe-review.openRelatedTest" => {
-            let file =
-                super::require_non_empty_json_str(payload, "file", "lsp.json code_action payload")?;
-            let line = super::json_usize_at(payload, "/line", "lsp.json code_action payload")?;
-            if line == 0 {
-                return Err("lsp.json code_action payload line must be one-based".to_string());
-            }
-            let name =
-                super::require_non_empty_json_str(payload, "name", "lsp.json code_action payload")?;
-            require_lsp_code_action_arguments(
-                command,
-                arguments,
-                &[
-                    action_card_id.to_string(),
-                    file.to_string(),
-                    line.to_string(),
-                    name.to_string(),
-                ],
-            )?;
-            "unsafe-review.related_test"
-        }
-        "unsafe-review.copyWitnessCommand" => {
-            let witness_command = super::require_non_empty_json_str(
-                payload,
-                "command",
-                "lsp.json code_action payload",
-            )?;
-            if !card_projection
-                .verify_commands
-                .iter()
-                .any(|expected| expected == witness_command)
-            {
-                return Err(format!(
-                    "lsp.json code_action copyWitnessCommand payload command `{witness_command}` must match a ReviewCard verify command for card id `{action_card_id}`"
-                ));
-            }
-            require_lsp_code_action_arguments(command, arguments, &[witness_command.to_string()])?;
-            "unsafe-review.witness_command"
-        }
-        _ => {
+    require_expected_value(
+        super::require_non_empty_json_str(payload, "action_id", "lsp.json code_action payload")?,
+        action_id,
+        "lsp.json code_action payload action_id",
+    )?;
+    if payload.get("analysis") != Some(analysis) || arguments.get("analysis") != Some(analysis) {
+        return Err("lsp.json code_action payload and command arguments must preserve the top-level analysis identity".to_string());
+    }
+    require_expected_value(
+        super::require_non_empty_json_str(arguments, "card_id", "lsp.json code_action arguments")?,
+        action_card_id,
+        "lsp.json code_action arguments card_id",
+    )?;
+    if action_id != "related-test"
+        && ["file", "line", "name", "command"]
+            .iter()
+            .any(|field| arguments.get(*field).is_some())
+    {
+        return Err(format!(
+            "lsp.json code_action `{action_id}` must not carry related-test or witness command fields"
+        ));
+    }
+    let readiness = super::require_non_empty_json_str(
+        payload,
+        "agent_readiness",
+        "lsp.json code_action payload",
+    )?;
+    let expected_readiness = match card_projection.agent_lsp_readiness.as_str() {
+        "ready" => "ready_for_agent",
+        "needs_human" => "requires_human_review",
+        "requires_witness_receipt" => "requires_witness_receipt",
+        "unsupported" => "unsupported",
+        other => {
             return Err(format!(
-                "lsp.json code_action command `{command}` is not verifier-known"
+                "cards.json has unknown agent_lsp_readiness `{other}`"
             ));
         }
     };
-    super::require_json_str(
-        payload,
-        "kind",
-        expected_kind,
-        "lsp.json code_action payload",
+    require_expected_value(
+        readiness,
+        expected_readiness,
+        "lsp.json code_action agent_readiness",
     )?;
-    require_projected_str(
-        payload,
-        "proof_path",
-        &card_projection.proof_path,
-        "lsp.json code_action payload",
-    )?;
-    let boundary = payload
-        .get("trust_boundary")
-        .and_then(serde_json::Value::as_str)
-        .ok_or_else(|| "lsp.json code_action payload is missing trust_boundary".to_string())?;
-    super::require_boundary_text(boundary, "lsp.json code_action payload")?;
-    Ok(())
-}
-
-fn require_lsp_code_action_arguments(
-    command: &str,
-    arguments: &[serde_json::Value],
-    expected: &[String],
-) -> Result<(), String> {
-    if arguments.len() != expected.len() {
-        return Err(format!(
-            "lsp.json code_action `{command}` arguments length must be {}; got {}",
-            expected.len(),
-            arguments.len()
-        ));
+    if action_id == "agent-packet" {
+        let (expected_packet_kind, expected_packet_title) = if readiness == "ready_for_agent" {
+            (
+                "quickfix.unsafeReview.agentPacket",
+                "Copy bounded unsafe-review agent packet",
+            )
+        } else {
+            (
+                "source.unsafeReview.reviewContext",
+                "Copy bounded unsafe-review review context (human review required)",
+            )
+        };
+        require_expected_value(kind, expected_packet_kind, "lsp.json agent-packet kind")?;
+        require_expected_value(
+            super::require_non_empty_json_str(action, "title", "lsp.json code_action")?,
+            expected_packet_title,
+            "lsp.json agent-packet title",
+        )?;
     }
-    for (idx, expected) in expected.iter().enumerate() {
-        let actual = arguments
-            .get(idx)
-            .and_then(serde_json::Value::as_str)
-            .ok_or_else(|| {
-                format!("lsp.json code_action `{command}` arguments[{idx}] must be a string")
-            })?;
-        if actual != expected {
+    let (expected_command, expected_kind) = match action_id {
+        "agent-packet" => ("unsafe-review.collectAgentPacket", None),
+        "witness-route" => (
+            "unsafe-review.explainWitnessRoute",
+            Some("source.unsafeReview.witnessRoute"),
+        ),
+        "witness-command" => (
+            "unsafe-review.collectWitnessCommand",
+            Some("source.unsafeReview.witnessCommand"),
+        ),
+        "related-test" => {
+            if let Some(line) = arguments.get("line") {
+                let line = line.as_u64().ok_or_else(|| {
+                    "lsp.json code_action related-test line must be an integer".to_string()
+                })?;
+                if line == 0 {
+                    return Err(
+                        "lsp.json code_action related-test line must be one-based".to_string()
+                    );
+                }
+            }
+            (
+                "unsafe-review.openRelatedTest",
+                Some("source.unsafeReview.relatedTest"),
+            )
+        }
+        _ => {
             return Err(format!(
-                "lsp.json code_action `{command}` arguments[{idx}] must be `{expected}`; got `{actual}`"
+                "lsp.json code_action action_id `{action_id}` is not verifier-known"
             ));
         }
+    };
+    require_expected_value(command, expected_command, "lsp.json code_action command")?;
+    if let Some(expected_kind) = expected_kind {
+        require_expected_value(kind, expected_kind, "lsp.json code_action kind")?;
+    } else if !matches!(
+        kind,
+        "quickfix.unsafeReview.agentPacket" | "source.unsafeReview.reviewContext"
+    ) {
+        return Err(format!(
+            "lsp.json code_action agent-packet has invalid kind `{kind}`"
+        ));
     }
+    let applicability = action
+        .get("applicability")
+        .filter(|value| value.is_object())
+        .ok_or_else(|| "lsp.json code_action is missing applicability".to_string())?;
+    let applicability_state = super::require_non_empty_json_str(
+        applicability,
+        "state",
+        "lsp.json code_action applicability",
+    )?;
+    if !matches!(applicability_state, "available" | "disabled") {
+        return Err(format!(
+            "lsp.json code_action applicability state `{applicability_state}` is invalid"
+        ));
+    }
+    if applicability_state == "disabled" {
+        super::require_non_empty_json_str(
+            applicability,
+            "reason_code",
+            "lsp.json code_action applicability",
+        )?;
+        super::require_non_empty_json_str(
+            applicability,
+            "reason",
+            "lsp.json code_action applicability",
+        )?;
+    }
+    let related_fields_present = arguments
+        .get("file")
+        .and_then(serde_json::Value::as_str)
+        .is_some_and(|value| !value.is_empty())
+        && arguments
+            .get("name")
+            .and_then(serde_json::Value::as_str)
+            .is_some_and(|value| !value.is_empty())
+        && arguments
+            .get("line")
+            .and_then(serde_json::Value::as_u64)
+            .is_some_and(|value| value > 0);
+    let expected_available = match action_id {
+        "agent-packet" => true,
+        "witness-route" => !card_projection.witness_routes.is_empty(),
+        "witness-command" => card_projection
+            .witness_routes
+            .iter()
+            .any(|route| route.command.is_some()),
+        "related-test" => related_fields_present,
+        _ => unreachable!("closed action vocabulary checked above"),
+    };
+    if (applicability_state == "available") != expected_available {
+        return Err(format!(
+            "lsp.json code_action `{action_id}` applicability does not match ReviewCard capabilities"
+        ));
+    }
+    if applicability_state == "disabled" {
+        let (expected_reason_code, expected_reason) = match action_id {
+            "witness-route" => (
+                "no_witness_route",
+                "No witness route is available for this card.",
+            ),
+            "witness-command" => (
+                "no_witness_command",
+                "No witness command is available for this card.",
+            ),
+            "related-test" => (
+                "no_related_test",
+                "No structured related test is available for this card.",
+            ),
+            "agent-packet" => unreachable!("agent packet is always available"),
+            _ => unreachable!("closed action vocabulary checked above"),
+        };
+        super::require_json_str(
+            applicability,
+            "reason_code",
+            expected_reason_code,
+            "lsp.json code_action applicability",
+        )?;
+        super::require_json_str(
+            applicability,
+            "reason",
+            expected_reason,
+            "lsp.json code_action applicability",
+        )?;
+        if action_id == "related-test"
+            && ["file", "line", "name"]
+                .iter()
+                .any(|field| arguments.get(*field).is_some())
+        {
+            return Err(
+                "lsp.json disabled related-test action must not carry target fields".to_string(),
+            );
+        }
+    } else if applicability.get("reason_code").is_some() || applicability.get("reason").is_some() {
+        return Err(
+            "lsp.json available code_action must not carry disabled reason fields".to_string(),
+        );
+    }
+    if action
+        .get("command_only")
+        .and_then(serde_json::Value::as_bool)
+        != Some(true)
+    {
+        return Err("lsp.json code_action command_only must be true".to_string());
+    }
+    if action
+        .get("is_preferred")
+        .and_then(serde_json::Value::as_bool)
+        != Some(false)
+    {
+        return Err("lsp.json code_action is_preferred must be false".to_string());
+    }
+    let boundary = action
+        .get("trust_boundary")
+        .and_then(serde_json::Value::as_str)
+        .ok_or_else(|| "lsp.json code_action is missing trust_boundary".to_string())?;
+    super::require_boundary_text(boundary, "lsp.json code_action")?;
+    let _ = card_projection;
     Ok(())
 }
 

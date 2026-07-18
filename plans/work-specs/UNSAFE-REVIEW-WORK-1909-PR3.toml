@@ -1,0 +1,32 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1909"
+kind = "correctness"
+objective = "Migrate saved lsp.json and the VS Code saved-bundle adapter to the canonical structured action contract."
+user_outcome = "Saved editor actions preserve ReviewCard identity, freshness, readiness, and disabled reasons while remaining command-only and safe to copy or open."
+claim_boundary = "This slice migrates the saved projection and saved-bundle adapter. It does not add live client wiring, source edits, witness execution, packet embedding, marketplace publication, or automatic repair."
+
+[scope]
+included = ["Emit canonical actions in saved lsp.json schema 0.2", "Join VS Code actions to the matching saved diagnostic and analysis identity", "Keep schema 0.1 parsing as warned display compatibility", "Copy the matching saved witness command without executing it", "Verify canonical action vocabulary and fixture goldens"]
+excluded = ["Live VS Code LSP transport", "WorkspaceEdit or source mutation", "Witness execution", "Embedded agent packet delivery", "Marketplace publication"]
+
+[[invariant]]
+id = "AC-1909-PR3-1"
+text = "Saved schema 0.2 actions are the canonical four-action vocabulary, preserve full analysis identity, and exactly match their saved diagnostic location."
+proof = ["rtk cargo test -p unsafe-review-core lsp --locked", "rtk cargo run --locked -p xtask -- check-fixture-surface-parity"]
+
+[[invariant]]
+id = "AC-1909-PR3-2"
+text = "The saved VS Code adapter rejects mixed or inconsistent identities, fail-open applicability, unknown vocabulary, and source edits."
+proof = ["rtk npm --prefix editors/vscode run compile", "rtk npm --prefix editors/vscode test"]
+
+[[invariant]]
+id = "AC-1909-PR3-3"
+text = "Witness actions copy only a command projected by the matching ReviewCard and never execute it."
+proof = ["rtk npm --prefix editors/vscode test", "rtk cargo test -p xtask first_pr_artifact_checker_rejects_lsp --locked"]
+
+[rollback]
+strategy = "Revert the saved projection, adapter, verifier, fixtures, and these contract updates together; retain the merged canonical core and live LSP action contract."
+
+[risks]
+client_compatibility = "Schema 0.1 remains a warned parsing path in the saved viewer. Schema 0.2 rejects legacy or mixed action shapes instead of guessing executable semantics."
+stale_state = "Payload and command identities must exactly equal the top-level analysis identity and action diagnostics must match saved diagnostics before an action is exposed."

@@ -34,6 +34,13 @@ explicitly removes live-LSP wiring from its surface, which frees publication
 from the UNSAFE-REVIEW-SPEC-0018 hardening gate while leaving this spec as
 the long-form contract for the eventual full live extension.
 
+The saved viewer treats schema 0.2 actions as a closed, command-only contract.
+It joins each action to the matching saved diagnostic and analysis identity,
+rejects unknown action, command, readiness, kind, or applicability values, and
+does not expose a disabled action as executable. Legacy schema 0.1 bundles may
+still render through the compatibility parser with an explicit warning. Copying
+a witness command uses the matching ReviewCard witness route and never runs it.
+
 It provides:
 
 - diagnostics from the LSP server,
