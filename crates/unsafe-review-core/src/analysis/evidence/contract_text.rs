@@ -49,31 +49,36 @@ fn safety_comment_summary(context: &str, snippet: &str) -> Option<&'static str> 
     if let Some(hit) = safety_marker_in(snippet.lines()) {
         return Some(hit);
     }
-    // Scan the before-context upward from the site, but stop at the first
-    // *complete prior `unsafe` statement*: a `// SAFETY:` comment above such a
-    // statement documents THAT earlier unsafe operation, not this one, so it
-    // must not be credited to this (uncommented) site (`comment != guard`, and
-    // only same-site rationale counts). Ordinary guard/`if`/loop blocks between
-    // the comment and the site are NOT boundaries — the common guard-before-
-    // unsafe idiom (`// SAFETY: … / if cond { return } / unsafe { … }`) keeps
-    // its rationale.
-    for line in context.lines().rev() {
-        if is_attribution_boundary(line) {
-            break;
+    // Single forward pass over the before-context with the comment/string state
+    // threaded across lines (so multi-line block comments and strings are
+    // tracked). Track the most recent same-scope SAFETY comment; a *complete
+    // prior `unsafe` statement* clears it, because such a comment documents THAT
+    // earlier unsafe operation, not this site (`comment != guard`, and only
+    // same-site rationale counts). Ordinary guard/`if`/loop blocks are NOT
+    // boundaries, so the common guard-before-unsafe idiom keeps its rationale.
+    let mut state = LineCommentState::default();
+    let mut in_scope_hit: Option<&'static str> = None;
+    for line in context.lines() {
+        let entry = state.clone();
+        let _ = split_code_and_comment(line, &mut state);
+        if is_attribution_boundary(line, entry.clone()) {
+            in_scope_hit = None;
+            continue;
         }
-        if let Some(hit) = safety_marker(line) {
-            return Some(hit);
+        if let Some(hit) = safety_marker(line, entry) {
+            in_scope_hit = Some(hit);
         }
     }
-    None
+    in_scope_hit
 }
 
 /// Detect a `SAFETY:` / `Safety:` line comment (not a doc comment) on a single
-/// source line. Only a real `//`-comment counts: a `SAFETY:`-shaped string
-/// literal (e.g. `let r = "// SAFETY: x";`) yields no comment and is ignored,
-/// so an author cannot fabricate contract evidence with a quoted marker.
-fn safety_marker(line: &str) -> Option<&'static str> {
-    let (_, comment) = split_code_and_comment(line, &mut LineCommentState::default());
+/// source line, using `entry` as the comment/string state at the start of the
+/// line. Only a real `//`-comment counts: a `SAFETY:`-shaped string literal
+/// (e.g. `let r = "// SAFETY: x";`) or one inside a block comment yields no
+/// inline comment, so an author cannot fabricate contract evidence that way.
+fn safety_marker(line: &str, mut entry: LineCommentState) -> Option<&'static str> {
+    let (_, comment) = split_code_and_comment(line, &mut entry);
     let comment = comment?;
     let trimmed = comment.trim_start();
     // Doc comments (`///`, `//!`) are the owner-contract path handled by
@@ -91,10 +96,12 @@ fn safety_marker(line: &str) -> Option<&'static str> {
 }
 
 fn safety_marker_in<'a>(lines: impl Iterator<Item = &'a str>) -> Option<&'static str> {
+    let mut state = LineCommentState::default();
     for line in lines {
-        if let Some(hit) = safety_marker(line) {
+        if let Some(hit) = safety_marker(line, state.clone()) {
             return Some(hit);
         }
+        let _ = split_code_and_comment(line, &mut state);
     }
     None
 }
@@ -114,8 +121,8 @@ fn safety_marker_in<'a>(lines: impl Iterator<Item = &'a str>) -> Option<&'static
 /// inside a string literal (e.g. `let s = "unsafe { x }";`) is not a boundary;
 /// `unsafe` is matched as a whole token so identifiers like `unsafe_helper` do
 /// not trip it.
-fn is_attribution_boundary(line: &str) -> bool {
-    let (code, _) = split_code_and_comment(line, &mut LineCommentState::default());
+fn is_attribution_boundary(line: &str, mut entry: LineCommentState) -> bool {
+    let (code, _) = split_code_and_comment(line, &mut entry);
     let has_unsafe_keyword = code
         .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
         .any(|token| token == "unsafe");
@@ -231,6 +238,19 @@ mod tests {
         assert_eq!(
             safety_comment_summary("let reason = \"// SAFETY: ptr is valid\";", ""),
             None
+        );
+    }
+
+    #[test]
+    fn unsafe_inside_a_block_comment_is_not_an_attribution_boundary() {
+        // A complete-looking `unsafe { … }` inside a multi-line block comment
+        // must not sever attribution of the real SAFETY comment above it — the
+        // comment/string state is threaded across context lines.
+        let context =
+            "// SAFETY: real rationale for the site\n/* disabled:\nlet old = unsafe { *p };\n*/";
+        assert_eq!(
+            safety_comment_summary(context, "unsafe { *ptr }"),
+            Some("Nearby `SAFETY:` comment was detected")
         );
     }
 

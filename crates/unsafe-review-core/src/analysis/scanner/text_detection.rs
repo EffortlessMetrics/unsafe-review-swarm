@@ -4,7 +4,7 @@ pub(super) struct StringDetectionState {
     escaped: bool,
 }
 
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub(crate) struct LineCommentState {
     pub(super) block_depth: usize,
     string: Option<StringDetectionState>,
