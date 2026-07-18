@@ -4,6 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
+use super::shell_arg;
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
@@ -317,14 +318,6 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
     parts.push("--format".to_string());
     parts.push("markdown".to_string());
     parts.join(" ")
-}
-
-fn shell_arg(value: &str) -> String {
-    if value.chars().any(char::is_whitespace) {
-        format!("\"{}\"", value.replace('"', "\\\""))
-    } else {
-        value.to_string()
-    }
 }
 
 fn baseline_init_command(root: &Path) -> String {

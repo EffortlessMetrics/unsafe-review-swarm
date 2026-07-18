@@ -949,6 +949,16 @@ fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthR
         include_unchanged_tests: true,
         max_cards: None,
     });
+    //
+    // The degrade branch keys off the strict loader mentioning the baseline ledger
+    // path — the loader formats every per-entry/parse failure with `path.display()`.
+    // This coupling is intentionally test-pinned, not implicit: the else arm re-raises
+    // (`Err(err) => return Err(err)`), so if the loader's error ever stopped naming the
+    // ledger path, this branch would stop firing, `baseline_status` would return `Err`
+    // for a merely-strict-invalid ledger, and the e2e regression
+    // `baseline_status_survives_a_strictly_invalid_baseline_ledger_entry` (which asserts
+    // the command still *succeeds* and surfaces `card_scan_error`) would fail. The drift
+    // therefore cannot land silently.
     let (current_cards, card_scan_error) = match analyze_result {
         Ok(output) => (output.cards, None),
         Err(err) if err.contains(&ledger_path.display().to_string()) => (Vec::new(), Some(err)),
