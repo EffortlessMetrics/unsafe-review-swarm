@@ -6,10 +6,13 @@
 //! correct while the set overwhelms human-facing summaries and the
 //! comment-plan budget.
 //!
-//! This module groups the *existing* `target_feature`-family `ReviewCard`s
-//! by a canonical, obligation-preserving identity so their volume is
-//! understandable without deleting, suppressing, or reclassifying any of
-//! them. It is a presentation-only projection:
+//! This module defines the *full-inventory* equivalence grouping of
+//! `target_feature`-family `ReviewCard`s by a canonical, obligation-preserving
+//! identity ([`GroupKey`]) so their volume is understandable without deleting,
+//! suppressing, or reclassifying any of them. `target_feature_groups` groups
+//! every matching card regardless of comment-plan eligibility -- it is the
+//! full-inventory view the markdown surfaces (`output/markdown.rs`) render.
+//! It is a presentation-only projection:
 //!
 //! - It derives every field from `ReviewCard`/`CoverageBlock` data already
 //!   computed by the pipeline; it never mutates a card, drops a card, or
@@ -20,16 +23,31 @@
 //! - Architecture/feature literals (e.g. `enable = "avx2"` vs
 //!   `enable = "neon"`) are treated as group *metadata*, never group
 //!   *identity* -- see [`normalized_shape`].
-//! - Cards whose obligation, review class, movement (baseline state),
+//! - Cards whose obligation (including the structured set of *which*
+//!   obligations are unsatisfied), review class, movement (baseline state),
 //!   receipt state, or next action differ NEVER collapse into the same
 //!   group -- see [`GroupKey`].
+//!
+//! A second, narrower concern -- which member of a group is eligible to
+//! occupy a comment-plan slot -- is deliberately NOT decided here. Comment-
+//! plan eligibility (`should_plan_comment`) and importance ranking
+//! (`importance_rank`) are `comment_plan`-internal concerns, so the
+//! eligibility-aware "at most one representative per group" selection used
+//! by the comment-plan lives in
+//! `output::comment_plan::selection::target_feature_grouped_repetition_ids`,
+//! which is built on top of the groups this module returns. Grouping members
+//! by equivalence and choosing a comment-plan representative among them are
+//! two different questions with two different answers: an equivalence group
+//! can (and often does) contain ineligible members that have their own
+//! canonical non-selection reason and must never be mislabeled
+//! `grouped_repetition`.
 //!
 //! See `docs/specs/UNSAFE-REVIEW-SPEC-0011-pr-ci-output.md` §3.2 for the
 //! rendered contract.
 
 use crate::api::AnalyzeOutput;
 use crate::domain::{CoverageBlock, OperationFamily, ReviewCard};
-use crate::util::path_display;
+use crate::util::{path_display, slug, stable_hash_hex};
 use std::collections::{BTreeMap, BTreeSet};
 
 /// `group_kind` tag stamped on every target-feature-repetition group
@@ -43,6 +61,14 @@ pub(crate) const TARGET_FEATURE_GROUP_KIND: &str = "target_feature_repetition";
 /// summary. Mirrors `declaration_summary::DECLARATION_SUMMARY_REPRESENTATIVE_LIMIT`.
 pub(crate) const TARGET_FEATURE_SUMMARY_REPRESENTATIVE_LIMIT: usize = 3;
 
+/// Field separator used only to build the canonical string hashed into
+/// `group_id` (see [`group_id`]). A control character so it cannot collide
+/// with file paths, next-action prose, or obligation keys.
+const GROUP_ID_FIELD_SEP: char = '\u{1}';
+/// List-item separator for the `missing_obligations` field within the
+/// canonical `group_id` string.
+const GROUP_ID_LIST_SEP: char = '\u{2}';
+
 /// Canonical, obligation-preserving group identity for a `target_feature`
 /// `ReviewCard`.
 ///
@@ -51,7 +77,17 @@ pub(crate) const TARGET_FEATURE_SUMMARY_REPRESENTATIVE_LIMIT: usize = 3;
 /// [`normalized_shape`]), so `enable = "avx2"` and `enable = "neon"` share a
 /// shape. Every other field is an equivalence requirement from issue #1894:
 /// two cards group together only when their file, class, baseline movement,
-/// full coverage-slot state, and next action are all identical.
+/// full coverage-slot state, structured set of unsatisfied obligations, and
+/// next action are all identical.
+///
+/// `missing_obligations` mirrors `comment_plan::model::comment_budget_key`'s
+/// obligation derivation exactly (sorted, deduplicated unsatisfied
+/// `obligation_evidence[].obligation.key` values, falling back to
+/// `["review"]` when every obligation is fully discharged) -- see
+/// [`unsatisfied_obligation_keys`]. Without this field two cards with
+/// different unmet obligations could collapse into one group even though
+/// the canonical family/obligation comment budget would keep them distinct
+/// candidates.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct GroupKey {
     file: String,
@@ -62,6 +98,7 @@ struct GroupKey {
     test_reach_coverage: &'static str,
     witness_receipt_coverage: &'static str,
     next_action: String,
+    missing_obligations: Vec<String>,
     shape: String,
 }
 
@@ -74,7 +111,10 @@ struct GroupKey {
 pub(crate) struct TargetFeatureGroup {
     /// Always `"target_feature_repetition"` -- reserved for future group kinds.
     pub(crate) group_kind: &'static str,
-    /// Stable, deterministic identifier for this group.
+    /// Stable, deterministic identifier for this group. A digest of the full
+    /// `GroupKey` (see [`group_id`]), so it depends only on this group's own
+    /// key -- never on how many sibling groups exist or in what order they
+    /// were discovered.
     pub(crate) group_id: String,
     /// Source file this group is scoped to (display-normalized, forward
     /// slashes).
@@ -101,10 +141,13 @@ pub(crate) struct TargetFeatureGroup {
 
 /// Derive deterministic target-feature-repetition groups from `output.cards`.
 ///
-/// Filters to `operation_family == target_feature`, groups by [`GroupKey`],
-/// and ranks groups with a `new`/`worsened` baseline posture ahead of other
-/// groups (ties broken by descending size, then file, then group id) so a
-/// changed obligation cannot be hidden behind unchanged repetition volume.
+/// Filters to `operation_family == target_feature` and groups by [`GroupKey`]
+/// -- every matching card is placed in exactly one group regardless of
+/// comment-plan eligibility (that is a separate, narrower concern; see the
+/// module docs). Groups with a `new`/`worsened` baseline posture sort ahead
+/// of other groups (ties broken by descending size, then file, then group
+/// id) so a changed obligation cannot be hidden behind unchanged repetition
+/// volume.
 ///
 /// Returns an empty `Vec` when there are no `target_feature` cards --
 /// callers must render nothing new in that case so quiet PRs stay quiet.
@@ -120,21 +163,9 @@ pub(crate) fn target_feature_groups(output: &AnalyzeOutput) -> Vec<TargetFeature
             .push(card);
     }
 
-    // Deterministic ordinal disambiguator: groups that share (file, class,
-    // shape) but differ only in baseline/coverage/next-action state (a real
-    // but rare case) still get distinct, stable, injective ids. Iteration
-    // order over `by_key` is the `GroupKey` `Ord` order, which is itself
-    // fully determined by card data, so the assignment below is
-    // deterministic across runs.
-    let mut ordinal_by_prefix: BTreeMap<(String, &'static str, String), usize> = BTreeMap::new();
     let mut groups: Vec<TargetFeatureGroup> = by_key
         .into_iter()
-        .map(|(key, cards)| {
-            let prefix = (key.file.clone(), key.class, key.shape.clone());
-            let ordinal = ordinal_by_prefix.entry(prefix).or_insert(0);
-            *ordinal += 1;
-            build_group(key, *ordinal, cards)
-        })
+        .map(|(key, cards)| build_group(key, cards))
         .collect();
 
     groups.sort_by(|left, right| {
@@ -148,24 +179,6 @@ pub(crate) fn target_feature_groups(output: &AnalyzeOutput) -> Vec<TargetFeature
             .then_with(|| left.group_id.cmp(&right.group_id))
     });
     groups
-}
-
-/// The set of `target_feature` card ids that are non-representative members
-/// of a repetition group (`group.total > 1`) -- every id in the group
-/// except the first, deterministic representative.
-///
-/// Used by the comment-plan (SPEC-0022/0032) to select at most one
-/// representative per equivalent group; the rest are recorded with the
-/// `grouped_repetition` omission reason rather than silently dropped. This
-/// is the single source of truth for that exclusion set so the markdown
-/// group projection and the comment-plan selection can never drift on which
-/// card is "the" representative -- both read `underlying_card_ids[0]`.
-pub(crate) fn grouped_repetition_card_ids(output: &AnalyzeOutput) -> BTreeSet<String> {
-    target_feature_groups(output)
-        .into_iter()
-        .filter(|group| group.total > 1)
-        .flat_map(|group| group.underlying_card_ids.into_iter().skip(1))
-        .collect()
 }
 
 fn is_new_movement(baseline_state: &str) -> bool {
@@ -183,8 +196,40 @@ fn group_key(card: &ReviewCard, output: &AnalyzeOutput) -> GroupKey {
         test_reach_coverage: block.test_reach_coverage.as_str(),
         witness_receipt_coverage: block.witness_receipt_coverage.as_str(),
         next_action: card.next_action.summary.clone(),
+        missing_obligations: unsatisfied_obligation_keys(card),
         shape: normalized_shape(&card.operation.expression),
     }
+}
+
+/// Sorted, deduplicated set of unsatisfied obligation keys for `card`.
+///
+/// Mirrors `comment_plan::model::comment_budget_key`'s obligation derivation
+/// exactly (an obligation is "unsatisfied" when its contract, discharge,
+/// reach, or witness evidence is not all present), minus the
+/// `operation.family` prefix -- callers of this function already filter to
+/// one family (`target_feature`) before deriving a key, so the prefix would
+/// be a constant. Falls back to `["review"]` when every obligation is fully
+/// discharged, exactly like `comment_budget_key`, so a fully-discharged
+/// card's key is still well-defined and distinct from one with a real unmet
+/// obligation.
+fn unsatisfied_obligation_keys(card: &ReviewCard) -> Vec<String> {
+    let mut obligations: Vec<String> = card
+        .obligation_evidence
+        .iter()
+        .filter(|evidence| {
+            !evidence.contract.present
+                || !evidence.discharge.present
+                || !evidence.reach.present
+                || !evidence.witness.present
+        })
+        .map(|evidence| evidence.obligation.key.clone())
+        .collect();
+    obligations.sort_unstable();
+    obligations.dedup();
+    if obligations.is_empty() {
+        obligations.push("review".to_string());
+    }
+    obligations
 }
 
 /// Compute `card`'s coverage block with snapshot-slot movement applied, the
@@ -256,7 +301,7 @@ fn feature_literals(expression: &str) -> Vec<String> {
     literals
 }
 
-fn build_group(key: GroupKey, ordinal: usize, mut cards: Vec<&ReviewCard>) -> TargetFeatureGroup {
+fn build_group(key: GroupKey, mut cards: Vec<&ReviewCard>) -> TargetFeatureGroup {
     // Deterministic in-group order: ascending line, then card id.
     cards.sort_by(|left, right| {
         left.site
@@ -281,7 +326,7 @@ fn build_group(key: GroupKey, ordinal: usize, mut cards: Vec<&ReviewCard>) -> Ta
     let total = cards.len();
     TargetFeatureGroup {
         group_kind: TARGET_FEATURE_GROUP_KIND,
-        group_id: group_id(&key, ordinal),
+        group_id: group_id(&key),
         module_or_file: key.file.clone(),
         class: key.class,
         baseline_state: key.baseline_state,
@@ -292,31 +337,37 @@ fn build_group(key: GroupKey, ordinal: usize, mut cards: Vec<&ReviewCard>) -> Ta
     }
 }
 
-fn group_id(key: &GroupKey, ordinal: usize) -> String {
-    format!(
-        "target-feature::{}::{}::{}#{ordinal}",
-        key.file,
+/// Stable, injective group identifier: a digest of the FULL `GroupKey`, so a
+/// group's id depends only on its own key -- never on how many sibling
+/// groups exist, their discovery order, or whether an unrelated group is
+/// inserted or removed elsewhere in the same output (issue #1894 finding 5).
+///
+/// Uses the same `stable_hash_hex` FNV-1a primitive and 12-hex-char
+/// truncation convention `analysis::pipeline::card_identity` already uses
+/// for embedding a content hash into a readable identifier, so collision
+/// risk is the same well-understood, already-accepted risk profile as a
+/// `ReviewCard` id.
+fn group_id(key: &GroupKey) -> String {
+    let canonical = [
+        key.file.as_str(),
         key.class,
-        slug(&key.shape)
+        key.baseline_state,
+        key.contract_coverage,
+        key.guard_coverage,
+        key.test_reach_coverage,
+        key.witness_receipt_coverage,
+        key.next_action.as_str(),
+        &key.missing_obligations.join(&GROUP_ID_LIST_SEP.to_string()),
+        key.shape.as_str(),
+    ]
+    .join(&GROUP_ID_FIELD_SEP.to_string());
+    let digest = stable_hash_hex(&canonical);
+    format!(
+        "target-feature::{}::{}::{}",
+        key.file,
+        slug(key.class),
+        &digest[..12]
     )
-}
-
-/// Lossy, deterministic slug: lowercase alphanumerics, runs of anything else
-/// collapsed to a single `-`, trimmed. Used only to keep `group_id` readable
-/// -- the `ordinal` suffix (not this slug) is what guarantees injectivity.
-fn slug(value: &str) -> String {
-    let mut out = String::with_capacity(value.len());
-    let mut last_was_dash = false;
-    for ch in value.chars() {
-        if ch.is_ascii_alphanumeric() {
-            out.push(ch.to_ascii_lowercase());
-            last_was_dash = false;
-        } else if !last_was_dash && !out.is_empty() {
-            out.push('-');
-            last_was_dash = true;
-        }
-    }
-    out.trim_end_matches('-').to_string()
 }
 
 #[cfg(test)]
@@ -324,14 +375,25 @@ mod tests {
     use super::*;
     use crate::api::{PolicyMode, Scope, Summary};
     use crate::domain::{
-        CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
-        NextAction, Priority, ProofPath, ReachEvidence, ReviewClass, SourceLocation,
-        UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
+        CardId, Confidence, ContractEvidence, DischargeEvidence, EvidenceState, HazardKind,
+        MissingEvidence, NextAction, ObligationEvidence, Priority, ProofPath, ReachEvidence,
+        ReviewClass, SafetyObligation, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+        WitnessEvidence,
     };
     use crate::freshness::AnalysisIdentity;
     use std::collections::BTreeSet as StdBTreeSet;
 
     fn target_feature_card(id: &str, file: &str, line: usize, feature: &str) -> ReviewCard {
+        target_feature_card_with_obligation(id, file, line, feature, "target-feature")
+    }
+
+    fn target_feature_card_with_obligation(
+        id: &str,
+        file: &str,
+        line: usize,
+        feature: &str,
+        obligation_key: &str,
+    ) -> ReviewCard {
         let expression = format!("#[target_feature(enable = \"{feature}\")]");
         ReviewCard {
             id: CardId(id.to_string()),
@@ -358,7 +420,16 @@ mod tests {
             },
             hazards: vec![HazardKind::TargetFeature],
             obligations: vec![],
-            obligation_evidence: vec![],
+            obligation_evidence: vec![ObligationEvidence {
+                obligation: SafetyObligation::new(
+                    obligation_key,
+                    "callers only execute this path on supported hardware",
+                ),
+                contract: EvidenceState::missing("no safety contract"),
+                discharge: EvidenceState::missing("no guard"),
+                reach: EvidenceState::missing("no tests"),
+                witness: EvidenceState::missing("no receipt"),
+            }],
             contract: ContractEvidence::missing(),
             discharge: DischargeEvidence::missing(),
             reach: ReachEvidence {
@@ -449,6 +520,16 @@ mod tests {
         documented.class = ReviewClass::UnsafeUnreached;
         documented.contract = ContractEvidence::present("safety docs present");
         documented.discharge = DischargeEvidence::present("target-feature contract discharge");
+        documented.obligation_evidence = vec![ObligationEvidence {
+            obligation: SafetyObligation::new(
+                "target-feature",
+                "callers only execute this path on supported hardware",
+            ),
+            contract: EvidenceState::present("safety docs present"),
+            discharge: EvidenceState::present("target-feature contract discharge"),
+            reach: EvidenceState::missing("no tests"),
+            witness: EvidenceState::missing("no receipt"),
+        }];
         documented.next_action = NextAction {
             summary: "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.".to_string(),
             verify_commands: vec![],
@@ -481,6 +562,40 @@ mod tests {
         Ok(())
     }
 
+    /// Issue #1894 finding 2: two `target_feature` cards that share file,
+    /// class, coverage, and shape but have DIFFERENT unsatisfied-obligation
+    /// sets must never collapse into the same group -- the canonical
+    /// family/obligation comment budget (`comment_budget_key`) keeps them
+    /// distinct candidates, so the grouping identity must too.
+    #[test]
+    fn cards_with_different_unsatisfied_obligations_never_collapse() {
+        let cards = vec![
+            target_feature_card_with_obligation(
+                "UR-c1",
+                "src/simd.rs",
+                3,
+                "avx2",
+                "target-feature",
+            ),
+            target_feature_card_with_obligation(
+                "UR-c2",
+                "src/simd.rs",
+                8,
+                "sse2",
+                "target-feature-alt",
+            ),
+        ];
+        let output = output_with_cards(cards);
+        let groups = target_feature_groups(&output);
+
+        assert_eq!(
+            groups.len(),
+            2,
+            "different unsatisfied-obligation keys must produce distinct groups; got {groups:?}"
+        );
+        assert!(groups.iter().all(|group| group.total == 1));
+    }
+
     #[test]
     fn representatives_are_bounded_and_full_membership_is_preserved() {
         let cards = (0..6)
@@ -503,26 +618,41 @@ mod tests {
         );
     }
 
+    /// Issue #1894 finding 5: a group's `group_id` must depend only on its
+    /// own `GroupKey`, never on how many sibling groups exist in the same
+    /// output or the order they were discovered in.
     #[test]
-    fn grouped_repetition_ids_exclude_only_the_first_representative() {
-        let cards = vec![
-            target_feature_card("UR-c1", "src/simd.rs", 3, "avx2"),
-            target_feature_card("UR-c2", "src/simd.rs", 8, "sse2"),
-            target_feature_card("UR-c3", "src/simd.rs", 13, "neon"),
-        ];
-        let output = output_with_cards(cards);
-        let omitted = grouped_repetition_card_ids(&output);
-        assert_eq!(
-            omitted,
-            StdBTreeSet::from(["UR-c2".to_string(), "UR-c3".to_string()])
-        );
-    }
-
-    #[test]
-    fn grouped_repetition_ids_are_empty_for_a_singleton_group() {
-        let output =
+    fn group_id_is_stable_when_an_unrelated_sibling_group_is_inserted() -> Result<(), String> {
+        let base_output =
             output_with_cards(vec![target_feature_card("UR-c1", "src/simd.rs", 3, "avx2")]);
-        assert!(grouped_repetition_card_ids(&output).is_empty());
+        let base_groups = target_feature_groups(&base_output);
+        assert_eq!(base_groups.len(), 1);
+        let base_id = base_groups[0].group_id.clone();
+
+        // Insert an unrelated sibling group (different file, different
+        // class) ahead of and behind the original card's group in BTreeMap
+        // iteration order.
+        let mut documented = target_feature_card("UR-z9", "zzz/other.rs", 1, "neon");
+        documented.class = ReviewClass::UnsafeUnreached;
+        let mut earlier = target_feature_card("UR-a1", "aaa/other.rs", 1, "sse2");
+        earlier.class = ReviewClass::GuardMissing;
+
+        let widened_output = output_with_cards(vec![
+            target_feature_card("UR-c1", "src/simd.rs", 3, "avx2"),
+            documented,
+            earlier,
+        ]);
+        let widened_groups = target_feature_groups(&widened_output);
+        assert_eq!(widened_groups.len(), 3);
+        let same_group = widened_groups
+            .iter()
+            .find(|group| group.underlying_card_ids == vec!["UR-c1".to_string()])
+            .ok_or_else(|| "original card's group must still be present".to_string())?;
+        assert_eq!(
+            same_group.group_id, base_id,
+            "group_id must not change when unrelated sibling groups are inserted"
+        );
+        Ok(())
     }
 
     #[test]
@@ -548,6 +678,22 @@ mod tests {
                 "#[cfg_attr(target_arch = \"aarch64\", target_feature(enable = \"neon\"))]"
             ),
             vec!["aarch64".to_string(), "neon".to_string()]
+        );
+    }
+
+    #[test]
+    fn unsatisfied_obligation_keys_falls_back_to_review_when_fully_discharged() {
+        let mut card = target_feature_card("UR-c1", "src/simd.rs", 3, "avx2");
+        card.obligation_evidence = vec![ObligationEvidence {
+            obligation: SafetyObligation::new("target-feature", "desc"),
+            contract: EvidenceState::present("ok"),
+            discharge: EvidenceState::present("ok"),
+            reach: EvidenceState::present("ok"),
+            witness: EvidenceState::present("ok"),
+        }];
+        assert_eq!(
+            unsatisfied_obligation_keys(&card),
+            vec!["review".to_string()]
         );
     }
 

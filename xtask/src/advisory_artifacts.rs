@@ -8506,9 +8506,10 @@ fn expected_selection_reason_code(_card: &CardProjection) -> &'static str {
 /// equivalence (issue #1894), computed from the `cards.json`-derived
 /// `CardProjection` fields available in this artifact checker. Two
 /// `target_feature` cards are equivalent only when their file, class,
-/// baseline movement, full coverage-slot state, and next action are all
-/// identical; architecture/feature literals in the operation expression are
-/// normalized away first (metadata, not group identity).
+/// baseline movement, full coverage-slot state, structured set of
+/// unsatisfied obligations, and next action are all identical;
+/// architecture/feature literals in the operation expression are normalized
+/// away first (metadata, not group identity).
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord)]
 struct TargetFeatureGroupKey {
     path: String,
@@ -8519,6 +8520,7 @@ struct TargetFeatureGroupKey {
     test_reach_coverage: String,
     witness_receipt_coverage: String,
     next_action: String,
+    missing_obligations: Vec<String>,
     shape: String,
 }
 
@@ -8532,8 +8534,38 @@ fn target_feature_group_key(card: &CardProjection) -> TargetFeatureGroupKey {
         test_reach_coverage: card.test_reach_coverage.clone(),
         witness_receipt_coverage: card.witness_receipt_coverage.clone(),
         next_action: card.next_action.clone(),
+        missing_obligations: unsatisfied_obligation_keys(card),
         shape: normalized_target_feature_shape(&card.operation),
     }
+}
+
+/// Mirrors `target_feature_summary::unsatisfied_obligation_keys` (and thus
+/// `comment_budget_key`'s obligation derivation, minus the family prefix):
+/// sorted, deduplicated unsatisfied `obligation_evidence[].key` values,
+/// falling back to `["review"]` when every obligation is fully discharged
+/// (issue #1894 finding 2). Without this, two `target_feature` cards with
+/// different unmet obligations could collapse into one equivalence group
+/// even though the canonical family/obligation comment budget
+/// (`comment_budget_key`) keeps them distinct candidates.
+fn unsatisfied_obligation_keys(card: &CardProjection) -> Vec<String> {
+    let mut obligations: Vec<String> = card
+        .obligation_evidence
+        .iter()
+        .filter(|evidence| {
+            !evidence_axis_present(evidence, "contract")
+                || !evidence_axis_present(evidence, "discharge")
+                || !evidence_axis_present(evidence, "reach")
+                || !evidence_axis_present(evidence, "witness")
+        })
+        .filter_map(|evidence| evidence.get("key").and_then(serde_json::Value::as_str))
+        .map(str::to_string)
+        .collect();
+    obligations.sort_unstable();
+    obligations.dedup();
+    if obligations.is_empty() {
+        obligations.push("review".to_string());
+    }
+    obligations
 }
 
 /// Mirrors `target_feature_summary::normalized_shape`: replaces every quoted
@@ -8559,11 +8591,59 @@ fn normalized_target_feature_shape(expression: &str) -> String {
     shape.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
-/// The set of `target_feature` card ids that are non-representative members
-/// of an equivalence group (`target_feature_group_key` collision with
-/// `group.len() > 1`) -- every id in the group except the first by
-/// `(line, id)` order, mirroring
-/// `target_feature_summary::grouped_repetition_card_ids`. Computed once per
+/// Mirrors `selection::importance_rank`'s gap-severity component exactly,
+/// reading the same SPEC-0029 coverage-slot strings `CardProjection` already
+/// carries.
+fn projection_gap_severity_rank(card: &CardProjection) -> u8 {
+    if card.contract_coverage != "present" {
+        return 0;
+    }
+    if card.guard_coverage == "missing" {
+        return 1;
+    }
+    if card.guard_coverage == "weak" {
+        return 2;
+    }
+    if card.test_reach_coverage == "weak" {
+        return 3;
+    }
+    if card.test_reach_coverage != "present" {
+        return 4;
+    }
+    5
+}
+
+/// Mirrors `selection::importance_rank` exactly (priority, gap severity,
+/// confidence, then `(file, line)` as the deterministic tiebreak) so this
+/// checker picks the identical representative production picks among a
+/// group's eligible members (issue #1894 finding 1).
+fn projection_importance_rank(card: &CardProjection) -> (u8, u8, u8, &str, u64) {
+    let priority_rank: u8 = if card.priority == "high" { 0 } else { 1 };
+    let gap_rank = projection_gap_severity_rank(card);
+    let confidence_rank: u8 = if card.confidence == "high" { 0 } else { 1 };
+    (
+        priority_rank,
+        gap_rank,
+        confidence_rank,
+        card.path.as_str(),
+        card.line,
+    )
+}
+
+/// The set of `target_feature` card ids that are ELIGIBLE (per
+/// `should_project_planned_comment`, which mirrors `should_plan_comment`)
+/// non-representative members of an equivalence group
+/// (`target_feature_group_key` collision with 2+ eligible members),
+/// mirroring `selection::target_feature_grouped_repetition_ids` exactly
+/// (issue #1894 finding 1).
+///
+/// Grouping is applied strictly AFTER eligibility: an equivalence group can
+/// contain a mix of eligible and ineligible cards, and only the eligible
+/// subset competes for the representative slot, chosen by
+/// `projection_importance_rank` (not line/id order). Ineligible members are
+/// never included here -- they keep their own canonical non-selection
+/// reason (`outside_changed_hunk`, `human_deep_review_only`,
+/// `lower_relevance`, ...), never `grouped_repetition`. Computed once per
 /// artifact check so the O(n) grouping pass does not repeat per
 /// `not_selected` entry.
 fn target_feature_repetition_omitted_ids(
@@ -8581,16 +8661,20 @@ fn target_feature_repetition_omitted_ids(
     }
 
     let mut omitted = BTreeSet::new();
-    for mut cards in by_key.into_values() {
-        if cards.len() <= 1 {
+    for cards in by_key.into_values() {
+        let mut eligible: Vec<&CardProjection> = cards
+            .into_iter()
+            .filter(|card| should_project_planned_comment(card))
+            .collect();
+        if eligible.len() < 2 {
             continue;
         }
-        cards.sort_by(|left, right| {
-            left.line
-                .cmp(&right.line)
+        eligible.sort_by(|left, right| {
+            projection_importance_rank(left)
+                .cmp(&projection_importance_rank(right))
                 .then_with(|| left.id.cmp(&right.id))
         });
-        for card in cards.into_iter().skip(1) {
+        for card in eligible.into_iter().skip(1) {
             omitted.insert(card.id.clone());
         }
     }

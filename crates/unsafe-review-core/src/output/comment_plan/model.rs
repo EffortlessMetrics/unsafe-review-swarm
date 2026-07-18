@@ -6,7 +6,7 @@ use crate::output::confirmation::{
 };
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE,
-    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, agent, repair_queue, target_feature_summary,
+    REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, agent, repair_queue,
 };
 use crate::util::path_display;
 use serde::Serialize;
@@ -17,7 +17,7 @@ use super::selection::{
     NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON, OPERATION_FAMILY_BUDGET_REASON,
     ReviewBudgetReason, actionability, comment_body, coverage_gap, importance_rank,
     non_selection_reason, owner_card_covered_by_specific_operation, relevance, selection_reason,
-    should_plan_comment,
+    should_plan_comment, target_feature_grouped_repetition_ids,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -46,32 +46,37 @@ impl From<&AnalyzeOutput> for CommentPlan {
         let mut not_selected = Vec::new();
         let mut selected_budget_keys = BTreeSet::new();
 
-        // Non-representative members of a `target_feature`-repetition group
-        // (issue #1894): at most one representative per equivalent group
-        // (same file, class, movement, coverage state, and next action --
-        // architecture/feature literal is metadata, not identity)
-        // participates in the eligibility/budget flow below. The rest are
-        // recorded with the `grouped_repetition` reason further down --
-        // never dropped, never merged into the survivor's card. Both this
-        // function and `card_statuses` (mod.rs, SPEC-0029 single-truth) read
-        // the same `grouped_repetition_card_ids` so a card's
-        // `comment_plan_status` can never drift from its comment-plan.json
-        // disposition.
-        let repetition_omitted = target_feature_summary::grouped_repetition_card_ids(output);
-        let (repetitive, candidates): (Vec<&ReviewCard>, Vec<&ReviewCard>) = output
-            .cards
-            .iter()
-            .partition(|card| repetition_omitted.contains(card.id.0.as_str()));
-
         // Partition cards into eligible and ineligible.
         // Eligible candidates are sorted by importance before the family/obligation
         // dedup and budget cap are applied, so the highest-importance unique card
         // per family fills each budget slot rather than the first one in file order.
         // The global card order (output.cards = file/line) is preserved for all
         // other output surfaces; only the comment-plan candidate selection re-ranks.
-        let (mut eligible, ineligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = candidates
-            .into_iter()
+        let (all_eligible, ineligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = output
+            .cards
+            .iter()
             .partition(|card| should_plan_comment(card));
+
+        // Non-representative ELIGIBLE members of a `target_feature`-
+        // repetition group (issue #1894, applied strictly after
+        // eligibility -- see `selection::target_feature_grouped_repetition_ids`).
+        // At most one eligible member per equivalent group (same file,
+        // class, movement, coverage state, structured unsatisfied-obligation
+        // set, and next action -- architecture/feature literal is metadata,
+        // not identity) competes for a budget slot below, chosen by the same
+        // importance-rank order the budget loop already uses. The rest are
+        // recorded with the `grouped_repetition` reason further down --
+        // never dropped, never merged into the survivor's card, and never
+        // applied to an ineligible sibling (that card keeps its own
+        // canonical `non_selection_reason` instead). Both this function and
+        // `card_statuses` (mod.rs, SPEC-0029 single-truth) call the exact
+        // same `target_feature_grouped_repetition_ids` so a card's
+        // `comment_plan_status` can never drift from its comment-plan.json
+        // disposition.
+        let repetition_omitted = target_feature_grouped_repetition_ids(output);
+        let (repetitive, mut eligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = all_eligible
+            .into_iter()
+            .partition(|card| repetition_omitted.contains(card.id.0.as_str()));
         eligible.sort_by(|a, b| {
             importance_rank(a)
                 .cmp(&importance_rank(b))

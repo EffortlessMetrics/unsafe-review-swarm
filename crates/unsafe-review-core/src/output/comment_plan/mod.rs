@@ -29,8 +29,9 @@ use std::collections::HashMap;
 /// report the same status as `comment-plan.json`.
 pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPlanStatus> {
     use self::model::comment_budget_key;
-    use self::selection::{importance_rank, should_plan_comment};
-    use crate::output::target_feature_summary;
+    use self::selection::{
+        importance_rank, should_plan_comment, target_feature_grouped_repetition_ids,
+    };
     use std::collections::BTreeSet;
 
     // Must match MAX_PLANNED_COMMENTS in model.rs — kept in sync by the
@@ -41,22 +42,30 @@ pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPl
     let mut statuses: HashMap<CardId, CommentPlanStatus> =
         HashMap::with_capacity(output.cards.len());
 
-    // Non-representative members of a `target_feature`-repetition group
-    // (issue #1894) are excluded from the eligibility/budget flow here in
-    // the same way `model::CommentPlan` excludes them, and read from the
-    // exact same `grouped_repetition_card_ids` set, so this coverage-block
-    // status can never drift from comment-plan.json's `not_selected[]`
-    // disposition (SPEC-0029 single-truth).
-    let repetition_omitted = target_feature_summary::grouped_repetition_card_ids(output);
-
-    let (mut eligible, ineligible): (
+    // Eligibility is decided first, on every card, exactly as
+    // `model::CommentPlan` decides it. `target_feature`-repetition grouping
+    // (issue #1894) is applied only AFTER that -- as a filter over the
+    // already-eligible set -- via the exact same
+    // `target_feature_grouped_repetition_ids` function `model::CommentPlan`
+    // calls, so this coverage-block status can never drift from
+    // comment-plan.json's `not_selected[]` disposition (SPEC-0029
+    // single-truth). An ineligible card keeps its `NotEligible` status
+    // regardless of any repetition group it belongs to.
+    let (all_eligible, ineligible): (
         Vec<&crate::domain::ReviewCard>,
         Vec<&crate::domain::ReviewCard>,
     ) = output
         .cards
         .iter()
-        .filter(|card| !repetition_omitted.contains(card.id.0.as_str()))
         .partition(|card| should_plan_comment(card));
+
+    let repetition_omitted = target_feature_grouped_repetition_ids(output);
+    let (repetitive, mut eligible): (
+        Vec<&crate::domain::ReviewCard>,
+        Vec<&crate::domain::ReviewCard>,
+    ) = all_eligible
+        .into_iter()
+        .partition(|card| repetition_omitted.contains(card.id.0.as_str()));
     eligible.sort_by(|a, b| {
         importance_rank(a)
             .cmp(&importance_rank(b))
@@ -81,11 +90,7 @@ pub(crate) fn card_statuses(output: &AnalyzeOutput) -> HashMap<CardId, CommentPl
     for card in ineligible {
         statuses.insert(card.id.clone(), CommentPlanStatus::NotEligible);
     }
-    for card in output
-        .cards
-        .iter()
-        .filter(|card| repetition_omitted.contains(card.id.0.as_str()))
-    {
+    for card in repetitive {
         statuses.insert(card.id.clone(), CommentPlanStatus::NotSelected);
     }
     statuses
@@ -1106,6 +1111,92 @@ mod tests {
             value["no_changed_gaps"]["limitation"],
             NO_CHANGED_GAPS_LIMITATION
         );
+        Ok(())
+    }
+
+    /// Issue #1894 finding 1: grouping is applied strictly AFTER eligibility.
+    /// Three cards share an identical `target_feature` equivalence group
+    /// (same file/class/coverage/shape/obligation), but the earliest-line
+    /// member is outside the changed hunk (ineligible). It must never "own"
+    /// the representative slot or block a later, genuinely eligible sibling,
+    /// and it must keep its own canonical `outside_changed_hunk` reason --
+    /// never `grouped_repetition`. Among the two eligible siblings, the
+    /// representative is chosen by the existing importance-rank order (here,
+    /// line order, since priority/confidence/coverage all tie).
+    #[test]
+    fn target_feature_grouping_applies_only_after_eligibility() -> Result<(), String> {
+        let mut output = fixture_output("target_feature_missing_safety_docs")?;
+        let template = output
+            .cards
+            .first()
+            .cloned()
+            .ok_or_else(|| "fixture should emit a target_feature card".to_string())?;
+
+        let mut ineligible_earliest = template.clone();
+        ineligible_earliest.id.0 = "tf-ineligible-earliest".to_string();
+        ineligible_earliest.site.location.line = 2;
+        ineligible_earliest.site.changed = false;
+
+        let mut eligible_middle = template.clone();
+        eligible_middle.id.0 = "tf-eligible-middle".to_string();
+        eligible_middle.site.location.line = 10;
+        eligible_middle.site.changed = true;
+
+        let mut eligible_late = template;
+        eligible_late.id.0 = "tf-eligible-late".to_string();
+        eligible_late.site.location.line = 20;
+        eligible_late.site.changed = true;
+
+        output.cards = vec![ineligible_earliest, eligible_middle, eligible_late];
+        output.summary.cards = output.cards.len();
+        output.summary.open_actionable_gaps = output.cards.len();
+
+        let value = parse_json(&render(&output))?;
+
+        let comments = value["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+        assert_eq!(
+            comments.len(),
+            1,
+            "exactly one eligible representative must be selected: {value}"
+        );
+        assert_eq!(
+            comments[0]["card_id"], "tf-eligible-middle",
+            "the earliest-line ELIGIBLE member must be the representative, not the group's \
+             overall earliest line (which is ineligible): {value}"
+        );
+
+        let not_selected = value["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        assert_eq!(not_selected.len(), 2, "not_selected: {not_selected:?}");
+
+        let ineligible_entry = not_selected
+            .iter()
+            .find(|card| card["card_id"] == "tf-ineligible-earliest")
+            .ok_or_else(|| "ineligible earliest card must be in not_selected".to_string())?;
+        assert_eq!(
+            ineligible_entry["reason_code"], "outside_changed_hunk",
+            "an ineligible group member must keep its own canonical reason, never \
+             grouped_repetition: {ineligible_entry}"
+        );
+        assert_eq!(ineligible_entry["reason"], "outside changed hunk");
+
+        let grouped_entry = not_selected
+            .iter()
+            .find(|card| card["card_id"] == "tf-eligible-late")
+            .ok_or_else(|| "the displaced eligible sibling must be in not_selected".to_string())?;
+        assert_eq!(
+            grouped_entry["reason_code"], "grouped_repetition",
+            "the displaced ELIGIBLE sibling must be tagged grouped_repetition: {grouped_entry}"
+        );
+        assert_eq!(
+            grouped_entry["reason"],
+            "grouped with an equivalent repetitive target_feature site; see the target-feature \
+             summary for the selected representative"
+        );
+
         Ok(())
     }
 
