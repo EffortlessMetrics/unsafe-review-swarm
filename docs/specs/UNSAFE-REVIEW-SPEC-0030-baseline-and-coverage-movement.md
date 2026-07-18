@@ -185,9 +185,10 @@ new_unbaselined                 open actionable card the ledger does not represe
 `suppression_overlap` only fires for a baseline entry covered by a **currently
 active (non-expired)** suppression entry, reusing the exact same expiry predicate
 as `policy report`'s `expired_suppressions` (one expiry model, not two): an
-expired suppression is already surfaced as its own ledger-health problem, so
-folding it into `suppression_overlap` too would double-report the same stale
-entry under two labels. `new_unbaselined` never includes a card covered by any
+expired suppression is already surfaced by `policy report` through
+`expired_suppressions` (there is no expired-suppression bucket among the ten
+`baseline status` buckets), so folding it into `suppression_overlap` too would
+double-report the same stale entry under two labels. `new_unbaselined` never includes a card covered by any
 suppression entry, active or expired — the core analyzer classifies such a card
 `Suppressed` (not actionable) before `baseline status` runs at all, so it is
 excluded by the existing analyzer classification, not by a second expiry check
