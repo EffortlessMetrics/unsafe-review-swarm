@@ -3,6 +3,7 @@ use crate::domain::{
     CommentPlanStatus, CoverageBlock, EvidenceState, ObligationEvidence, Priority, ReviewCard,
     WitnessRoute,
 };
+use crate::freshness::AnalysisIdentity;
 use crate::output::{
     REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, agent::card_has_scoped_repairs, comment_plan,
 };
@@ -15,6 +16,7 @@ mod hover;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorProjection {
+    pub analysis: AnalysisIdentity,
     pub schema_version: String,
     pub tool: String,
     pub mode: String,
@@ -52,6 +54,7 @@ pub(crate) fn render_hover(card: &ReviewCard) -> String {
 pub(crate) fn project_editor(output: &AnalyzeOutput) -> EditorProjection {
     let projection = LspProjection::from(output);
     EditorProjection {
+        analysis: projection.analysis.clone(),
         schema_version: projection.schema_version.to_string(),
         tool: projection.tool.to_string(),
         mode: projection.mode.to_string(),
@@ -93,6 +96,7 @@ pub(crate) fn project_actionable_editor_diagnostics(
 
 #[derive(Serialize)]
 struct LspProjection<'a> {
+    analysis: &'a AnalysisIdentity,
     schema_version: &'a str,
     tool: &'a str,
     mode: &'static str,
@@ -108,6 +112,7 @@ struct LspProjection<'a> {
 impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     fn from(output: &'a AnalyzeOutput) -> Self {
         Self {
+            analysis: &output.analysis_identity,
             schema_version: &output.schema_version,
             tool: &output.tool,
             mode: "read_only_projection",

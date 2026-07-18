@@ -10,6 +10,18 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
 
     assert_eq!(value["schema_version"], "0.1");
     assert_eq!(value["tool"], "unsafe-review");
+    assert_eq!(
+        value["analysis"]["analysis_id"],
+        output.analysis_identity.analysis_id
+    );
+    assert_eq!(
+        value["analysis"]["generation"],
+        output.analysis_identity.generation
+    );
+    assert_eq!(value["analysis"]["scope"], "diff");
+    assert_eq!(value["analysis"]["state"], "current");
+    assert!(value["analysis"].get("base_commit").is_none());
+    assert!(value["analysis"].get("document_version").is_none());
     assert_eq!(value["mode"], "read_only_projection");
     assert_eq!(value["policy"], "advisory");
     assert_eq!(value["status"]["state"], "actionable");
@@ -295,6 +307,24 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
             .as_str()
             .unwrap_or("")
             .contains("not a site-execution claim")
+    );
+    Ok(())
+}
+
+#[test]
+fn saved_lsp_and_agent_packet_share_analysis_identity() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let lsp = parse_json(&render(&output))?;
+    let card = output.cards.first().ok_or("fixture should emit a card")?;
+    let packet = parse_json(&crate::output::agent::render_with_output(&output, card))?;
+    assert_eq!(lsp["analysis"], packet["analysis"]);
+    assert_eq!(
+        packet["analysis"]["analysis_id"],
+        output.analysis_identity.analysis_id
+    );
+    assert_eq!(
+        packet["analysis"]["generation"],
+        output.analysis_identity.generation
     );
     Ok(())
 }

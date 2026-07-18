@@ -117,10 +117,10 @@ note = "Buckets, bounded allowed-repair hints, and readiness are derived from th
 
 [[field]]
 name = "freshness_identity"
-canonical_source = "#1908 AnalysisIdentity contract (canonical producer to be introduced after this map-only PR)"
+canonical_source = "api.rs::AnalyzeOutput.analysis_identity / freshness.rs::AnalysisIdentity"
 surfaces = ["json", "lsp", "agent"]
 single_truth = true
-note = "Saved LSP, live LSP, VS Code-consumed data, and agent packets need one truthful analysis identity. Current schema-version and refresh-generation placeholders are an uncovered seam recorded for #1908; this map does not claim freshness behavior exists."
+note = "Saved LSP and agent packets project the shared per-analysis identity. Live LSP, VS Code freshness presentation, document versions, and stale/failure transitions remain later #1908 slices; the identity is a signal, not a safety or currentness guarantee."
 
 [[field]]
 name = "missing_evidence"

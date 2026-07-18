@@ -2571,6 +2571,11 @@ mod tests {
     #[test]
     fn review_kit_manifest_lists_artifacts_and_boundary() -> Result<(), String> {
         let output = AnalyzeOutput {
+            analysis_identity: unsafe_review_core::AnalysisIdentity::for_test(
+                1,
+                "test-review-kit",
+                "diff",
+            ),
             schema_version: "0.1".to_string(),
             tool: "unsafe-review".to_string(),
             root: Path::new(".").to_path_buf(),

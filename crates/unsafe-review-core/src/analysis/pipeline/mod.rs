@@ -15,6 +15,7 @@ use crate::api::{
     PerFileScanStats, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, Scope,
 };
 use crate::domain::ReviewCard;
+use crate::freshness::AnalysisIdentity;
 use crate::input::workspace;
 use crate::policy::PolicyState;
 use std::collections::{BTreeMap, BTreeSet};
@@ -276,6 +277,7 @@ fn analyze_with_receipts(
     );
     let coverage_snapshot = policy_state.coverage_snapshot.clone();
     let output = AnalyzeOutput {
+        analysis_identity: AnalysisIdentity::new(input.scope.as_str()),
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
         root: input.root.clone(),
@@ -507,6 +509,7 @@ fn partial_analyze_output(
         candidate_files,
     );
     AnalyzeOutput {
+        analysis_identity: AnalysisIdentity::new(input.scope.as_str()),
         schema_version: "0.1".to_string(),
         tool: "unsafe-review".to_string(),
         root: input.root.clone(),

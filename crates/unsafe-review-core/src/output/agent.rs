@@ -1,4 +1,5 @@
 use crate::domain::{CommentPlanStatus, ReviewCard};
+use crate::freshness::AnalysisIdentity;
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::policy::SnapshotCoverage;
 use serde::Serialize;
@@ -61,8 +62,11 @@ pub(crate) fn render_with_output(output: &crate::api::AnalyzeOutput, card: &Revi
         .copied()
         .unwrap_or(CommentPlanStatus::NotEligible);
     let snapshot = output.coverage_snapshot.get(&card.id.0);
-    render_pretty(&packet::AgentPacket::from_with_status(
-        card, status, snapshot,
+    render_pretty(&packet::AgentPacket::from_with_analysis(
+        card,
+        status,
+        snapshot,
+        Some(output.analysis_identity.clone()),
     ))
 }
 
@@ -81,15 +85,75 @@ pub(crate) fn render_with_output(output: &crate::api::AnalyzeOutput, card: &Revi
     clippy::too_many_arguments,
     reason = "file range + cards + base + statuses + snapshot are all needed together; extracting a struct would add churn at all call sites without simplifying the logic"
 )]
+#[allow(
+    dead_code,
+    reason = "kept as a compatibility helper for isolated range-scan tests without analysis context"
+)]
 pub(crate) fn render_range_scan<'a>(
     queried_file: String,
     queried_line_start: u32,
     queried_line_end: u32,
     changed_only: bool,
     file_cards: &[&'a ReviewCard],
-    analyzed_base: &'a str,
+    _analyzed_base: &'a str,
     statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
     coverage_snapshot: &'a BTreeMap<String, SnapshotCoverage>,
+) -> String {
+    render_range_scan_impl(
+        queried_file,
+        queried_line_start,
+        queried_line_end,
+        changed_only,
+        file_cards,
+        None,
+        statuses,
+        coverage_snapshot,
+        Some(AnalysisIdentity::for_test(0, "test-range-scan", "diff")),
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "file range + cards + base + statuses + snapshot + identity are all needed together"
+)]
+pub(crate) fn render_range_scan_with_identity<'a>(
+    queried_file: String,
+    queried_line_start: u32,
+    queried_line_end: u32,
+    changed_only: bool,
+    file_cards: &[&'a ReviewCard],
+    analyzed_base: Option<&'a str>,
+    statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
+    coverage_snapshot: &'a BTreeMap<String, SnapshotCoverage>,
+    analysis: AnalysisIdentity,
+) -> String {
+    render_range_scan_impl(
+        queried_file,
+        queried_line_start,
+        queried_line_end,
+        changed_only,
+        file_cards,
+        analyzed_base,
+        statuses,
+        coverage_snapshot,
+        Some(analysis),
+    )
+}
+
+#[allow(
+    clippy::too_many_arguments,
+    reason = "file range + cards + base + statuses + snapshot + identity are all needed together"
+)]
+fn render_range_scan_impl<'a>(
+    queried_file: String,
+    queried_line_start: u32,
+    queried_line_end: u32,
+    changed_only: bool,
+    file_cards: &[&'a ReviewCard],
+    analyzed_base: Option<&'a str>,
+    statuses: &std::collections::HashMap<crate::domain::CardId, CommentPlanStatus>,
+    coverage_snapshot: &'a BTreeMap<String, SnapshotCoverage>,
+    analysis: Option<AnalysisIdentity>,
 ) -> String {
     let mut matching: Vec<&'a ReviewCard> = file_cards
         .iter()
@@ -105,7 +169,7 @@ pub(crate) fn render_range_scan<'a>(
             .cmp(&b.site.location.line)
             .then_with(|| a.id.0.cmp(&b.id.0))
     });
-    let envelope = range_scan::FileRangeScanEnvelope::build(
+    let envelope = range_scan::FileRangeScanEnvelope::build_with_identity(
         queried_file,
         queried_line_start,
         queried_line_end,
@@ -114,6 +178,7 @@ pub(crate) fn render_range_scan<'a>(
         analyzed_base,
         statuses,
         coverage_snapshot,
+        analysis,
     );
     render_pretty(&envelope)
 }

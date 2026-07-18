@@ -1160,7 +1160,7 @@ pub fn bless_fixture_surface_goldens_from_workspace(
         return Ok(Vec::new());
     }
     let root = workspace.join("fixtures").join(fixture);
-    let output = analyze(AnalyzeInput {
+    let mut output = analyze(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
         diff: DiffSource::File(root.join("change.diff")),
@@ -1169,6 +1169,10 @@ pub fn bless_fixture_surface_goldens_from_workspace(
         include_unchanged_tests: true,
         max_cards: None,
     })?;
+    // Fixture goldens retain the additive identity envelope while using a
+    // deterministic test identity. Runtime analyses receive a fresh identity.
+    output.analysis_identity =
+        crate::AnalysisIdentity::for_test(0, format!("fixture-analysis-{fixture}"), "diff");
     let mut written = Vec::new();
     for &surface in surfaces {
         let (filename, rendered) = match surface {
@@ -1228,7 +1232,7 @@ pub fn render_fixture_surface_from_workspace(
     use crate::api::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, analyze};
 
     let root = workspace.join("fixtures").join(fixture);
-    let output = analyze(AnalyzeInput {
+    let mut output = analyze(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
         diff: DiffSource::File(root.join("change.diff")),
@@ -1237,6 +1241,8 @@ pub fn render_fixture_surface_from_workspace(
         include_unchanged_tests: true,
         max_cards: None,
     })?;
+    output.analysis_identity =
+        crate::AnalysisIdentity::for_test(0, format!("fixture-analysis-{fixture}"), "diff");
     let raw = match surface {
         "lsp" => crate::output::lsp::render(&output),
         "repair-queue" => crate::output::repair_queue::render(&output),
