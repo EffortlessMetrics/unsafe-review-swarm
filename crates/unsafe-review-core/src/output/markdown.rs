@@ -384,9 +384,10 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
 /// This is a presentation-only grouping projected from the same
 /// `ReviewCard`/`CoverageBlock` data as every other surface -- it does not
 /// mutate, drop, or reclassify a card, and it is not a second truth surface.
-/// The full per-declaration inventory stays in `cards.json` and the card
-/// table above. Renders nothing when there are no `unsafe_declaration`
-/// cards, so quiet PRs stay quiet.
+/// The complete per-declaration inventory (every id and its metadata) stays in
+/// `cards.json`; the card table above already groups owner/contract cards, so it
+/// is not the full per-declaration listing. Renders nothing when there are no
+/// `unsafe_declaration` cards, so quiet PRs stay quiet.
 fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
     let groups = declaration_summary::declaration_groups(output);
     if groups.is_empty() {
@@ -395,7 +396,7 @@ fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
 
     out.push_str("\n## Declaration summary\n\n");
     out.push_str(
-        "Grouped from existing `unsafe_declaration` ReviewCards by source file. This is a report-only volume summary, not a new classifier and not a discharge -- every declaration keeps its own card, class, and policy status in `cards.json` and the card table above. Files with a new or worsened declaration are always listed ahead of inherited-only files.\n\n",
+        "Grouped from existing `unsafe_declaration` ReviewCards by source file. This is a report-only volume summary, not a new classifier and not a discharge -- every declaration keeps its own card, class, and policy status in `cards.json` (the complete per-declaration inventory). Files with a new or worsened declaration are always listed ahead of inherited-only files.\n\n",
     );
     out.push_str(
         "| File | Total | New/worsened | Inherited | Contract missing | Contract present | Representative cards |\n",
