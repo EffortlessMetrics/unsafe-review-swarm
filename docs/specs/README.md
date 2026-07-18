@@ -54,6 +54,7 @@ Specs define behavior. They do not carry the PR queue.
 40. [Syntax-first dispatch architecture](UNSAFE-REVIEW-SPEC-0041-syntax-first-dispatch-architecture.md)
 41. [Corpus validation taxonomy](UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md)
 42. [Release ergonomics — prebuilt binaries and automated promotion](UNSAFE-REVIEW-SPEC-0043-release-ergonomics-prebuilt-and-automated-promotion.md)
+43. [Issue-linked work specs](UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md)
 
 
 ## Appendices

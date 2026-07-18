@@ -1,0 +1,65 @@
+# UNSAFE-REVIEW-WORK-1900
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1900"
+kind = "correctness"
+objective = "Define an issue-linked machine-readable work-spec contract for one bounded delivery unit."
+user_outcome = "A controller, builder, reviewer, and verifier can share one stable implementation contract without a repository-wide default task."
+claim_boundary = "This artifact structures intent and proof obligations; it does not prove implementation correctness, hosted CI success, or any unsafe-code safety property."
+dependencies = ["#1899 portfolio semantics"]
+blockers = []
+affected_files = ["docs/schemas/issue-work-spec.schema.json", "xtask/src/work_specs.rs"]
+affected_symbols = ["xtask check-work-specs"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0044"]
+linked_adrs = []
+
+[scope]
+included = [
+    "The version-one TOML content contract",
+    "Offline structural validation and invalid fixtures",
+    "Compatibility registration with cargo-allow 0.1.10",
+]
+excluded = [
+    "GitHub issue prioritization or status synchronization",
+    "Codex agent configuration and controller state persistence",
+    "Automatic PR or closeout generation",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The work spec describes one issue-linked delivery contract and never selects the repository's next task."
+
+[[invariant]]
+id = "INV-2"
+text = "Acceptance and invariant identifiers remain stable while implementation and verification evidence is added."
+
+[[acceptance]]
+id = "AC-1"
+text = "A valid example contains objective, outcome, scope, invariants, acceptance proof, integrations, risks, rollback, and claim boundary."
+proof = ["rtk cargo run --locked -p xtask -- check-work-specs"]
+
+[[acceptance]]
+id = "AC-2"
+text = "Invalid fixtures reject duplicate criterion IDs and repository-wide scheduling fields."
+proof = ["rtk cargo test --locked -p xtask work_specs"]
+
+[[integration]]
+surface = "cargo_allow"
+expected = "The example is registered as a draft plan_item because cargo-allow 0.1.10 has no first-class work_spec kind; the content schema remains checked by xtask."
+
+[[integration]]
+surface = "pr_body"
+expected = "A later PR can report stable acceptance IDs and proof results without rewriting the contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the checker offline and reject scheduler-shaped fields rather than mirroring GitHub queue state."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Record cargo-allow's fixed-kind limitation explicitly and defer first-class registration to a compatible cargo-allow version or follow-up."
+
+[compatibility]
+posture = "Additive repository governance artifact; no analyzer, ReviewCard, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the work-spec example and checker, then supersede SPEC-0044 and its ledger entry with a linked governance decision."

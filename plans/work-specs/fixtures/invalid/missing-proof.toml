@@ -1,0 +1,29 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1900"
+kind = "correctness"
+objective = "Invalid fixture with incomplete acceptance proof."
+user_outcome = "The checker must reject an acceptance entry without proof."
+claim_boundary = "Structural validation only."
+
+[scope]
+included = ["The invalid fixture"]
+excluded = ["A valid implementation"]
+
+[[invariant]]
+id = "INV-1"
+text = "The fixture is intentionally invalid."
+
+[[acceptance]]
+id = "AC-1"
+text = "This entry omits proof."
+
+[[integration]]
+surface = "checker"
+expected = "The checker rejects the fixture."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the invalid fixture out of valid examples."
+
+[rollback]
+strategy = "Delete the fixture after the negative test is no longer needed."

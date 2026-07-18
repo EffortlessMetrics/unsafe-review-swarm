@@ -46,6 +46,7 @@ mod spec_status;
 mod stance_checks;
 mod support_tiers;
 mod unsafe_review_ledger;
+mod work_specs;
 mod workflow_allowlist;
 
 use advisory_artifacts::{check_advisory_artifacts, check_first_pr_artifacts};
@@ -488,6 +489,7 @@ const DOC_ARTIFACT_KINDS: &[&str] = &[
     "spec",
     "adr",
     "plan",
+    "plan_item",
     "implementation_plan",
     "goal",
     "active_goal",
@@ -893,6 +895,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckDocs => check_docs(),
         commands::XtaskCommand::CheckPolicy => check_policy(),
         commands::XtaskCommand::CheckDocArtifacts => check_doc_artifacts(),
+        commands::XtaskCommand::CheckWorkSpecs => work_specs::check(),
         commands::XtaskCommand::CheckDocsAutomation => check_docs_automation(),
         commands::XtaskCommand::CheckSpecStatus => spec_status::check(),
         commands::XtaskCommand::CheckPublicSurfaces => public_surfaces::check(),
@@ -953,7 +956,7 @@ fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
 
 fn print_help() {
     println!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-docs-automation, check-spec-status, check-public-surfaces, check-goals, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-work-specs, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-usefulness, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>]"
     );
 }
 
@@ -1213,6 +1216,7 @@ fn check_policy() -> Result<(), String> {
         unsafe_review_ledger::LedgerKind::Suppression,
     )?;
     check_doc_artifacts()?;
+    work_specs::check()?;
     check_docs_automation()?;
     public_surfaces::check()?;
     source_truth_ledgers::check_package_boundary()?;
