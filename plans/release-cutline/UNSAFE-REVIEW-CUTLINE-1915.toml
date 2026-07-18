@@ -1,0 +1,109 @@
+# UNSAFE-REVIEW-CUTLINE-1915
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
+candidate = "TBD_FROM_LIVE_STATE"
+status = "draft"
+swarm_base = "7aad79695d49fb5b07ab847672baa41ad2ecdd44"
+source_base = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
+candidate_commit = "7649bff733b7f4cf1676b9b4b4fb40226c5744b5"
+audited_at = "2026-07-18"
+owner = "repo-infra"
+semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
+dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
+rollback = "Supersede this draft with a dated cutline artifact and retain it as an audit record; do not alter source history, tags, publication state, or public v1."
+
+[[item]]
+id = "PR-1939"
+disposition = "required"
+reason = "Moves durable governance authority to .allow and keeps GitHub as the operational portfolio."
+proof = ["cargo-allow check --profile spec-system --mode audit", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "PR-1941"
+disposition = "required"
+reason = "Provides the issue-linked work-spec contract used by later release qualification slices."
+proof = ["cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "PR-1913"
+disposition = "required"
+reason = "Canonical editor and agent field ownership is already integrated on swarm main and must remain in the candidate contract."
+proof = ["cargo run --locked -p xtask -- check-spec-coverage", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1889"
+disposition = "required"
+reason = "Recovery audit must establish that still-correct local slices are integrated or explicitly rejected before candidate freeze."
+proof = ["git fetch origin", "cargo run --locked -p xtask -- source-divergence"]
+
+[[item]]
+id = "ISSUE-1890"
+disposition = "required"
+reason = "Current-main cargo-allow false-actionability evidence is a release qualification input, not a global accuracy claim."
+proof = ["cargo run --locked -p xtask -- check-dogfood", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1907"
+disposition = "required"
+reason = "Canonical live/saved/editor diagnostic projection is part of the candidate public contract."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1908"
+disposition = "required"
+reason = "Freshness, version, stale, failure, partial, and capped states are required for honest editor diagnostics."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1909"
+disposition = "required"
+reason = "Structured command-only actions must remain bound to canonical diagnostics and readiness."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1910"
+disposition = "required"
+reason = "Exact editor identity and bounded packet delivery complete the candidate-facing editor contract."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1887"
+disposition = "required"
+reason = "The diagnostic-to-explanation-to-packet-to-receipt loop must be proven on selected scenarios before claiming a coherent editor/agent product."
+proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1911"
+disposition = "deferred"
+reason = "Typed repair candidates are additive and are not required to establish the current advisory candidate contract."
+proof = []
+
+[[item]]
+id = "ISSUE-1912"
+disposition = "deferred"
+reason = "Pull diagnostics, cancellation, and progress remain post-correctness evaluation work."
+proof = []
+
+[[item]]
+id = "ISSUE-1886"
+disposition = "deferred"
+reason = "Prebuilt distribution is a separate release-ergonomics lane and remains owner-gated."
+proof = []
+
+[[item]]
+id = "ISSUE-1894-1895"
+disposition = "deferred"
+reason = "Grouping and badge work must not be promoted without measured evidence that it is necessary for the candidate."
+proof = []
+
+[[item]]
+id = "PR-1620"
+disposition = "deferred"
+reason = "RSS telemetry is not a release blocker for the current candidate and remains a separate advisory lane."
+proof = []
+
+[[item]]
+id = "PUBLICATION-1879"
+disposition = "deferred"
+reason = "Source promotion, publication, tags, GitHub Release, and public v1 remain explicitly owner-gated after qualification."
+proof = []
