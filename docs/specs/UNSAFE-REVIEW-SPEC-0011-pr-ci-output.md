@@ -298,7 +298,8 @@ declaration summary, when at least one `unsafe_declaration`-family
   `CoverageBlock::derive` data every other baseline-movement surface uses;
   never a second classifier and never a discharge
   each group row reports: file, total cards, new-or-worsened count,
-  inherited count, contract-missing count, contract-present count, and a
+  inherited count, contract-missing/weak count (a weak contract slot counts
+  with missing), contract-present count, and a
   representative card-id sample capped at
   `declaration_summary::DECLARATION_SUMMARY_REPRESENTATIVE_LIMIT` with a
   "+N more (see `cards.json`)" pointer to the complete membership

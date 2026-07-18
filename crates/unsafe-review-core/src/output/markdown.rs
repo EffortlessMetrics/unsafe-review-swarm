@@ -399,7 +399,7 @@ fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
         "Grouped from existing `unsafe_declaration` ReviewCards by source file. This is a report-only volume summary, not a new classifier and not a discharge -- every declaration keeps its own card, class, and policy status in `cards.json` (the complete per-declaration inventory). Files with a new or worsened declaration are always listed ahead of inherited-only files.\n\n",
     );
     out.push_str(
-        "| File | Total | New/worsened | Inherited | Contract missing | Contract present | Representative cards |\n",
+        "| File | Total | New/worsened | Inherited | Contract missing/weak | Contract present | Representative cards |\n",
     );
     out.push_str("|---|---:|---:|---:|---:|---:|---|\n");
     for group in &groups {
