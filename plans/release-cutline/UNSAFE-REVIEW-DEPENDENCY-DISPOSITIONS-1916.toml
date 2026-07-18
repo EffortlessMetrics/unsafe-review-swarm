@@ -1,0 +1,55 @@
+# UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
+snapshot_date = "2026-07-18"
+swarm_base = "64f1eb4caa8490de76dc5bea7469794f9ea13b9c"
+source_base = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
+status = "audit_complete_repair_in_review"
+chosen_history = "retain_source_candidate; defer_swarm_duplicate; never_merge_both_without_convergence_proof"
+freeze = "not_active"
+publication = "owner_gated_out_of_scope"
+source_divergence = "new_source_commits=0"
+rollback = "Supersede this snapshot with a refreshed live audit; do not change source history, tags, publication state, or public v1."
+
+[[disposition]]
+surface = "ra_ap_syntax"
+swarm_pr = 1875
+source_pr = 548
+decision = "defer_swarm_retain_source"
+swarm_head = "eed5b73040304c0be905b4e8d224f62b2d3bad08"
+source_head = "e5f7ca68f5f2c8cd478bbabbc84314ab7408d68e"
+reason = "Duplicate patch family; retain the public source candidate and require parser-specific proof before merge."
+
+[[disposition]]
+surface = "ignore"
+swarm_pr = 1874
+source_pr = 547
+decision = "defer_swarm_retain_source"
+swarm_head = "40e646427b36d0ca197e526d974e3526ed985a3a"
+source_head = "58f4b89a3cbee9ad0b4b6e6ecdb6523bf743c359"
+reason = "Duplicate patch family; retain the public source candidate and do not merge both lockfile updates independently."
+
+[[disposition]]
+surface = "github_actions"
+swarm_pr = 1906
+source_pr = 545
+decision = "repair_swarm_leave_source_owner_gated"
+swarm_head = "ce87b0aaed34f5c3c542a0b3ebebcd883df7a932"
+source_head = "d90071ee485dc9b93869541f06586ebbe1de01df"
+reason = "Both candidates fail policy because action pin updates lack matching allowlist entries; this PR repairs the swarm pair only."
+
+[[disposition]]
+surface = "signal_hook"
+swarm_pr = 0
+source_pr = 515
+decision = "retain_source_owner_gated"
+source_head = "c4d890a9ba016399b6fba3ce8225d07e75eb1191"
+reason = "No swarm duplicate; source PR is clean and remains a source-repository release decision."
+
+[[disposition]]
+surface = "rss_self_unsafe"
+swarm_pr = 1620
+source_pr = 0
+decision = "park"
+swarm_head = "59b2ca6176e5b04b3045c3d5edc4c26ade5e52b0"
+reason = "Draft/conflicted and failing the Rust gate; outside the cutline absent the separate owner decision."

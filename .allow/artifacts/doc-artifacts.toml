@@ -212,6 +212,26 @@ linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 linked_spec = "UNSAFE-REVIEW-SPEC-0020"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916"
+kind = "plan_item"
+path = "plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916.toml"
+status = "draft"
+owner = "repo-infra"
+created = "2026-07-18"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0024"
+
+[[artifact]]
+id = "UNSAFE-REVIEW-WORK-1916-ACTION-PINS"
+kind = "plan_item"
+path = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1916-ACTION-PINS.toml"
+status = "draft"
+owner = "repo-infra"
+created = "2026-07-18"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0024"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-SUPPORT-0001"
 kind = "support_tier"
 path = "docs/status/SUPPORT_TIERS.md"

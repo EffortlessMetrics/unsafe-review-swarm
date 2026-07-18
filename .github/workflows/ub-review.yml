@@ -51,7 +51,7 @@ jobs:
         # the advisory lane. Bump deliberately and keep the
         # policy/workflow-allowlist.toml pin in sync in the same PR — a
         # dependabot pin bump alone cannot pass the deterministic gate.
-        uses: EffortlessMetrics/ub-review@f0620c358f4a9032d3f832fda92488fd198ab6e9
+        uses: EffortlessMetrics/ub-review@7abfb093a32bad67019f94b8d33bf04ec2b0621d
         with:
           profile: gh-runner
           posting: review
