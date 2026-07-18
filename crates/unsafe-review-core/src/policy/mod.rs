@@ -166,6 +166,14 @@ pub(crate) struct LedgerEntry {
     pub(crate) expires: Option<String>,
 }
 
+/// Canonical suppression-expiry predicate: `true` when `expires` is set and has
+/// passed as of `today`. This is the single expiry model for the whole crate —
+/// `policy report`'s `expired_suppressions` and `baseline_health`'s active-suppression
+/// filtering both call this instead of each re-deriving their own comparison.
+pub(crate) fn is_expired(expires: Option<&str>, today: &str) -> bool {
+    expires.is_some_and(|expires| expires < today)
+}
+
 fn load_ledger_ids(path: &Path, kind: LedgerKind) -> Result<BTreeSet<String>, String> {
     Ok(load_ledger_entries(path, kind)?
         .into_iter()
@@ -288,14 +296,22 @@ pub(crate) fn load_baseline_entries_lenient(path: &Path) -> Result<Vec<RawLedger
         .parse::<toml::Table>()
         .map(toml::Value::Table)
         .map_err(|err| format!("{} is not valid TOML: {err}", path.display()))?;
-    let status = value
-        .get("status")
-        .and_then(toml::Value::as_str)
-        .unwrap_or("active");
-    let entries = value
-        .get("entries")
-        .and_then(toml::Value::as_array)
-        .map_or(&[][..], Vec::as_slice);
+    // Distinguish MISSING (keep the documented default) from PRESENT-BUT-WRONG-TYPE
+    // (a structural ledger error, not something this lenient loader can paper over)
+    // (issue #1893 review finding).
+    let status = match value.get("status") {
+        None => "active",
+        Some(raw) => raw
+            .as_str()
+            .ok_or_else(|| format!("{} status must be a string", path.display()))?,
+    };
+    let entries: &[toml::Value] = match value.get("entries") {
+        None => &[],
+        Some(raw) => raw
+            .as_array()
+            .map(Vec::as_slice)
+            .ok_or_else(|| format!("{} entries must be an array", path.display()))?,
+    };
 
     if status == "empty" {
         if entries.is_empty() {
@@ -647,6 +663,24 @@ expires = "2026-08-01"
         }
     }
 
+    // ── is_expired: the single shared expiry predicate ────────────────────────
+
+    #[test]
+    fn is_expired_true_when_expires_before_today() {
+        assert!(is_expired(Some("2020-01-01"), "2026-07-18"));
+    }
+
+    #[test]
+    fn is_expired_false_when_expires_on_or_after_today() {
+        assert!(!is_expired(Some("2026-07-18"), "2026-07-18"));
+        assert!(!is_expired(Some("2099-01-01"), "2026-07-18"));
+    }
+
+    #[test]
+    fn is_expired_false_when_no_expires_date() {
+        assert!(!is_expired(None, "2026-07-18"));
+    }
+
     #[test]
     fn worsened_detected_when_contract_regresses() {
         // Baseline had present; current is weak → worsened.
@@ -810,6 +844,69 @@ expires = "2026-08-01"
             .get(card_b)
             .ok_or("card_b missing from loaded snapshot")?;
         assert_eq!(b.witness_receipt_coverage, "present");
+        Ok(())
+    }
+
+    // ── load_baseline_entries_lenient: missing vs wrong-type status/entries ──────
+
+    #[test]
+    fn lenient_loader_defaults_status_and_entries_when_absent() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-lenient-defaults")?;
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy dir failed: {err}"))?;
+        let path = policy.join("unsafe-review-baseline.toml");
+        fs::write(&path, "schema_version = \"0.1\"\n")
+            .map_err(|err| format!("write ledger failed: {err}"))?;
+
+        let entries = load_baseline_entries_lenient(&path);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        assert_eq!(
+            entries?,
+            Vec::new(),
+            "absent status/entries must default, not error"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn lenient_loader_rejects_non_string_status() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-lenient-status-type")?;
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy dir failed: {err}"))?;
+        let path = policy.join("unsafe-review-baseline.toml");
+        fs::write(&path, "schema_version = \"0.1\"\nstatus = 42\n")
+            .map_err(|err| format!("write ledger failed: {err}"))?;
+
+        let result = load_baseline_entries_lenient(&path);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let err = result
+            .err()
+            .ok_or("expected an error for non-string status")?;
+        assert!(err.contains("status must be a string"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn lenient_loader_rejects_non_array_entries() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-lenient-entries-type")?;
+        let policy = root.join("policy");
+        fs::create_dir_all(&policy).map_err(|err| format!("create policy dir failed: {err}"))?;
+        let path = policy.join("unsafe-review-baseline.toml");
+        fs::write(
+            &path,
+            "schema_version = \"0.1\"\nstatus = \"active\"\nentries = \"oops\"\n",
+        )
+        .map_err(|err| format!("write ledger failed: {err}"))?;
+
+        let result = load_baseline_entries_lenient(&path);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let err = result
+            .err()
+            .ok_or("expected an error for non-array entries")?;
+        assert!(err.contains("entries must be an array"), "{err}");
         Ok(())
     }
 

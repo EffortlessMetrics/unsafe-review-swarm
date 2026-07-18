@@ -3422,7 +3422,7 @@ fn print_baseline_help() {
         "- `status` is a read-only health report: it classifies every ledger entry (and every unbaselined open actionable card) into one of ten SPEC-0030 buckets — active_unchanged, active_improved, active_worsened, resolved, review_due, snapshot_missing_or_invalid, duplicate_or_conflicting_entry, suppression_overlap, identity_unmatched, new_unbaselined."
     );
     println!(
-        "- `refresh --dry-run` previews the per-entry action a maintainer could take (keep, update_snapshot, mark_resolved, advance_review_after, add_new_debt, conflict) without writing anything; there is no apply mode."
+        "- `refresh --dry-run` previews the per-entry action a maintainer could take (keep, update_snapshot, mark_resolved, advance_review_after, add_new_debt, conflict); it leaves repository policy, source, and snapshot state unchanged, writing a plan artifact only when --out is explicitly given, and there is no apply mode."
     );
     println!(
         "- The baseline ledger is `policy/unsafe-review-baseline.toml`; the snapshot is `policy/unsafe-review-baseline-snapshot.toml`."
@@ -3447,7 +3447,7 @@ fn print_baseline_help() {
         "- Adding a card to the baseline does not prove memory safety, UB-free status, Miri-clean status, or that any unsafe site executed safely."
     );
     println!(
-        "- `status` and `refresh --dry-run` are read-only: they classify existing SPEC-0030 movement/ledger signals and write nothing. `refresh` previews a plan; it does not edit policy, source, or snapshot files."
+        "- `status` and `refresh --dry-run` are read-only: they classify existing SPEC-0030 movement/ledger signals. `status` writes nothing. `refresh` never edits policy, source, or snapshot files, and writes a plan artifact only when --out is explicitly given."
     );
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."

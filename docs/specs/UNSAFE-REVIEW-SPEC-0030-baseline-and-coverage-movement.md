@@ -176,20 +176,40 @@ resolved                        ledger entry's card no longer appears
 review_due                      ledger entry's review_after has passed
 snapshot_missing_or_invalid     no usable coverage-snapshot floor for this card
 duplicate_or_conflicting_entry  card_id appears more than once in the ledger
-suppression_overlap             card_id is both baseline-known and suppressed
-identity_unmatched              card_id fails the exact UR-*-cN identity shape
+suppression_overlap             card_id is baseline-known and actively suppressed
+identity_unmatched              bad card_id shape, or the entry is otherwise
+                                 structurally invalid (see below)
 new_unbaselined                 open actionable card the ledger does not represent
 ```
+
+`suppression_overlap` only fires for a baseline entry covered by a **currently
+active (non-expired)** suppression entry, reusing the exact same expiry predicate
+as `policy report`'s `expired_suppressions` (one expiry model, not two): an
+expired suppression is already surfaced as its own ledger-health problem, so
+folding it into `suppression_overlap` too would double-report the same stale
+entry under two labels. `new_unbaselined` never includes a card covered by any
+suppression entry, active or expired — the core analyzer classifies such a card
+`Suppressed` (not actionable) before `baseline status` runs at all, so it is
+excluded by the existing analyzer classification, not by a second expiry check
+inside this module.
+
+`identity_unmatched` also covers ledger entries that are structurally invalid in
+other ways — missing/empty `owner`/`reason`/`evidence`, or a present-but-malformed
+`review_after` date — instead of a broken entry silently falling through to
+`active_unchanged`/`resolved` and looking healthy. There is still exactly ten
+buckets; a structurally invalid entry is folded into the existing
+`identity_unmatched` bucket rather than adding an eleventh.
 
 Human and JSON output project from the same report, so both always report
 identical bucket counts and entry identities. `unsafe-review baseline refresh
 --dry-run [--root .] [--out dir]` builds a deterministic per-entry action plan
 from the same classification — `keep`, `update_snapshot`, `mark_resolved`,
-`advance_review_after`, `add_new_debt`, or `conflict` — and writes nothing to
-policy, source, or snapshot files; `--dry-run` is required and there is no apply
-mode (see Non-goals). `advance_review_after` and `add_new_debt` are always
-flagged as requiring a separate, explicit decision, never auto-applied; no
-resolved entry is silently removed by this preview.
+`advance_review_after`, `add_new_debt`, or `conflict`. It leaves repository
+policy, source, and snapshot state unchanged, writing a plan artifact only when
+`--out` is explicitly given; `--dry-run` is required and there is no apply mode
+(see Non-goals). `advance_review_after` and `add_new_debt` are always flagged as
+requiring a separate, explicit decision, never auto-applied; no resolved entry is
+silently removed by this preview.
 
 `unsafe-review pr` (not `first-pr`) surfaces a bounded one-line warning naming
 the exact `baseline status` command when the ledger has any entry outside the

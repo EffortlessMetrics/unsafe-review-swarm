@@ -913,8 +913,8 @@ pub fn baseline_status(root: &Path) -> Result<BaselineHealthReport, String> {
 
 fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthReport, String> {
     use crate::policy::{
-        LedgerKind, baseline_health, load_baseline_entries_lenient, load_coverage_snapshot,
-        load_ledger_entries,
+        LedgerKind, baseline_health, is_expired, load_baseline_entries_lenient,
+        load_coverage_snapshot, load_ledger_entries,
     };
 
     let output = pipeline::analyze(AnalyzeInput {
@@ -930,10 +930,19 @@ fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthR
     let ledger_path = root.join("policy/unsafe-review-baseline.toml");
     let ledger_entries = load_baseline_entries_lenient(&ledger_path)?;
 
+    // Only currently-active (non-expired) suppressions count as `suppression_overlap`
+    // (issue #1893 review finding): an expired suppression is already surfaced as its
+    // own ledger-health problem (`policy report`'s `expired_suppressions`), and folding
+    // it into `suppression_overlap` too would double-report the same stale entry under
+    // two different labels. Reuses the canonical expiry predicate — no second expiry
+    // model. Note this does not affect `new_unbaselined`: the core analyzer already
+    // classifies any card matching *any* suppression entry (active or expired) as
+    // `Suppressed`, which is not actionable, before `baseline_health` ever sees it.
     let suppression_path = root.join("policy/unsafe-review-suppressions.toml");
     let suppression_ids: BTreeSet<String> =
         load_ledger_entries(&suppression_path, LedgerKind::Suppression)?
             .into_iter()
+            .filter(|entry| !is_expired(entry.expires.as_deref(), today))
             .map(|entry| entry.card_id)
             .collect();
 

@@ -8145,7 +8145,7 @@ fn baseline_status_reports_identical_counts_in_human_and_json() -> Result<(), Bo
     ])?;
     let advisory = parse_json(&stdout_text(&advisory)?)?;
     let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
-    write_baseline(&copied, &card_id)?;
+    write_baseline_far_future(&copied, &card_id)?;
     assert!(
         !copied
             .join("policy/unsafe-review-baseline-snapshot.toml")
@@ -8297,6 +8297,128 @@ review_after = "2099-01-01"
     Ok(())
 }
 
+// issue #1893 review finding: `suppression_overlap` must only fire for a *currently
+// active* suppression entry, reusing the same expiry semantics as `policy report`'s
+// `expired_suppressions` (no second expiry model). An expired suppression entry for
+// the same card_id must NOT be reported as suppression_overlap — it is already
+// surfaced separately as ledger-health debt.
+#[test]
+fn baseline_status_suppression_overlap_ignores_expired_suppressions() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
+
+    // Case 1: an EXPIRED suppression entry must not produce suppression_overlap.
+    let expired_temp = TempDir::new("unsafe-review-baseline-suppression-expired-e2e")?;
+    let expired_root = expired_temp.path().join("fixture");
+    copy_dir_all(&fixture, &expired_root)?;
+    write_baseline_far_future(&expired_root, &card_id)?;
+    write_suppression(&expired_root, &card_id, "2000-01-01")?;
+
+    let expired_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        expired_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let expired_report = parse_json(&stdout_text(&expired_output)?)?;
+    assert_eq!(
+        expired_report["counts"]["suppression_overlap"], 0,
+        "an expired suppression must not count as suppression_overlap: {expired_report}"
+    );
+
+    // Case 2: an ACTIVE (far-future) suppression entry for the identical card_id must
+    // still produce suppression_overlap.
+    let active_temp = TempDir::new("unsafe-review-baseline-suppression-active-e2e")?;
+    let active_root = active_temp.path().join("fixture");
+    copy_dir_all(&fixture, &active_root)?;
+    write_baseline_far_future(&active_root, &card_id)?;
+    write_suppression(&active_root, &card_id, "2099-01-01")?;
+
+    let active_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        active_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let active_report = parse_json(&stdout_text(&active_output)?)?;
+    assert_eq!(
+        active_report["counts"]["suppression_overlap"], 1,
+        "an active suppression must still count as suppression_overlap: {active_report}"
+    );
+
+    Ok(())
+}
+
+// issue #1893 review finding: `write_baseline`'s hardcoded `review_after` (2026-08-01)
+// expires shortly after this fixture's authoring date and would flip these tests out of
+// their intended bucket once that date passes. Local helper with a stable far-future
+// date keeps `baseline status`/`baseline refresh` tests deterministic regardless of when
+// they run.
+fn write_baseline_far_future(root: &Path, card_id: &str) -> Result<(), Box<dyn Error>> {
+    let policy = root.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "e2e baseline-health baseline"
+evidence = "fixture card"
+review_after = "2099-01-01"
+
+[[entries]]
+card_id = "UR-resolved-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "resolved e2e baseline"
+evidence = "resolved fixture card"
+review_after = "2099-01-01"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+fn write_suppression(root: &Path, card_id: &str, expires: &str) -> Result<(), Box<dyn Error>> {
+    let policy = root.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-suppressions.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "e2e suppression"
+evidence = "fixture"
+expires = "{expires}"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
 // issue #1893: `baseline refresh` requires `--dry-run` (there is no apply mode), writes
 // nothing under `--root` either way, and only writes the JSON plan file when `--out` is
 // given. The plan is deterministic for the same repo/ledger state.
@@ -8318,7 +8440,7 @@ fn baseline_refresh_dry_run_is_required_and_writes_only_to_out() -> Result<(), B
     ])?;
     let advisory = parse_json(&stdout_text(&advisory)?)?;
     let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
-    write_baseline(&copied, &card_id)?;
+    write_baseline_far_future(&copied, &card_id)?;
     let ledger_before = fs::read_to_string(copied.join("policy/unsafe-review-baseline.toml"))?;
 
     // Missing --dry-run must refuse to run at all — never silently apply.
@@ -8343,7 +8465,10 @@ fn baseline_refresh_dry_run_is_required_and_writes_only_to_out() -> Result<(), B
         os("--dry-run"),
     ])?;
     let no_out_stdout = stdout_text(&no_out)?;
-    assert!(no_out_stdout.contains("writes nothing"), "{no_out_stdout}");
+    assert!(
+        no_out_stdout.contains("leaves repository policy, source, and snapshot state unchanged"),
+        "{no_out_stdout}"
+    );
     assert!(no_out_stdout.contains("mark_resolved"), "{no_out_stdout}");
     assert_eq!(
         fs::read_to_string(copied.join("policy/unsafe-review-baseline.toml"))?,

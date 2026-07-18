@@ -17,7 +17,7 @@
 //! classification. None of these buckets is a safety, UB-free, Miri-clean, or
 //! site-execution claim; a baseline pass remains a no-new-debt statement only.
 
-use super::{RawLedgerEntry, SnapshotCoverage};
+use super::{RawLedgerEntry, SnapshotCoverage, looks_like_iso_date};
 use crate::domain::ReviewCard;
 use crate::domain::coverage::CoverageBlock;
 use serde::Serialize;
@@ -45,8 +45,14 @@ pub enum HealthBucket {
     /// `card_id` is recorded in both the baseline ledger and the active suppression
     /// ledger.
     SuppressionOverlap,
-    /// `card_id` does not satisfy the exact counted `UR-*-cN` identity contract, so it
-    /// can never be matched under the current identity rule.
+    /// `card_id` does not satisfy the exact counted `UR-*-cN` identity contract (so it
+    /// can never be matched under the current identity rule), OR the entry is otherwise
+    /// structurally invalid: missing/empty `owner`/`reason`/`evidence`, or a
+    /// present-but-malformed `review_after` date. There is no eleventh bucket for
+    /// malformed metadata — a structurally broken entry is, definitionally, an entry
+    /// this module cannot trust to classify as healthy, so it is folded into
+    /// `identity_unmatched` rather than silently falling through to
+    /// `active_unchanged`/`resolved`.
     IdentityUnmatched,
     /// A currently open actionable card that the baseline ledger does not represent.
     NewUnbaselined,
@@ -167,6 +173,12 @@ pub struct BaselineHealthInput<'a> {
     /// movement computation (`resolved_gaps`).
     pub current_cards: &'a [ReviewCard],
     pub ledger_entries: &'a [RawLedgerEntry],
+    /// Card IDs covered by a **currently active (non-expired)** suppression entry. The
+    /// caller is responsible for filtering out expired suppressions before building
+    /// this set (via the shared `policy::is_expired` predicate) — an expired
+    /// suppression must not count toward `suppression_overlap`, since it is already
+    /// surfaced as its own ledger-health problem elsewhere (`policy report`'s
+    /// `expired_suppressions`).
     pub suppression_ids: &'a BTreeSet<String>,
     /// `None` means the coverage snapshot file exists but failed to parse (invalid
     /// TOML). A missing file is represented by the caller as `Some(&empty map)` — a
@@ -232,8 +244,10 @@ pub fn classify(input: &BaselineHealthInput<'_>) -> BaselineHealthReport {
 }
 
 /// Classify a single ledger entry. Precedence (first match wins), top to bottom:
-/// duplicate > identity_unmatched > suppression_overlap > resolved > review_due >
-/// snapshot_missing_or_invalid > active_worsened > active_improved > active_unchanged.
+/// duplicate > identity_unmatched (bad card_id shape OR missing/empty
+/// owner/reason/evidence OR malformed review_after) > suppression_overlap > resolved >
+/// review_due > snapshot_missing_or_invalid > active_worsened > active_improved >
+/// active_unchanged.
 fn classify_entry<'a>(
     entry: &RawLedgerEntry,
     occurrences: &BTreeMap<&str, usize>,
@@ -249,10 +263,14 @@ fn classify_entry<'a>(
             format!("card_id appears {occurrence_count} times in the baseline ledger"),
         );
     }
-    if !entry.valid_identity {
+    let structural_problems = structural_problems(entry);
+    if !structural_problems.is_empty() {
         return (
             HealthBucket::IdentityUnmatched,
-            "card_id does not match the exact counted UR-*-cN identity contract".to_string(),
+            format!(
+                "ledger entry is structurally invalid: {}",
+                structural_problems.join("; ")
+            ),
         );
     }
     if input.suppression_ids.contains(id) {
@@ -308,6 +326,37 @@ fn classify_entry<'a>(
         HealthBucket::ActiveUnchanged,
         "coverage matches the recorded snapshot".to_string(),
     )
+}
+
+/// List every reason `entry` is structurally invalid: a card_id that fails the exact
+/// counted-identity shape check, missing/empty `owner`/`reason`/`evidence` (already
+/// collapsed to `None` by the lenient loader's `optional_string`), or a
+/// present-but-malformed `review_after` date. Empty means the entry is structurally
+/// sound (its bucket may still be anything else). A missing `review_after` is not
+/// itself a problem here — `classify_entry`'s `review_due` check already treats an
+/// absent `review_after` as "cannot determine due date" rather than invalid.
+fn structural_problems(entry: &RawLedgerEntry) -> Vec<&'static str> {
+    let mut problems = Vec::new();
+    if !entry.valid_identity {
+        problems.push("card_id does not match the exact counted UR-*-cN identity contract");
+    }
+    if entry.owner.is_none() {
+        problems.push("missing owner");
+    }
+    if entry.reason.is_none() {
+        problems.push("missing reason");
+    }
+    if entry.evidence.is_none() {
+        problems.push("missing evidence");
+    }
+    if entry
+        .review_after
+        .as_deref()
+        .is_some_and(|date| !looks_like_iso_date(date))
+    {
+        problems.push("malformed review_after date");
+    }
+    problems
 }
 
 /// Refresh-plan action for one ledger entry (`baseline refresh --dry-run`, issue #1893).
@@ -720,6 +769,50 @@ mod tests {
 
         assert_eq!(report.counts.identity_unmatched, 1);
         assert_eq!(report.entries[0].bucket, HealthBucket::IdentityUnmatched);
+    }
+
+    #[test]
+    fn identity_unmatched_when_metadata_is_missing_or_review_after_is_malformed()
+    -> Result<(), String> {
+        let id =
+            "UR-broken-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let mut missing_owner = raw_entry(id);
+        missing_owner.owner = None;
+        let mut malformed_date = raw_entry(
+            "UR-broken2-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
+        );
+        malformed_date.review_after = Some("not-a-date".to_string());
+        let entries = vec![missing_owner, malformed_date];
+        let suppression = empty_suppression();
+        let cards: Vec<ReviewCard> = Vec::new();
+
+        let report = classify(&BaselineHealthInput {
+            today: TODAY,
+            current_cards: &cards,
+            ledger_entries: &entries,
+            suppression_ids: &suppression,
+            snapshot: None,
+            snapshot_load_error: None,
+        });
+
+        // Neither entry falls through to active_unchanged/resolved looking healthy —
+        // both are folded into the existing identity_unmatched bucket (no 11th bucket).
+        assert_eq!(report.counts.identity_unmatched, 2, "{:?}", report.entries);
+        assert_eq!(report.counts.active_unchanged, 0);
+        assert_eq!(report.counts.resolved, 0);
+        for entry in &report.entries {
+            assert_eq!(entry.bucket, HealthBucket::IdentityUnmatched);
+        }
+        let owner_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.card_id == id)
+            .ok_or("missing-owner entry must be present")?;
+        assert!(
+            owner_entry.detail.contains("missing owner"),
+            "{owner_entry:?}"
+        );
+        Ok(())
     }
 
     #[test]
