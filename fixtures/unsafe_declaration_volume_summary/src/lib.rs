@@ -1,0 +1,32 @@
+// A single declaration-heavy file: four `unsafe fn` owner/contract sites in
+// one module. This is the fixture target for the declaration-summary
+// projection (issue #1895) -- it proves the summary groups these four cards
+// into one file-scoped row (total 4, contract_missing 2, contract_present 2)
+// while every card still keeps its own ID, class, and location in
+// `cards.json`.
+
+pub unsafe fn first_undocumented_owner(ptr: *const u8) -> usize {
+    if ptr.is_null() { 0 } else { 1 }
+}
+
+pub unsafe fn second_undocumented_owner(ptr: *const u8) -> usize {
+    if ptr.is_null() { 0 } else { 1 }
+}
+
+/// Reads a byte from a caller-provided pointer.
+///
+/// # Safety
+///
+/// `ptr` must be valid for reads of one byte.
+pub unsafe fn first_documented_owner(ptr: *const u8) -> usize {
+    if ptr.is_null() { 0 } else { 1 }
+}
+
+/// Reads a byte from a caller-provided pointer.
+///
+/// # Safety
+///
+/// `ptr` must be valid for reads of one byte.
+pub unsafe fn second_documented_owner(ptr: *const u8) -> usize {
+    if ptr.is_null() { 0 } else { 1 }
+}

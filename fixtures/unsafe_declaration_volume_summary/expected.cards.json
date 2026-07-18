@@ -1,0 +1,420 @@
+[
+  {
+    "id": "UR-unsafe-declaration-volume-summary-src-lib-rs-first-undocumented-owner-unsafe_fn-unsafe_declaration-first-undocumented-owner-134d3667b6cb-unknown-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 8,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "first_undocumented_owner",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn first_undocumented_owner(ptr: *const u8) -> usize {"
+    },
+    "operation": "pub unsafe fn first_undocumented_owner(ptr: *const u8) -> usize {",
+    "operation_family": "unsafe_declaration",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe declaration caller contract is documented and reviewable"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "Public unsafe API is missing nearby `# Safety` documentation"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `first_undocumented_owner` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Public unsafe API is missing nearby `# Safety` documentation",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `first_undocumented_owner` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing public `# Safety` documentation for unsafe API",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `pub unsafe fn first_undocumented_owner(ptr: *const u8) -> usize {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-declaration-volume-summary-src-lib-rs-first-undocumented-owner-unsafe_fn-unsafe_declaration-first-undocumented-owner-134d3667b6cb-unknown-c1` still maps to `pub unsafe fn first_undocumented_owner(ptr: *const u8) -> usize {` at `src/lib.rs:8:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-unsafe-declaration-volume-summary-src-lib-rs-second-undocumented-owner-unsafe_fn-unsafe_declaration-second-undocumented-owner-8a7e988f5d79-unknown-c1",
+    "class": "contract_missing",
+    "priority": "high",
+    "confidence": "high",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 12,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "second_undocumented_owner",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn second_undocumented_owner(ptr: *const u8) -> usize {"
+    },
+    "operation": "pub unsafe fn second_undocumented_owner(ptr: *const u8) -> usize {",
+    "operation_family": "unsafe_declaration",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe declaration caller contract is documented and reviewable"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "Public unsafe API is missing nearby `# Safety` documentation"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `second_undocumented_owner` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Public unsafe API is missing nearby `# Safety` documentation",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `second_undocumented_owner` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing public `# Safety` documentation for unsafe API",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise public `# Safety` section that names the required caller obligations.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `pub unsafe fn second_undocumented_owner(ptr: *const u8) -> usize {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-declaration-volume-summary-src-lib-rs-second-undocumented-owner-unsafe_fn-unsafe_declaration-second-undocumented-owner-8a7e988f5d79-unknown-c1` still maps to `pub unsafe fn second_undocumented_owner(ptr: *const u8) -> usize {` at `src/lib.rs:12:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-unsafe-declaration-volume-summary-src-lib-rs-first-documented-owner-unsafe_fn-unsafe_declaration-first-documented-owner-69a0cc4cb691-unknown-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 21,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "first_documented_owner",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn first_documented_owner(ptr: *const u8) -> usize {"
+    },
+    "operation": "pub unsafe fn first_documented_owner(ptr: *const u8) -> usize {",
+    "operation_family": "unsafe_declaration",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe declaration caller contract is documented and reviewable"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `first_documented_owner` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `first_documented_owner` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `pub unsafe fn first_documented_owner(ptr: *const u8) -> usize {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-declaration-volume-summary-src-lib-rs-first-documented-owner-unsafe_fn-unsafe_declaration-first-documented-owner-69a0cc4cb691-unknown-c1` still maps to `pub unsafe fn first_documented_owner(ptr: *const u8) -> usize {` at `src/lib.rs:21:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-unsafe-declaration-volume-summary-src-lib-rs-second-documented-owner-unsafe_fn-unsafe_declaration-second-documented-owner-a64f3c8edcec-unknown-c1",
+    "class": "unsafe_unreached",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "human_review_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 30,
+      "column": 1,
+      "kind": "unsafe_fn",
+      "owner": "second_documented_owner",
+      "visibility": "public",
+      "public_api_surface": true,
+      "snippet": "pub unsafe fn second_documented_owner(ptr: *const u8) -> usize {"
+    },
+    "operation": "pub unsafe fn second_documented_owner(ptr: *const u8) -> usize {",
+    "operation_family": "unsafe_declaration",
+    "hazards": [
+      "unknown"
+    ],
+    "obligations": [
+      "unsafe declaration caller contract is documented and reviewable"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "caller-contract",
+        "description": "unsafe declaration caller contract is documented and reviewable",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `# Safety` documentation was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `second_documented_owner` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `# Safety` documentation was detected",
+    "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+    "reach": "No static test mention of owner `second_documented_owner` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "human-deep-review",
+        "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or identify a focused test path that reaches the safe wrapper around this unsafe seam.",
+    "verify_commands": [],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `unsafe_unreached` ReviewCard for `pub unsafe fn second_documented_owner(ptr: *const u8) -> usize {`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+      },
+      "minimal_repro": {
+        "kind": "witness_route",
+        "command": null,
+        "route_kind": "human-deep-review",
+        "steps": [
+          "Confirm ReviewCard `UR-unsafe-declaration-volume-summary-src-lib-rs-second-documented-owner-unsafe_fn-unsafe_declaration-second-documented-owner-a64f3c8edcec-unknown-c1` still maps to `pub unsafe fn second_documented_owner(ptr: *const u8) -> usize {` at `src/lib.rs:30:1` before upgrading confidence.",
+          "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+          "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  }
+]

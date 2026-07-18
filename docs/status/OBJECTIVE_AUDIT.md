@@ -60,7 +60,7 @@ The active calibration rail is now recorded in
 `docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md`,
 the `.allow` project charter and linked adoption plan,
 `policy/accuracy-calibration.toml`, and
-`docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 43 fixture-pinned claims, 623 calibration cases, 43 label ledgers, and 599 label samples. It records zero dogfood-measured, labeled-calibrated, or
+`docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 43 fixture-pinned claims, 624 calibration cases, 43 label ledgers, and 599 label samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
 claim-scoped fixture-pinned proof index, not a global precision/recall result
 or support-tier promotion. The latest MaybeUninit assume-init slice recognizes

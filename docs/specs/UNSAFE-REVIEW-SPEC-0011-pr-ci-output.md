@@ -291,6 +291,26 @@ top actionable card, when present
 compact card table
   rows project ReviewCard id, class, location, operation family, operation,
   missing evidence, primary route, and next action
+declaration summary, when at least one `unsafe_declaration`-family
+  ReviewCard is present (issue #1895)
+  bounded, deterministic groups of `unsafe_declaration` ReviewCards by
+  source file -- presentation-only, projected from the same
+  `CoverageBlock::derive` data every other baseline-movement surface uses;
+  never a second classifier and never a discharge
+  each group row reports: file, total cards, new-or-worsened count,
+  inherited count, contract-missing/weak count (a weak contract slot counts
+  with missing), contract-present count, and a
+  representative card-id sample capped at
+  `declaration_summary::DECLARATION_SUMMARY_REPRESENTATIVE_LIMIT` with a
+  "+N more (see `cards.json`)" pointer to the complete membership
+  groups containing at least one new-or-worsened card MUST sort ahead of
+  inherited-only groups so a changed obligation cannot be hidden behind
+  unchanged declaration volume
+  omitted entirely when there are no `unsafe_declaration` cards -- a quiet
+  PR must not gain a new empty section
+  every underlying card keeps its own id, class, and policy status in
+  `cards.json` and the card table above; this section only bounds what is
+  printed inline
 missing evidence summary
 witness route summary
   rows project ReviewCard id, primary route, route reason, and route command

@@ -144,6 +144,13 @@ single_truth = true
 note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints."
 
 [[field]]
+name = "declaration_summary_group"
+canonical_source = "output/declaration_summary.rs::declaration_groups (derived from ReviewCard.operation.family, domain/coverage.rs::CoverageBlock::derive contract_coverage/baseline_state)"
+surfaces = ["pr_summary"]
+single_truth = true
+note = "Presentation-only grouping (issue #1895) of unsafe_declaration-family ReviewCards by source file. total/new_or_worsened/inherited/contract_missing/contract_present/representatives are all counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier and cards.json remains the complete per-declaration inventory."
+
+[[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
 surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "gate_manifest", "action", "ub_review"]
