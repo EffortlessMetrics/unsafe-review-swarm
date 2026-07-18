@@ -589,6 +589,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "panic_from_safe_js_non_js_signed_no_card",
     "split_unsafe_block",
     "raw_pointer_deref",
+    "raw_pointer_deref_prior_block_safety_not_owner",
     "raw_pointer_read_unaligned",
     "raw_pointer_read_volatile",
     "raw_pointer_read_len_capacity_assert",
