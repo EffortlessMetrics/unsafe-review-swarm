@@ -1,0 +1,76 @@
+# UNSAFE-REVIEW-WORK-1916-ACTION-PINS
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
+kind = "maintenance"
+objective = "Audit the live dependency and release PR queue and repair the swarm action-pin update with its required workflow policy mirror."
+user_outcome = "The release-prep queue has an evidence-backed disposition record, and the swarm action-pin path is mergeable without weakening workflow allowlist policy."
+claim_boundary = "This slice records current PR dispositions and validates workflow/policy parity; it does not prove dependency safety, release readiness, publication authorization, or source-repository mergeability."
+dependencies = ["#1915 release cutline"]
+blockers = ["Source-repository dependency PRs remain owner-gated and are not changed by this swarm PR."]
+affected_files = [".github/workflows/editor-extension.yml", ".github/workflows/editor-publish.yml", ".github/workflows/ub-review.yml", "policy/workflow-allowlist.toml", "docs/status/DEPENDENCY_DISPOSITIONS.md"]
+affected_symbols = []
+linked_specs = ["UNSAFE-REVIEW-SPEC-0024"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Live source/swarm disposition matrix for parser, ignore, Actions, signal-hook, and RSS/self-unsafe PRs",
+    "Paired swarm workflow and policy allowlist updates for setup-node and ub-review pins",
+    "Explicit non-publication and source-of-record boundaries",
+]
+excluded = [
+    "Merging dependency PRs in the public source repository",
+    "Closing or rewriting source-repository PRs",
+    "Candidate dependency freeze, version freeze, source promotion, publication, or tag movement",
+    "Analyzer, runtime, or unsafe-review product behavior changes",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Every action pin changed in a workflow has the matching policy/workflow-allowlist entry in the same change."
+
+[[invariant]]
+id = "INV-2"
+text = "Source and swarm duplicate dependency PRs receive one chosen history path; this swarm slice does not merge both copies."
+
+[[invariant]]
+id = "INV-3"
+text = "The disposition record remains an audit artifact and does not become a scheduler, freeze gate, or publication authorization."
+
+[[acceptance]]
+id = "AC-1"
+text = "The live disposition document records exact repository, PR, head, status, check, and chosen-history evidence for the required dependency/release queue."
+proof = ["rtk git diff --check"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The swarm action-pin update and policy mirror pass the deterministic workflow and repository policy checks."
+proof = ["rtk cargo run --locked -p xtask -- check-policy", "rtk cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-3"
+text = "The change does not claim source promotion, publication, candidate freeze, memory safety, or dependency safety."
+proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+
+[[integration]]
+surface = "workflow_policy"
+expected = "xtask check-policy sees the changed setup-node and ub-review pins in policy/workflow-allowlist.toml."
+
+[[integration]]
+surface = "release_cutline"
+expected = "The audit can feed a later candidate-specific dependency freeze without rewriting the draft cutline or publishing."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Leave failing, stale, conflicted, or duplicate dependency PRs open with explicit dispositions instead of merging for queue optics."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Keep action pin changes paired with the allowlist and run the full repository gate before review."
+
+[compatibility]
+posture = "Maintenance and documentation-only release-prep slice; no analyzer, runtime, ReviewCard, public schema, source, or publication behavior changes."
+
+[rollback]
+strategy = "Revert the paired workflow/allowlist commit and supersede the audit document with a refreshed live-state record; do not alter source history or publication state."
+
