@@ -2,17 +2,23 @@ use std::collections::BTreeSet;
 use std::error::Error;
 use std::path::{Path, PathBuf};
 
+use futures::StreamExt;
 use serde_json::{Value, json};
+use tower::Service as _;
+use tower_lsp_server::jsonrpc::Request;
 use tower_lsp_server::ls_types::{
     CodeActionOrCommand, CodeActionProviderCapability, DiagnosticSeverity, ExecuteCommandOptions,
-    HoverContents, HoverProviderCapability, Position,
+    ExecuteCommandParams, HoverContents, HoverParams, HoverProviderCapability, InitializeParams,
+    MessageType, Position, TextDocumentIdentifier, TextDocumentPositionParams, WorkspaceFolder,
 };
+use tower_lsp_server::{ClientSocket, LanguageServer, LspService};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewClass, Scope, analyze,
     project_editor, project_editor_diagnostics,
 };
 
 use super::actions::{code_actions_for, execute_card_command};
+use super::backend::Backend;
 use super::capabilities::server_capabilities;
 use super::config::{LspConfig, parse_config, should_refresh_on_change};
 use super::diagnostics::{diagnostic_card_id, diagnostics_by_uri};
@@ -444,8 +450,14 @@ fn execute_open_related_test_returns_test_metadata() -> Result<(), Box<dyn Error
     Ok(())
 }
 
+/// `clear_uris_for_failure` backs `mark_diagnostics_stale` (the didChange
+/// path), which intentionally blanks diagnostics because the document is
+/// known to have changed underneath them. This is distinct from a *failed*
+/// refresh (analysis error, task-join error, or no diff source): see
+/// `refresh_failure_*` tests below, which assert the opposite — a failed
+/// refresh must NOT blank diagnostics via this helper.
 #[test]
-fn refresh_failure_clears_stale_diagnostics() -> Result<(), Box<dyn Error>> {
+fn document_change_clears_previously_diagnosed_uris() -> Result<(), Box<dyn Error>> {
     let uri =
         uri_from_path(std::env::current_dir()?.join("fixtures/raw_pointer_alignment/src/lib.rs"))
             .ok_or("expected file uri")?;
@@ -454,6 +466,308 @@ fn refresh_failure_clears_stale_diagnostics() -> Result<(), Box<dyn Error>> {
     assert_eq!(clear, vec![uri]);
     assert!(previous.is_empty());
     Ok(())
+}
+
+/// Drives `execute_command(CMD_REFRESH)` while concurrently draining `count`
+/// server-to-client notifications off `socket` on a spawned task, then hands
+/// `socket` back for the next call. `ClientSocket`'s channel has a capacity of
+/// 1, so a refresh that sends more than one notification (e.g. a
+/// `window/logMessage` from `diff_source` followed by the `window/showMessage`
+/// from `mark_diagnostics_failed`) would deadlock if the socket were drained
+/// only after `refresh` completed — draining must happen concurrently, and a
+/// real spawned task (rather than a hand-rolled `select`/`join` over a
+/// borrowed socket) sidesteps the channel's internal single-slot readiness
+/// bookkeeping.
+async fn refresh_via_execute_command_collecting_messages(
+    backend: &Backend,
+    socket: ClientSocket,
+    count: usize,
+) -> Result<(ClientSocket, Vec<Request>), Box<dyn Error>> {
+    // Bound both awaits: if a regression emits fewer notifications than `count`,
+    // the drain's `socket.next()` would otherwise block forever; if it emits
+    // more, the capacity-1 channel could wedge `execute_command`. On any
+    // timeout or refresh failure, abort the drain task before returning so a
+    // hung test fails fast instead of hanging CI.
+    let timeout = std::time::Duration::from_secs(30);
+    let mut drain_handle = tokio::spawn(async move {
+        let mut socket = socket;
+        let mut collected = Vec::new();
+        while collected.len() < count {
+            match socket.next().await {
+                Some(message) => collected.push(message),
+                None => break,
+            }
+        }
+        (socket, collected)
+    });
+    let refresh_result = match tokio::time::timeout(
+        timeout,
+        backend.execute_command(ExecuteCommandParams {
+            command: CMD_REFRESH.to_string(),
+            arguments: Vec::new(),
+            work_done_progress_params: Default::default(),
+        }),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            drain_handle.abort();
+            return Err("execute_command(refresh) timed out".into());
+        }
+    };
+    if let Err(err) = refresh_result {
+        drain_handle.abort();
+        return Err(format!("execute_command(refresh) failed: {err:?}").into());
+    }
+    match tokio::time::timeout(timeout, &mut drain_handle).await {
+        Ok(joined) => {
+            Ok(joined.map_err(|err| format!("drain task panicked or was cancelled: {err}"))?)
+        }
+        Err(_) => {
+            drain_handle.abort();
+            Err("draining server-to-client notifications timed out".into())
+        }
+    }
+}
+
+/// Drives a real `initialize` request/response through `service` (rather than
+/// calling `Backend::initialize` directly) so that `tower_lsp_server`'s
+/// internal server-state gate flips from `Uninitialized` to `Initialized`.
+/// That gate is otherwise invisible: `Client::show_message`/`log_message`/
+/// `publish_diagnostics` silently no-op pre-initialize, which would make
+/// every assertion in these tests about outbound messages vacuously pass.
+/// The service only accepts one real `initialize` call (a second is rejected
+/// as a duplicate), so later config changes in these tests instead call
+/// `Backend::initialize` directly — that updates the backend's root/config
+/// fields without touching server state, exactly like the state-gate-free
+/// `did_change_configuration` path a real client would use.
+async fn initialize_over_the_wire(
+    service: &mut LspService<Backend>,
+    params: &InitializeParams,
+) -> Result<(), Box<dyn Error>> {
+    let request = Request::build("initialize")
+        .id(1_i64)
+        .params(serde_json::to_value(params).map_err(|err| err.to_string())?)
+        .finish();
+    let response = service
+        .call(request)
+        .await
+        .map_err(|err| format!("service call failed: {err}"))?
+        .ok_or("expected a response to the initialize request")?;
+    if !response.is_ok() {
+        return Err(format!("initialize request was rejected: {response:?}").into());
+    }
+    Ok(())
+}
+
+fn fixture_root() -> Result<PathBuf, Box<dyn Error>> {
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .and_then(Path::parent)
+        .ok_or("unsafe-review-cli should live under crates/")?
+        .to_path_buf();
+    Ok(workspace_root
+        .join("fixtures")
+        .join("raw_pointer_alignment"))
+}
+
+/// Headline regression test for the refresh-failure bug: a refresh that fails
+/// (here, because the configured diff base does not resolve) must surface a
+/// visible, distinct failure to the editor — not silently render the same as
+/// a clean, zero-card file, and not blank out diagnostics from the last
+/// successful analysis.
+#[test]
+fn refresh_failure_surfaces_a_visible_warning_and_preserves_last_diagnostics()
+-> Result<(), Box<dyn Error>> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("failed to build test runtime: {err}"))?;
+    runtime.block_on(async {
+        let root = fixture_root()?;
+        let root_uri = uri_from_path(&root).ok_or("expected root uri")?;
+        let lib_uri =
+            uri_from_path(root.join("src/lib.rs")).ok_or("expected file uri for src/lib.rs")?;
+
+        let (mut service, socket) = LspService::new(Backend::new);
+        initialize_over_the_wire(
+            &mut service,
+            &InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri.clone(),
+                    name: "fixture".to_string(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let backend = service.inner();
+
+        // Repo mode (the default): `diff_source` resolves immediately, so a
+        // successful refresh over a known-hazard fixture sends exactly one
+        // `textDocument/publishDiagnostics` notification.
+        let (socket, success_messages) =
+            refresh_via_execute_command_collecting_messages(backend, socket, 1).await?;
+        let publish = success_messages
+            .first()
+            .ok_or("expected a publishDiagnostics notification from the successful refresh")?;
+        assert_eq!(publish.method(), "textDocument/publishDiagnostics");
+        let params = publish
+            .params()
+            .cloned()
+            .ok_or("publishDiagnostics notification should carry params")?;
+        let diagnostics = params
+            .get("diagnostics")
+            .and_then(Value::as_array)
+            .cloned()
+            .ok_or("publishDiagnostics params should carry a diagnostics array")?;
+        assert!(
+            !diagnostics.is_empty(),
+            "the successful refresh over raw_pointer_alignment must publish at least one diagnostic"
+        );
+        let start = diagnostics
+            .first()
+            .and_then(|diagnostic| diagnostic.get("range"))
+            .and_then(|range| range.get("start"))
+            .ok_or("expected a diagnostic range start")?;
+        let position = Position::new(
+            start
+                .get("line")
+                .and_then(Value::as_u64)
+                .ok_or("expected numeric line")? as u32,
+            start
+                .get("character")
+                .and_then(Value::as_u64)
+                .ok_or("expected numeric character")? as u32,
+        );
+
+        let hover_before = backend
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: lib_uri.clone(),
+                    },
+                    position,
+                },
+                work_done_progress_params: Default::default(),
+            })
+            .await
+            .map_err(|err| format!("hover failed: {err:?}"))?;
+        assert!(
+            hover_before.is_some(),
+            "expected a hover result over the published diagnostic's range"
+        );
+
+        // Reconfigure to a diff base that cannot resolve, so `diff_source`
+        // returns `None` and the refresh fails before analysis even runs.
+        // This calls `Backend::initialize` directly (not through `service`,
+        // which would reject a second real `initialize` as a duplicate) —
+        // there is no `did_change_configuration` handler in this backend, so
+        // this is the only way to change the root/config fields in a test.
+        // It intentionally does not touch server state (already Initialized
+        // from `initialize_over_the_wire` above).
+        backend
+            .initialize(InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri,
+                    name: "fixture".to_string(),
+                }]),
+                initialization_options: Some(json!({
+                    "unsafeReview": {
+                        "mode": "diff",
+                        "base": "definitely-not-a-real-ref-zzz",
+                    }
+                })),
+                ..Default::default()
+            })
+            .await
+            .map_err(|err| format!("re-initialize failed: {err:?}"))?;
+
+        let (_socket, failure_messages) =
+            refresh_via_execute_command_collecting_messages(backend, socket, 2).await?;
+
+        // The bug: every failure path used to call `clear_stale_diagnostics`,
+        // which published an EMPTY diagnostics set — rendering a failed
+        // refresh identically to a clean, zero-card file. Assert that no
+        // `publishDiagnostics` notification is sent on failure at all.
+        assert!(
+            failure_messages
+                .iter()
+                .all(|message| message.method() != "textDocument/publishDiagnostics"),
+            "a failed refresh must not publish diagnostics (that would blank or fake a clean \
+             result); got methods: {:?}",
+            failure_messages
+                .iter()
+                .map(Request::method)
+                .collect::<Vec<_>>()
+        );
+
+        // The fix: a `window/showMessage` (editor-visible, not just a log)
+        // must appear, and its wording must be a freshness signal only — it
+        // must not claim the file is safe, proven, or UB-free.
+        let show_message = failure_messages
+            .iter()
+            .find(|message| message.method() == "window/showMessage")
+            .ok_or("expected a window/showMessage notification on refresh failure")?;
+        let show_params = show_message
+            .params()
+            .cloned()
+            .ok_or("showMessage notification should carry params")?;
+        let expected_type = serde_json::to_value(MessageType::WARNING)
+            .map_err(|err| format!("failed to serialize MessageType::WARNING: {err}"))?;
+        assert_eq!(
+            show_params.get("type"),
+            Some(&expected_type),
+            "refresh failure must be surfaced at WARNING severity"
+        );
+        let show_text = show_params
+            .get("message")
+            .and_then(Value::as_str)
+            .ok_or("showMessage params should carry a message string")?;
+        assert!(
+            !show_text.is_empty(),
+            "the visible failure message must not be empty"
+        );
+        for forbidden in ["proof", "UB-free", "Miri-clean", "guarantee", "certif"] {
+            assert!(
+                !show_text.to_lowercase().contains(&forbidden.to_lowercase()),
+                "visible failure message must not overclaim (found {forbidden:?} in {show_text:?})"
+            );
+        }
+        assert!(
+            show_text.to_lowercase().contains("not current")
+                || show_text.to_lowercase().contains("stale"),
+            "visible failure message must read as a freshness signal, got {show_text:?}"
+        );
+        assert!(
+            show_text.to_lowercase().contains("does not mean")
+                || show_text
+                    .to_lowercase()
+                    .contains("not mean this file is safe"),
+            "visible failure message must make clear absence of diagnostics is not a safety \
+             claim, got {show_text:?}"
+        );
+
+        // The last successful diagnostics must survive the failed refresh
+        // untouched: hovering the same position returns the same result.
+        let hover_after = backend
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier { uri: lib_uri },
+                    position,
+                },
+                work_done_progress_params: Default::default(),
+            })
+            .await
+            .map_err(|err| format!("hover failed: {err:?}"))?;
+        assert_eq!(
+            hover_after, hover_before,
+            "a failed refresh must preserve the last successful diagnostics, not blank them"
+        );
+
+        Ok(())
+    })
 }
 
 #[test]

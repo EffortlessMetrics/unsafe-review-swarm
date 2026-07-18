@@ -21,6 +21,19 @@ tower-lsp-server = "0.23.0"
 [target.'cfg(unix)'.dependencies]
 signal-hook = "0.4"
 
+[dev-dependencies]
+# Only needed to drain `tower_lsp_server::ClientSocket` (a `Stream`) in LSP
+# backend tests that drive `Backend::refresh()` end-to-end; not used by
+# product code. `executor`/`async-await` (the default features) are not
+# needed for `StreamExt`, so they stay off.
+futures = { version = "0.3", default-features = false, features = ["std"] }
+# Only needed to drive `LspService` (a `tower::Service<Request>`) through a
+# real `initialize` request/response in LSP backend tests, so that
+# `tower_lsp_server`'s internal server-state gate actually flips to
+# `Initialized` (outbound client notifications are otherwise silently
+# suppressed pre-initialize). Not used by product code.
+tower = { version = "0.5", default-features = false }
+
 [lib]
 name = "unsafe_review_cli"
 path = "src/lib.rs"

@@ -931,9 +931,11 @@ dependencies = [
 name = "unsafe-review-cli"
 version = "0.3.8"
 dependencies = [
+ "futures",
  "serde_json",
  "signal-hook",
  "tokio",
+ "tower",
  "tower-lsp-server",
  "unsafe-review-core",
 ]
