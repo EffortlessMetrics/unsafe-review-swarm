@@ -10,7 +10,7 @@ This directory stores the historical coordination state for unsafe-review
 development and release lanes.
 
 - Historical namespace index: `.rails/index.toml` (parity only)
-- Current goal: `.allow/goals/active.toml`
+- Durable charter (compatibility input, not a task selector): `.allow/goals/active.toml`
 - Historical goals: `.rails/goals/archive/`
 - Lane trackers: `.rails/lanes/`
 - Agent operating entrypoint: `AGENTS.md`

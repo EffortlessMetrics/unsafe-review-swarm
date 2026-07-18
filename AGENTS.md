@@ -37,7 +37,8 @@ to `unsafe-review-swarm` or stop and leave a handoff explaining the routing
 problem.
 
 After selecting a bounded issue from live GitHub state, continue that issue in
-`unsafe-review-swarm` along the accepted contract and current rails. Good issue
+`unsafe-review-swarm` along its accepted contract and the linked
+source-of-truth graph. Good issue
 scopes include ReviewCard correctness, evidence precision, artifact/schema
 verification, first-run UX, saved LSP/agent projections, dogfood calibration,
 tests, maintainability refactors, and source-of-truth spec alignment. The
@@ -45,9 +46,11 @@ absence of a selected issue is not permission to invent a repository-wide
 default task; inspect the live portfolio and leave durable work selection in
 GitHub issue/PR metadata.
 
-Assume the repository has an active multi-day improvement runway. Treat that
-runway only as portfolio context, not as a default task selector; every
-execution still starts from a live issue/PR and its accepted contract.
+The repository may have several concurrent improvement lanes in flight, or none
+— zero active work items is a valid repository state. Treat any such runway only
+as portfolio context, not as a default task selector; every execution still
+starts from a live issue/PR and its accepted contract, and an incomplete program
+is not by itself a reason to keep generating work.
 PR batches on `unsafe-review-swarm` are expected input, but they do not choose
 the current issue; live GitHub metadata and the accepted work contract do.
 
@@ -115,9 +118,10 @@ coverage remains telemetry, release readiness stays explicit, and trusted
 comment posting remains a future split-token lane. Do not turn advisory
 unsafe-review findings into default CI failures.
 
-Use the rails as forward drive. A well-designed missing rail is usually a repo
-alignment task, not a blocker. Add it when it keeps future work convergent and
-does not turn the current PR into a broad process rewrite.
+Treat rail gaps as alignment signals, not as a mandate to keep driving work
+forward. A well-designed missing rail is usually a repo alignment task, not a
+blocker. Add it when it keeps future work convergent and does not turn the
+current PR into a broad process rewrite.
 
 Do not reject a useful generated PR just because it references missing but
 well-designed scaffolding. Decide whether the missing rail should exist. If yes,
@@ -224,8 +228,8 @@ For Codex Web or other generated PR batches:
    or future lane.
 
 Out-of-lane is a scheduling fact, not a close reason. If an aligned PR is not
-in the current lane, leave it open as deferred, draft, blocked, or parked and
-name the next lane or owner decision needed. Close only duplicate, superseded,
+in a currently prioritized lane, leave it open as deferred, draft, blocked, or
+parked and name the next lane or owner decision needed. Close only duplicate, superseded,
 rejected, abandoned, or unrecoverable work, and record the repository-level
 evidence for that disposition.
 

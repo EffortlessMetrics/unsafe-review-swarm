@@ -73,7 +73,7 @@ must_include = [
   "`ReviewCard` is the canonical product unit",
   "configuration obstacle",
   "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md",
-  "Assume the repository has an active multi-day improvement runway.",
+  "zero active work items is a valid repository state",
   "PR batches on `unsafe-review-swarm` are expected input",
   "Spec rails are meant to make routine progress easier, not ceremonial.",
   "Do not reject a useful generated PR just because it references missing but",
