@@ -1,8 +1,8 @@
 use std::path::PathBuf;
 
 use tower_lsp_server::ls_types::{
-    CodeActionProviderCapability, ExecuteCommandOptions, InitializeParams, ServerCapabilities,
-    TextDocumentSyncCapability, TextDocumentSyncKind,
+    CodeActionKind, CodeActionOptions, CodeActionProviderCapability, ExecuteCommandOptions,
+    InitializeParams, ServerCapabilities, TextDocumentSyncCapability, TextDocumentSyncKind,
 };
 
 use super::uri::uri_to_path;
@@ -14,7 +14,22 @@ pub(super) fn server_capabilities() -> ServerCapabilities {
         hover_provider: Some(tower_lsp_server::ls_types::HoverProviderCapability::Simple(
             true,
         )),
-        code_action_provider: Some(CodeActionProviderCapability::Simple(true)),
+        code_action_provider: Some(CodeActionProviderCapability::Options(CodeActionOptions {
+            code_action_kinds: Some(
+                [
+                    "quickfix.unsafeReview.agentPacket",
+                    "source.unsafeReview.reviewContext",
+                    "source.unsafeReview.witnessRoute",
+                    "source.unsafeReview.witnessCommand",
+                    "source.unsafeReview.relatedTest",
+                ]
+                .into_iter()
+                .map(|kind| CodeActionKind::from(kind.to_string()))
+                .collect(),
+            ),
+            resolve_provider: Some(false),
+            work_done_progress_options: Default::default(),
+        })),
         execute_command_provider: Some(ExecuteCommandOptions {
             commands: vec![
                 CMD_REFRESH.into(),

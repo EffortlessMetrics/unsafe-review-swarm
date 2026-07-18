@@ -199,6 +199,13 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - An unavailable route, witness command, or related test must be omitted or
   disabled with its canonical reason. No enabled action may knowingly execute
   to an unexplained `null`.
+- Live card actions are native diagnostic-bound `CodeAction` values. They carry
+  the full analysis identity in typed command arguments, set `edit = None`, and
+  are never preferred. Disabled actions carry no command. Refresh remains the
+  only workspace-scoped bare `Command`.
+- Analysis and diagnostics are installed and read as one live snapshot. A
+  refreshing, failed, changed, or superseded snapshot is not executable; full
+  analysis identity must match before current card capability is resolved.
 
 ## Execute command contract
 

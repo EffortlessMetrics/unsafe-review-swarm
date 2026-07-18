@@ -13,15 +13,17 @@ use tower_lsp_server::ls_types::{
 };
 use tower_lsp_server::{ClientSocket, LanguageServer, LspService};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewClass, Scope, analyze,
-    project_editor, project_editor_diagnostics,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, DiffSource, EditorActionArguments,
+    PolicyMode, ReviewClass, Scope, analyze, project_editor, project_editor_diagnostics,
 };
 
-use super::actions::{code_actions_for, execute_card_command};
+use super::actions::{
+    ActionClientSupport, code_actions_for, execute_card_command, validate_command_arguments,
+};
 use super::backend::Backend;
 use super::capabilities::server_capabilities;
 use super::config::{LspConfig, parse_config, should_refresh_on_change};
-use super::diagnostics::{diagnostic_card_id, diagnostics_by_uri};
+use super::diagnostics::{canonical_request_diagnostics, diagnostic_card_id, diagnostics_by_uri};
 use super::hover::hover_for;
 use super::state::clear_uris_for_failure;
 use super::uri::uri_from_path;
@@ -53,10 +55,18 @@ fn initialize_returns_read_only_capabilities() -> Result<(), Box<dyn Error>> {
         capabilities.hover_provider,
         Some(HoverProviderCapability::Simple(true))
     ));
-    assert!(matches!(
-        capabilities.code_action_provider,
-        Some(CodeActionProviderCapability::Simple(true))
-    ));
+    let Some(CodeActionProviderCapability::Options(action_options)) =
+        capabilities.code_action_provider
+    else {
+        return Err("structured code action options should be advertised".into());
+    };
+    assert_eq!(action_options.resolve_provider, Some(false));
+    assert_eq!(
+        action_options
+            .code_action_kinds
+            .map_or(0, |kinds| kinds.len()),
+        5
+    );
     let Some(ExecuteCommandOptions { commands, .. }) = capabilities.execute_command_provider else {
         return Err("execute command provider should be present".into());
     };
@@ -325,7 +335,7 @@ fn hover_outside_card_returns_none_or_neutral_status() -> Result<(), Box<dyn Err
 }
 
 #[test]
-fn code_actions_are_command_only() -> Result<(), Box<dyn Error>> {
+fn code_actions_are_structured_and_command_only() -> Result<(), Box<dyn Error>> {
     let (root, output) = fixture_output("raw_pointer_alignment")?;
     let diagnostics = diagnostics_by_uri(&root, &output);
     let diagnostic = diagnostics
@@ -337,24 +347,178 @@ fn code_actions_are_command_only() -> Result<(), Box<dyn Error>> {
         Some(&output),
         std::slice::from_ref(diagnostic),
         diagnostic.range.start,
+        modern_action_support(),
     );
-    assert!(actions.len() >= 3);
+    assert_eq!(actions.len(), 5);
     assert!(
-        actions
+        matches!(&actions[0], CodeActionOrCommand::Command(command) if command.command == CMD_REFRESH)
+    );
+    for action in &actions[1..] {
+        let CodeActionOrCommand::CodeAction(action) = action else {
+            return Err("card-scoped actions must be structured CodeActions".into());
+        };
+        assert!(action.edit.is_none());
+        assert_eq!(action.is_preferred, Some(false));
+        assert_eq!(
+            action.diagnostics.as_deref(),
+            Some(std::slice::from_ref(diagnostic))
+        );
+        assert!(action.data.is_some());
+    }
+    Ok(())
+}
+
+#[test]
+fn unavailable_card_actions_are_structured_and_disabled() -> Result<(), Box<dyn Error>> {
+    let (root, mut output) = fixture_output("raw_pointer_alignment")?;
+    output.cards[0].routes.clear();
+    output.cards[0].related_tests.clear();
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let actions = code_actions_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+        modern_action_support(),
+    );
+    let disabled = actions[1..]
+        .iter()
+        .filter_map(|action| match action {
+            CodeActionOrCommand::CodeAction(action) => action.disabled.as_ref(),
+            CodeActionOrCommand::Command(_) => None,
+        })
+        .collect::<Vec<_>>();
+    assert_eq!(disabled.len(), 3);
+    assert!(
+        disabled
+            .iter()
+            .any(|item| item.reason.contains("No witness route"))
+    );
+    assert!(
+        disabled
+            .iter()
+            .any(|item| item.reason.contains("No witness command"))
+    );
+    assert!(
+        disabled
+            .iter()
+            .any(|item| item.reason.contains("No structured related test"))
+    );
+    for action in &actions[1..] {
+        let CodeActionOrCommand::CodeAction(action) = action else {
+            continue;
+        };
+        if action.disabled.is_some() {
+            assert!(action.command.is_none());
+        }
+    }
+    let reason_codes = actions[1..]
+        .iter()
+        .filter_map(|action| match action {
+            CodeActionOrCommand::CodeAction(action) => action
+                .data
+                .as_ref()?
+                .get("applicability")?
+                .get("reason_code")?
+                .as_str(),
+            CodeActionOrCommand::Command(_) => None,
+        })
+        .collect::<BTreeSet<_>>();
+    assert_eq!(
+        reason_codes,
+        BTreeSet::from(["no_related_test", "no_witness_command", "no_witness_route"])
+    );
+    Ok(())
+}
+
+#[test]
+fn client_capabilities_never_upgrade_unsupported_actions() -> Result<(), Box<dyn Error>> {
+    let (root, mut output) = fixture_output("raw_pointer_alignment")?;
+    output.cards[0].routes.clear();
+    output.cards[0].related_tests.clear();
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let legacy = code_actions_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+        ActionClientSupport::default(),
+    );
+    assert_eq!(legacy.len(), 2);
+    assert!(
+        legacy
             .iter()
             .all(|action| matches!(action, CodeActionOrCommand::Command(_)))
     );
-    assert!(actions.iter().any(|action| {
-        matches!(action, CodeActionOrCommand::Command(command) if command.command == CMD_PACKET)
-    }));
-    assert!(actions.iter().any(|action| {
-        matches!(
-            action,
-            CodeActionOrCommand::Command(command)
-                if command.command == CMD_WITNESS_COMMAND
-                    && command.title.contains("does not run")
-        )
-    }));
+    let without_disabled = code_actions_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+        ActionClientSupport {
+            literals: true,
+            ..Default::default()
+        },
+    );
+    assert_eq!(without_disabled.len(), 2);
+    Ok(())
+}
+
+#[test]
+fn client_diagnostics_cannot_replace_canonical_association() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("raw_pointer_alignment")?;
+    let cached = diagnostics_by_uri(&root, &output)
+        .into_values()
+        .flatten()
+        .collect::<Vec<_>>();
+    let mut forged = cached[0].clone();
+    forged.message = "forged client message".to_string();
+    assert!(canonical_request_diagnostics(cached.clone(), &[forged]).is_empty());
+    assert_eq!(
+        canonical_request_diagnostics(cached.clone(), &cached),
+        cached
+    );
+    Ok(())
+}
+
+#[test]
+fn overlapping_diagnostics_emit_deterministic_actions_for_each_card() -> Result<(), Box<dyn Error>>
+{
+    let (root, mut output) = fixture_output("raw_pointer_alignment")?;
+    let mut sibling = output.cards[0].clone();
+    sibling.id = CardId(format!("{}-overlap", sibling.id.0));
+    output.cards.push(sibling);
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let same_uri = diagnostics.values().next().ok_or("expected diagnostics")?;
+    assert_eq!(same_uri.len(), 2);
+    let actions = code_actions_for(
+        Some(&output),
+        same_uri,
+        same_uri[0].range.start,
+        modern_action_support(),
+    );
+    assert_eq!(actions.len(), 9);
+    let mut card_ids = actions[1..]
+        .iter()
+        .filter_map(|action| match action {
+            CodeActionOrCommand::CodeAction(action) => action
+                .data
+                .as_ref()?
+                .get("payload")?
+                .get("card_id")?
+                .as_str(),
+            CodeActionOrCommand::Command(_) => None,
+        })
+        .collect::<Vec<_>>();
+    card_ids.dedup();
+    assert_eq!(card_ids.len(), 2);
     Ok(())
 }
 
@@ -362,8 +526,12 @@ fn code_actions_are_command_only() -> Result<(), Box<dyn Error>> {
 fn execute_collect_agent_packet_returns_packet_for_card() -> Result<(), Box<dyn Error>> {
     let (_root, output) = fixture_output("raw_pointer_alignment")?;
     let card_id = output.cards[0].id.0.clone();
-    let packet = execute_card_command(CMD_PACKET, &[json!({"card_id": card_id})], &output)
-        .ok_or("expected packet")?;
+    let packet = execute_card_command(
+        CMD_PACKET,
+        &[command_arguments(&output, &card_id)?],
+        &output,
+    )
+    .ok_or("expected packet")?;
     let packet = packet
         .as_str()
         .ok_or("packet should be returned as a string")?;
@@ -378,12 +546,91 @@ fn execute_collect_agent_packet_returns_packet_for_card() -> Result<(), Box<dyn 
 }
 
 #[test]
+fn execute_rejects_action_from_a_different_analysis() -> Result<(), Box<dyn Error>> {
+    let (_root, first) = fixture_output("raw_pointer_alignment")?;
+    let (_root, second) = fixture_output("raw_pointer_alignment")?;
+    assert_eq!(first.cards[0].id, second.cards[0].id);
+    assert_ne!(first.analysis_identity, second.analysis_identity);
+    let arguments = command_arguments(&first, &first.cards[0].id.0)?;
+    assert!(execute_card_command(CMD_PACKET, &[arguments], &second).is_none());
+    Ok(())
+}
+
+#[test]
+fn command_validation_rejects_malformed_foreign_and_unavailable_actions()
+-> Result<(), Box<dyn Error>> {
+    let (_root, mut output) = fixture_output("raw_pointer_alignment")?;
+    assert_eq!(
+        validate_command_arguments(CMD_PACKET, &[], &output),
+        Err("invalid_action_arguments")
+    );
+    let valid = command_arguments(&output, &output.cards[0].id.0)?;
+    assert_eq!(
+        validate_command_arguments(CMD_PACKET, &[valid.clone(), valid.clone()], &output),
+        Err("invalid_action_arguments")
+    );
+    assert_eq!(
+        validate_command_arguments(
+            CMD_PACKET,
+            &[json!({"card_id": output.cards[0].id.0})],
+            &output
+        ),
+        Err("invalid_action_arguments")
+    );
+    let unknown = command_arguments(&output, "unknown-card")?;
+    assert_eq!(
+        validate_command_arguments(CMD_PACKET, &[unknown], &output),
+        Err("unknown_card")
+    );
+    output.cards[0].routes.clear();
+    assert_eq!(
+        validate_command_arguments(CMD_WITNESS_ROUTE, &[valid], &output),
+        Err("action_unavailable")
+    );
+    Ok(())
+}
+
+#[test]
+fn human_only_live_actions_never_look_like_automatic_quickfixes() -> Result<(), Box<dyn Error>> {
+    let (root, output) = fixture_output("ffi_missing_boundary_contract")?;
+    let diagnostics = diagnostics_by_uri(&root, &output);
+    let diagnostic = diagnostics
+        .values()
+        .flatten()
+        .next()
+        .ok_or("expected diagnostic")?;
+    let actions = code_actions_for(
+        Some(&output),
+        std::slice::from_ref(diagnostic),
+        diagnostic.range.start,
+        modern_action_support(),
+    );
+    let packet = actions[1..]
+        .iter()
+        .find_map(|action| match action {
+            CodeActionOrCommand::CodeAction(action) if action.title.contains("review context") => {
+                Some(action)
+            }
+            _ => None,
+        })
+        .ok_or("expected human review context action")?;
+    assert_eq!(
+        packet.kind.as_ref().map(|kind| kind.as_str()),
+        Some("source.unsafeReview.reviewContext")
+    );
+    assert!(!packet.title.to_ascii_lowercase().contains("automatic"));
+    assert_eq!(packet.is_preferred, Some(false));
+    assert!(packet.edit.is_none());
+    Ok(())
+}
+
+#[test]
 fn execute_unknown_command_returns_none() -> Result<(), Box<dyn Error>> {
     let (_root, output) = fixture_output("raw_pointer_alignment")?;
     assert!(
         execute_card_command(
             "unsafe-review.unknown",
-            &[json!({"card_id": output.cards[0].id.0})],
+            &[command_arguments(&output, &output.cards[0].id.0)?],
             &output
         )
         .is_none()
@@ -405,8 +652,12 @@ fn execute_explain_witness_route_returns_route_for_card() -> Result<(), Box<dyn 
         "raw_pointer_alignment card must have at least one witness route; \
          if the fixture changed, update the fixture or pick one that has routes",
     )?;
-    let result = execute_card_command(CMD_WITNESS_ROUTE, &[json!({"card_id": card.id.0})], &output)
-        .ok_or("CMD_WITNESS_ROUTE must return Some for a card with routes")?;
+    let result = execute_card_command(
+        CMD_WITNESS_ROUTE,
+        &[command_arguments(&output, &card.id.0)?],
+        &output,
+    )
+    .ok_or("CMD_WITNESS_ROUTE must return Some for a card with routes")?;
     assert_eq!(result["kind"], "unsafe-review.witness_route");
     assert_eq!(result["card_id"], card.id.0.as_str());
     assert_eq!(result["route"], route.kind.as_str());
@@ -434,8 +685,12 @@ fn execute_open_related_test_returns_test_metadata() -> Result<(), Box<dyn Error
         "raw_pointer_alignment card must have at least one related test; \
          if the fixture changed, update the fixture or pick one that has related tests",
     )?;
-    let result = execute_card_command(CMD_OPEN_TEST, &[json!({"card_id": card.id.0})], &output)
-        .ok_or("CMD_OPEN_TEST must return Some for a card with related tests")?;
+    let result = execute_card_command(
+        CMD_OPEN_TEST,
+        &[command_arguments(&output, &card.id.0)?],
+        &output,
+    )
+    .ok_or("CMD_OPEN_TEST must return Some for a card with related tests")?;
     assert_eq!(result["kind"], "unsafe-review.related_test");
     assert_eq!(result["card_id"], card.id.0.as_str());
     assert_eq!(result["name"], test.name.as_str());
@@ -448,6 +703,25 @@ fn execute_open_related_test_returns_test_metadata() -> Result<(), Box<dyn Error
         "line field must be a number"
     );
     Ok(())
+}
+
+fn command_arguments(output: &AnalyzeOutput, card_id: &str) -> Result<Value, Box<dyn Error>> {
+    Ok(serde_json::to_value(EditorActionArguments {
+        card_id: card_id.to_string(),
+        analysis: output.analysis_identity.clone(),
+        file: None,
+        line: None,
+        name: None,
+    })?)
+}
+
+fn modern_action_support() -> ActionClientSupport {
+    ActionClientSupport {
+        literals: true,
+        disabled: true,
+        data: true,
+        preferred: true,
+    }
 }
 
 /// `clear_uris_for_failure` backs `mark_diagnostics_stale` (the didChange

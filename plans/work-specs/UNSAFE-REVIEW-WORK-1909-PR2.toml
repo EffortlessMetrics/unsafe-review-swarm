@@ -1,0 +1,32 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1909"
+kind = "correctness"
+objective = "Migrate live card-scoped LSP actions to the canonical structured action contract and reject stale execution."
+user_outcome = "Editors receive diagnostic-bound, command-only actions with honest readiness and disabled reasons, and an old action cannot execute against a newer analysis."
+claim_boundary = "This slice changes only the live LSP adapter. It does not migrate saved lsp.json or VS Code, add edits, resolve actions lazily, execute witnesses, or prove repairs sufficient."
+
+[scope]
+included = ["Translate canonical core actions to native LSP CodeAction values", "Install and read analysis plus diagnostics atomically", "Reject action execution unless the full analysis identity is current", "Keep failed or refreshing analysis non-executable while preserving last diagnostics visibly", "Advertise structured action kinds without resolve support"]
+excluded = ["Saved LSP and VS Code adapter parity", "WorkspaceEdit or source mutation", "codeAction/resolve", "Witness execution or automatic repair"]
+
+[[invariant]]
+id = "AC-1909-PR2-1"
+text = "Every card-scoped live action is diagnostic-bound, edit-free, non-preferred, and translated from the canonical core contract; refresh remains workspace-scoped."
+proof = ["cargo test -p unsafe-review-cli lsp --locked"]
+
+[[invariant]]
+id = "AC-1909-PR2-2"
+text = "Disabled capabilities carry canonical reasons and no executable command."
+proof = ["cargo test -p unsafe-review-cli lsp --locked"]
+
+[[invariant]]
+id = "AC-1909-PR2-3"
+text = "A command from a different, stale, failed, or refreshing analysis cannot resolve by card ID against the current output."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[rollback]
+strategy = "Revert the live adapter, atomic snapshot, tests, capability advertisement, work spec, and spec clauses; the merged core contract remains available for a corrected migration."
+
+[risks]
+client_compatibility = "Modern clients receive structured actions according to negotiated optional fields. Legacy clients retain available card actions as typed-identity Commands; disabled actions are omitted rather than degraded into enabled commands."
+stale_state = "The atomic live snapshot marks refreshing and failed state non-current while retaining the last successful diagnostics for visible warning context."
