@@ -4136,6 +4136,56 @@ fn check_bad_base_ref_emits_actionable_hint() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// issue #1883 (hostile-input regression coverage): a diff file that is not valid
+// UTF-8 must fail closed — the CLI exits non-zero, writes nothing, and never
+// treats the unreadable input as an empty/zero-change diff. The read fails before
+// parsing, so the error names the diff read step rather than a parse failure.
+#[test]
+fn check_reports_non_utf8_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-non-utf8-diff-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+
+    let non_utf8_diff = temp.path().join("non-utf8.diff");
+    fs::write(&non_utf8_diff, [0xffu8, 0xfe, 0x00, 0xfd])?;
+
+    let cards_out = temp.path().join("cards.json");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        non_utf8_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    assert_eq!(
+        stdout_text(&output)?.trim(),
+        "",
+        "stdout should be empty on read failure"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("non-utf8.diff"),
+        "stderr should include the diff path: {stderr}"
+    );
+    assert!(
+        stderr.contains("read diff") && stderr.contains("failed"),
+        "stderr should describe the diff read failure: {stderr}"
+    );
+    assert!(
+        !cards_out.exists(),
+        "output file must not be created when the diff cannot be read"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
