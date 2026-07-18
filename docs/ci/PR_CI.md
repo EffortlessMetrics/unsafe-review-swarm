@@ -106,6 +106,8 @@ deterministic `check-pr` components relevant to those categories, and emits a
 receipt (`unsafe-review/check-local/v1`) listing every executed and skipped
 check with the reason it was selected or omitted. The receipt always carries
 `"full_gate_required": true` and a `next_command` pointing back at `check-pr`.
+In JSON mode, the receipt is the only stdout payload, so it can be piped to a
+machine consumer; check progress remains out of the JSON stream.
 
 `check-local` is a shift-left aid, not a weaker replacement gate. A skipped
 check is never represented as passed, and `check-local` changes no branch

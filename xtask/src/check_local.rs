@@ -469,15 +469,16 @@ fn require_value(raw: &[String], index: usize, flag: &str) -> Result<String, Str
 /// heavyweight checks.
 pub(crate) fn run(
     raw: &[String],
-    dispatch: &dyn Fn(&str) -> Result<(), String>,
+    dispatch: &dyn Fn(&str, bool) -> Result<(), String>,
 ) -> Result<(), String> {
     let args = Args::parse(raw)?;
     let (diff, degraded) = resolve_diff(args.base.as_deref());
     let plan = plan_inner(&diff.changed_paths, degraded);
+    let json_mode = matches!(args.format, Format::Json);
 
     let mut outcomes: Vec<(&'static str, Result<(), String>)> = Vec::new();
     for check in plan.checks.iter().filter(|check| check.selected) {
-        let result = dispatch(check.spec.id);
+        let result = dispatch(check.spec.id, json_mode);
         outcomes.push((check.spec.id, result));
     }
 
@@ -522,39 +523,46 @@ pub(crate) fn run(
 /// stray untracked file while the base diff errored) could yield a targeted
 /// selection that silently omits an unseen product-Rust change.
 fn resolve_diff(base_arg: Option<&str>) -> (Diff, bool) {
-    let head = git(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|_| "unknown".to_string());
+    resolve_diff_with(base_arg, &|args| git(args))
+}
+
+fn resolve_diff_with(
+    base_arg: Option<&str>,
+    run_git: &dyn Fn(&[&str]) -> Result<String, String>,
+) -> (Diff, bool) {
+    let head = run_git(&["rev-parse", "--short", "HEAD"]).unwrap_or_else(|_| "unknown".to_string());
     let base_ref = base_arg
         .map(str::to_string)
-        .or_else(|| git(&["merge-base", "origin/main", "HEAD"]).ok())
-        .or_else(|| git(&["merge-base", "main", "HEAD"]).ok())
-        .or_else(|| git(&["rev-parse", "HEAD~1"]).ok());
+        .or_else(|| run_git(&["merge-base", "origin/main", "HEAD"]).ok())
+        .or_else(|| run_git(&["merge-base", "main", "HEAD"]).ok());
 
     let mut paths: BTreeSet<String> = BTreeSet::new();
     let mut degraded = false;
 
     // Untracked files are always part of "the current diff".
-    match git(&["ls-files", "--others", "--exclude-standard"]) {
+    match run_git(&["ls-files", "--others", "--exclude-standard"]) {
         Ok(out) => collect_lines(&out, &mut paths),
         Err(_) => degraded = true,
     }
 
     let base_display = match &base_ref {
         Some(base) => {
-            // `git diff --name-only <base>` already reports committed-since-base,
+            // `git diff --no-renames --name-only <base>` reports both sides of
+            // cross-category renames, plus committed-since-base,
             // staged, and unstaged tracked changes vs the base, so no separate
             // `--cached` pass is needed. If it fails we may be under-reporting.
-            match git(&["diff", "--name-only", base]) {
+            match run_git(&["diff", "--no-renames", "--name-only", base]) {
                 Ok(out) => collect_lines(&out, &mut paths),
                 Err(_) => degraded = true,
             }
-            git(&["rev-parse", "--short", base]).unwrap_or_else(|_| base.clone())
+            run_git(&["rev-parse", "--short", base]).unwrap_or_else(|_| base.clone())
         }
         None => {
             // No base ref resolved: we cannot compute a reliable diff, so mark
             // the result degraded (forces the full set) while still surfacing any
             // working-tree changes vs HEAD for the receipt.
             degraded = true;
-            if let Ok(out) = git(&["diff", "--name-only", "HEAD"]) {
+            if let Ok(out) = run_git(&["diff", "--name-only", "HEAD"]) {
                 collect_lines(&out, &mut paths);
             }
             "unknown".to_string()
@@ -764,6 +772,7 @@ fn render_human(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::cell::RefCell;
 
     fn paths(list: &[&str]) -> Vec<String> {
         list.iter().map(|path| (*path).to_string()).collect()
@@ -1147,5 +1156,93 @@ mod tests {
         assert!(Args::parse(&paths(&["xtask", "check-local", "--nope"])).is_err());
         assert!(Args::parse(&paths(&["xtask", "check-local", "--format", "yaml"])).is_err());
         assert!(Args::parse(&paths(&["xtask", "check-local", "--base"])).is_err());
+    }
+
+    #[test]
+    fn resolve_diff_keeps_both_sides_of_a_cross_category_rename() {
+        let calls = RefCell::new(Vec::<Vec<String>>::new());
+        let (diff, degraded) = resolve_diff_with(None, &|args| {
+            calls
+                .borrow_mut()
+                .push(args.iter().map(|arg| (*arg).to_string()).collect());
+            match args {
+                ["rev-parse", "--short", "HEAD"] => Ok("head".to_string()),
+                ["merge-base", "origin/main", "HEAD"] => Ok("base".to_string()),
+                ["ls-files", "--others", "--exclude-standard"] => Ok(String::new()),
+                ["diff", "--no-renames", "--name-only", "base"] => {
+                    Ok("crates/unsafe-review-core/src/removed.rs\ndocs/removed.md\n".to_string())
+                }
+                ["rev-parse", "--short", "base"] => Ok("base".to_string()),
+                _ => Err(format!("unexpected git args: {args:?}")),
+            }
+        });
+
+        assert!(!degraded);
+        assert_eq!(
+            diff.changed_paths,
+            paths(&[
+                "crates/unsafe-review-core/src/removed.rs",
+                "docs/removed.md",
+            ])
+        );
+        assert!(
+            calls
+                .borrow()
+                .iter()
+                .any(|args| args == &["diff", "--no-renames", "--name-only", "base"])
+        );
+    }
+
+    #[test]
+    fn resolve_diff_does_not_treat_head_parent_as_a_trusted_base() {
+        let calls = RefCell::new(Vec::<Vec<String>>::new());
+        let (diff, degraded) = resolve_diff_with(None, &|args| {
+            calls
+                .borrow_mut()
+                .push(args.iter().map(|arg| (*arg).to_string()).collect());
+            match args {
+                ["rev-parse", "--short", "HEAD"] => Ok("head".to_string()),
+                ["merge-base", ..] => Err("no default branch".to_string()),
+                ["ls-files", "--others", "--exclude-standard"] => Ok(String::new()),
+                ["diff", "--name-only", "HEAD"] => Ok("README.md\n".to_string()),
+                _ => Err(format!("unexpected git args: {args:?}")),
+            }
+        });
+
+        assert!(degraded);
+        assert_eq!(diff.base, "unknown");
+        assert_eq!(diff.changed_paths, paths(&["README.md"]));
+        assert!(
+            !calls
+                .borrow()
+                .iter()
+                .any(|args| args == &["rev-parse", "HEAD~1"])
+        );
+    }
+
+    #[test]
+    fn json_mode_requests_quiet_check_dispatch() -> Result<(), String> {
+        let seen = RefCell::new(Vec::<(String, bool)>::new());
+        let out = PathBuf::from("target/check-local/test-json-dispatch.json");
+        let raw = paths(&[
+            "xtask",
+            "check-local",
+            "--base",
+            "HEAD",
+            "--format",
+            "json",
+            "--out",
+            "target/check-local/test-json-dispatch.json",
+        ]);
+
+        run(&raw, &|id, quiet| {
+            seen.borrow_mut().push((id.to_string(), quiet));
+            Ok(())
+        })?;
+
+        assert!(!seen.borrow().is_empty());
+        assert!(seen.borrow().iter().all(|(_, quiet)| *quiet));
+        let _ = std::fs::remove_file(out);
+        Ok(())
     }
 }

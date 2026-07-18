@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::sync::OnceLock;
 
 use calibration_constants::{
@@ -945,8 +945,9 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
         commands::XtaskCommand::CheckExternalPilots => external_pilots::check(),
         commands::XtaskCommand::CheckLocal(raw_args) => {
-            check_local::run(&raw_args, &run_named_check)
+            check_local::run(&raw_args, &|id, quiet| run_named_check(id, quiet))
         }
+        commands::XtaskCommand::CheckLocalRun(id) => run_named_check(&id, false),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
@@ -993,7 +994,35 @@ fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
 /// This is the execution seam for `check-local`: the selection logic lives in
 /// `check_local` (pure, unit-tested) and this dispatch maps each catalog id to
 /// the same function `check-pr` invokes, so the two can never drift in behavior.
-fn run_named_check(id: &str) -> Result<(), String> {
+fn run_named_check(id: &str, quiet: bool) -> Result<(), String> {
+    if quiet {
+        let executable = std::env::args_os()
+            .next()
+            .map(PathBuf::from)
+            .filter(|path| path.is_file())
+            .or_else(|| std::env::current_exe().ok().filter(|path| path.is_file()))
+            .ok_or_else(|| "check-local: failed to resolve xtask executable".to_string())?;
+        let output = Command::new(&executable)
+            .arg("check-local-run")
+            .arg(id)
+            .stdout(Stdio::null())
+            .output()
+            .map_err(|err| {
+                format!(
+                    "check-local: failed to run `{id}` quietly via `{}`: {err}",
+                    executable.display()
+                )
+            })?;
+        if output.status.success() {
+            return Ok(());
+        }
+        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
+        return Err(if detail.is_empty() {
+            format!("check-local: `{id}` exited with {}", output.status)
+        } else {
+            detail
+        });
+    }
     match dispatch_check(id) {
         Some(check) => check(),
         None => Err(format!("check-local: unknown check id `{id}`")),

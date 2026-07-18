@@ -44,6 +44,7 @@ pub(crate) enum XtaskCommand {
     CheckEvidenceLossChallenges,
     CheckExternalPilots,
     CheckLocal(Vec<String>),
+    CheckLocalRun(String),
     DogfoodExec(Vec<String>),
 }
 
@@ -168,6 +169,14 @@ impl XtaskCommand {
             Some("check-local") => {
                 // Trailing flags are forwarded to the CheckLocal arg parser.
                 Ok(Self::CheckLocal(args.to_vec()))
+            }
+            Some("check-local-run") => {
+                command_args::require_max_args(args, "check-local-run", 3)?;
+                let id = args
+                    .get(2)
+                    .cloned()
+                    .ok_or_else(|| "check-local-run requires a check id".to_string())?;
+                Ok(Self::CheckLocalRun(id))
             }
             Some("dogfood-exec") => {
                 // All trailing args are forwarded to the DogfoodExec arg parser.
