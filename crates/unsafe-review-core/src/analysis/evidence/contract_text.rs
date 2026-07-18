@@ -48,12 +48,14 @@ fn safety_comment_summary(context: &str, snippet: &str) -> Option<&'static str> 
     if let Some(hit) = safety_marker_in(snippet.lines()) {
         return Some(hit);
     }
-    // Scan the before-context upward from the site, but stop at the first scope
-    // boundary — a prior `unsafe` statement or a closing brace. A `// SAFETY:`
-    // comment that documents an earlier unsafe block, or a sibling item pulled
-    // into the flat proximity window, is not owned by this (uncommented) site
-    // and must not be credited as its contract evidence (`comment != guard`,
-    // and only same-site rationale counts).
+    // Scan the before-context upward from the site, but stop at the first
+    // *complete prior `unsafe` statement*: a `// SAFETY:` comment above such a
+    // statement documents THAT earlier unsafe operation, not this one, so it
+    // must not be credited to this (uncommented) site (`comment != guard`, and
+    // only same-site rationale counts). Ordinary guard/`if`/loop blocks between
+    // the comment and the site are NOT boundaries — the common guard-before-
+    // unsafe idiom (`// SAFETY: … / if cond { return } / unsafe { … }`) keeps
+    // its rationale.
     for line in context.lines().rev() {
         let trimmed = line.trim_start();
         if is_attribution_boundary(trimmed) {
@@ -97,19 +99,20 @@ fn safety_marker_in<'a>(lines: impl Iterator<Item = &'a str>) -> Option<&'static
 }
 
 /// A line in the before-context that ends the current site's comment-attribution
-/// scope: a closing brace (a prior block/scope), or a *complete* prior `unsafe`
-/// statement that both opens and closes on the same line (e.g.
-/// `let a = unsafe { *p };`). The current site's own multi-line `unsafe {`
-/// opener has no closing brace on its line and is therefore NOT a boundary, so
-/// a `// SAFETY:` comment above a multi-line `unsafe { … }` block still counts.
-/// Comment lines are never boundaries, and `unsafe` is matched as a whole token
-/// so identifiers like `unsafe_helper` do not trip the boundary.
+/// scope: a *complete* prior `unsafe` statement that both opens and closes on
+/// the same line (e.g. `let a = unsafe { *p };`). A `// SAFETY:` comment above
+/// such a statement documents that earlier unsafe operation, so a later,
+/// uncommented site must not inherit it.
+///
+/// Deliberately NOT a boundary: the current site's own multi-line `unsafe {`
+/// opener (no closing brace on its line), and ordinary guard/`if`/loop block
+/// braces — so a `// SAFETY:` comment above a multi-line `unsafe { … }` block,
+/// or above a guard block that precedes the unsafe op, still counts. Comment
+/// lines are never boundaries, and `unsafe` is matched as a whole token so
+/// identifiers like `unsafe_helper` do not trip the boundary.
 fn is_attribution_boundary(trimmed: &str) -> bool {
     if trimmed.starts_with("//") {
         return false;
-    }
-    if trimmed.starts_with('}') {
-        return true;
     }
     let has_unsafe_keyword = trimmed
         .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
@@ -186,10 +189,22 @@ mod tests {
     }
 
     #[test]
-    fn safety_comment_not_credited_across_a_closing_brace() {
-        // The `// SAFETY:` belongs to a sibling item above the closing brace.
-        let context = "// SAFETY: unrelated sibling rationale.\n    let _ = 1;\n}";
-        assert_eq!(safety_comment_summary(context, "unsafe { *p }"), None);
+    fn safety_comment_credited_across_a_guard_block_before_the_site() {
+        // The common guard-before-unsafe idiom: the `// SAFETY:` documents the
+        // following unsafe op, with an ordinary early-return guard block in
+        // between. The guard's braces must NOT sever the rationale.
+        let context =
+            "// SAFETY: null is rejected below\nif ptr.is_null() {\n    return default();\n}";
+        assert_eq!(
+            safety_comment_summary(context, "unsafe { *ptr }"),
+            Some("Nearby `SAFETY:` comment was detected")
+        );
+        // Single-line guard form too.
+        let inline = "// SAFETY: null is rejected below\nif ptr.is_null() { return; }";
+        assert_eq!(
+            safety_comment_summary(inline, "unsafe { *ptr }"),
+            Some("Nearby `SAFETY:` comment was detected")
+        );
     }
 
     #[test]
