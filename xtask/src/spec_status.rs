@@ -32,6 +32,7 @@ const XTASK_COMMANDS: &[&str] = &[
     "check-first-hour",
     "check-first-pr-artifacts",
     "check-goals",
+    "check-local",
     "check-manual-candidate-examples",
     "check-package-boundary",
     "check-pr",
