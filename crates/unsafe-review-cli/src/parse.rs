@@ -1,9 +1,9 @@
 use crate::command::{
-    BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
-    CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput,
-    ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format, OutcomeOptions, RepoOptions,
-    SubcommandHelpTarget,
+    BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
+    BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
+    CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
+    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format,
+    OutcomeOptions, RepoOptions, SubcommandHelpTarget,
 };
 use std::{
     env,
@@ -294,7 +294,86 @@ fn parse_baseline(args: Vec<String>) -> Result<BaselineCommand, String> {
     match subcommand.as_str() {
         "init" => parse_baseline_init(rest).map(BaselineCommand::Init),
         "add" => parse_baseline_add(rest).map(BaselineCommand::Add),
+        "status" => parse_baseline_status(rest).map(BaselineCommand::Status),
+        "refresh" => parse_baseline_refresh(rest).map(BaselineCommand::Refresh),
         other => Err(format!("unknown baseline subcommand `{other}`")),
+    }
+}
+
+fn parse_baseline_status(args: Vec<String>) -> Result<BaselineStatusOptions, String> {
+    let mut options = BaselineStatusOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = human_or_json_format(
+                    parse_format(value(&args, idx, "--format")?)?,
+                    "baseline status",
+                )?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = human_or_json_format(
+                    parse_format(inline_value(arg, "--format")?)?,
+                    "baseline status",
+                )?;
+            }
+            "--json" => options.format = Format::Json,
+            other => return Err(format!("unknown baseline status argument `{other}`")),
+        }
+        idx += 1;
+    }
+    Ok(options)
+}
+
+fn parse_baseline_refresh(args: Vec<String>) -> Result<BaselineRefreshOptions, String> {
+    let mut options = BaselineRefreshOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--dry-run" => options.dry_run = true,
+            "--out" => {
+                idx += 1;
+                options.out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                options.out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            other => return Err(format!("unknown baseline refresh argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if !options.dry_run {
+        return Err(
+            "baseline refresh requires --dry-run; there is no apply mode (SPEC-0030 non-goal)"
+                .to_string(),
+        );
+    }
+    Ok(options)
+}
+
+fn human_or_json_format(format: Format, command_name: &str) -> Result<Format, String> {
+    match format {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "{command_name} only supports human or json output, got `{}`",
+            format_name(&other)
+        )),
     }
 }
 
@@ -3801,5 +3880,153 @@ mod tests {
 
     fn args<const N: usize>(values: [&str; N]) -> Vec<String> {
         values.iter().map(|value| (*value).to_string()).collect()
+    }
+
+    #[test]
+    fn parses_baseline_status_defaults_to_human_format() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "baseline", "status"]))?;
+        let Command::Baseline(BaselineCommand::Status(options)) = command else {
+            return Err("expected baseline status command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert_eq!(options.format, Format::Human);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_baseline_status_root_and_json_format() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "baseline",
+            "status",
+            "--root",
+            "fixtures/example",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Baseline(BaselineCommand::Status(options)) = command else {
+            return Err("expected baseline status command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("fixtures/example"));
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_baseline_status_json_flag_shorthand() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "baseline", "status", "--json"]))?;
+        let Command::Baseline(BaselineCommand::Status(options)) = command else {
+            return Err("expected baseline status command".to_string());
+        };
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn baseline_status_rejects_non_human_json_format() {
+        let err = parse(args([
+            "unsafe-review",
+            "baseline",
+            "status",
+            "--format",
+            "sarif",
+        ]))
+        .err()
+        .unwrap_or_default();
+        assert!(
+            err.contains("baseline status only supports human or json output"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn baseline_status_rejects_unknown_argument() {
+        let err = parse(args(["unsafe-review", "baseline", "status", "--bogus"]))
+            .err()
+            .unwrap_or_default();
+        assert!(
+            err.contains("unknown baseline status argument `--bogus`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn parses_baseline_refresh_requires_dry_run_flag() {
+        let err = parse(args([
+            "unsafe-review",
+            "baseline",
+            "refresh",
+            "--root",
+            ".",
+        ]))
+        .err()
+        .unwrap_or_default();
+        assert!(err.contains("baseline refresh requires --dry-run"), "{err}");
+        assert!(err.contains("no apply mode"), "{err}");
+    }
+
+    #[test]
+    fn parses_baseline_refresh_dry_run_with_root_and_out() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "baseline",
+            "refresh",
+            "--root",
+            "fixtures/example",
+            "--dry-run",
+            "--out",
+            "target/baseline-refresh",
+        ]))?;
+        let Command::Baseline(BaselineCommand::Refresh(options)) = command else {
+            return Err("expected baseline refresh command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("fixtures/example"));
+        assert!(options.dry_run);
+        assert_eq!(options.out, Some(PathBuf::from("target/baseline-refresh")));
+        Ok(())
+    }
+
+    #[test]
+    fn parses_baseline_refresh_dry_run_without_out() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "baseline", "refresh", "--dry-run"]))?;
+        let Command::Baseline(BaselineCommand::Refresh(options)) = command else {
+            return Err("expected baseline refresh command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert!(options.dry_run);
+        assert_eq!(options.out, None);
+        Ok(())
+    }
+
+    #[test]
+    fn baseline_refresh_rejects_unknown_argument() {
+        let err = parse(args([
+            "unsafe-review",
+            "baseline",
+            "refresh",
+            "--dry-run",
+            "--bogus",
+        ]))
+        .err()
+        .unwrap_or_default();
+        assert!(
+            err.contains("unknown baseline refresh argument `--bogus`"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn parses_baseline_help_still_covers_status_and_refresh_subcommands() -> Result<(), String> {
+        // `baseline` with no subcommand and `baseline help` remain the help path;
+        // status/refresh are only reached via their explicit subcommand name.
+        assert_eq!(
+            parse(args(["unsafe-review", "baseline"]))?,
+            Command::BaselineHelp
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "baseline", "help"]))?,
+            Command::BaselineHelp
+        );
+        Ok(())
     }
 }

@@ -1,7 +1,9 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::{CoverageBlock, ReviewClass};
 use crate::output::{NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE};
-use crate::policy::{LedgerEntry as PolicyLedgerRecord, LedgerKind, load_ledger_entries};
+use crate::policy::{
+    LedgerEntry as PolicyLedgerRecord, LedgerKind, is_expired, load_ledger_entries,
+};
 use crate::util::slug;
 use serde::Serialize;
 use std::collections::BTreeSet;
@@ -150,12 +152,7 @@ fn evaluate_with_date(output: &AnalyzeOutput, audit_date: &str) -> Result<Policy
         .collect::<Vec<_>>();
     let expired_suppressions = suppression_entries
         .into_iter()
-        .filter(|entry| {
-            entry
-                .expires
-                .as_deref()
-                .is_some_and(|expires| expires < audit_date)
-        })
+        .filter(|entry| is_expired(entry.expires.as_deref(), audit_date))
         .collect::<Vec<_>>();
     let cards = output
         .cards
@@ -523,7 +520,10 @@ fn markdown_cell(value: &str) -> String {
     value.replace('|', "\\|").replace('\n', " ")
 }
 
-fn current_utc_date() -> Result<String, String> {
+/// Today's UTC date as `YYYY-MM-DD`. Shared with `baseline_status`/`baseline_refresh_preview`
+/// (issue #1893) so both surfaces inject the identical "today" into their pure classifiers
+/// rather than each reading the clock separately.
+pub(crate) fn current_utc_date() -> Result<String, String> {
     let days = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?

@@ -902,6 +902,134 @@ pub fn baseline_add(
     Ok(())
 }
 
+/// `baseline status` (issue #1893): classify every baseline ledger entry, plus every
+/// currently open actionable card the ledger does not represent, into the ten SPEC-0030
+/// baseline-health buckets. Read-only — runs a full repo scan and reads policy files;
+/// writes nothing.
+///
+/// Degrades instead of failing outright when the baseline ledger itself fails the
+/// analyzer's strict per-entry validation (bad card_id shape, or missing
+/// owner/reason/evidence) — see [`baseline_status_with_date`]'s doc comment and
+/// [`crate::policy::baseline_health::BaselineHealthReport::card_scan_error`].
+pub fn baseline_status(root: &Path) -> Result<BaselineHealthReport, String> {
+    let today = policy_report::current_utc_date()?;
+    baseline_status_with_date(root, &today)
+}
+
+fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthReport, String> {
+    use crate::policy::{
+        LedgerKind, baseline_health, is_expired, load_baseline_entries_lenient,
+        load_coverage_snapshot, load_ledger_entries,
+    };
+
+    // Load the baseline ledger leniently FIRST (cheap, no repo scan) so its result is
+    // available before attempting the full-repo card scan below (issue #1893 review
+    // finding).
+    let ledger_path = root.join("policy/unsafe-review-baseline.toml");
+    let ledger_entries = load_baseline_entries_lenient(&ledger_path)?;
+
+    // `pipeline::analyze` loads `PolicyState` internally, which uses the *strict*
+    // ledger loader for the baseline file — the exact per-entry validation
+    // `identity_unmatched` exists to tolerate. A baseline ledger entry with a bad
+    // card_id shape or missing owner/reason/evidence (real TOML, just failing that
+    // strict per-entry check) would otherwise abort the repo scan entirely, defeating
+    // the corrupt-ledger-diagnosis purpose of this command before it could ever report
+    // `identity_unmatched` for the offending row. Since `load_baseline_entries_lenient`
+    // just proved the file itself parses (only the strict per-entry checks differ),
+    // treat that specific failure as "current-card data unavailable" and still produce
+    // a report — every other failure (a genuinely unparseable ledger, a broken
+    // suppression ledger, a source-scan error, and so on) still fails `baseline_status`
+    // outright, same as before.
+    let analyze_result = pipeline::analyze(AnalyzeInput {
+        root: root.to_path_buf(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    });
+    //
+    // The degrade branch keys off the strict loader mentioning the baseline ledger
+    // path — the loader formats every per-entry/parse failure with `path.display()`.
+    // This coupling is intentionally test-pinned, not implicit: the else arm re-raises
+    // (`Err(err) => return Err(err)`), so if the loader's error ever stopped naming the
+    // ledger path, this branch would stop firing, `baseline_status` would return `Err`
+    // for a merely-strict-invalid ledger, and the e2e regression
+    // `baseline_status_survives_a_strictly_invalid_baseline_ledger_entry` (which asserts
+    // the command still *succeeds* and surfaces `card_scan_error`) would fail. The drift
+    // therefore cannot land silently.
+    let (current_cards, card_scan_error) = match analyze_result {
+        Ok(output) => (output.cards, None),
+        Err(err) if err.contains(&ledger_path.display().to_string()) => (Vec::new(), Some(err)),
+        Err(err) => return Err(err),
+    };
+
+    // Only currently-active (non-expired) suppressions count as `suppression_overlap`
+    // (issue #1893 review finding): an expired suppression is already surfaced as its
+    // own ledger-health problem (`policy report`'s `expired_suppressions`), and folding
+    // it into `suppression_overlap` too would double-report the same stale entry under
+    // two different labels. Reuses the canonical expiry predicate — no second expiry
+    // model. Note this does not affect `new_unbaselined`: the core analyzer already
+    // classifies any card matching *any* suppression entry (active or expired) as
+    // `Suppressed`, which is not actionable, before `baseline_health` ever sees it.
+    let suppression_path = root.join("policy/unsafe-review-suppressions.toml");
+    let suppression_ids: BTreeSet<String> =
+        load_ledger_entries(&suppression_path, LedgerKind::Suppression)?
+            .into_iter()
+            .filter(|entry| !is_expired(entry.expires.as_deref(), today))
+            .map(|entry| entry.card_id)
+            .collect();
+
+    let snapshot_path = baseline_snapshot_path(&ledger_path);
+    let (snapshot, snapshot_load_error) = match load_coverage_snapshot(&snapshot_path) {
+        Ok(map) => (Some(map), None),
+        Err(err) => (None, Some(err)),
+    };
+
+    let input = baseline_health::BaselineHealthInput {
+        today,
+        current_cards: &current_cards,
+        ledger_entries: &ledger_entries,
+        suppression_ids: &suppression_ids,
+        snapshot: snapshot.as_ref(),
+        snapshot_load_error: snapshot_load_error.as_deref(),
+    };
+    let mut report = baseline_health::classify(&input);
+    report.card_scan_error = card_scan_error;
+    Ok(report)
+}
+
+/// `baseline refresh --dry-run` (issue #1893): build the deterministic per-entry action
+/// plan from the same classification as `baseline_status`. Writes nothing; there is no
+/// apply mode (SPEC-0030 non-goal — a future apply command would be separately
+/// approved, explicit, idempotent, and refuse to overwrite a changed ledger).
+pub fn baseline_refresh_preview(root: &Path) -> Result<BaselineRefreshPlan, String> {
+    let report = baseline_status(root)?;
+    Ok(crate::policy::baseline_health::build_refresh_plan(&report))
+}
+
+pub fn render_baseline_status_json(report: &BaselineHealthReport) -> String {
+    crate::output::baseline_health::render_status_json(report)
+}
+
+pub fn render_baseline_status_human(report: &BaselineHealthReport) -> String {
+    crate::output::baseline_health::render_status_human(report)
+}
+
+pub fn render_baseline_refresh_json(plan: &BaselineRefreshPlan) -> String {
+    crate::output::baseline_health::render_refresh_json(plan)
+}
+
+pub fn render_baseline_refresh_human(plan: &BaselineRefreshPlan) -> String {
+    crate::output::baseline_health::render_refresh_human(plan)
+}
+
+pub use crate::policy::baseline_health::{
+    BaselineHealthCounts, BaselineHealthEntry, BaselineHealthReport, BaselineRefreshPlan,
+    HealthBucket, RefreshAction, RefreshPlanEntry, RefreshPlanSummary,
+};
+
 /// Derive the coverage snapshot path from the baseline ledger path: the snapshot is written
 /// as a sibling `<ledger-stem>-snapshot.toml`. The default ledger
 /// `policy/unsafe-review-baseline.toml` keeps producing

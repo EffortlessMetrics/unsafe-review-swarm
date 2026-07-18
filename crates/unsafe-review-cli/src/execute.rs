@@ -1,9 +1,9 @@
 use crate::command::{
-    BaselineAddOptions, BaselineCommand, BaselineInitOptions, CandidateCommand,
-    CandidateImportOptions, CandidateLintOptions, CandidateListOptions, CandidateNewOptions,
-    CandidateWitnessPlanOptions, CheckOptions, Command, ContextQuery, DiffInput,
-    ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions, ReceiptTemplateOptions,
-    RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
+    BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
+    BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
+    CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
+    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions,
+    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
 };
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
@@ -23,17 +23,18 @@ use unsafe_review_core::{
     ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
     SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
     analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
-    audit_witness_receipts, baseline_add, baseline_init, collect_context_range,
-    compare_outcome_json, discover_repo_files, evaluate_policy_report,
+    audit_witness_receipts, baseline_add, baseline_init, baseline_refresh_preview, baseline_status,
+    collect_context_range, compare_outcome_json, discover_repo_files, evaluate_policy_report,
     evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
     manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    render_badge_jsons, render_comment_plan, render_gate_manifest, render_gate_manifest_repo,
-    render_github_summary, render_human, render_json, render_json_with_provenance, render_lsp,
-    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
-    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
-    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
-    validate_witness_receipts,
+    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
+    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
+    render_gate_manifest, render_gate_manifest_repo, render_github_summary, render_human,
+    render_json, render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan,
+    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
+    render_receipt_audit_markdown, render_repair_queue, render_sarif,
+    render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -2765,11 +2766,41 @@ fn run_baseline(command: BaselineCommand) -> Result<(), String> {
     match command {
         BaselineCommand::Init(options) => run_baseline_init(options),
         BaselineCommand::Add(options) => run_baseline_add(options),
+        BaselineCommand::Status(options) => run_baseline_status(options),
+        BaselineCommand::Refresh(options) => run_baseline_refresh(options),
         BaselineCommand::Help => {
             print_baseline_help();
             Ok(())
         }
     }
+}
+
+const BASELINE_REFRESH_PLAN_ARTIFACT: &str = "baseline-refresh-plan.json";
+
+/// `baseline status` (issue #1893): read-only baseline-ledger health report. Human and
+/// JSON output project from the same `BaselineHealthReport`, so they always report
+/// identical bucket counts and entry identities.
+fn run_baseline_status(options: BaselineStatusOptions) -> Result<(), String> {
+    let report = baseline_status(&options.root)?;
+    match options.format {
+        Format::Json => println!("{}", render_baseline_status_json(&report)),
+        _ => print!("{}", render_baseline_status_human(&report)),
+    }
+    Ok(())
+}
+
+/// `baseline refresh --dry-run` (issue #1893): deterministic per-entry refresh preview.
+/// Writes nothing to policy, source, or snapshot files; `--out`, if given, additionally
+/// writes the JSON plan to `<out>/baseline-refresh-plan.json`.
+fn run_baseline_refresh(options: BaselineRefreshOptions) -> Result<(), String> {
+    let plan = baseline_refresh_preview(&options.root)?;
+    print!("{}", render_baseline_refresh_human(&plan));
+    if let Some(out) = &options.out {
+        let path = out.join(BASELINE_REFRESH_PLAN_ARTIFACT);
+        write_artifact(&path, render_baseline_refresh_json(&plan))?;
+        println!("plan written: {}", repo_path_display(&path));
+    }
+    Ok(())
 }
 
 fn run_baseline_init(options: BaselineInitOptions) -> Result<(), String> {
@@ -3375,6 +3406,10 @@ fn print_baseline_help() {
     println!(
         "  unsafe-review baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
     );
+    println!("  unsafe-review baseline status [--root .] [--format human|json]");
+    println!(
+        "  unsafe-review baseline refresh --dry-run [--root .] [--out target/baseline-refresh]"
+    );
     println!();
     println!("What baseline does:");
     println!(
@@ -3382,6 +3417,12 @@ fn print_baseline_help() {
     );
     println!(
         "- `add` adds or updates a single ledger entry and its snapshot state without rescanning the entire ledger."
+    );
+    println!(
+        "- `status` is a read-only health report: it classifies every ledger entry (and every unbaselined open actionable card) into one of ten SPEC-0030 buckets — active_unchanged, active_improved, active_worsened, resolved, review_due, snapshot_missing_or_invalid, duplicate_or_conflicting_entry, suppression_overlap, identity_unmatched, new_unbaselined."
+    );
+    println!(
+        "- `refresh --dry-run` previews the per-entry action a maintainer could take (keep, update_snapshot, mark_resolved, advance_review_after, add_new_debt, conflict); it leaves repository policy, source, and snapshot state unchanged, writing a plan artifact only when --out is explicitly given, and there is no apply mode."
     );
     println!(
         "- The baseline ledger is `policy/unsafe-review-baseline.toml`; the snapshot is `policy/unsafe-review-baseline-snapshot.toml`."
@@ -3395,6 +3436,8 @@ fn print_baseline_help() {
     println!("  git commit -m 'baseline: record pre-existing debt floor'");
     println!("  # from now on:");
     println!("  unsafe-review check --policy no-new-debt");
+    println!("  # to check ledger health before refreshing it:");
+    println!("  unsafe-review baseline status");
     println!();
     println!("Trust boundary:");
     println!(
@@ -3402,6 +3445,9 @@ fn print_baseline_help() {
     );
     println!(
         "- Adding a card to the baseline does not prove memory safety, UB-free status, Miri-clean status, or that any unsafe site executed safely."
+    );
+    println!(
+        "- `status` and `refresh --dry-run` are read-only: they classify existing SPEC-0030 movement/ledger signals. `status` writes nothing. `refresh` never edits policy, source, or snapshot files, and writes a plan artifact only when --out is explicitly given."
     );
     println!(
         "- unsafe-review does not execute witnesses, post comments, edit source, run an agent, or enforce blocking policy by default."
@@ -3441,6 +3487,12 @@ fn print_help() {
     );
     println!(
         "  baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
+    );
+    println!(
+        "  baseline status [--root .] [--format human|json]  (read-only ledger health report)"
+    );
+    println!(
+        "  baseline refresh --dry-run [--root .] [--out target/baseline-refresh]  (read-only refresh preview; no apply mode)"
     );
     println!(
         "  confirm <card-id> --dry-run|--allow-heavy [--author <owner>] [--root .] [--base origin/main|--diff file] [--expires-at <date>] [--timeout-seconds 600] [--command <override>] [--out file]  (executes the routed witness command only with --allow-heavy; never default; --dry-run previews without executing)"

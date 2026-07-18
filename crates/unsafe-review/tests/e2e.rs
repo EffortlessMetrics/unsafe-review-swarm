@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -8118,6 +8119,742 @@ fn coverage_improved_baseline_shows_improved_gap_shape() -> Result<(), Box<dyn E
         "no-new-debt must pass: improved card does not count as a new gap"
     );
     assert_eq!(passing["summary"]["improved_gaps"], 1);
+
+    Ok(())
+}
+
+// issue #1893: `baseline status` is a read-only ledger health report. Human and JSON
+// output must report identical bucket counts and entry identities. `write_baseline`
+// records the real (still-open) card plus a synthetic card_id that never appears in
+// the current scan, and this fixture has no coverage snapshot file — so a single
+// `baseline status` run exercises both `resolved` and `snapshot_missing_or_invalid`.
+#[test]
+fn baseline_status_reports_identical_counts_in_human_and_json() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-status-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
+    write_baseline_far_future(&copied, &card_id)?;
+    assert!(
+        !copied
+            .join("policy/unsafe-review-baseline-snapshot.toml")
+            .is_file(),
+        "fixture must not ship a coverage snapshot for this test to exercise \
+         snapshot_missing_or_invalid"
+    );
+
+    let json_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let json_report = parse_json(&stdout_text(&json_output)?)?;
+    assert_eq!(json_report["counts"]["resolved"], 1, "{json_report}");
+    assert_eq!(
+        json_report["counts"]["snapshot_missing_or_invalid"], 1,
+        "{json_report}"
+    );
+    assert_eq!(json_report["counts"]["active_unchanged"], 0);
+    assert_eq!(json_report["counts"]["new_unbaselined"], 0);
+    assert!(
+        json_report["trust_boundary"]
+            .as_str()
+            .ok_or("trust_boundary should be a string")?
+            .contains("no-new-debt statement only"),
+        "{json_report}"
+    );
+
+    let human_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+    let human = stdout_text(&human_output)?;
+    assert!(human.contains("resolved: 1"), "{human}");
+    assert!(human.contains("snapshot_missing_or_invalid: 1"), "{human}");
+    assert!(human.contains(&card_id), "{human}");
+    assert!(
+        human.contains("UR-resolved-src-lib-rs-owner-operation-raw_pointer_read"),
+        "{human}"
+    );
+    assert!(human.contains("trust boundary:"), "{human}");
+    assert!(
+        !human.contains("memory-safe")
+            && !human.contains("UB-free status is")
+            && !human.contains("Miri-clean status is"),
+        "human status output must not assert a positive safety claim: {human}"
+    );
+
+    // Full human/JSON parity, not just the two headline buckets: every one of the ten
+    // bucket counts, the convenience `total`, and the exact set of entry identities
+    // rendered must agree between the two surfaces (issue #1893 acceptance criterion).
+    for bucket in [
+        "active_unchanged",
+        "active_improved",
+        "active_worsened",
+        "resolved",
+        "review_due",
+        "snapshot_missing_or_invalid",
+        "duplicate_or_conflicting_entry",
+        "suppression_overlap",
+        "identity_unmatched",
+        "new_unbaselined",
+    ] {
+        let human_count = human_bucket_count(&human, bucket)?;
+        let json_count = json_report["counts"][bucket].as_i64().ok_or_else(|| {
+            format!("json counts.{bucket} missing or not a number: {json_report}")
+        })?;
+        assert_eq!(
+            human_count, json_count,
+            "bucket `{bucket}` differs between human ({human_count}) and json ({json_count})"
+        );
+    }
+    let human_total = human_labelled_i64(&human, "total: ")?;
+    let json_total = json_report["total"]
+        .as_i64()
+        .ok_or_else(|| format!("json total missing or not a number: {json_report}"))?;
+    assert_eq!(
+        human_total, json_total,
+        "total differs between human ({human_total}) and json ({json_total})"
+    );
+
+    let json_ids: BTreeSet<String> = json_array(&json_report["entries"], "entries")?
+        .iter()
+        .map(|entry| json_str(&entry["card_id"], "entries[].card_id").map(str::to_string))
+        .collect::<Result<_, Box<dyn Error>>>()?;
+    let human_ids = human_all_entries_card_ids(&human)?;
+    assert_eq!(
+        human_ids, json_ids,
+        "the set of entry identities rendered in human output must equal the json report's"
+    );
+
+    Ok(())
+}
+
+/// Parse the `  {bucket}: {n}` line from `baseline status` human output.
+fn human_bucket_count(human: &str, bucket: &str) -> Result<i64, Box<dyn Error>> {
+    let prefix = format!("  {bucket}: ");
+    let line = human
+        .lines()
+        .find(|line| line.starts_with(&prefix))
+        .ok_or_else(|| format!("human output is missing a `{bucket}` bucket line: {human}"))?;
+    line.trim_start_matches(&prefix)
+        .trim()
+        .parse::<i64>()
+        .map_err(|err| format!("failed to parse `{bucket}` count from `{line}`: {err}").into())
+}
+
+/// Parse a `{label}{n}` line (e.g. `total: 2`) from human output.
+fn human_labelled_i64(human: &str, label: &str) -> Result<i64, Box<dyn Error>> {
+    let line = human
+        .lines()
+        .find(|line| line.starts_with(label))
+        .ok_or_else(|| format!("human output is missing a `{label}` line: {human}"))?;
+    line.trim_start_matches(label)
+        .trim()
+        .parse::<i64>()
+        .map_err(|err| format!("failed to parse `{label}` line `{line}`: {err}").into())
+}
+
+/// Parse the set of card_ids listed under the `All entries:` section of `baseline
+/// status` human output (one `  {card_id}  {bucket}  {detail}` line per entry).
+fn human_all_entries_card_ids(human: &str) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    const HEADER: &str = "All entries:\n";
+    let start = human
+        .find(HEADER)
+        .ok_or_else(|| format!("human output is missing an `All entries:` section: {human}"))?
+        + HEADER.len();
+    let rest = &human[start..];
+    let end = rest.find("\n\n").unwrap_or(rest.len());
+    Ok(rest[..end]
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            line.trim_start()
+                .split("  ")
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect())
+}
+
+// issue #1893: `baseline status` must report a currently open actionable card the
+// ledger does not represent as `new_unbaselined` when no ledger exists at all.
+#[test]
+fn baseline_status_reports_new_unbaselined_when_no_ledger_exists() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(report["counts"]["new_unbaselined"], 1, "{report}");
+    assert_eq!(report["counts"]["resolved"], 0);
+    assert_eq!(
+        report["entries"][0]["bucket"], "new_unbaselined",
+        "{report}"
+    );
+
+    Ok(())
+}
+
+// issue #1893: a duplicated card_id in the raw ledger file must be surfaced as
+// `duplicate_or_conflicting_entry`, not silently deduplicated.
+#[test]
+fn baseline_status_reports_duplicate_or_conflicting_entry() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-duplicate-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
+
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "first entry"
+evidence = "fixture"
+review_after = "2099-01-01"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "duplicate entry for the same identity"
+evidence = "fixture"
+review_after = "2099-01-01"
+"#
+        ),
+    )?;
+
+    let output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(
+        report["counts"]["duplicate_or_conflicting_entry"], 1,
+        "{report}"
+    );
+    // The identity is reported once, not once per raw duplicate row.
+    assert_eq!(
+        json_array(&report["entries"], "entries")?.len(),
+        1,
+        "{report}"
+    );
+
+    Ok(())
+}
+
+// issue #1893 review finding: a baseline ledger entry that fails the analyzer's own
+// *strict* per-entry validation (bad card_id shape, here) would otherwise abort the
+// whole repo-wide card scan inside `pipeline::analyze` (via `PolicyState::load`)
+// before `baseline status` ever got a chance to report `identity_unmatched` for the
+// offending row — defeating the corrupt-ledger-diagnosis feature for exactly the
+// class of problem it exists to catch. `baseline status` must instead still succeed,
+// flag the bad entry as `identity_unmatched`, and surface `card_scan_error` so readers
+// know the repo-wide card data (and therefore any `resolved` bucket) is degraded.
+#[test]
+fn baseline_status_survives_a_strictly_invalid_baseline_ledger_entry() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-strict-invalid-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    // Valid TOML, valid owner/reason/evidence/review_after — but `card_id` fails the
+    // exact counted UR-*-cN shape check, which the *strict* loader used by
+    // `PolicyState::load` (and therefore `pipeline::analyze`) rejects outright.
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "not-a-valid-counted-identity"
+owner = "core/policy"
+reason = "hand-edited, broke the shape"
+evidence = "fixture"
+review_after = "2099-01-01"
+"#,
+    )?;
+
+    // Confirm the premise: the strict loader used elsewhere (e.g. `policy report`)
+    // really does hard-fail on this file, so this test is not vacuous.
+    run_failure([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+
+    let output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(report["counts"]["identity_unmatched"], 1, "{report}");
+    assert_eq!(
+        report["entries"][0]["card_id"],
+        "not-a-valid-counted-identity"
+    );
+    assert_eq!(report["entries"][0]["bucket"], "identity_unmatched");
+    let card_scan_error = report["card_scan_error"]
+        .as_str()
+        .ok_or_else(|| format!("card_scan_error should be a non-null string: {report}"))?;
+    assert!(
+        card_scan_error.contains("unsafe-review-baseline.toml"),
+        "{card_scan_error}"
+    );
+
+    let human_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+    let human = stdout_text(&human_output)?;
+    assert!(
+        human.contains("the repo-wide card scan could not run"),
+        "{human}"
+    );
+    assert!(human.contains("identity_unmatched: 1"), "{human}");
+
+    Ok(())
+}
+
+// issue #1893 review round 3 (CodeRabbit): when the repo-wide card scan could not run
+// (`card_scan_error` is set), a `resolved` bucket means "unverifiable", not "confirmed
+// gone." `baseline refresh --dry-run` must therefore NOT preview `mark_resolved` for any
+// such entry — an unavailable scan must never present an unverifiable entry as a
+// confirmed deletion. The degraded run is forced exactly as the sibling test above: one
+// strictly-invalid ledger row aborts the strict card scan, so a second valid-shape entry
+// (whose card cannot be located while the scan is down) lands in `resolved` and must be
+// planned as `conflict`.
+#[test]
+fn baseline_refresh_never_marks_resolved_when_card_scan_is_unavailable()
+-> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-degraded-refresh-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    // First entry: fails the exact counted UR-*-cN shape, so the strict loader used by
+    // `pipeline::analyze` hard-fails the repo-wide scan (sets card_scan_error). Second
+    // entry: a valid-shape identity whose card cannot be located while the scan is down,
+    // so it is classified `resolved` in the degraded state.
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "not-a-valid-counted-identity"
+owner = "core/policy"
+reason = "hand-edited, broke the shape"
+evidence = "fixture"
+review_after = "2099-01-01"
+
+[[entries]]
+card_id = "UR-degraded-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "valid-shape entry, unverifiable while scan is down"
+evidence = "fixture"
+review_after = "2099-01-01"
+"#,
+    )?;
+
+    // Confirm the degraded state: `baseline status` still succeeds and surfaces
+    // card_scan_error, with the valid-shape entry landing in `resolved`.
+    let status = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let status = parse_json(&stdout_text(&status)?)?;
+    assert!(
+        status["card_scan_error"].is_string(),
+        "degraded run must set card_scan_error: {status}"
+    );
+    assert_eq!(
+        status["counts"]["resolved"], 1,
+        "valid-shape entry must land in resolved while the scan is down: {status}"
+    );
+
+    // The refresh plan for the same degraded state must never recommend mark_resolved.
+    let out_dir = temp.path().join("degraded-refresh-plan");
+    fs::create_dir_all(&out_dir)?;
+    run_success([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--dry-run"),
+        os("--out"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let plan = parse_json(&fs::read_to_string(
+        out_dir.join("baseline-refresh-plan.json"),
+    )?)?;
+    assert_eq!(
+        plan["summary"]["mark_resolved"], 0,
+        "a scan-unavailable run must never preview mark_resolved: {plan}"
+    );
+    let resolved_entry = plan["entries"]
+        .as_array()
+        .ok_or("plan entries should be an array")?
+        .iter()
+        .find(|entry| entry["bucket"] == "resolved")
+        .ok_or_else(|| format!("plan must contain the resolved-bucket entry: {plan}"))?;
+    assert_eq!(
+        resolved_entry["action"], "conflict",
+        "resolved entry under an unavailable scan must plan as conflict, not mark_resolved: {plan}"
+    );
+    assert_eq!(resolved_entry["auto_eligible"], false, "{plan}");
+
+    Ok(())
+}
+
+// issue #1893 review finding: `suppression_overlap` must only fire for a *currently
+// active* suppression entry, reusing the same expiry semantics as `policy report`'s
+// `expired_suppressions` (no second expiry model). An expired suppression entry for
+// the same card_id must NOT be reported as suppression_overlap — it is already
+// surfaced separately as ledger-health debt.
+#[test]
+fn baseline_status_suppression_overlap_ignores_expired_suppressions() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
+
+    // Case 1: an EXPIRED suppression entry must not produce suppression_overlap.
+    let expired_temp = TempDir::new("unsafe-review-baseline-suppression-expired-e2e")?;
+    let expired_root = expired_temp.path().join("fixture");
+    copy_dir_all(&fixture, &expired_root)?;
+    write_baseline_far_future(&expired_root, &card_id)?;
+    write_suppression(&expired_root, &card_id, "2000-01-01")?;
+
+    let expired_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        expired_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let expired_report = parse_json(&stdout_text(&expired_output)?)?;
+    assert_eq!(
+        expired_report["counts"]["suppression_overlap"], 0,
+        "an expired suppression must not count as suppression_overlap: {expired_report}"
+    );
+
+    // Case 2: an ACTIVE (far-future) suppression entry for the identical card_id must
+    // still produce suppression_overlap.
+    let active_temp = TempDir::new("unsafe-review-baseline-suppression-active-e2e")?;
+    let active_root = active_temp.path().join("fixture");
+    copy_dir_all(&fixture, &active_root)?;
+    write_baseline_far_future(&active_root, &card_id)?;
+    write_suppression(&active_root, &card_id, "2099-01-01")?;
+
+    let active_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        active_root.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let active_report = parse_json(&stdout_text(&active_output)?)?;
+    assert_eq!(
+        active_report["counts"]["suppression_overlap"], 1,
+        "an active suppression must still count as suppression_overlap: {active_report}"
+    );
+
+    Ok(())
+}
+
+// issue #1893 review finding: `write_baseline`'s hardcoded `review_after` (2026-08-01)
+// expires shortly after this fixture's authoring date and would flip these tests out of
+// their intended bucket once that date passes. Local helper with a stable far-future
+// date keeps `baseline status`/`baseline refresh` tests deterministic regardless of when
+// they run.
+fn write_baseline_far_future(root: &Path, card_id: &str) -> Result<(), Box<dyn Error>> {
+    let policy = root.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "e2e baseline-health baseline"
+evidence = "fixture card"
+review_after = "2099-01-01"
+
+[[entries]]
+card_id = "UR-resolved-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+owner = "core/policy"
+reason = "resolved e2e baseline"
+evidence = "resolved fixture card"
+review_after = "2099-01-01"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+fn write_suppression(root: &Path, card_id: &str, expires: &str) -> Result<(), Box<dyn Error>> {
+    let policy = root.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-suppressions.toml"),
+        format!(
+            r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "{card_id}"
+owner = "core/policy"
+reason = "e2e suppression"
+evidence = "fixture"
+expires = "{expires}"
+"#
+        ),
+    )?;
+    Ok(())
+}
+
+// issue #1893: `baseline refresh` requires `--dry-run` (there is no apply mode), writes
+// nothing under `--root` either way, and only writes the JSON plan file when `--out` is
+// given. The plan is deterministic for the same repo/ledger state.
+#[test]
+fn baseline_refresh_dry_run_is_required_and_writes_only_to_out() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-refresh-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    let advisory = run_success([
+        os("check"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--diff"),
+        copied.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let advisory = parse_json(&stdout_text(&advisory)?)?;
+    let card_id = json_str(&advisory["cards"][0]["id"], "cards[0].id")?.to_string();
+    write_baseline_far_future(&copied, &card_id)?;
+    let ledger_before = fs::read_to_string(copied.join("policy/unsafe-review-baseline.toml"))?;
+
+    // Missing --dry-run must refuse to run at all — never silently apply.
+    let missing_flag = run_failure([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+    let missing_flag_stderr = String::from_utf8(missing_flag.stderr)?;
+    assert!(
+        missing_flag_stderr.contains("requires --dry-run"),
+        "{missing_flag_stderr}"
+    );
+
+    // --dry-run with no --out: prints a plan, writes nothing anywhere.
+    let no_out = run_success([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--dry-run"),
+    ])?;
+    let no_out_stdout = stdout_text(&no_out)?;
+    assert!(
+        no_out_stdout.contains("leaves repository policy, source, and snapshot state unchanged"),
+        "{no_out_stdout}"
+    );
+    assert!(no_out_stdout.contains("mark_resolved"), "{no_out_stdout}");
+    assert_eq!(
+        fs::read_to_string(copied.join("policy/unsafe-review-baseline.toml"))?,
+        ledger_before,
+        "baseline refresh --dry-run must not modify the ledger"
+    );
+
+    // --dry-run --out writes the deterministic JSON plan to --out, still nothing under --root.
+    let out_dir = temp.path().join("refresh-plan-a");
+    fs::create_dir_all(&out_dir)?;
+    run_success([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--dry-run"),
+        os("--out"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let plan_path = out_dir.join("baseline-refresh-plan.json");
+    assert!(plan_path.is_file(), "plan JSON must be written to --out");
+    let plan_a = fs::read_to_string(&plan_path)?;
+    assert_eq!(
+        fs::read_to_string(copied.join("policy/unsafe-review-baseline.toml"))?,
+        ledger_before,
+        "baseline refresh --dry-run --out must still not modify the scanned --root"
+    );
+    assert!(
+        !copied
+            .join("policy/unsafe-review-baseline-snapshot.toml")
+            .is_file(),
+        "baseline refresh --dry-run must not create a snapshot file"
+    );
+
+    // Determinism: the same repo/ledger state produces the same plan JSON byte-for-byte.
+    let out_dir_b = temp.path().join("refresh-plan-b");
+    fs::create_dir_all(&out_dir_b)?;
+    run_success([
+        os("baseline"),
+        os("refresh"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--dry-run"),
+        os("--out"),
+        out_dir_b.as_os_str().to_os_string(),
+    ])?;
+    let plan_b = fs::read_to_string(out_dir_b.join("baseline-refresh-plan.json"))?;
+    assert_eq!(plan_a, plan_b, "refresh plan must be deterministic");
+
+    let plan_json = parse_json(&plan_a)?;
+    assert_eq!(plan_json["summary"]["mark_resolved"], 1, "{plan_json}");
+    assert_eq!(plan_json["summary"]["conflict"], 1, "{plan_json}");
+
+    Ok(())
+}
+
+// issue #1893 §Integration: `pr` (not `first-pr`) surfaces a bounded one-line warning
+// naming the exact `baseline status` command when the ledger needs attention, and
+// `init` onboarding (the `pr`/`first-pr` "Brownfield baseline" handoff) points to
+// `baseline status` before suggesting `baseline init` again when a ledger already
+// exists. The `raw_pointer_deref_brownfield_inherited` fixture ships a baseline entry
+// with no coverage snapshot, so its ledger is unhealthy (snapshot_missing_or_invalid).
+#[test]
+fn pr_warns_about_unhealthy_baseline_but_first_pr_does_not() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_deref_brownfield_inherited");
+    let out_dir = TempDir::new("unsafe-review-pr-baseline-warning-e2e")?;
+
+    let pr_output = run_success([
+        os("pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let pr_stdout = stdout_text(&pr_output)?;
+    assert!(
+        pr_stdout.contains("a baseline ledger already exists; check its health"),
+        "{pr_stdout}"
+    );
+    assert!(
+        pr_stdout.contains(&format!(
+            "unsafe-review baseline status --root {}",
+            fixture.display()
+        )),
+        "{pr_stdout}"
+    );
+    assert!(
+        pr_stdout.contains("warning: baseline ledger needs attention"),
+        "{pr_stdout}"
+    );
+
+    let first_pr_out_dir = TempDir::new("unsafe-review-first-pr-baseline-warning-e2e")?;
+    let first_pr_output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        first_pr_out_dir.path().as_os_str().to_os_string(),
+    ])?;
+    let first_pr_stdout = stdout_text(&first_pr_output)?;
+    assert!(
+        !first_pr_stdout.contains("warning: baseline ledger needs attention"),
+        "the bounded warning is `pr`-only (issue #1893 §Integration): {first_pr_stdout}"
+    );
+    // The ledger-exists pointer to `baseline status` is shown for both entrypoints —
+    // only the bounded warning line is `pr`-specific.
+    assert!(
+        first_pr_stdout.contains("a baseline ledger already exists; check its health"),
+        "{first_pr_stdout}"
+    );
 
     Ok(())
 }

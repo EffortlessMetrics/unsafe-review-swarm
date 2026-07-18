@@ -1,5 +1,6 @@
 pub(crate) mod agent;
 pub(crate) mod badges;
+pub(crate) mod baseline_health;
 pub(crate) mod comment_plan;
 pub(crate) mod confirmation;
 pub(crate) mod gate_manifest;
