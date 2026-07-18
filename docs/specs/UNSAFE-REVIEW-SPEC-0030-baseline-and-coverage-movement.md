@@ -155,8 +155,48 @@ human-readable explanation for the `policy_status` classification.
 
 When a baseline-known card no longer appears (the unsafe site was removed or
 repaired), the entry is reported as `resolved` in the policy report so baselines
-can be pruned. Expired `review_after` dates are surfaced, not auto-removed. The
-existing suppression expiry behavior (UNSAFE-REVIEW-SPEC-0010) is unchanged.
+can be pruned. Expired baseline `review_after` dates are surfaced by
+`unsafe-review baseline status` as the `review_due` bucket (see below), not
+auto-removed. The existing suppression expiry behavior (UNSAFE-REVIEW-SPEC-0010)
+is unchanged.
+
+### Baseline health and refresh preview (issue #1893)
+
+`unsafe-review baseline status [--root .] [--format human|json]` is a read-only
+ledger-health report. It classifies every baseline ledger entry, plus every
+currently open actionable card the ledger does not represent, into one of ten
+buckets, reusing the movement/identity signals defined above (no second movement
+model, no change to exact card-id matching):
+
+```text
+active_unchanged                baseline-known, still open, coverage unchanged
+active_improved                 baseline-known, still open, coverage improved
+active_worsened                 baseline-known, still open, coverage regressed
+resolved                        ledger entry's card no longer appears
+review_due                      ledger entry's review_after has passed
+snapshot_missing_or_invalid     no usable coverage-snapshot floor for this card
+duplicate_or_conflicting_entry  card_id appears more than once in the ledger
+suppression_overlap             card_id is both baseline-known and suppressed
+identity_unmatched              card_id fails the exact UR-*-cN identity shape
+new_unbaselined                 open actionable card the ledger does not represent
+```
+
+Human and JSON output project from the same report, so both always report
+identical bucket counts and entry identities. `unsafe-review baseline refresh
+--dry-run [--root .] [--out dir]` builds a deterministic per-entry action plan
+from the same classification — `keep`, `update_snapshot`, `mark_resolved`,
+`advance_review_after`, `add_new_debt`, or `conflict` — and writes nothing to
+policy, source, or snapshot files; `--dry-run` is required and there is no apply
+mode (see Non-goals). `advance_review_after` and `add_new_debt` are always
+flagged as requiring a separate, explicit decision, never auto-applied; no
+resolved entry is silently removed by this preview.
+
+`unsafe-review pr` (not `first-pr`) surfaces a bounded one-line warning naming
+the exact `baseline status` command when the ledger has any entry outside the
+`active_unchanged`/`resolved` buckets. The `pr`/`first-pr` brownfield-baseline
+handoff points to `baseline status` before suggesting `baseline init` again when
+a ledger already exists. Neither surface invents a second movement model, changes
+`policy_status`, or touches badges, the gate manifest, or agent/LSP surfaces.
 
 ## Adoption flow
 
@@ -182,7 +222,14 @@ This spec does not:
 - change the exact counted card-id (`UR-...-cN`) matching contract,
 - introduce per-line suppression comments in source (that remains out of scope),
 - post comments, run witnesses, edit source, or make any proof, site-execution,
-  calibrated precision/recall, or policy-readiness claim.
+  calibrated precision/recall, or policy-readiness claim,
+- implement a `baseline refresh` apply mode (issue #1893) — `--dry-run` is
+  required and there is no way to write the previewed plan back to policy files
+  in this spec; a future apply command would be separately approved, explicit,
+  idempotent, and refuse to overwrite a changed ledger,
+- add a fuzzy or structural identity matcher — `identity_unmatched` in
+  `baseline status` reports when the exact-identity contract fails to match,
+  it does not introduce a fallback matcher.
 
 ## Trust boundary
 
@@ -190,11 +237,20 @@ A no-new-debt pass means only that the change under review did not add open
 actionable unsafe-review gaps above the recorded baseline. It is not a statement
 that the changed code is memory-safe, UB-free, Miri-clean, or that any unsafe
 site executed safely. Baseline entries are debt records, not safety records.
+`baseline status` and `baseline refresh --dry-run` carry the same boundary: they
+classify existing ledger/movement signals and write nothing.
 
 ## Proof obligations
 
 - `cargo test -p unsafe-review-core policy` — baseline/suppression exact match,
-  new-debt set arithmetic, resolved/expired reporting.
+  new-debt set arithmetic, resolved/expired reporting, and the ten `baseline
+  status`/`baseline refresh` health buckets (issue #1893).
+- `cargo test -p unsafe-review-cli baseline` — `baseline init` / `baseline add`
+  / `baseline status` / `baseline refresh` argument parsing, including the
+  required `--dry-run` refusal.
+- `cargo test -p unsafe-review --test e2e baseline` — `baseline status` human/JSON
+  parity, `baseline refresh --dry-run` writes-nothing and determinism, and the
+  bounded `pr`-only health warning.
 - `cargo test -p unsafe-review-cli` — `baseline init` / `baseline add` parsing
   and ledger round-trip; `--policy no-new-debt` exit codes for the
   pre-existing-debt-only, new-debt, and empty-baseline cases.

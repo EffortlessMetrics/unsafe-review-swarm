@@ -1,7 +1,14 @@
 use crate::domain::CardId;
+use crate::domain::coverage::CoverageBlock;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
 use std::path::Path;
+
+/// Baseline health classification (issue #1893): `baseline status` / `baseline refresh`.
+/// Pure, deterministic classification built on the same signals as this module
+/// (`SnapshotCoverage::is_worsened_by`/`is_improved_by`, exact counted-card-id matching,
+/// `review_after` comparison) — no second movement model.
+pub(crate) mod baseline_health;
 
 /// Per-card coverage state recorded in the baseline snapshot (SPEC-0030).
 ///
@@ -71,6 +78,20 @@ impl SnapshotCoverage {
             || Self::ordinal(&current.witness_receipt_coverage)
                 > Self::ordinal(&self.witness_receipt_coverage);
         any_higher && !self.is_worsened_by(current)
+    }
+}
+
+impl From<&CoverageBlock> for SnapshotCoverage {
+    /// Project a card's current `CoverageBlock` into the same shape stored in the
+    /// baseline snapshot, so it can be compared with `is_worsened_by`/`is_improved_by`
+    /// (used by `baseline_health` classification, issue #1893).
+    fn from(block: &CoverageBlock) -> Self {
+        Self {
+            contract_coverage: block.contract_coverage.as_str().to_string(),
+            guard_coverage: block.guard_coverage.as_str().to_string(),
+            test_reach_coverage: block.test_reach_coverage.as_str().to_string(),
+            witness_receipt_coverage: block.witness_receipt_coverage.as_str().to_string(),
+        }
     }
 }
 
@@ -230,6 +251,77 @@ pub(crate) fn load_ledger_entries(
         });
     }
 
+    Ok(records)
+}
+
+/// A baseline ledger entry read leniently for `baseline status`/`baseline refresh`
+/// diagnostics (issue #1893).
+///
+/// Unlike [`load_ledger_entries`], this does not error on missing `owner`/`reason`/
+/// `evidence`/`review_after`, and does not error when `card_id` fails the exact
+/// counted-identity shape check (`looks_like_counted_card_id`) — those conditions are
+/// reported as baseline-health buckets instead of failing the whole command. It still
+/// errors on TOML syntax errors, on `[[entries]]` blocks that are not tables, and on
+/// entries that omit `card_id` entirely: those are structural failures the health
+/// surface cannot meaningfully diagnose per entry.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct RawLedgerEntry {
+    pub(crate) card_id: String,
+    pub(crate) owner: Option<String>,
+    pub(crate) reason: Option<String>,
+    pub(crate) evidence: Option<String>,
+    pub(crate) review_after: Option<String>,
+    /// Whether `card_id` satisfies the exact counted `UR-*-cN` identity contract
+    /// (SPEC-0030). `false` means this entry can never match under the current
+    /// exact-identity matching rule; surfaced as `identity_unmatched` — this is a
+    /// structural format check, not fuzzy or structural identity *matching*.
+    pub(crate) valid_identity: bool,
+}
+
+pub(crate) fn load_baseline_entries_lenient(path: &Path) -> Result<Vec<RawLedgerEntry>, String> {
+    if !path.is_file() {
+        return Ok(Vec::new());
+    }
+    let text =
+        fs::read_to_string(path).map_err(|err| format!("read {} failed: {err}", path.display()))?;
+    let value = text
+        .parse::<toml::Table>()
+        .map(toml::Value::Table)
+        .map_err(|err| format!("{} is not valid TOML: {err}", path.display()))?;
+    let status = value
+        .get("status")
+        .and_then(toml::Value::as_str)
+        .unwrap_or("active");
+    let entries = value
+        .get("entries")
+        .and_then(toml::Value::as_array)
+        .map_or(&[][..], Vec::as_slice);
+
+    if status == "empty" {
+        if entries.is_empty() {
+            return Ok(Vec::new());
+        }
+        return Err(format!(
+            "{} status is empty but has entries",
+            path.display()
+        ));
+    }
+
+    let mut records = Vec::new();
+    for (idx, entry) in entries.iter().enumerate() {
+        let Some(entry) = entry.as_table() else {
+            return Err(format!("{} entries[{idx}] must be a table", path.display()));
+        };
+        let card_id = required_string(entry, "card_id", path, idx)?.to_string();
+        records.push(RawLedgerEntry {
+            valid_identity: looks_like_counted_card_id(&card_id),
+            card_id,
+            owner: optional_string(entry, "owner"),
+            reason: optional_string(entry, "reason"),
+            evidence: optional_string(entry, "evidence"),
+            review_after: optional_string(entry, "review_after"),
+        });
+    }
     Ok(records)
 }
 

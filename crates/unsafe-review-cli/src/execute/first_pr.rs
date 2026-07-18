@@ -7,8 +7,8 @@ use std::process::Command as ProcessCommand;
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
-    AnalyzeOutput, ManualCandidate, ReviewCard, Scope, manual_candidate_implementer_handoff,
-    project_review_card_confirmation, render_repair_queue,
+    AnalyzeOutput, ManualCandidate, ReviewCard, Scope, baseline_status,
+    manual_candidate_implementer_handoff, project_review_card_confirmation, render_repair_queue,
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
@@ -110,7 +110,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     );
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
-    print_baseline_onboarding_handoff(report.root);
+    print_baseline_onboarding_handoff(report.terminal_command, report.root);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
@@ -128,8 +128,18 @@ fn print_policy_report_handoff(out_dir: &Path) {
     println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
 }
 
-fn print_baseline_onboarding_handoff(root: &Path) {
+fn print_baseline_onboarding_handoff(terminal_command: &str, root: &Path) {
     println!("Brownfield baseline (optional):");
+    if root
+        .join("policy")
+        .join("unsafe-review-baseline.toml")
+        .is_file()
+    {
+        // Issue #1893 §Integration: point to `baseline status` before suggesting
+        // `baseline init` again when a ledger already exists.
+        println!("  a baseline ledger already exists; check its health before re-running init:");
+        println!("  {}", baseline_status_command(root));
+    }
     println!("  run only from a clean base/default branch before feature changes");
     println!("  do not run it from the PR branch being reviewed");
     println!("  {}", baseline_init_command(root));
@@ -137,6 +147,36 @@ fn print_baseline_onboarding_handoff(root: &Path) {
         "  records current open actionable gaps as pre-existing debt; review generated policy files before committing"
     );
     println!("  not a safety record, not UB-free status, and not a witness result");
+    // Issue #1893 §Integration: `pr` (not `first-pr`) surfaces a bounded one-line
+    // warning naming the exact `baseline status` command when the ledger needs
+    // attention. Bounded to `pr` and gated on the ledger existing so the common
+    // (no baseline yet) case never pays for the extra full-repo classification scan.
+    if terminal_command == "pr" {
+        print_baseline_health_warning(root);
+    }
+}
+
+/// Bounded, advisory-only `pr` warning (issue #1893 §Integration). Reuses
+/// `baseline_status` verbatim — no second movement model. Any classification error
+/// (e.g. a malformed suppression ledger) is swallowed: this is a one-line hint, not a
+/// gate, and must never fail the primary `pr` command.
+fn print_baseline_health_warning(root: &Path) {
+    if !root
+        .join("policy")
+        .join("unsafe-review-baseline.toml")
+        .is_file()
+    {
+        return;
+    }
+    let Ok(report) = baseline_status(root) else {
+        return;
+    };
+    if !report.counts.is_fully_healthy() {
+        println!(
+            "  warning: baseline ledger needs attention — run `{}`",
+            baseline_status_command(root)
+        );
+    }
 }
 
 fn print_manual_candidate_handoff(
@@ -290,6 +330,13 @@ fn shell_arg(value: &str) -> String {
 fn baseline_init_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline init --root {}",
+        shell_arg(&root.display().to_string())
+    )
+}
+
+fn baseline_status_command(root: &Path) -> String {
+    format!(
+        "unsafe-review baseline status --root {}",
         shell_arg(&root.display().to_string())
     )
 }

@@ -273,11 +273,52 @@ pub(crate) struct BaselineAddOptions {
     pub out: Option<PathBuf>,
 }
 
+/// Options for `baseline status` (SPEC-0030 baseline health surface, issue #1893).
+/// Read-only: runs a full repo scan and reads policy files, writes nothing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BaselineStatusOptions {
+    pub root: PathBuf,
+    /// `Format::Human` or `Format::Json` only.
+    pub format: Format,
+}
+
+impl Default for BaselineStatusOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            format: Format::Human,
+        }
+    }
+}
+
+/// Options for `baseline refresh --dry-run` (issue #1893). `--dry-run` is required —
+/// there is no apply mode. `--out`, if given, additionally writes the deterministic
+/// JSON plan to `<out>/baseline-refresh-plan.json`; the scanned `--root` is never
+/// written to.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct BaselineRefreshOptions {
+    pub root: PathBuf,
+    pub dry_run: bool,
+    pub out: Option<PathBuf>,
+}
+
+impl Default for BaselineRefreshOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            dry_run: false,
+            out: None,
+        }
+    }
+}
+
 /// Subcommand variants for `baseline`.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum BaselineCommand {
     Init(BaselineInitOptions),
     Add(BaselineAddOptions),
+    Status(BaselineStatusOptions),
+    Refresh(BaselineRefreshOptions),
     Help,
 }
 

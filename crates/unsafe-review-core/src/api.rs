@@ -902,6 +902,88 @@ pub fn baseline_add(
     Ok(())
 }
 
+/// `baseline status` (issue #1893): classify every baseline ledger entry, plus every
+/// currently open actionable card the ledger does not represent, into the ten SPEC-0030
+/// baseline-health buckets. Read-only — runs a full repo scan and reads policy files;
+/// writes nothing.
+pub fn baseline_status(root: &Path) -> Result<BaselineHealthReport, String> {
+    let today = policy_report::current_utc_date()?;
+    baseline_status_with_date(root, &today)
+}
+
+fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthReport, String> {
+    use crate::policy::{
+        LedgerKind, baseline_health, load_baseline_entries_lenient, load_coverage_snapshot,
+        load_ledger_entries,
+    };
+
+    let output = pipeline::analyze(AnalyzeInput {
+        root: root.to_path_buf(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+
+    let ledger_path = root.join("policy/unsafe-review-baseline.toml");
+    let ledger_entries = load_baseline_entries_lenient(&ledger_path)?;
+
+    let suppression_path = root.join("policy/unsafe-review-suppressions.toml");
+    let suppression_ids: BTreeSet<String> =
+        load_ledger_entries(&suppression_path, LedgerKind::Suppression)?
+            .into_iter()
+            .map(|entry| entry.card_id)
+            .collect();
+
+    let snapshot_path = baseline_snapshot_path(&ledger_path);
+    let (snapshot, snapshot_load_error) = match load_coverage_snapshot(&snapshot_path) {
+        Ok(map) => (Some(map), None),
+        Err(err) => (None, Some(err)),
+    };
+
+    let input = baseline_health::BaselineHealthInput {
+        today,
+        current_cards: &output.cards,
+        ledger_entries: &ledger_entries,
+        suppression_ids: &suppression_ids,
+        snapshot: snapshot.as_ref(),
+        snapshot_load_error: snapshot_load_error.as_deref(),
+    };
+    Ok(baseline_health::classify(&input))
+}
+
+/// `baseline refresh --dry-run` (issue #1893): build the deterministic per-entry action
+/// plan from the same classification as `baseline_status`. Writes nothing; there is no
+/// apply mode (SPEC-0030 non-goal — a future apply command would be separately
+/// approved, explicit, idempotent, and refuse to overwrite a changed ledger).
+pub fn baseline_refresh_preview(root: &Path) -> Result<BaselineRefreshPlan, String> {
+    let report = baseline_status(root)?;
+    Ok(crate::policy::baseline_health::build_refresh_plan(&report))
+}
+
+pub fn render_baseline_status_json(report: &BaselineHealthReport) -> String {
+    crate::output::baseline_health::render_status_json(report)
+}
+
+pub fn render_baseline_status_human(report: &BaselineHealthReport) -> String {
+    crate::output::baseline_health::render_status_human(report)
+}
+
+pub fn render_baseline_refresh_json(plan: &BaselineRefreshPlan) -> String {
+    crate::output::baseline_health::render_refresh_json(plan)
+}
+
+pub fn render_baseline_refresh_human(plan: &BaselineRefreshPlan) -> String {
+    crate::output::baseline_health::render_refresh_human(plan)
+}
+
+pub use crate::policy::baseline_health::{
+    BaselineHealthCounts, BaselineHealthEntry, BaselineHealthReport, BaselineRefreshPlan,
+    HealthBucket, RefreshAction, RefreshPlanEntry, RefreshPlanSummary,
+};
+
 /// Derive the coverage snapshot path from the baseline ledger path: the snapshot is written
 /// as a sibling `<ledger-stem>-snapshot.toml`. The default ledger
 /// `policy/unsafe-review-baseline.toml` keeps producing

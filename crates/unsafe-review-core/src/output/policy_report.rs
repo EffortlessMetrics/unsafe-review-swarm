@@ -523,7 +523,10 @@ fn markdown_cell(value: &str) -> String {
     value.replace('|', "\\|").replace('\n', " ")
 }
 
-fn current_utc_date() -> Result<String, String> {
+/// Today's UTC date as `YYYY-MM-DD`. Shared with `baseline_status`/`baseline_refresh_preview`
+/// (issue #1893) so both surfaces inject the identical "today" into their pure classifiers
+/// rather than each reading the clock separately.
+pub(crate) fn current_utc_date() -> Result<String, String> {
     let days = SystemTime::now()
         .duration_since(UNIX_EPOCH)
         .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
