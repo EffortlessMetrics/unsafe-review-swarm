@@ -483,7 +483,13 @@ async fn refresh_via_execute_command_collecting_messages(
     socket: ClientSocket,
     count: usize,
 ) -> Result<(ClientSocket, Vec<Request>), Box<dyn Error>> {
-    let drain_handle = tokio::spawn(async move {
+    // Bound both awaits: if a regression emits fewer notifications than `count`,
+    // the drain's `socket.next()` would otherwise block forever; if it emits
+    // more, the capacity-1 channel could wedge `execute_command`. On any
+    // timeout or refresh failure, abort the drain task before returning so a
+    // hung test fails fast instead of hanging CI.
+    let timeout = std::time::Duration::from_secs(30);
+    let mut drain_handle = tokio::spawn(async move {
         let mut socket = socket;
         let mut collected = Vec::new();
         while collected.len() < count {
@@ -494,18 +500,35 @@ async fn refresh_via_execute_command_collecting_messages(
         }
         (socket, collected)
     });
-    let refresh_result = backend
-        .execute_command(ExecuteCommandParams {
+    let refresh_result = match tokio::time::timeout(
+        timeout,
+        backend.execute_command(ExecuteCommandParams {
             command: CMD_REFRESH.to_string(),
             arguments: Vec::new(),
             work_done_progress_params: Default::default(),
-        })
-        .await;
-    refresh_result.map_err(|err| format!("execute_command(refresh) failed: {err:?}"))?;
-    let outcome = drain_handle
-        .await
-        .map_err(|err| format!("drain task panicked or was cancelled: {err}"))?;
-    Ok(outcome)
+        }),
+    )
+    .await
+    {
+        Ok(result) => result,
+        Err(_) => {
+            drain_handle.abort();
+            return Err("execute_command(refresh) timed out".into());
+        }
+    };
+    if let Err(err) = refresh_result {
+        drain_handle.abort();
+        return Err(format!("execute_command(refresh) failed: {err:?}").into());
+    }
+    match tokio::time::timeout(timeout, &mut drain_handle).await {
+        Ok(joined) => {
+            Ok(joined.map_err(|err| format!("drain task panicked or was cancelled: {err}"))?)
+        }
+        Err(_) => {
+            drain_handle.abort();
+            Err("draining server-to-client notifications timed out".into())
+        }
+    }
 }
 
 /// Drives a real `initialize` request/response through `service` (rather than

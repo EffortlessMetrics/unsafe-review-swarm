@@ -10,10 +10,11 @@ static NEXT_GENERATION: AtomicU64 = AtomicU64::new(0);
 ///
 /// These are freshness signals only: they describe the relationship between an
 /// output and the source it was computed from (current, in-flight, stale,
-/// partial, capped, or failed). No variant is a safety, correctness, or
-/// currentness claim — `Current` does not mean the file is safe, and none of
-/// `Refreshing`/`Stale`/`Partial`/`Capped`/`Failed` mean it is unsafe. Consumers
-/// must not read any state as proof, UB-free status, or Miri-clean status.
+/// partial, capped, or failed). No variant is a safety or correctness claim
+/// beyond this freshness relationship — `Current` does not mean the file is
+/// safe, and none of `Refreshing`/`Stale`/`Partial`/`Capped`/`Failed` mean it is
+/// unsafe. Consumers must not read any state as proof, UB-free status, or
+/// Miri-clean status.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "lowercase")]
 pub enum AnalysisState {
