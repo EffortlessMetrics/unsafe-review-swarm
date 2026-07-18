@@ -150,6 +150,43 @@ mod tests {
     }
 
     #[test]
+    fn non_utf8_diff_file_is_rejected_fail_closed() -> Result<(), String> {
+        // A diff file that is not valid UTF-8 must fail closed at read time
+        // (`fs::read_to_string` rejects it) rather than being silently treated
+        // as an empty / zero-change diff. Hostile-input regression coverage for
+        // the `File` diff source (issue #1883): the only prior non-UTF-8 test
+        // targeted a source file during repo scan, not the diff input itself.
+        let path = unique_temp_path("unsafe-review-non-utf8-diff-test")?;
+        fs::write(&path, [0xffu8, 0xfe, 0x00, 0xfd])
+            .map_err(|err| format!("write temp diff failed: {err}"))?;
+        let source = DiffSource::File(path.clone());
+        let err = match load_diff_index(&source) {
+            Err(e) => e,
+            Ok(_) => {
+                let _ = fs::remove_file(&path);
+                return Err(
+                    "expected a non-UTF-8 diff file to be rejected, but it was accepted".into(),
+                );
+            }
+        };
+        let path_str = path.display().to_string();
+        assert!(
+            err.contains(&path_str),
+            "error should include the diff path: {err}"
+        );
+        assert!(
+            err.contains("read diff"),
+            "error should name the diff read step: {err}"
+        );
+        assert!(
+            err.contains("failed"),
+            "error should state the read failed: {err}"
+        );
+        let _ = fs::remove_file(&path);
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
