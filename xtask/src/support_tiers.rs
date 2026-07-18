@@ -7,7 +7,13 @@ use crate::{markdown_table_columns, read_to_string, workspace_path};
 
 pub(crate) const SUPPORT_TIERS_DOC: &str = "docs/status/SUPPORT_TIERS.md";
 pub(crate) const SUPPORT_SUMMARY_DOC: &str = "docs/status/SUPPORT_SUMMARY.md";
-const KNOWN_SUPPORT_TIERS: &[&str] = &["scaffold", "experimental", "planned", "deferred"];
+const KNOWN_SUPPORT_TIERS: &[&str] = &[
+    "scaffold",
+    "experimental",
+    "planned",
+    "deferred",
+    "advisory",
+];
 const SUPPORT_PROOF_TERMS: &[&str] = &[
     "test",
     "tests",
@@ -136,7 +142,11 @@ fn support_tier_row_from_line<'a>(
     path: &str,
     line_no: usize,
 ) -> Result<Option<SupportTierRow<'a>>, String> {
-    if !line.starts_with('|') || line.contains("---") || line.contains("Capability") {
+    if !line.starts_with('|')
+        || line.contains("---")
+        || line.contains("Capability")
+        || is_cargo_allow_support_tier_header(line)
+    {
         return Ok(None);
     }
     let columns = markdown_table_columns(line);
@@ -160,6 +170,10 @@ fn support_tier_row_from_line<'a>(
         tier: columns[1],
         proof: columns[3],
     }))
+}
+
+fn is_cargo_allow_support_tier_header(line: &str) -> bool {
+    markdown_table_columns(line) == ["Surface", "Tier", "Claim", "Proof command", "Notes"]
 }
 
 fn reject_placeholder_cell(

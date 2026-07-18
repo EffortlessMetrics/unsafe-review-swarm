@@ -9,7 +9,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Read first
 
 - `AGENTS.md` — the agent operating contract. It governs command style (prefix local commands with `rtk`), repository roles, worktree/branch hygiene, model routing (cheap discovery/verification, mid-tier implementation, top-tier arbitration — project subagent roles in `.claude/agents/`), PR queue discipline, and product boundaries. This file summarizes; AGENTS.md wins on conflict.
-- Source-of-truth stack for choosing and scoping work: `.rails/goals/active.toml` → linked plan item → linked spec in `docs/specs/`. Make one PR-sized change and run the proof commands the plan item lists.
+- Source-of-truth stack for durable contracts: `.allow` project charter and cargo-allow graph → linked plan/spec in `docs/specs/`. GitHub issues and project metadata own the work portfolio; `.rails` is a parity-window archive, not current authority. Make one PR-sized change and run the proof commands in its accepted contract.
 
 ## Repository roles
 
@@ -48,7 +48,7 @@ cargo run --locked -p unsafe-review -- first-pr \
   --diff fixtures/raw_pointer_alignment/change.diff
 ```
 
-`cargo run -p xtask -- help` lists all gates. Beyond the `check-pr` bundle, notable ones: `source-divergence` / `check-source-sync` (swarm↔source drift), `check-advisory-artifacts <dir>` / `check-first-pr-artifacts <dir>` (validate generated output bundles), `check-spec-status`, `check-goals`, `dogfood-usefulness`.
+`cargo run -p xtask -- help` lists all gates. Beyond the `check-pr` bundle, notable ones: `source-divergence` / `check-source-sync` (swarm↔source drift), `check-advisory-artifacts <dir>` / `check-first-pr-artifacts <dir>` (validate generated output bundles), `check-spec-status`, `dogfood-usefulness`, and `cargo-allow check --profile spec-system --mode audit`. `check-goals` remains a parity-window legacy check only.
 
 Fuzzing is manual, not part of the PR gate: `cargo fuzz run analyze` (see `docs/FUZZING.md`). Toolchain is pinned (`rust-toolchain.toml`): Rust 1.95.0, edition 2024.
 

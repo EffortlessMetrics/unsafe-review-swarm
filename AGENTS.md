@@ -36,19 +36,20 @@ starts in source and is not release/public-surface/hotfix work, move the work
 to `unsafe-review-swarm` or stop and leave a handoff explaining the routing
 problem.
 
-When there is no narrower owner instruction, continue improving this codebase in
-`unsafe-review-swarm` along the current rails. Good default work includes
-ReviewCard correctness, evidence precision, artifact/schema verification,
-first-run UX, saved LSP/agent projections, dogfood calibration, tests,
-maintainability refactors, and source-of-truth spec alignment. Do not treat the
-absence of a new direction as a reason to pause if the work clearly advances one
-of those rails.
+After selecting a bounded issue from live GitHub state, continue that issue in
+`unsafe-review-swarm` along the accepted contract and current rails. Good issue
+scopes include ReviewCard correctness, evidence precision, artifact/schema
+verification, first-run UX, saved LSP/agent projections, dogfood calibration,
+tests, maintainability refactors, and source-of-truth spec alignment. The
+absence of a selected issue is not permission to invent a repository-wide
+default task; inspect the live portfolio and leave durable work selection in
+GitHub issue/PR metadata.
 
-Assume the repository has an active multi-day improvement runway. New Codex Web
-PR batches on `unsafe-review-swarm` are expected input, not a reason to change
-direction. Keep burning down generated PRs, tightening rails, and improving the
-codebase inside the current advisory ReviewCard-centered lane unless the owner
-explicitly changes the lane.
+Assume the repository has an active multi-day improvement runway. Treat that
+runway only as portfolio context, not as a default task selector; every
+execution still starts from a live issue/PR and its accepted contract.
+PR batches on `unsafe-review-swarm` are expected input, but they do not choose
+the current issue; live GitHub metadata and the accepted work contract do.
 
 Before routine swarm implementation, run the source sync guard:
 
@@ -85,22 +86,23 @@ its status is clean.
 
 Use the repo source-of-truth stack:
 
-1. Read `.rails/goals/active.toml`.
-2. Read the linked plan item.
-3. Read the linked spec.
+1. Read the selected GitHub issue and its current dependency/disposition metadata.
+2. Read the `.allow` project charter and cargo-allow audit/worklist as durable
+   graph evidence, never as a default task selector.
+3. Read the linked plan/spec and any issue-linked work specification.
 4. Read the linked proposal only for context.
 5. Make one PR-sized change.
 6. Update support tiers or policy ledgers only if the claim/policy changes.
-7. Run the proof commands listed in the plan item.
+7. Run the proof commands named by the accepted issue/spec/plan contract.
 8. Do not invent missing claims. If proof is missing, keep the claim advisory/experimental.
-9. Do not use `.jules`, `.codex`, or product runtime output directories as unsafe-review source-of-truth state.
+9. Do not use `.jules`, `.codex`, `.rails`, or product runtime output directories as current unsafe-review source-of-truth state. `.rails` is a parity-window archive only.
 10. Do not stop at "human merge required" unless the repo has that policy in a current source-of-truth file.
 
 If a specific command, lint, API, feature flag, crate name, or workflow name is mentioned, verify it exists before building a PR around it.
 
 Spec rails are meant to make routine progress easier, not ceremonial. If a PR or
 agent task references a not-yet-existing rail and the rail belongs in the repo,
-add or align it in `.rails` or the corresponding `docs/specs/`
+add or align it in `.allow` or the corresponding `docs/specs/`
 contract. Prefer the smallest useful rail: a plan item, spec clause, template,
 or verifier hook that keeps future PRs pointed at the same truth without adding
 fake enforcement.
@@ -124,7 +126,7 @@ follow-up when it would turn the PR into a mixed-scope change.
 
 Do not put durable repo operating state in `.codex`; keep agent-local state
 there only if a local tool requires it. Durable unsafe-review repo state belongs
-under `.rails`, `docs/specs`, or the documented handoff/status
+under `.allow`, `docs/specs`, or the documented handoff/status
 surfaces.
 
 ## Helper roles and workflows
@@ -209,8 +211,9 @@ For Codex Web or other generated PR batches:
 2. Inspect the stated intent and actual diff.
 3. Verify the change is scoped to the PR title and does not create a second
    analyzer truth outside `ReviewCard`.
-4. Check whether the change advances an active `.rails` plan item,
-   a documented projection contract, or a narrow maintainability/test goal. If
+4. Check whether the change advances the selected GitHub issue and its accepted
+   contract, the durable `.allow` graph, a documented projection contract, or a
+   narrow maintainability/test goal. If
    it creates a useful new rail, land the rail in the source-of-truth stack with
    the same PR or a clearly linked follow-up.
 5. Run the narrow validation first, then broader repo gates when practical.

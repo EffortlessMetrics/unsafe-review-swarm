@@ -5,6 +5,14 @@ All tiers describe static review evidence. None means memory-safety proof.
 For a concise front panel, see [`SUPPORT_SUMMARY.md`](SUPPORT_SUMMARY.md). This
 file remains the detailed claim-to-proof ledger.
 
+## Governance support contract
+
+UNSAFE-REVIEW-SUPPORT-0001
+
+| Surface | Tier | Claim | Proof command | Notes |
+| --- | --- | --- | --- | --- |
+| Spec-system governance graph | advisory | Proposal, spec, plan, active-goal, support-tier, and closeout links are validated as source-tree structure. | cargo-allow manifest and audit: `cargo-allow check --profile spec-system --mode audit` | Structural graph validation only; does not execute proof commands, repository code, Cargo, or GitHub APIs. |
+
 Recent core smoke proof additions include fixture-backed `get_unchecked_mut`
 bounds controls for same-receiver `get(index)` probes, early-return probes,
 if-let, let-else, and match Some-arm forms, plus stale or shadowed index,

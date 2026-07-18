@@ -4,7 +4,10 @@ on:
   pull_request:
     paths:
       - "policy/**"
+      - ".allow/**"
       - ".rails/**"
+      - "plans/**"
+      - "docs/templates/**"
       - "docs/specs/**"
       - "docs/status/**"
       - ".github/workflows/**"
@@ -28,12 +31,17 @@ jobs:
       - uses: actions/checkout@v7
         with:
           persist-credentials: false
+      - name: Install cargo-allow
+        run: cargo install --locked cargo-allow --version 0.1.10
+      - name: Check cargo-allow spec system
+        run: |
+          cargo-allow doctor --profile spec-system
+          cargo-allow check --profile spec-system --mode audit
+          cargo-allow worklist --profile spec-system --format json
       - name: Check doc artifacts
         run: cargo run --locked -p xtask -- check-doc-artifacts
       - name: Check docs automation
         run: cargo run --locked -p xtask -- check-docs-automation
-      - name: Check active goals
-        run: cargo run --locked -p xtask -- check-goals
       - name: Check package boundary
         run: cargo run --locked -p xtask -- check-package-boundary
       - name: Check CI lane ledger

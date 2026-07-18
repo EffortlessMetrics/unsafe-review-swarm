@@ -1,5 +1,7 @@
 # 0.2.0 implementation plan
 
+Artifact ID: UNSAFE-REVIEW-PLAN-0002
+
 ## Work item: source-of-truth-scaffold
 
 Status: active

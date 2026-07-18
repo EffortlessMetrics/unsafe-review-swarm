@@ -58,7 +58,7 @@ The latest closed execution lane is recorded in
 
 The active calibration rail is now recorded in
 `docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md`,
-`.rails/lanes/accuracy-calibration/implementation-plan.md`,
+the `.allow` project charter and linked adoption plan,
 `policy/accuracy-calibration.toml`, and
 `docs/accuracy/CALIBRATION_REPORT.md`. The checked report currently records 43 fixture-pinned claims, 622 calibration cases, 43 label ledgers, and 598 label samples. It records zero dogfood-measured, labeled-calibrated, or
 policy-eligible claims. That is intentional: the current report is a
@@ -280,7 +280,7 @@ rtk cargo run --locked -p xtask -- check-pr
 rtk cargo run --locked -p xtask -- check-calibration
 rtk cargo run --locked -p xtask -- check-dogfood
 rtk cargo run --locked -p xtask -- check-doc-artifacts
-rtk cargo run --locked -p xtask -- check-goals
+rtk cargo-allow check --profile spec-system --mode audit
 rtk cargo run --locked -p xtask -- source-divergence
 rtk git diff --check
 ```

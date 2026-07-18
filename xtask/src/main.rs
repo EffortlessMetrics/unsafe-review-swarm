@@ -477,14 +477,27 @@ const WORKFLOW_ALLOWLIST: &str = "policy/workflow-allowlist.toml";
 const WORKFLOW_DIR: &str = ".github/workflows";
 const CORPUS_BACKSTOP_SAMPLE_REPORT: &str = "policy/corpus-backstop-sample-report.json";
 const CORPUS_USEFULNESS_SAMPLE_ROLLUP: &str = "policy/corpus-usefulness-sample-rollup.json";
-const DOC_ARTIFACT_LEDGER: &str = "policy/doc-artifacts.toml";
+const DOC_ARTIFACT_LEDGER: &str = ".allow/artifacts/doc-artifacts.toml";
 const DOCS_AUTOMATION_LEDGER: &str = "policy/docs-automation.toml";
 const CI_LANE_LEDGER: &str = "policy/ci-lane-whitelist.toml";
 const PACKAGE_BOUNDARY_LEDGER: &str = "policy/package-boundary.toml";
 const SOURCE_OF_TRUTH_INDEX: &str = ".rails/index.toml";
 const ACTIVE_GOAL_MANIFEST: &str = ".rails/goals/active.toml";
-const DOC_ARTIFACT_KINDS: &[&str] = &["proposal", "spec", "adr", "plan", "goal"];
-const DOC_ARTIFACT_STATUSES: &[&str] = &["proposed", "accepted", "active", "done", "deferred"];
+const DOC_ARTIFACT_KINDS: &[&str] = &[
+    "proposal",
+    "spec",
+    "adr",
+    "plan",
+    "implementation_plan",
+    "goal",
+    "active_goal",
+    "project_charter",
+    "support_tier",
+    "closeout",
+];
+const DOC_ARTIFACT_STATUSES: &[&str] = &[
+    "proposed", "accepted", "active", "done", "deferred", "draft",
+];
 const DOCS_AUTOMATION_KINDS: &[&str] = &[
     "spec_status_dashboard",
     "operator_front_door",
@@ -831,14 +844,6 @@ const DOGFOOD_STABLE_BYTE_COVERAGE_HEADER: &[&str] = &[
     "Analyzer/support tier",
     "Boundary",
 ];
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub(crate) struct DocArtifactEntry {
-    pub(crate) kind: String,
-    pub(crate) path: String,
-    pub(crate) status: String,
-    pub(crate) owner: String,
-}
-
 fn main() {
     if let Err(err) = run(std::env::args().collect()) {
         eprintln!("xtask: {err}");
@@ -1210,7 +1215,6 @@ fn check_policy() -> Result<(), String> {
     check_doc_artifacts()?;
     check_docs_automation()?;
     public_surfaces::check()?;
-    source_truth_ledgers::check_goals()?;
     source_truth_ledgers::check_package_boundary()?;
     ci_lanes::check()?;
     ci_routing_contract::check_ci_routing_contract()?;
@@ -2354,8 +2358,6 @@ fn check_doc_artifacts() -> Result<(), String> {
 
 fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
     let value = parse_toml_file(Path::new(DOC_ARTIFACT_LEDGER))?;
-    let source_index = parse_toml_file(Path::new(SOURCE_OF_TRUTH_INDEX))?;
-    let source_artifacts = source_truth_ledgers::source_truth_index_artifacts(&source_index)?;
     require_toml_string(&value, "schema_version", DOC_ARTIFACT_LEDGER)?;
     let artifacts = toml_array(&value, "artifact", DOC_ARTIFACT_LEDGER)?;
     if artifacts.is_empty() {
@@ -2365,7 +2367,6 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
     }
 
     let mut ids = BTreeSet::new();
-    let mut ledger_artifacts = BTreeMap::new();
     let mut linked_ids = Vec::new();
     for (idx, artifact) in artifacts.iter().enumerate() {
         let table = toml_table(artifact, DOC_ARTIFACT_LEDGER, "artifact", idx)?;
@@ -2373,7 +2374,7 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
         let kind = required_table_string(table, "kind", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
         let path = required_table_string(table, "path", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
         let status = required_table_string(table, "status", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
-        let owner = required_table_string(table, "owner", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
+        required_table_string(table, "owner", DOC_ARTIFACT_LEDGER, "artifact", idx)?;
 
         require_known(kind, DOC_ARTIFACT_KINDS, DOC_ARTIFACT_LEDGER, "kind")?;
         require_known(status, DOC_ARTIFACT_STATUSES, DOC_ARTIFACT_LEDGER, "status")?;
@@ -2382,15 +2383,6 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
                 "{DOC_ARTIFACT_LEDGER} contains duplicate id `{id}`"
             ));
         }
-        ledger_artifacts.insert(
-            id.to_string(),
-            DocArtifactEntry {
-                kind: kind.to_string(),
-                path: path.to_string(),
-                status: status.to_string(),
-                owner: owner.to_string(),
-            },
-        );
         require_file(path)?;
         if let Some(linked_proposal) = table.get("linked_proposal").and_then(toml::Value::as_str) {
             linked_ids.push((
@@ -2417,33 +2409,7 @@ fn check_doc_artifacts_impl() -> Result<BTreeSet<String>, String> {
         }
     }
 
-    check_doc_artifacts_source_index_consistency(&ledger_artifacts, &source_artifacts)?;
-
     Ok(ids)
-}
-
-fn check_doc_artifacts_source_index_consistency(
-    ledger_artifacts: &BTreeMap<String, DocArtifactEntry>,
-    source_artifacts: &BTreeMap<String, DocArtifactEntry>,
-) -> Result<(), String> {
-    for (id, ledger) in ledger_artifacts {
-        let Some(indexed) = source_artifacts.get(id) else {
-            continue;
-        };
-        for (field, ledger_value, index_value) in [
-            ("kind", &ledger.kind, &indexed.kind),
-            ("path", &ledger.path, &indexed.path),
-            ("status", &ledger.status, &indexed.status),
-            ("owner", &ledger.owner, &indexed.owner),
-        ] {
-            if ledger_value != index_value {
-                return Err(format!(
-                    "{SOURCE_OF_TRUTH_INDEX} artifact `{id}` {field} `{index_value}` must match {DOC_ARTIFACT_LEDGER} `{ledger_value}`"
-                ));
-            }
-        }
-    }
-    Ok(())
 }
 
 fn check_docs_automation() -> Result<(), String> {
@@ -9307,16 +9273,6 @@ mod tests {
         }
     }
 
-    fn doc_artifact_entry(status: &str) -> DocArtifactEntry {
-        DocArtifactEntry {
-            kind: "spec".to_string(),
-            path: "docs/specs/UNSAFE-REVIEW-SPEC-0026-accuracy-validation-and-calibration.md"
-                .to_string(),
-            status: status.to_string(),
-            owner: "calibration".to_string(),
-        }
-    }
-
     fn write_fake_workspace_root(root: &Path) -> Result<(), String> {
         fs::create_dir_all(root.join("xtask"))
             .map_err(|err| format!("create fake xtask dir failed: {err}"))?;
@@ -9668,6 +9624,14 @@ jobs:
             Some("scaffold")
         );
         assert_eq!(support_tier_from_row("|---|---|"), None);
+    }
+
+    #[test]
+    fn support_tier_parser_ignores_cargo_allow_header() {
+        assert_eq!(
+            support_tier_from_row("| Surface | Tier | Claim | Proof command | Notes |"),
+            None
+        );
     }
 
     #[test]
@@ -12298,45 +12262,6 @@ OperationFamily::RawPointerRead => vec![
         assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
         assert!(err.contains("status `accepted` must match"));
         assert!(err.contains("Status lifecycle `proposed`"));
-        Ok(())
-    }
-
-    #[test]
-    fn doc_artifact_index_status_matches_policy_ledger() -> Result<(), String> {
-        let mut ledger = BTreeMap::new();
-        ledger.insert(
-            "UNSAFE-REVIEW-SPEC-0026".to_string(),
-            doc_artifact_entry("proposed"),
-        );
-        let mut index = BTreeMap::new();
-        index.insert(
-            "UNSAFE-REVIEW-SPEC-0026".to_string(),
-            doc_artifact_entry("proposed"),
-        );
-
-        check_doc_artifacts_source_index_consistency(&ledger, &index)
-    }
-
-    #[test]
-    fn doc_artifact_index_status_rejects_policy_ledger_drift() -> Result<(), String> {
-        let mut ledger = BTreeMap::new();
-        ledger.insert(
-            "UNSAFE-REVIEW-SPEC-0026".to_string(),
-            doc_artifact_entry("proposed"),
-        );
-        let mut index = BTreeMap::new();
-        index.insert(
-            "UNSAFE-REVIEW-SPEC-0026".to_string(),
-            doc_artifact_entry("draft"),
-        );
-
-        let err = err_text(check_doc_artifacts_source_index_consistency(
-            &ledger, &index,
-        ))?;
-
-        assert!(err.contains(".rails/index.toml"));
-        assert!(err.contains("UNSAFE-REVIEW-SPEC-0026"));
-        assert!(err.contains("status `draft` must match"));
         Ok(())
     }
 

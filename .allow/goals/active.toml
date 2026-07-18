@@ -1,0 +1,28 @@
+schema_version = "1.0"
+
+id = "UNSAFE-REVIEW-GOAL-0001"
+title = "unsafe-review project charter"
+status = "active"
+owner = "repo-infra"
+created = "2026-07-12"
+
+objective = """
+Preserve unsafe-review as a syntax-first, build-free, advisory unsafe-evidence
+layer whose product semantics derive from the canonical ReviewCard model.
+Maintain the no-proof, no-UB-free, no-Miri-clean, no-default-posting,
+no-source-edit, and no-default-blocking boundaries. Publication remains parked
+until the owner explicitly reopens it.
+
+This manifest is a neutral project charter required by the current cargo-allow
+profile. It records durable repository truth and graph links; it does not select
+a default issue, schedule a team, mirror the GitHub portfolio, or identify the
+current Codex operation. GitHub issues, project metadata, PRs, and receipts own
+requested work, priority, dependencies, disposition, implementation, and
+verification state.
+"""
+
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0020"
+linked_support_tier = "UNSAFE-REVIEW-SUPPORT-0001"
+linked_plan = "plans/adoption-0.4.0/implementation-plan.md"
+linked_plan_status = "active"

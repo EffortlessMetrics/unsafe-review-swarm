@@ -2,9 +2,7 @@ use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 use crate::{
-    SOURCE_OF_TRUTH_INDEX, markdown, markdown_files, markdown_table_columns, parse_toml_file,
-    read_to_string, require_known, source_truth_ledgers::source_truth_index_artifacts,
-    source_truth_ledgers::source_truth_index_ids, workspace_path,
+    markdown, markdown_files, markdown_table_columns, read_to_string, require_known, workspace_path,
 };
 
 pub(crate) const DASHBOARD: &str = "docs/specs/UNSAFE-REVIEW-SPEC-STATUS.md";
@@ -106,47 +104,6 @@ pub(crate) fn check_dashboard_impl() -> Result<usize, String> {
             ));
         }
         check_proof_commands(&row.spec_id, &row.proof_commands)?;
-    }
-
-    let source_index = parse_toml_file(&workspace_path(SOURCE_OF_TRUTH_INDEX))?;
-    let indexed_artifact_ids = source_truth_index_ids(&source_index, "artifact")?;
-    for id in indexed_artifact_ids
-        .iter()
-        .filter(|id| id.starts_with("UNSAFE-REVIEW-SPEC-"))
-    {
-        if !seen.contains(id) {
-            return Err(format!(
-                "{DASHBOARD} is missing source-of-truth indexed spec `{id}`"
-            ));
-        }
-    }
-
-    // Cross-check that each indexed spec artifact's `status` field matches the
-    // `Status:` header in its spec file. The dashboard-vs-file check above covers
-    // the dashboard table; this covers the index.toml field, which is otherwise
-    // unchecked and can silently drift (e.g. a spec promoted to `accepted` in the
-    // file/dashboard while the index still says `proposed`). Only spec-kind
-    // artifacts carry a `Status:` header; ADRs/proposals are skipped.
-    let indexed_artifacts = source_truth_index_artifacts(&source_index)?;
-    for (id, entry) in &indexed_artifacts {
-        if entry.kind != "spec" || !id.starts_with("UNSAFE-REVIEW-SPEC-") {
-            continue;
-        }
-        let spec_path = workspace_path(&entry.path);
-        let file_status = file_lifecycle_status(&spec_path)?;
-        let index_status = lifecycle_status(&entry.status);
-        require_known(
-            &index_status,
-            LIFECYCLE_STATUSES,
-            SOURCE_OF_TRUTH_INDEX,
-            "status",
-        )?;
-        check_lifecycle_match(
-            id,
-            &index_status,
-            &file_status,
-            &spec_path.display().to_string(),
-        )?;
     }
 
     Ok(rows.len())

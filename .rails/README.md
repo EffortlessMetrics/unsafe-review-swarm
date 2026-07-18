@@ -1,22 +1,25 @@
-# unsafe-review source-of-truth state
+# unsafe-review legacy source-of-truth archive
 
-This directory stores repository-owned coordination state for unsafe-review
+Governance authority moved to [`.allow/goals/active.toml`](../.allow/goals/active.toml)
+and [`.allow/artifacts/doc-artifacts.toml`](../.allow/artifacts/doc-artifacts.toml)
+under cargo-allow's `spec-system` profile. This directory is retained as a
+read-only parity snapshot until the migration closeout; do not add new active
+goals or route agents here.
+
+This directory stores the historical coordination state for unsafe-review
 development and release lanes.
 
-- Namespace index: `.rails/index.toml`
-- Current goal: `.rails/goals/active.toml`
+- Historical namespace index: `.rails/index.toml` (parity only)
+- Current goal: `.allow/goals/active.toml`
 - Historical goals: `.rails/goals/archive/`
 - Lane trackers: `.rails/lanes/`
 - Agent operating entrypoint: `AGENTS.md`
 
 ## Why `.rails`?
 
-`.rails` is the portable convention for repository-owned source-of-truth
-coordination state across this org's Rust repos. The name is deliberate, both
-literal and metaphorical: well-designed specs and tests are the *rails* that keep
-work on-design and verifiable — directional specs, drift-lock tests, and the
-links between them that let any agent or contributor enter cold and stay on
-track.
+`.rails` was the portable convention for repository-owned source-of-truth
+coordination state. It is now retained only for migration history and parity
+comparison; cargo-allow's `.allow` graph is the current machine-checked source.
 
 It is chosen over a per-repo `.<repo>-spec` name because it is:
 
@@ -28,9 +31,10 @@ It is chosen over a per-repo `.<repo>-spec` name because it is:
 - **Collision-free** — unused by Rust tooling, and unlike `.spec/` it does not
   clash with tool/session namespaces (see the rule below).
 
-This directory was renamed from `.unsafe-review-spec/`; all repo references,
-gates (`check-goals`, `check-doc-artifacts`), CI triggers, and agent contracts
-point at `.rails/`.
+This directory was renamed from `.unsafe-review-spec/`. The legacy `check-goals`
+command remains available only for explicit parity investigation; it is not part
+of `check-pr`, policy CI, or agent work selection. Current agent contracts point
+at `.allow/`, and no active-goal file selects the repository's next issue.
 
 ## Source-of-Truth Rule
 
@@ -45,10 +49,10 @@ documented output locations.
 
 Do not store durable repo operating state in external tool namespaces such as
 `.codex/`, `.spec/`, `.claude/`, or `.jules/`. Those directories may exist for
-tool/session state, but unsafe-review's durable coordination state belongs in
-`.rails/`, `docs/`, `plans/`, `policy/`, and documented handoff or
-status surfaces.
+tool/session state, but unsafe-review's durable governance graph belongs in
+`.allow/`. This archive may retain historical parity data, while operational
+selection belongs to live GitHub issues and pull requests.
 
 `AGENTS.md` is the agent-facing entrypoint for these rules. Keep it aligned
-with this directory when repo operation style changes, but do not move durable
+with `.allow` when repo operation style changes, but do not move durable
 unsafe-review source-of-truth data into agent-local tool directories.

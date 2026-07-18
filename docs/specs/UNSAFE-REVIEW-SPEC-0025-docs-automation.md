@@ -24,7 +24,7 @@ false product claims, broken first-use paths, or ambiguous next-work guidance.
 The repo MUST provide docs automation that checks or generates:
 
 - source-of-truth artifact graph,
-- active goal and work-item proof commands,
+- optional project-charter links and issue-linked work-spec proof commands,
 - lane trackers and implementation plans,
 - spec lifecycle dashboard,
 - agent operating contract,
@@ -54,7 +54,6 @@ roots, checked/generated outputs, or source inputs for checked repo artifacts.
 ```bash
 cargo run --locked -p xtask -- check-docs-automation
 cargo run --locked -p xtask -- check-doc-artifacts
-cargo run --locked -p xtask -- check-goals
 cargo run --locked -p xtask -- check-support-tiers
 cargo run --locked -p xtask -- check-pr
 git diff --check
@@ -67,9 +66,9 @@ git diff --check
 - `AGENTS.md` must preserve source/swarm routing, source-divergence preflight,
   source-of-truth stack, SPEC-0024 CI routing, and no-`.codex` durable-state
   wording.
-- `AGENTS.md` must preserve the active improvement runway, expected generated
-  PR batches, spec rails as forward drive, missing-rail alignment, and
-  configuration-obstacle handling for single-contributor review gates.
+- `AGENTS.md` must require live issue/PR selection before work begins, preserve
+  spec rails as forward drive, and keep configuration-obstacle handling for
+  single-contributor review gates.
 - `policy/docs-automation.toml` must keep external agent/tool roots awareness
   only, not owned or checked source-of-truth paths.
 - Active lane plans must preserve guardrail wording that matches the checked
@@ -77,7 +76,8 @@ git diff --check
 - If a public README claims a product boundary, it must include no-proof/no-UB-free/no-Miri-clean wording.
 - If a crate README references a local asset, `cargo package --list` must include it.
 - If a doc-artifact ledger references a file, that file must exist.
-- If a work item is active or ready, it must list proof commands.
+- If an issue-linked work item is represented in a governed artifact, it must
+  list proof commands; a neutral project charter does not need work items.
 
 ## Follow-up
 
