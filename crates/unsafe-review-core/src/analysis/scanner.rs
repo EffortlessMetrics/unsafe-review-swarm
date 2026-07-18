@@ -31,7 +31,7 @@ mod owner_context;
 mod panic_from_safe_js;
 mod scan_site;
 mod syntax_scan;
-mod text_detection;
+pub(crate) mod text_detection;
 
 use self::item_names::{parse_fn_name, parse_mod_name, parse_trait_name};
 #[cfg(test)]

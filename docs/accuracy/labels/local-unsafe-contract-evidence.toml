@@ -54,6 +54,22 @@ label_source = "fixture_golden"
 rationale = "Local Safety-colon prose counts as unsafe-call contract evidence but does not discharge the callee contract."
 
 [[samples]]
+id = "raw-pointer-deref-prior-block-safety-not-owner-contract-missing"
+fixture = "raw_pointer_deref_prior_block_safety_not_owner"
+kind = "false_positive_control"
+expected_cards = 2
+expected_class = "contract_missing"
+expected_operation_family = "raw_pointer_deref"
+expected_hazard = "pointer_validity"
+expected_owner = "read_headers"
+expected_site_kind = "operation"
+expected_obligation_key = "pointer-live"
+expected_contract_state = "missing"
+expected_discharge_state = "missing"
+label_source = "fixture_golden"
+rationale = "A `// SAFETY:` comment attached to the first `unsafe { *first }` block is not credited as contract evidence for the second, uncommented `unsafe { *second }` site in the same function."
+
+[[samples]]
 id = "custom-unsafe-impl-contract-present-not-send-sync"
 fixture = "unsafe_impl_custom_trait_not_send_sync"
 kind = "false_positive_control"

@@ -394,6 +394,7 @@ fixtures = [
   "private_unsafe_helper_safety_comment",
   "local_safety_colon_comment",
   "unsafe_impl_custom_trait_not_send_sync",
+  "raw_pointer_deref_prior_block_safety_not_owner",
 ]
 dogfood_targets = []
 label_ledgers = [
@@ -404,6 +405,8 @@ allowed_public_claim = """
 Fixture-pinned private/local unsafe contract evidence distinguishes documented
 private unsafe contracts, custom unsafe trait impl contracts, and local
 SAFETY/Safety prose from actual guard discharge evidence in the listed fixtures.
+A `// SAFETY:` line comment attached to an earlier unsafe site is not credited
+as contract evidence for a later, uncommented site in the same window.
 """
 forbidden_claims = [
   "complete unsafe contract audit",
