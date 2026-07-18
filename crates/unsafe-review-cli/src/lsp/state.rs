@@ -41,8 +41,9 @@ mod tests {
     use tower_lsp_server::ls_types::Uri;
 
     #[test]
-    fn document_versions_follow_open_change_and_save_updates() {
-        let uri: Uri = "file:///workspace/src/lib.rs".parse().expect("valid URI");
+    fn document_versions_follow_open_change_and_save_updates()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let uri: Uri = "file:///workspace/src/lib.rs".parse()?;
         let mut store = DocumentStore::default();
 
         store.upsert(uri.clone(), "fn main() {}".to_string(), 7);
@@ -50,14 +51,17 @@ mod tests {
 
         store.update_version(&uri, 8);
         assert_eq!(store.version(&uri), Some(8));
+        Ok(())
     }
 
     #[test]
-    fn saving_an_unopened_document_does_not_fabricate_a_version() {
-        let uri: Uri = "file:///workspace/src/lib.rs".parse().expect("valid URI");
+    fn saving_an_unopened_document_does_not_fabricate_a_version()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let uri: Uri = "file:///workspace/src/lib.rs".parse()?;
         let mut store = DocumentStore::default();
 
         store.update_version(&uri, 3);
         assert_eq!(store.version(&uri), None);
+        Ok(())
     }
 }
