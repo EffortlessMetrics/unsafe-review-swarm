@@ -5,12 +5,30 @@ pub(super) struct StringDetectionState {
 }
 
 #[derive(Default)]
-pub(super) struct LineCommentState {
+pub(crate) struct LineCommentState {
     pub(super) block_depth: usize,
     string: Option<StringDetectionState>,
 }
 
-pub(super) fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
+/// Return the code portion of `line` with string/char-literal contents and any
+/// line comment removed (see [`split_code_and_comment`]).
+pub(crate) fn line_for_text_detection(line: &str, state: &mut LineCommentState) -> String {
+    split_code_and_comment(line, state).0
+}
+
+/// Split `line` into `(code, line_comment)`.
+///
+/// `code` is the line with string and char-literal *contents* elided (their
+/// delimiters are kept as bare `"` / `'`) and any `//` line comment removed, so
+/// text inside a string literal is never mistaken for real code — e.g.
+/// `let s = "unsafe { x }";` yields code `let s = "";`. `line_comment` is the
+/// `//`-comment tail when the line has a real comment outside any string/char/
+/// block context, else `None` — so `let r = "// SAFETY: x";` yields no comment.
+/// `state` threads multi-line string/block-comment context across calls.
+pub(crate) fn split_code_and_comment(
+    line: &str,
+    state: &mut LineCommentState,
+) -> (String, Option<String>) {
     let mut out = String::with_capacity(line.len());
     let mut chars = line.chars().peekable();
 
@@ -48,7 +66,10 @@ pub(super) fn line_for_text_detection(line: &str, state: &mut LineCommentState) 
         }
 
         if ch == '/' && chars.peek() == Some(&'/') {
-            break;
+            let mut comment = String::from("//");
+            let _ = chars.next();
+            comment.extend(chars);
+            return (out, Some(comment));
         }
         if ch == '/' && chars.peek() == Some(&'*') {
             state.block_depth += 1;
@@ -84,7 +105,7 @@ pub(super) fn line_for_text_detection(line: &str, state: &mut LineCommentState) 
         out.push(ch);
     }
 
-    out
+    (out, None)
 }
 
 fn consume_char_literal<I>(chars: &mut std::iter::Peekable<I>) -> bool

@@ -1,4 +1,5 @@
 use crate::analysis::scanner::ScannedSite;
+use crate::analysis::scanner::text_detection::{LineCommentState, split_code_and_comment};
 use crate::domain::ContractEvidence;
 
 pub(crate) fn contract_evidence(site: &ScannedSite) -> ContractEvidence {
@@ -57,11 +58,10 @@ fn safety_comment_summary(context: &str, snippet: &str) -> Option<&'static str> 
     // unsafe idiom (`// SAFETY: … / if cond { return } / unsafe { … }`) keeps
     // its rationale.
     for line in context.lines().rev() {
-        let trimmed = line.trim_start();
-        if is_attribution_boundary(trimmed) {
+        if is_attribution_boundary(line) {
             break;
         }
-        if let Some(hit) = safety_marker(trimmed) {
+        if let Some(hit) = safety_marker(line) {
             return Some(hit);
         }
     }
@@ -69,15 +69,16 @@ fn safety_comment_summary(context: &str, snippet: &str) -> Option<&'static str> 
 }
 
 /// Detect a `SAFETY:` / `Safety:` line comment (not a doc comment) on a single
-/// already-trimmed line. Returns the canonical summary string when matched.
-fn safety_marker(trimmed: &str) -> Option<&'static str> {
+/// source line. Only a real `//`-comment counts: a `SAFETY:`-shaped string
+/// literal (e.g. `let r = "// SAFETY: x";`) yields no comment and is ignored,
+/// so an author cannot fabricate contract evidence with a quoted marker.
+fn safety_marker(line: &str) -> Option<&'static str> {
+    let (_, comment) = split_code_and_comment(line, &mut LineCommentState::default());
+    let comment = comment?;
+    let trimmed = comment.trim_start();
+    // Doc comments (`///`, `//!`) are the owner-contract path handled by
+    // safety_doc_summary; don't double-count them as inline SAFETY comments.
     if trimmed.starts_with("///") || trimmed.starts_with("//!") {
-        return None;
-    }
-    if !(trimmed.starts_with("//")
-        || trimmed.contains("// SAFETY:")
-        || trimmed.contains("// Safety:"))
-    {
         return None;
     }
     if trimmed.contains("SAFETY:") {
@@ -91,7 +92,7 @@ fn safety_marker(trimmed: &str) -> Option<&'static str> {
 
 fn safety_marker_in<'a>(lines: impl Iterator<Item = &'a str>) -> Option<&'static str> {
     for line in lines {
-        if let Some(hit) = safety_marker(line.trim_start()) {
+        if let Some(hit) = safety_marker(line) {
             return Some(hit);
         }
     }
@@ -107,17 +108,18 @@ fn safety_marker_in<'a>(lines: impl Iterator<Item = &'a str>) -> Option<&'static
 /// Deliberately NOT a boundary: the current site's own multi-line `unsafe {`
 /// opener (no closing brace on its line), and ordinary guard/`if`/loop block
 /// braces — so a `// SAFETY:` comment above a multi-line `unsafe { … }` block,
-/// or above a guard block that precedes the unsafe op, still counts. Comment
-/// lines are never boundaries, and `unsafe` is matched as a whole token so
-/// identifiers like `unsafe_helper` do not trip the boundary.
-fn is_attribution_boundary(trimmed: &str) -> bool {
-    if trimmed.starts_with("//") {
-        return false;
-    }
-    let has_unsafe_keyword = trimmed
+/// or above a guard block that precedes the unsafe op, still counts.
+///
+/// Detection runs on the string-stripped code projection, so an `unsafe { … }`
+/// inside a string literal (e.g. `let s = "unsafe { x }";`) is not a boundary;
+/// `unsafe` is matched as a whole token so identifiers like `unsafe_helper` do
+/// not trip it.
+fn is_attribution_boundary(line: &str) -> bool {
+    let (code, _) = split_code_and_comment(line, &mut LineCommentState::default());
+    let has_unsafe_keyword = code
         .split(|ch: char| !ch.is_alphanumeric() && ch != '_')
         .any(|token| token == "unsafe");
-    has_unsafe_keyword && trimmed.contains('}')
+    has_unsafe_keyword && code.contains('}')
 }
 
 #[cfg(test)]
@@ -220,10 +222,26 @@ mod tests {
 
     #[test]
     fn safety_marker_in_string_literal_is_not_a_comment() {
-        // `SAFETY:` inside a string literal (no `//`) is not comment evidence.
+        // `SAFETY:` inside a string literal is not comment evidence — neither the
+        // bare form nor a fabricated `// SAFETY:` marker embedded in a string.
         assert_eq!(
             safety_comment_summary("let reason = \"SAFETY: bounds are checked\";", ""),
             None
+        );
+        assert_eq!(
+            safety_comment_summary("let reason = \"// SAFETY: ptr is valid\";", ""),
+            None
+        );
+    }
+
+    #[test]
+    fn unsafe_inside_a_string_literal_is_not_an_attribution_boundary() {
+        // `unsafe { … }` inside a string literal must not sever attribution: the
+        // real `// SAFETY:` above the guard/string still reaches the site below.
+        let context = "// SAFETY: null is rejected below\nlet s = \"unsafe { foo }\";\nif ptr.is_null() { return; }";
+        assert_eq!(
+            safety_comment_summary(context, "unsafe { *ptr }"),
+            Some("Nearby `SAFETY:` comment was detected")
         );
     }
 
