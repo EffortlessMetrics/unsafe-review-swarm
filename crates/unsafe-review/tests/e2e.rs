@@ -1,4 +1,5 @@
 use serde_json::Value;
+use std::collections::BTreeSet;
 use std::error::Error;
 use std::ffi::{OsStr, OsString};
 use std::fs;
@@ -8200,7 +8201,98 @@ fn baseline_status_reports_identical_counts_in_human_and_json() -> Result<(), Bo
         "human status output must not assert a positive safety claim: {human}"
     );
 
+    // Full human/JSON parity, not just the two headline buckets: every one of the ten
+    // bucket counts, the convenience `total`, and the exact set of entry identities
+    // rendered must agree between the two surfaces (issue #1893 acceptance criterion).
+    for bucket in [
+        "active_unchanged",
+        "active_improved",
+        "active_worsened",
+        "resolved",
+        "review_due",
+        "snapshot_missing_or_invalid",
+        "duplicate_or_conflicting_entry",
+        "suppression_overlap",
+        "identity_unmatched",
+        "new_unbaselined",
+    ] {
+        let human_count = human_bucket_count(&human, bucket)?;
+        let json_count = json_report["counts"][bucket].as_i64().ok_or_else(|| {
+            format!("json counts.{bucket} missing or not a number: {json_report}")
+        })?;
+        assert_eq!(
+            human_count, json_count,
+            "bucket `{bucket}` differs between human ({human_count}) and json ({json_count})"
+        );
+    }
+    let human_total = human_labelled_i64(&human, "total: ")?;
+    let json_total = json_report["total"]
+        .as_i64()
+        .ok_or_else(|| format!("json total missing or not a number: {json_report}"))?;
+    assert_eq!(
+        human_total, json_total,
+        "total differs between human ({human_total}) and json ({json_total})"
+    );
+
+    let json_ids: BTreeSet<String> = json_array(&json_report["entries"], "entries")?
+        .iter()
+        .map(|entry| json_str(&entry["card_id"], "entries[].card_id").map(str::to_string))
+        .collect::<Result<_, Box<dyn Error>>>()?;
+    let human_ids = human_all_entries_card_ids(&human)?;
+    assert_eq!(
+        human_ids, json_ids,
+        "the set of entry identities rendered in human output must equal the json report's"
+    );
+
     Ok(())
+}
+
+/// Parse the `  {bucket}: {n}` line from `baseline status` human output.
+fn human_bucket_count(human: &str, bucket: &str) -> Result<i64, Box<dyn Error>> {
+    let prefix = format!("  {bucket}: ");
+    let line = human
+        .lines()
+        .find(|line| line.starts_with(&prefix))
+        .ok_or_else(|| format!("human output is missing a `{bucket}` bucket line: {human}"))?;
+    line.trim_start_matches(&prefix)
+        .trim()
+        .parse::<i64>()
+        .map_err(|err| format!("failed to parse `{bucket}` count from `{line}`: {err}").into())
+}
+
+/// Parse a `{label}{n}` line (e.g. `total: 2`) from human output.
+fn human_labelled_i64(human: &str, label: &str) -> Result<i64, Box<dyn Error>> {
+    let line = human
+        .lines()
+        .find(|line| line.starts_with(label))
+        .ok_or_else(|| format!("human output is missing a `{label}` line: {human}"))?;
+    line.trim_start_matches(label)
+        .trim()
+        .parse::<i64>()
+        .map_err(|err| format!("failed to parse `{label}` line `{line}`: {err}").into())
+}
+
+/// Parse the set of card_ids listed under the `All entries:` section of `baseline
+/// status` human output (one `  {card_id}  {bucket}  {detail}` line per entry).
+fn human_all_entries_card_ids(human: &str) -> Result<BTreeSet<String>, Box<dyn Error>> {
+    const HEADER: &str = "All entries:\n";
+    let start = human
+        .find(HEADER)
+        .ok_or_else(|| format!("human output is missing an `All entries:` section: {human}"))?
+        + HEADER.len();
+    let rest = &human[start..];
+    let end = rest.find("\n\n").unwrap_or(rest.len());
+    Ok(rest[..end]
+        .lines()
+        .filter(|line| !line.trim().is_empty())
+        .map(|line| {
+            line.trim_start()
+                .split("  ")
+                .next()
+                .unwrap_or_default()
+                .to_string()
+        })
+        .collect())
 }
 
 // issue #1893: `baseline status` must report a currently open actionable card the
@@ -8293,6 +8385,89 @@ review_after = "2099-01-01"
         1,
         "{report}"
     );
+
+    Ok(())
+}
+
+// issue #1893 review finding: a baseline ledger entry that fails the analyzer's own
+// *strict* per-entry validation (bad card_id shape, here) would otherwise abort the
+// whole repo-wide card scan inside `pipeline::analyze` (via `PolicyState::load`)
+// before `baseline status` ever got a chance to report `identity_unmatched` for the
+// offending row — defeating the corrupt-ledger-diagnosis feature for exactly the
+// class of problem it exists to catch. `baseline status` must instead still succeed,
+// flag the bad entry as `identity_unmatched`, and surface `card_scan_error` so readers
+// know the repo-wide card data (and therefore any `resolved` bucket) is degraded.
+#[test]
+fn baseline_status_survives_a_strictly_invalid_baseline_ledger_entry() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-strict-invalid-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+
+    // Valid TOML, valid owner/reason/evidence/review_after — but `card_id` fails the
+    // exact counted UR-*-cN shape check, which the *strict* loader used by
+    // `PolicyState::load` (and therefore `pipeline::analyze`) rejects outright.
+    let policy = copied.join("policy");
+    fs::create_dir_all(&policy)?;
+    fs::write(
+        policy.join("unsafe-review-baseline.toml"),
+        r#"schema_version = "0.1"
+status = "active"
+
+[[entries]]
+card_id = "not-a-valid-counted-identity"
+owner = "core/policy"
+reason = "hand-edited, broke the shape"
+evidence = "fixture"
+review_after = "2099-01-01"
+"#,
+    )?;
+
+    // Confirm the premise: the strict loader used elsewhere (e.g. `policy report`)
+    // really does hard-fail on this file, so this test is not vacuous.
+    run_failure([
+        os("policy"),
+        os("report"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+
+    let output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&output)?)?;
+    assert_eq!(report["counts"]["identity_unmatched"], 1, "{report}");
+    assert_eq!(
+        report["entries"][0]["card_id"],
+        "not-a-valid-counted-identity"
+    );
+    assert_eq!(report["entries"][0]["bucket"], "identity_unmatched");
+    let card_scan_error = report["card_scan_error"]
+        .as_str()
+        .ok_or_else(|| format!("card_scan_error should be a non-null string: {report}"))?;
+    assert!(
+        card_scan_error.contains("unsafe-review-baseline.toml"),
+        "{card_scan_error}"
+    );
+
+    let human_output = run_success([
+        os("baseline"),
+        os("status"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+    ])?;
+    let human = stdout_text(&human_output)?;
+    assert!(
+        human.contains("the repo-wide card scan could not run"),
+        "{human}"
+    );
+    assert!(human.contains("identity_unmatched: 1"), "{human}");
 
     Ok(())
 }

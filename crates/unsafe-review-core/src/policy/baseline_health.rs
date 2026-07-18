@@ -33,7 +33,9 @@ pub enum HealthBucket {
     ActiveImproved,
     /// Baseline-known card, still open, evidence coverage regressed.
     ActiveWorsened,
-    /// Baseline ledger entry whose card no longer appears in the current scan.
+    /// Baseline ledger entry whose card no longer appears in the current scan. When
+    /// [`BaselineHealthReport::card_scan_error`] is set, the scan itself could not
+    /// run — `resolved` then means "unverifiable", not "confirmed gone".
     Resolved,
     /// Baseline ledger entry whose `review_after` date has passed.
     ReviewDue,
@@ -162,6 +164,17 @@ pub struct BaselineHealthReport {
     /// Set when the coverage snapshot file exists but failed to parse — explains why
     /// every ledger entry may have landed in `snapshot_missing_or_invalid`.
     pub snapshot_load_error: Option<String>,
+    /// Set by the caller (not by [`classify`]) when the repo-wide card scan could not
+    /// run because the baseline ledger itself failed the analyzer's own strict
+    /// per-entry validation — exactly the condition `identity_unmatched` exists to
+    /// diagnose (issue #1893 review finding). When set, `current_cards` was empty for
+    /// this classification: every `resolved` bucket in `entries` means "no current
+    /// card was found" in the *degraded, scan-unavailable* sense, not a confirmed
+    /// disappearance — the entry itself may still be genuinely present in the
+    /// repository. `identity_unmatched`/`duplicate_or_conflicting_entry`/
+    /// `suppression_overlap` classifications are unaffected: they never depend on
+    /// card data.
+    pub card_scan_error: Option<String>,
 }
 
 /// Inputs to [`classify`]. Every field is already-loaded data — `classify` performs no
@@ -240,6 +253,10 @@ pub fn classify(input: &BaselineHealthInput<'_>) -> BaselineHealthReport {
         entries,
         counts,
         snapshot_load_error: input.snapshot_load_error.map(ToOwned::to_owned),
+        // Set by the caller after `classify` returns (`api.rs`), not here: `classify`
+        // has no idea whether `current_cards` is empty because the repo genuinely has
+        // no cards, or because the repo-wide scan couldn't run at all.
+        card_scan_error: None,
     }
 }
 
@@ -330,11 +347,13 @@ fn classify_entry<'a>(
 
 /// List every reason `entry` is structurally invalid: a card_id that fails the exact
 /// counted-identity shape check, missing/empty `owner`/`reason`/`evidence` (already
-/// collapsed to `None` by the lenient loader's `optional_string`), or a
-/// present-but-malformed `review_after` date. Empty means the entry is structurally
-/// sound (its bucket may still be anything else). A missing `review_after` is not
-/// itself a problem here — `classify_entry`'s `review_due` check already treats an
-/// absent `review_after` as "cannot determine due date" rather than invalid.
+/// collapsed to `None` by the lenient loader's `optional_string`), or a missing or
+/// malformed `review_after` date. Empty means the entry is structurally sound (its
+/// bucket may still be anything else). `review_after` is schema-required on every
+/// baseline entry (SPEC-0030; enforced by the strict loader elsewhere), so a row
+/// lacking it entirely is exactly as invalid as one with a malformed date — neither
+/// should fall through to `classify_entry`'s `review_due`/`active_*` checks and look
+/// healthy.
 fn structural_problems(entry: &RawLedgerEntry) -> Vec<&'static str> {
     let mut problems = Vec::new();
     if !entry.valid_identity {
@@ -349,12 +368,10 @@ fn structural_problems(entry: &RawLedgerEntry) -> Vec<&'static str> {
     if entry.evidence.is_none() {
         problems.push("missing evidence");
     }
-    if entry
-        .review_after
-        .as_deref()
-        .is_some_and(|date| !looks_like_iso_date(date))
-    {
-        problems.push("malformed review_after date");
+    match entry.review_after.as_deref() {
+        None => problems.push("missing review_after"),
+        Some(date) if !looks_like_iso_date(date) => problems.push("malformed review_after date"),
+        Some(_) => {}
     }
     problems
 }
@@ -782,7 +799,14 @@ mod tests {
             "UR-broken2-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1",
         );
         malformed_date.review_after = Some("not-a-date".to_string());
-        let entries = vec![missing_owner, malformed_date];
+        // A missing review_after (schema-required on every baseline entry) must be
+        // treated exactly like a malformed one — without the fix this card_id has no
+        // current match, so it would silently fall through to `resolved` instead.
+        let missing_review_after_id =
+            "UR-broken3-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let mut missing_review_after = raw_entry(missing_review_after_id);
+        missing_review_after.review_after = None;
+        let entries = vec![missing_owner, malformed_date, missing_review_after];
         let suppression = empty_suppression();
         let cards: Vec<ReviewCard> = Vec::new();
 
@@ -795,9 +819,9 @@ mod tests {
             snapshot_load_error: None,
         });
 
-        // Neither entry falls through to active_unchanged/resolved looking healthy —
-        // both are folded into the existing identity_unmatched bucket (no 11th bucket).
-        assert_eq!(report.counts.identity_unmatched, 2, "{:?}", report.entries);
+        // No entry falls through to active_unchanged/resolved looking healthy — all
+        // three are folded into the existing identity_unmatched bucket (no 11th bucket).
+        assert_eq!(report.counts.identity_unmatched, 3, "{:?}", report.entries);
         assert_eq!(report.counts.active_unchanged, 0);
         assert_eq!(report.counts.resolved, 0);
         for entry in &report.entries {
@@ -811,6 +835,17 @@ mod tests {
         assert!(
             owner_entry.detail.contains("missing owner"),
             "{owner_entry:?}"
+        );
+        let missing_review_after_entry = report
+            .entries
+            .iter()
+            .find(|entry| entry.card_id == missing_review_after_id)
+            .ok_or("missing-review_after entry must be present")?;
+        assert!(
+            missing_review_after_entry
+                .detail
+                .contains("missing review_after"),
+            "{missing_review_after_entry:?}"
         );
         Ok(())
     }

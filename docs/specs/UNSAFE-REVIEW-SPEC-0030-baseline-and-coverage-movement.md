@@ -194,11 +194,23 @@ excluded by the existing analyzer classification, not by a second expiry check
 inside this module.
 
 `identity_unmatched` also covers ledger entries that are structurally invalid in
-other ways — missing/empty `owner`/`reason`/`evidence`, or a present-but-malformed
-`review_after` date — instead of a broken entry silently falling through to
-`active_unchanged`/`resolved` and looking healthy. There is still exactly ten
-buckets; a structurally invalid entry is folded into the existing
-`identity_unmatched` bucket rather than adding an eleventh.
+other ways — missing/empty `owner`/`reason`/`evidence`, or a missing or malformed
+`review_after` date (schema-required on every entry) — instead of a broken entry
+silently falling through to `active_unchanged`/`resolved` and looking healthy.
+There is still exactly ten buckets; a structurally invalid entry is folded into
+the existing `identity_unmatched` bucket rather than adding an eleventh.
+
+A baseline ledger entry that fails the analyzer's own *strict* per-entry
+validation (used by every other command, e.g. `policy report`) would otherwise
+abort the whole repo-wide card scan before `baseline status` could report
+`identity_unmatched` for the offending row — defeating the corrupt-ledger-
+diagnosis purpose for exactly the class of problem it exists to catch.
+`baseline status` degrades instead: it still succeeds, still flags the bad
+entry `identity_unmatched`, and sets `card_scan_error` on the report (surfaced
+as a warning in both human and JSON output) — in that state `resolved` means
+"the repo-wide card scan could not run", not "confirmed gone." Every other
+scan failure (a genuinely unparseable ledger, a broken suppression ledger, a
+source-scan error) still fails `baseline status` outright.
 
 Human and JSON output project from the same report, so both always report
 identical bucket counts and entry identities. `unsafe-review baseline refresh
@@ -258,7 +270,9 @@ actionable unsafe-review gaps above the recorded baseline. It is not a statement
 that the changed code is memory-safe, UB-free, Miri-clean, or that any unsafe
 site executed safely. Baseline entries are debt records, not safety records.
 `baseline status` and `baseline refresh --dry-run` carry the same boundary: they
-classify existing ledger/movement signals and write nothing.
+classify existing ledger/movement signals, and both leave repository policy,
+source, and snapshot state unchanged. `baseline refresh --dry-run` writes a
+plan artifact only when the explicit `--out` option is given.
 
 ## Proof obligations
 

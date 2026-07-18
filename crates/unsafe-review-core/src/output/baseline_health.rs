@@ -98,6 +98,17 @@ pub(crate) fn render_status_human(report: &BaselineHealthReport) -> String {
         "audit date: {}\n\n",
         escape_control_chars(&report.today)
     ));
+    if let Some(err) = &report.card_scan_error {
+        out.push_str(&format!(
+            "warning: the repo-wide card scan could not run because the baseline ledger \
+             failed strict validation: {}\n\
+             `resolved` below means \"no current card was found\" in this degraded, \
+             scan-unavailable sense, not a confirmed disappearance — affected entries may \
+             still be present in the repository. `identity_unmatched`, \
+             `duplicate_or_conflicting_entry`, and `suppression_overlap` are unaffected.\n\n",
+            escape_control_chars(err)
+        ));
+    }
     out.push_str("Buckets:\n");
     out.push_str(&format!(
         "  active_unchanged: {}\n",
@@ -237,6 +248,7 @@ mod tests {
             }],
             counts,
             snapshot_load_error: None,
+            card_scan_error: None,
         }
     }
 
