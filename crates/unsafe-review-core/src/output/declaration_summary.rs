@@ -118,39 +118,50 @@ pub(crate) fn declaration_groups(output: &AnalyzeOutput) -> Vec<DeclarationGroup
     groups
 }
 
-fn build_group(
-    file: String,
-    mut cards: Vec<&ReviewCard>,
-    output: &AnalyzeOutput,
-) -> DeclarationGroup {
+fn build_group(file: String, cards: Vec<&ReviewCard>, output: &AnalyzeOutput) -> DeclarationGroup {
+    // Derive each card's movement flag and contract-coverage slot exactly once
+    // up front, so the sort comparator and the counting loop below reuse the
+    // results instead of re-running `is_new_or_worsened` (O(n log n) times) and
+    // `CoverageBlock::derive` (again per card). Same values, fewer derivations.
+    let mut entries: Vec<(&ReviewCard, bool, Coverage)> = cards
+        .into_iter()
+        .map(|card| {
+            let is_new = is_new_or_worsened(card, output);
+            let contract = CoverageBlock::derive(card).contract_coverage;
+            (card, is_new, contract)
+        })
+        .collect();
+
     // Deterministic in-group order: new/worsened cards first, then by
     // ascending line, then by card id -- this also fixes the deterministic
     // representative sample selected below.
-    cards.sort_by(|left, right| {
-        let left_new = is_new_or_worsened(left, output);
-        let right_new = is_new_or_worsened(right, output);
-        right_new
-            .cmp(&left_new)
-            .then_with(|| left.site.location.line.cmp(&right.site.location.line))
-            .then_with(|| left.id.0.cmp(&right.id.0))
+    entries.sort_by(|left, right| {
+        right
+            .1
+            .cmp(&left.1)
+            .then_with(|| left.0.site.location.line.cmp(&right.0.site.location.line))
+            .then_with(|| left.0.id.0.cmp(&right.0.id.0))
     });
 
     let mut new_or_worsened = 0usize;
     let mut contract_missing = 0usize;
     let mut contract_present = 0usize;
-    for card in &cards {
-        if is_new_or_worsened(card, output) {
+    for (_, is_new, contract) in &entries {
+        if *is_new {
             new_or_worsened += 1;
         }
-        match CoverageBlock::derive(card).contract_coverage {
+        match contract {
             Coverage::Present => contract_present += 1,
             Coverage::Missing | Coverage::Weak => contract_missing += 1,
         }
     }
 
-    let total = cards.len();
+    let total = entries.len();
     let inherited = total.saturating_sub(new_or_worsened);
-    let underlying_card_ids: Vec<String> = cards.iter().map(|card| card.id.to_string()).collect();
+    let underlying_card_ids: Vec<String> = entries
+        .iter()
+        .map(|(card, _, _)| card.id.to_string())
+        .collect();
     let representatives = underlying_card_ids
         .iter()
         .take(DECLARATION_SUMMARY_REPRESENTATIVE_LIMIT)
@@ -360,6 +371,39 @@ mod tests {
         assert_eq!(groups.len(), 1);
         assert_eq!(groups[0].contract_present, 1);
         assert_eq!(groups[0].contract_missing, 1);
+    }
+
+    #[test]
+    fn is_new_or_worsened_detects_worsened_against_a_populated_snapshot() {
+        // The other tests all use an empty `coverage_snapshot`; this one exercises
+        // the `apply_snapshot_slots` branch. A baseline-known declaration whose
+        // recorded snapshot floor had contract evidence present, but whose current
+        // card has none, must read as worsened once the snapshot slots are applied.
+        let card = declaration_card("UR-snap", "src/lib.rs", 1, ReviewClass::BaselineKnown);
+        let mut output = output_with_cards(vec![card.clone()]);
+
+        // No snapshot: a baseline-known card is inherited, not new/worsened.
+        assert!(!is_new_or_worsened(&card, &output));
+
+        output.coverage_snapshot.insert(
+            card.id.0.clone(),
+            crate::policy::SnapshotCoverage {
+                contract_coverage: "present".to_string(),
+                guard_coverage: "missing".to_string(),
+                test_reach_coverage: "missing".to_string(),
+                witness_receipt_coverage: "missing".to_string(),
+            },
+        );
+        assert!(
+            is_new_or_worsened(&card, &output),
+            "contract dropped present -> missing since the snapshot floor: must be worsened"
+        );
+
+        // The group reflects the worsened movement counted from the same path.
+        let groups = declaration_groups(&output);
+        assert_eq!(groups.len(), 1);
+        assert_eq!(groups[0].new_or_worsened, 1);
+        assert_eq!(groups[0].inherited, 0);
     }
 
     #[test]

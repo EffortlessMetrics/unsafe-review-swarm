@@ -1646,6 +1646,48 @@ mod tests {
         Ok(())
     }
 
+    // issue #1895 review (CodeRabbit): the calibration case only asserts the
+    // per-card inventory, which cannot fail if the grouping or markdown rendering
+    // disappears. This ties the `unsafe_declaration_volume_summary` fixture to the
+    // rendered grouped projection end-to-end so a regression in either surface is
+    // caught.
+    #[test]
+    fn declaration_volume_summary_renders_grouped_projection_for_the_fixture() -> Result<(), String>
+    {
+        let pr = render_pr_summary(&fixture_output("unsafe_declaration_volume_summary")?);
+        assert!(
+            pr.contains("## Declaration summary"),
+            "pr-summary must render the declaration summary section:\n{pr}"
+        );
+        // Exact grouped row: 4 declaration cards in src/lib.rs, all new/worsened,
+        // 2 contract-missing + 2 contract-present.
+        assert!(
+            pr.contains("| `src/lib.rs` | 4 | 4 | 0 | 2 | 2 |"),
+            "grouped src/lib.rs row must report totals 4/4/0 and contract 2/2:\n{pr}"
+        );
+        // The group exceeds the representative cap, so the bounded inventory
+        // pointer must appear rather than a full dump of every card id.
+        assert!(
+            pr.contains("+1 more (see `cards.json`)"),
+            "over-cap group must render the inventory pointer:\n{pr}"
+        );
+
+        // The same projection appears on the repo-posture surface.
+        let repo = render_repo_posture(&repo_fixture_output("unsafe_declaration_volume_summary")?);
+        assert!(
+            repo.contains("## Declaration summary"),
+            "repo posture must render the declaration summary section:\n{repo}"
+        );
+
+        // Quiet PRs (no unsafe_declaration cards) must not gain the section.
+        let quiet = render_pr_summary(&fixture_output("raw_pointer_alignment")?);
+        assert!(
+            !quiet.contains("## Declaration summary"),
+            "a fixture with no declaration cards must not render the section:\n{quiet}"
+        );
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
