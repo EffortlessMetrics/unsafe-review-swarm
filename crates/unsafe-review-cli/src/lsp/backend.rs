@@ -77,26 +77,33 @@ impl LanguageServer for Backend {
     }
 
     async fn did_open(&self, params: DidOpenTextDocumentParams) {
-        self.documents
-            .lock()
-            .await
-            .docs
-            .insert(params.text_document.uri, params.text_document.text);
+        self.documents.lock().await.upsert(
+            params.text_document.uri,
+            params.text_document.text,
+            params.text_document.version,
+        );
         if self.config.lock().await.refresh_on_open {
             self.refresh().await;
         }
     }
 
     async fn did_change(&self, params: DidChangeTextDocumentParams) {
+        let uri = params.text_document.uri;
+        let version = params.text_document.version;
         if let Some(TextDocumentContentChangeEvent { text, .. }) =
             params.content_changes.into_iter().next()
         {
-            self.documents
-                .lock()
-                .await
-                .docs
-                .insert(params.text_document.uri, text);
+            let mut documents = self.documents.lock().await;
+            if let Some(document) = documents.docs.get_mut(&uri) {
+                document.text = text;
+                document.version = version;
+            } else {
+                documents.upsert(uri.clone(), text, version);
+            }
+        } else {
+            self.documents.lock().await.update_version(&uri, version);
         }
+        self.mark_diagnostics_stale().await;
         let refresh_on_change = {
             let config = self.config.lock().await;
             should_refresh_on_change(&config)

@@ -66,12 +66,12 @@ impl Backend {
         }
         let by_uri = diagnostics_by_uri(&root, &output);
         let (clear_uris, publish_batches) = self.install_refresh_result(output, by_uri).await;
-        for uri in clear_uris {
-            self.client.publish_diagnostics(uri, vec![], None).await;
+        for (uri, version) in clear_uris {
+            self.client.publish_diagnostics(uri, vec![], version).await;
         }
-        for (uri, diagnostics) in publish_batches {
+        for (uri, diagnostics, version) in publish_batches {
             self.client
-                .publish_diagnostics(uri, diagnostics, None)
+                .publish_diagnostics(uri, diagnostics, version)
                 .await;
         }
     }
@@ -130,17 +130,30 @@ impl Backend {
         &self,
         output: AnalyzeOutput,
         by_uri: BTreeMap<Uri, Vec<Diagnostic>>,
-    ) -> (Vec<Uri>, Vec<(Uri, Vec<Diagnostic>)>) {
+    ) -> (
+        Vec<(Uri, Option<i32>)>,
+        Vec<(Uri, Vec<Diagnostic>, Option<i32>)>,
+    ) {
+        let versions = self.document_versions().await;
         let current: BTreeSet<_> = by_uri.keys().cloned().collect();
         let clear_uris = {
             let mut previous = self.last_diagnostic_uris.lock().await;
-            let clear_uris = previous.difference(&current).cloned().collect::<Vec<_>>();
+            let clear_uris = previous
+                .difference(&current)
+                .cloned()
+                .map(|uri| {
+                    let version = versions.get(&uri).copied();
+                    (uri, version)
+                })
+                .collect::<Vec<_>>();
             *previous = current;
             clear_uris
         };
         let publish_batches = by_uri
             .iter()
-            .map(|(uri, diagnostics)| (uri.clone(), diagnostics.clone()))
+            .map(|(uri, diagnostics)| {
+                (uri.clone(), diagnostics.clone(), versions.get(uri).copied())
+            })
             .collect::<Vec<_>>();
         *self.latest_analysis.lock().await = Some(output);
         *self.latest_diagnostics.lock().await = by_uri;
@@ -155,8 +168,33 @@ impl Backend {
         *self.latest_analysis.lock().await = None;
         self.latest_diagnostics.lock().await.clear();
         for uri in clear_uris {
-            self.client.publish_diagnostics(uri, vec![], None).await;
+            let version = self.document_version(&uri).await;
+            self.client.publish_diagnostics(uri, vec![], version).await;
         }
+    }
+
+    pub(super) async fn mark_diagnostics_stale(&self) {
+        self.clear_stale_diagnostics().await;
+        self.client
+            .log_message(
+                MessageType::INFO,
+                "unsafe-review diagnostics marked stale after document change",
+            )
+            .await;
+    }
+
+    async fn document_versions(&self) -> BTreeMap<Uri, i32> {
+        self.documents
+            .lock()
+            .await
+            .docs
+            .iter()
+            .map(|(uri, document)| (uri.clone(), document.version))
+            .collect()
+    }
+
+    async fn document_version(&self, uri: &Uri) -> Option<i32> {
+        self.documents.lock().await.version(uri)
     }
 
     async fn log_refresh_error(&self, context: &str, detail: &str) {

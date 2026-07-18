@@ -1,0 +1,55 @@
+# Issue-linked work specification for the #1908 live document-version slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1908"
+kind = "correctness"
+objective = "Track known LSP document versions, publish them with saved-file diagnostics, and clear prior feedback immediately when an opened document changes."
+user_outcome = "An editor never continues presenting diagnostics from the prior opened-document version as current after a change, and consumers can match published diagnostics to the client-supplied version when available."
+claim_boundary = "This slice carries a document-version signal and an explicit stale transition. It does not claim unsaved-buffer analysis, semantic currentness, safety, completeness, analyzer accuracy, failure/partial/capped state, or pull-diagnostic support."
+
+[identity]
+meaning = "The LSP document version is the client-provided version observed at open or change time; it is not an analysis identity and does not prove the saved file or semantic source state is current."
+known_values = "Publish the tracked version for opened documents and omit the version for URIs that have not supplied one."
+stale_transition = "didChange clears prior diagnostics and cached analysis before any optional saved-file refresh, and emits an explicit stale log message."
+unknown_facts = "A didSave notification does not contain a version in the current LSP type, so save never fabricates one for an unopened document."
+
+[scope]
+included = [
+    "Track document text and version in the LSP document store",
+    "Publish known document versions with diagnostics and diagnostic clears",
+    "Clear cached diagnostics and analysis immediately on didChange",
+    "Keep saved-file-only analysis and existing refresh scheduling unchanged",
+    "Add focused document-store regression tests and align this work specification",
+]
+excluded = [
+    "Unsaved-buffer analysis or source overlay plumbing",
+    "Failed, partial, capped, refreshing, or retained-stale result states",
+    "Pull diagnostics, progress, cancellation, packet delivery, or exact VS Code binding",
+    "Automatic edits, witness execution, policy blocking, safety, currentness, completeness, or precision claims",
+]
+
+[[invariant]]
+id = "AC-1908-PR2-1"
+text = "A known client-supplied document version is retained across open/change state updates and remains absent when no opened document supplied one."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo test -p unsafe-review-cli --lib lsp::state --locked"]
+
+[[invariant]]
+id = "AC-1908-PR2-2"
+text = "Saved-file diagnostics and diagnostic clears carry the current known document version, or omit it when the URI has no tracked version."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[invariant]]
+id = "AC-1908-PR2-3"
+text = "didChange removes prior cached diagnostics before optional refresh so an edit cannot leave the prior result presented as current."
+proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[integration]
+surface = "1908-analysis-freshness"
+expected = "The live LSP version and stale-transition signal is additive around the canonical diagnostic projection; ReviewCard and saved-file analyzer semantics remain unchanged."
+
+[rollback]
+strategy = "Revert the document-store version fields, versioned diagnostic publication, didChange stale clearing, focused tests, and this work specification; PR1 analysis identity and the pre-PR2 saved-file LSP behavior remain available."
+
+[risks]
+version_unknown = "Older or unopened URIs publish diagnostics without a version rather than guessing one."
+stale_visibility = "This slice clears diagnostics and emits a client log status; structured failed/partial/capped and retained-stale editor state belongs to PR3."
+claim_drift = "Keep semantic currentness, unsaved-buffer analysis, and safety claims out of document-version metadata."
