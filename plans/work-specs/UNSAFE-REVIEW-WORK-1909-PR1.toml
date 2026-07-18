@@ -1,0 +1,37 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1909"
+kind = "correctness"
+objective = "Define one typed command-only editor action contract before migrating live and saved LSP adapters."
+user_outcome = "Editors and agents can consume stable action identity, readiness, diagnostic binding, analysis identity, and applicability without guessing from titles or executing dead actions."
+claim_boundary = "This slice defines and tests the canonical contract only. It does not migrate live or saved LSP output, reject stale commands at execution time, create edits, run witnesses, or prove a repair sufficient."
+
+[scope]
+included = ["Add one typed core action DTO and stable action vocabulary", "Derive readiness from the canonical editor diagnostic and applicability from structured card facts", "Represent unavailable actions with stable disabled reason codes", "Bind card actions to diagnostic identity and the full analysis identity", "Align SPEC-0012, SPEC-0018, and the spec-coverage producer"]
+excluded = ["Live LSP CodeAction migration and stale command rejection", "Saved lsp.json and VS Code adapter migration", "WorkspaceEdit, source mutation, witness execution, or automatic repair", "Lazy codeAction/resolve support and full agent packet delivery"]
+
+[[invariant]]
+id = "AC-1909-PR1-1"
+text = "Stable action IDs, hierarchical kinds, commands, readiness wording, diagnostic identity, and analysis identity come from one typed producer."
+proof = ["cargo test -p unsafe-review-core action_contract --locked"]
+
+[[invariant]]
+id = "AC-1909-PR1-2"
+text = "Unavailable witness and related-test actions have precise disabled reasons; human-only cards never look preferred or automatically repairable."
+proof = ["cargo test -p unsafe-review-core action_contract --locked"]
+
+[[invariant]]
+id = "AC-1909-PR1-3"
+text = "Every action is explicitly command-only and the contract serializes no edit or WorkspaceEdit field."
+proof = ["cargo test -p unsafe-review-core action_contract --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[integration]
+surface = "1907-canonical-editor-projection"
+expected = "PR2 and PR3 adapt this DTO to live and saved protocol shapes without re-deriving action semantics."
+
+[rollback]
+strategy = "Revert the typed action module, exports, tests, work specification, and narrow spec/ledger clauses; legacy live and saved action behavior remains unchanged throughout PR1."
+
+[risks]
+stale_execution = "PR1 carries analysis identity but does not yet enforce it at live executeCommand; PR2 must reject stale identity rather than resolving card_id against a newer run."
+adapter_drift = "Live and saved adapters remain legacy in PR1; their migration is explicitly sequenced into PR2 and PR3."
+authority_drift = "Readiness stays advisory, isPreferred remains false, and no action contains an edit or claim that a repair is sufficient."

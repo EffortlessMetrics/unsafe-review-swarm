@@ -458,13 +458,13 @@ struct LspStatus {
     trust_boundary: &'static str,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EditorRange {
     pub end: EditorPosition,
     pub start: EditorPosition,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct EditorPosition {
     pub character: usize,
     pub line: usize,

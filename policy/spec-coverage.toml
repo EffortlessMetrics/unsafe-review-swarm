@@ -138,7 +138,7 @@ note = "Receipt coverage is imported metadata for the exact card; it is not evid
 
 [[field]]
 name = "editor_action_contract"
-canonical_source = "#1909 structured command-only action contract (canonical producer to be introduced after this map-only PR)"
+canonical_source = "output/lsp/action_contract.rs::actions_for_card"
 surfaces = ["json", "lsp", "agent"]
 single_truth = true
 note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints."
