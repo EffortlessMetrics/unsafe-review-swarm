@@ -12,3 +12,7 @@ not a scheduler or publication authorization.
 Issue #1916's live dependency audit is recorded in
 [`release-cutline/UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916.toml`](release-cutline/UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916.toml)
 and [`docs/status/DEPENDENCY_DISPOSITIONS.md`](../docs/status/DEPENDENCY_DISPOSITIONS.md).
+
+Its draft, non-active lockfile and exception record is
+[`release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml`](release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml),
+with a human summary in [`docs/status/DEPENDENCY_FREEZE.md`](../docs/status/DEPENDENCY_FREEZE.md).
