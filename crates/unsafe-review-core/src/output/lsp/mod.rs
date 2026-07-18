@@ -1,3 +1,4 @@
+mod action_contract;
 mod projection;
 #[cfg(test)]
 mod tests;
@@ -6,6 +7,10 @@ use crate::api::AnalyzeOutput;
 use crate::domain::ReviewCard;
 use serde::Serialize;
 
+pub use action_contract::{
+    EditorActionApplicability, EditorActionArguments, EditorActionCommand, EditorActionContract,
+    EditorActionDiagnostic, EditorActionPayload, EditorActionReadiness, actions_for_card,
+};
 pub use projection::{
     EditorCoverageBlock, EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary,
     EditorObligationEvidence, EditorPosition, EditorProjection, EditorRange, EditorReachEvidence,

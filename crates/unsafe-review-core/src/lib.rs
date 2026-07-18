@@ -16,9 +16,11 @@ mod util;
 
 pub use output::comment_plan::COMMENT_BODY_WORD_LIMIT;
 pub use output::lsp::{
-    EditorCoverageBlock, EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary,
-    EditorObligationEvidence, EditorPosition, EditorProjection, EditorRange, EditorReachEvidence,
-    EditorSafetyCondition, EditorSimpleEvidence, EditorWitnessRoute,
+    EditorActionApplicability, EditorActionArguments, EditorActionCommand, EditorActionContract,
+    EditorActionDiagnostic, EditorActionPayload, EditorActionReadiness, EditorCoverageBlock,
+    EditorDiagnostic, EditorEvidenceState, EditorEvidenceSummary, EditorObligationEvidence,
+    EditorPosition, EditorProjection, EditorRange, EditorReachEvidence, EditorSafetyCondition,
+    EditorSimpleEvidence, EditorWitnessRoute, actions_for_card,
 };
 
 pub use api::{

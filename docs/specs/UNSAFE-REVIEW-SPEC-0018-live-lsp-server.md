@@ -191,6 +191,14 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
   optional witness route, and trust boundary.
 - Hover must not overclaim safety/soundness/UB-free/Miri-clean status.
 - All code actions are card-scoped and command-only (`edit == None`).
+- Card actions consume the canonical typed action contract from SPEC-0012.
+  Stable action identity, hierarchical kind, diagnostic/card binding, analysis
+  identity, readiness wording, applicability, and disabled reasons must not be
+  re-derived in the live adapter. Explanation/navigation/copy actions are not
+  automatic fixes, are never preferred, and remain edit-free.
+- An unavailable route, witness command, or related test must be omitted or
+  disabled with its canonical reason. No enabled action may knowingly execute
+  to an unexplained `null`.
 
 ## Execute command contract
 
