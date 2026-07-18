@@ -26,6 +26,10 @@ const REMOVE_SAFETY_DIFF: &str = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/sr
 const WEAKEN_BOOL_VALID_VALUE_GUARD_BEFORE: &str = "    assert!(value <= 1);\n";
 const WEAKEN_BOOL_VALID_VALUE_GUARD_AFTER: &str = "    debug_assert!(value <= 1);\n";
 const WEAKEN_BOOL_VALID_VALUE_DIFF: &str = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,7 +1,7 @@\n pub fn byte_to_bool_checked(value: u8) -> bool {\n     assert_eq!(core::mem::size_of::<u8>(), core::mem::size_of::<bool>());\n-    assert!(value <= 1);\n+    debug_assert!(value <= 1);\n     // SAFETY: size equality and the bool byte domain are checked locally.\n     unsafe { core::mem::transmute::<u8, bool>(value) }\n }\n";
+const REMOVE_AVAILABILITY_GUARD_BEFORE: &str = "        assert!(One::is_available());\n        // SAFETY: availability is asserted before constructing this searcher.\n";
+const REMOVE_AVAILABILITY_GUARD_AFTER: &str =
+    "        // SAFETY: caller must ensure availability before constructing this searcher.\n";
+const REMOVE_AVAILABILITY_GUARD_DIFF: &str = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -12,8 +12,7 @@ impl One {\n     }\n \n     pub fn new(needle: u8) -> One {\n-        assert!(One::is_available());\n-        // SAFETY: availability is asserted before constructing this searcher.\n+        // SAFETY: caller must ensure availability before constructing this searcher.\n         unsafe { One::new_unchecked(needle) }\n     }\n \n";
 
 struct ChallengeCase {
     id: String,
@@ -203,6 +207,7 @@ fn apply_transformation(case: &ChallengeCase, root: &Path) -> Result<(), String>
         "weaken-bool-valid-value-guard-to-debug-assert" => {
             weaken_bool_valid_value_guard_to_debug_assert(case, root)
         }
+        "remove-availability-guard" => remove_availability_guard(case, root),
         _ => Err(format!(
             "{LEDGER} challenge `{}` uses unsupported transformation `{}`",
             case.id, case.transformation
@@ -252,6 +257,25 @@ fn weaken_bool_valid_value_guard_to_debug_assert(
 
     let diff_path = root.join(&case.diff);
     fs::write(&diff_path, WEAKEN_BOOL_VALID_VALUE_DIFF)
+        .map_err(|err| format!("write {} failed: {err}", diff_path.display()))?;
+    Ok(())
+}
+
+fn remove_availability_guard(case: &ChallengeCase, root: &Path) -> Result<(), String> {
+    let src = root.join("src").join("lib.rs");
+    let text =
+        fs::read_to_string(&src).map_err(|err| format!("read {} failed: {err}", src.display()))?;
+    let text = normalize_lf(&text);
+    let text = replace_once(
+        &text,
+        REMOVE_AVAILABILITY_GUARD_BEFORE,
+        REMOVE_AVAILABILITY_GUARD_AFTER,
+        &format!("{} src/lib.rs runtime availability guard", case.id),
+    )?;
+    fs::write(&src, text).map_err(|err| format!("write {} failed: {err}", src.display()))?;
+
+    let diff_path = root.join(&case.diff);
+    fs::write(&diff_path, REMOVE_AVAILABILITY_GUARD_DIFF)
         .map_err(|err| format!("write {} failed: {err}", diff_path.display()))?;
     Ok(())
 }
