@@ -1,0 +1,52 @@
+# Issue-linked work specification for the #1891 holdout contract and inventory audit (PR 1).
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1891"
+kind = "maintenance"
+objective = "Audit the existing dogfood holdout inventory, opt-in enforcement rails, and tuning-input status, and record rotation, first-result retention, promotion-to-regression, and target-replacement rules by reference to SPEC-0042, without adding a new holdout target, a duplicate corpus manifest, or any analyzer behavior change."
+user_outcome = "Maintainers and reviewers have one durable, dated audit record of holdout governance to cite before a later PR proposes adding, rotating, or promoting a holdout target."
+claim_boundary = "This slice audits and documents existing holdout partition mechanics. It adds no analyzer or detector behavior, no new holdout target, and no proof, UB-free, Miri-clean, memory-safety, calibrated precision/recall, or site-execution claim. Holdout results remain diagnostic evidence on selected pinned repositories, not ecosystem generalization evidence."
+
+[scope]
+included = [
+    "Audit docs/dogfood/corpus.toml for the current holdout partition membership and target metadata",
+    "Cite the dogfood-exec (xtask/src/dogfood_exec.rs) and corpus-partitions (xtask/src/corpus_partitions.rs) opt-in enforcement as evidence a holdout cannot silently enter every-PR or ordinary regression cadence",
+    "Check via git log whether any analyzer, detector, or ranking commit has targeted the getrandom-holdout crate since it was added, and record the finding",
+    "Reference SPEC-0042 Refresh policy and Generalization partitions sections for rotation cadence, first-result retention, promotion-to-regression criteria, and target-replacement rules, without duplicating that spec text",
+    "Add plans/work-specs/UNSAFE-REVIEW-WORK-1891-PR1.toml and docs/dogfood/reports/2026-07-19-holdout-contract-audit.md",
+    "Name the still-unmet dimension matrix (FFI/platform, raw pointers/alloc/MaybeUninit, SIMD/target_feature/asm, atomics/concurrency, no_std/embedded, macro-heavy/generated, multi-crate workspace, quiet/small unsafe surface) as explicit PR2+ backlog",
+]
+excluded = [
+    "Adding a new holdout target, repo-snapshot, or PR-diff corpus entry",
+    "Editing docs/specs/UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md text",
+    "Creating a second or duplicate corpus manifest alongside docs/dogfood/corpus.toml",
+    "Any analyzer, detector, obligation, or ranking code change",
+    "Changing the holdout partition count in docs/dogfood/index.json",
+    "Selecting or scheduling PR2+ holdout targets; this slice only names the unmet dimensions",
+]
+
+[[invariant]]
+id = "AC-1891-PR1-1"
+text = "docs/dogfood/corpus.toml gains no new target and docs/dogfood/index.json summary.partitions.holdout remains 1."
+proof = ["cargo run --locked -p xtask -- check-corpus-partitions", "cargo run --locked -p xtask -- check-dogfood"]
+
+[[invariant]]
+id = "AC-1891-PR1-2"
+text = "The audit report cites SPEC-0042's Refresh policy and Generalization partitions sections by reference for rotation, retention, promotion, and replacement rules, and the spec file itself is unchanged."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[invariant]]
+id = "AC-1891-PR1-3"
+text = "The audit report and this work spec preserve the advisory trust boundary: no proof, UB-free, Miri-clean, site-execution, memory-safety, or calibrated precision/recall claim, and holdout evidence is described as diagnostic on selected pinned repositories only."
+proof = ["cargo run --locked -p xtask -- check-dogfood", "cargo run --locked -p xtask -- check-pr"]
+
+[integration]
+surface = "docs/specs/UNSAFE-REVIEW-SPEC-0042-corpus-validation-taxonomy.md"
+expected = "PR2+ holdout target work cites this audit's inventory, enforcement evidence, and unmet-dimension backlog by reference instead of re-auditing corpus.toml, dogfood_exec.rs, and corpus_partitions.rs from scratch."
+
+[rollback]
+strategy = "Revert the work spec and audit report. There is no corpus manifest, index, or analyzer change to roll back; docs/dogfood/index.json and docs/dogfood/corpus.toml are unaffected by this slice."
+
+[risks]
+audit_staleness = "The git-log finding that getrandom has not been tuned against is a point-in-time result; a later PR touching analyzer, detector, or ranking code near getrandom-shaped patterns must re-check before continuing to cite this audit as current."
+scope_creep = "This slice intentionally adds no holdout target and no analyzer change. PR2+ target selection and addition must be filed and reviewed separately rather than folded into this audit's diff."
+spec_citation_drift = "Rotation, retention, promotion, and replacement rules are referenced from SPEC-0042 by section name rather than duplicated. If SPEC-0042 is renumbered or its Refresh policy section is renamed, the citing PR must update this work spec and the audit report in the same change."

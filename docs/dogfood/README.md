@@ -34,6 +34,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-07-19 holdout contract audit](reports/2026-07-19-holdout-contract-audit.md)
 - [2026-06-19 generalization validation closeout](reports/2026-06-19-generalization-validation-closeout.md)
 - [2026-06-19 initial holdout report](reports/2026-06-19-initial-holdout-report.md)
 - [2026-06-18 residual unknown classifier report](reports/2026-06-18-residual-unknown-classifier-report.md)
