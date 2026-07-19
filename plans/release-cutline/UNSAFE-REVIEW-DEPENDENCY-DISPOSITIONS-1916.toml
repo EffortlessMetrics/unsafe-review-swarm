@@ -2,10 +2,10 @@
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
 snapshot_date = "2026-07-18"
-swarm_base = "64f1eb4caa8490de76dc5bea7469794f9ea13b9c"
-source_base = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
-status = "audit_complete_repair_in_review"
-chosen_history = "retain_source_candidate; defer_swarm_duplicate; never_merge_both_without_convergence_proof"
+swarm_base = "e7f52c9187e1f5ef81f7325d8dcb8e478c580fad"
+source_base = "4fc6eb806de1460c618d60869b8a1cb885f87eea"
+status = "dependency_updates_absorbed_checkpoint_complete"
+chosen_history = "accept_source_updates; absorb_versions_into_swarm; close_swarm_duplicates_without_merging_duplicate_history"
 freeze = "not_active"
 publication = "owner_gated_out_of_scope"
 source_divergence = "new_source_commits=0"
@@ -15,19 +15,19 @@ rollback = "Supersede this snapshot with a refreshed live audit; do not change s
 surface = "ra_ap_syntax"
 swarm_pr = 1875
 source_pr = 548
-decision = "defer_swarm_retain_source"
+decision = "source_merged_swarm_duplicate_closed_and_absorbed"
 swarm_head = "eed5b73040304c0be905b4e8d224f62b2d3bad08"
 source_head = "e5f7ca68f5f2c8cd478bbabbc84314ab7408d68e"
-reason = "Duplicate patch family; retain the public source candidate and require parser-specific proof before merge."
+reason = "Source PR #548 merged as 4fc6eb80 after parser-specific proof; swarm PR #1875 was closed as the duplicate and swarm PR #1958 absorbed the accepted version."
 
 [[disposition]]
 surface = "ignore"
 swarm_pr = 1874
 source_pr = 547
-decision = "defer_swarm_retain_source"
+decision = "source_merged_swarm_duplicate_closed_and_absorbed"
 swarm_head = "40e646427b36d0ca197e526d974e3526ed985a3a"
 source_head = "58f4b89a3cbee9ad0b4b6e6ecdb6523bf743c359"
-reason = "Duplicate patch family; retain the public source candidate and do not merge both lockfile updates independently."
+reason = "Source PR #547 merged as fb217073; swarm PR #1874 was closed as the duplicate and swarm PR #1958 absorbed the accepted version without merging duplicate history."
 
 [[disposition]]
 surface = "github_actions"
