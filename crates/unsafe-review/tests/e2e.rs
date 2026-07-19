@@ -3491,6 +3491,88 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     Ok(())
 }
 
+/// Every count displayed in `pr-summary.md` must match the canonical count in
+/// `cards.json` (issue #1884 acceptance criterion: "Every displayed count
+/// matches the canonical JSON artifacts"). The terminal front panel is a
+/// bounded projection over the same `Summary`, so a future refactor of either
+/// renderer that let the surfaced numbers drift from the canonical artifact
+/// would be a single-truth violation. This is a structural cross-surface guard,
+/// not a brittle full-Markdown golden -- it parses only the integers out of the
+/// labelled summary lines.
+#[test]
+fn pr_summary_counts_match_cards_json() -> Result<(), Box<dyn Error>> {
+    let source_fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-pr-summary-counts-e2e")?;
+    let fixture = temp.path().join("fixture");
+    copy_dir_all(&source_fixture, &fixture)?;
+    let out_dir = temp.path().join("unsafe-review");
+
+    run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    let summary = &cards["summary"];
+    let pr_summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
+
+    // Header counts that are always rendered.
+    assert_eq!(
+        pr_summary_line_ints(&pr_summary, "- Review cards:")?,
+        vec![json_usize(&summary["cards"], "summary.cards")?],
+        "pr-summary `Review cards` count must equal cards.json summary.cards"
+    );
+    assert_eq!(
+        pr_summary_line_ints(&pr_summary, "- Open actionable gaps:")?,
+        vec![json_usize(
+            &summary["open_actionable_gaps"],
+            "summary.open_actionable_gaps"
+        )?],
+        "pr-summary `Open actionable gaps` count must equal cards.json summary.open_actionable_gaps"
+    );
+
+    // The diff-scope bullet renders three counts: total changed, Rust, non-Rust.
+    assert_eq!(
+        pr_summary_line_ints(&pr_summary, "- Diff scope:")?,
+        vec![
+            json_usize(&summary["changed_files"], "summary.changed_files")?,
+            json_usize(&summary["changed_rust_files"], "summary.changed_rust_files")?,
+            json_usize(
+                &summary["changed_non_rust_files"],
+                "summary.changed_non_rust_files"
+            )?,
+        ],
+        "pr-summary `Diff scope` counts must equal cards.json summary changed-file counts"
+    );
+
+    // The coverage-movement bullet is only rendered when some movement signal is
+    // present; when it is, its five counts must match the canonical summary in
+    // order: new, worsened, improved, resolved, inherited.
+    if let Some(movement) = pr_summary
+        .lines()
+        .find(|line| line.trim_start().starts_with("- Coverage movement:"))
+    {
+        assert_eq!(
+            pr_summary_line_ints(&pr_summary, "- Coverage movement:")?,
+            vec![
+                json_usize(&summary["new_gaps"], "summary.new_gaps")?,
+                json_usize(&summary["worsened_gaps"], "summary.worsened_gaps")?,
+                json_usize(&summary["improved_gaps"], "summary.improved_gaps")?,
+                json_usize(&summary["resolved_gaps"], "summary.resolved_gaps")?,
+                json_usize(&summary["inherited_gaps"], "summary.inherited_gaps")?,
+            ],
+            "pr-summary `Coverage movement` counts must equal cards.json summary movement counts; line: {movement}"
+        );
+    }
+
+    Ok(())
+}
+
 #[test]
 fn first_pr_emits_usefulness_telemetry_artifact() -> Result<(), Box<dyn Error>> {
     // Verifies that first-pr emits usefulness-telemetry.json and that it
@@ -7395,6 +7477,31 @@ fn json_usize(value: &Value, field: &str) -> Result<usize, Box<dyn Error>> {
         .ok_or_else(|| format!("{field} must be an unsigned count"))?
         .try_into()
         .map_err(|_err| format!("{field} does not fit in usize"))?)
+}
+
+/// Return every ASCII unsigned-integer run, in order, from the first
+/// `pr-summary.md` line whose trimmed text starts with `prefix`. Used to
+/// cross-check the front panel's displayed counts against the canonical
+/// `cards.json` summary without pinning the surrounding prose.
+fn pr_summary_line_ints(summary: &str, prefix: &str) -> Result<Vec<usize>, Box<dyn Error>> {
+    let line = summary
+        .lines()
+        .find(|line| line.trim_start().starts_with(prefix))
+        .ok_or_else(|| format!("pr-summary.md has no line starting with {prefix:?}"))?;
+    let mut ints = Vec::new();
+    let mut current = String::new();
+    for ch in line.chars() {
+        if ch.is_ascii_digit() {
+            current.push(ch);
+        } else if !current.is_empty() {
+            ints.push(current.parse::<usize>()?);
+            current.clear();
+        }
+    }
+    if !current.is_empty() {
+        ints.push(current.parse::<usize>()?);
+    }
+    Ok(ints)
 }
 
 fn json_str<'a>(value: &'a Value, path: &str) -> Result<&'a str, Box<dyn Error>> {
