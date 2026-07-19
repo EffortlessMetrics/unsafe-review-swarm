@@ -1906,4 +1906,105 @@ mod tests {
 
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): class-derived severity
+    /// is a single `ReviewClass` fact, but `cards.json` (`JsonCard::class_name`),
+    /// SARIF (`SarifResult::level`, via `ReviewClass::sarif_level()`), and the
+    /// saved LSP projection (`EditorDiagnostic::severity`, via
+    /// `ReviewClass::lsp_severity()`) each independently build their own
+    /// severity encoding from that one `ReviewCard.class` value rather than
+    /// sharing one projection (`policy/spec-coverage.toml` names all three as
+    /// canonical consumers of the severity seam). This is distinct from the
+    /// existing domain-level lock in `domain/classification.rs`
+    /// (`sarif_level_and_lsp_severity_are_consistent_for_every_class`,
+    /// issue #1770), which only compares `ReviewClass::sarif_level()` against
+    /// `ReviewClass::lsp_severity()` directly and never renders an artifact —
+    /// it would not catch a renderer wiring the wrong field (e.g. a stale
+    /// severity constant, or reading a different card's class) even if the
+    /// two domain methods still agree. This test proves the three *rendered*
+    /// surfaces currently agree for one canonical fixture card: `cards.json`'s
+    /// `class` string names the `ReviewClass`, and SARIF's string `level` and
+    /// LSP's integer `severity` are each that class's correct projection
+    /// through the same public `sarif_level()` / `lsp_severity()` accessors.
+    /// The three surfaces use different encodings (a class-name string, a
+    /// SARIF level string, and an LSP severity integer) so this locks mutual
+    /// consistency of already-correct behavior, not byte-identical values,
+    /// and asserts nothing about memory safety, UB-freedom, or which severity
+    /// value is "right".
+    #[test]
+    fn severity_is_identical_across_json_sarif_and_lsp_surfaces() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+
+        // Surface 1: cards.json carries the class string (the anchor fact the
+        // other two surfaces derive their own severity encoding from).
+        let json_value = parse_json(&render(&output))?;
+        let card_id = json_value["cards"][0]["id"]
+            .as_str()
+            .ok_or("cards.json cards[0].id must be a string")?;
+        let json_class = json_value["cards"][0]["class"]
+            .as_str()
+            .ok_or("cards.json cards[0].class must be a string")?;
+
+        // Surface 2: SARIF result `level`, matched by the `card_id` result
+        // property rather than assuming index 0.
+        let sarif_value = parse_json(&crate::output::sarif::render(&output))?;
+        let results = sarif_value["runs"][0]["results"]
+            .as_array()
+            .ok_or("sarif runs[0].results must be an array")?;
+        let sarif_result = results
+            .iter()
+            .find(|result| result["properties"]["cardId"].as_str() == Some(card_id))
+            .ok_or("sarif results should contain an entry for the fixture card")?;
+        let sarif_level = sarif_result["level"]
+            .as_str()
+            .ok_or("sarif result level must be a string")?;
+
+        // Surface 3: saved LSP projection `severity`, matched by `card_id`.
+        let lsp_value = parse_json(&crate::output::lsp::render(&output))?;
+        let diagnostics = lsp_value["diagnostics"]
+            .as_array()
+            .ok_or("lsp diagnostics must be an array")?;
+        let lsp_diagnostic = diagnostics
+            .iter()
+            .find(|entry| entry["card_id"].as_str() == Some(card_id))
+            .ok_or("lsp diagnostics should contain an entry for the fixture card")?;
+        let lsp_severity = lsp_diagnostic["severity"]
+            .as_u64()
+            .ok_or("lsp diagnostic severity must be a number")?;
+
+        // Derive the expected per-surface projections from the SAME
+        // `ReviewClass` that cards.json named, using the public accessors
+        // each renderer is supposed to call.
+        assert_eq!(
+            json_class,
+            card.class.as_str(),
+            "cards.json class must name the fixture card's ReviewClass"
+        );
+        assert_eq!(
+            sarif_level,
+            card.class.sarif_level(),
+            "sarif level must be the same ReviewClass's sarif_level() projection"
+        );
+        assert_eq!(
+            lsp_severity,
+            card.class.lsp_severity() as u64,
+            "lsp diagnostic severity must be the same ReviewClass's lsp_severity() projection"
+        );
+
+        assert_eq!(
+            json_class, "guard_missing",
+            "raw_pointer_alignment fixture card class is guard_missing"
+        );
+        assert_eq!(
+            sarif_level, "warning",
+            "raw_pointer_alignment fixture card sarif level is warning"
+        );
+        assert_eq!(
+            lsp_severity, 2,
+            "raw_pointer_alignment fixture card lsp severity is 2 (Warning)"
+        );
+
+        Ok(())
+    }
 }
