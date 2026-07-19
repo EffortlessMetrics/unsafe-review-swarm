@@ -423,7 +423,8 @@ function parseCanonicalCodeAction(
     vocabulary === undefined || vocabulary.command !== commandId || vocabulary.kind !== kind ||
     entry["is_preferred"] !== false || matchingDiagnostic === undefined ||
     actionTrustBoundary === undefined || actionTrustBoundary !== bundleTrustBoundary ||
-    !isRecord(bundleAnalysis) || !isRecord(payloadAnalysis) || !isRecord(argumentAnalysis) ||
+    !isAnalysisIdentity(bundleAnalysis) || !isAnalysisIdentity(payloadAnalysis) ||
+    !isAnalysisIdentity(argumentAnalysis) ||
     JSON.stringify(payloadAnalysis) !== JSON.stringify(bundleAnalysis) ||
     JSON.stringify(argumentAnalysis) !== JSON.stringify(bundleAnalysis)
   ) {
@@ -636,6 +637,19 @@ function readStringArray(value: unknown): string[] | undefined {
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+function isAnalysisIdentity(value: unknown): value is Record<string, unknown> {
+  if (!isRecord(value)) {
+    return false;
+  }
+  const generation = value["generation"];
+  const state = readString(value["state"]);
+  return ["analysis_id", "tool_version", "scope"].every((field) => {
+    const fieldValue = readString(value[field]);
+    return fieldValue !== undefined && fieldValue.trim().length > 0;
+  }) && typeof generation === "number" && Number.isSafeInteger(generation) && generation >= 0 &&
+    state !== undefined && ["current", "refreshing", "stale", "partial", "capped", "failed"].includes(state);
 }
 
 export function diagnosticsByFile(

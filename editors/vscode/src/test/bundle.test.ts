@@ -120,7 +120,7 @@ test("parseBundle returns diagnostics, hovers, and code actions", () => {
 });
 
 test("parseBundle preserves canonical 0.2 action semantics", () => {
-  const analysis = { analysis_id: "analysis-1", generation: 1, scope: "diff", state: "current" };
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
   const canonical = {
     ...MINIMAL_BUNDLE,
     schema_version: "0.2",
@@ -221,7 +221,7 @@ test("parseBundle uses default trust boundary when missing", () => {
 });
 
 test("canonical actions reject cross-card command arguments", () => {
-  const analysis = { analysis_id: "analysis-1", generation: 1, scope: "diff", state: "current" };
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
   const action = {
     action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
     kind: "quickfix.unsafeReview.agentPacket",
@@ -236,7 +236,7 @@ test("canonical actions reject cross-card command arguments", () => {
   assert.match(result.warnings[0], /inconsistent canonical identity/);
 });
 
-test("canonical actions require explicit analysis identities", () => {
+test("canonical actions require complete analysis identities", () => {
   const action = {
     action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
     kind: "quickfix.unsafeReview.agentPacket",
@@ -249,10 +249,24 @@ test("canonical actions require explicit analysis identities", () => {
   const result = parseBundle(JSON.stringify({ ...MINIMAL_BUNDLE, schema_version: "0.2", code_actions: [action] }));
   assert.equal(result.codeActions.length, 0);
   assert.match(result.warnings[0], /inconsistent canonical identity/);
+
+  const emptyIdentity = {
+    ...action,
+    payload: { ...action.payload, analysis: {} },
+    command: { ...action.command, arguments: { ...action.command.arguments, analysis: {} } },
+  };
+  const emptyResult = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis: {},
+    code_actions: [emptyIdentity],
+  }));
+  assert.equal(emptyResult.codeActions.length, 0);
+  assert.match(emptyResult.warnings[0], /inconsistent canonical identity/);
 });
 
 test("canonical actions reject diagnostic and applicability drift", () => {
-  const analysis = { analysis_id: "analysis-1", generation: 1, scope: "diff", state: "current" };
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
   const action = {
     action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
     kind: "quickfix.unsafeReview.agentPacket",
