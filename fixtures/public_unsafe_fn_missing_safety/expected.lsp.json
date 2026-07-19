@@ -6,7 +6,7 @@
     "scope": "diff",
     "state": "current"
   },
-  "schema_version": "0.1",
+  "schema_version": "0.2",
   "tool": "unsafe-review",
   "mode": "read_only_projection",
   "policy": "advisory",
@@ -140,56 +140,208 @@
   ],
   "code_actions": [
     {
-      "arguments": [
-        "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1"
-      ],
-      "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
-      "command": "unsafe-review.copyAgentPacket",
-      "kind": "quickfix",
-      "path": "src/lib.rs",
-      "payload": {
+      "action_id": "agent-packet",
+      "title": "Copy bounded unsafe-review review context (human review required)",
+      "kind": "source.unsafeReview.reviewContext",
+      "diagnostic": {
         "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
-        "kind": "unsafe-review.agent_packet",
-        "proof_path": "human_review_only",
-        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
-      },
-      "range": {
-        "end": {
-          "character": 45,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
+        "path": "src/lib.rs",
+        "range": {
+          "end": {
+            "character": 45,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
         }
       },
-      "title": "Copy unsafe-review packet for UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1"
+      "payload": {
+        "action_id": "agent-packet",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "analysis": {
+          "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+          "generation": 0,
+          "tool_version": "0.3.8",
+          "scope": "diff",
+          "state": "current"
+        },
+        "agent_readiness": "requires_human_review"
+      },
+      "command": {
+        "command": "unsafe-review.collectAgentPacket",
+        "arguments": {
+          "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+          "analysis": {
+            "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+            "generation": 0,
+            "tool_version": "0.3.8",
+            "scope": "diff",
+            "state": "current"
+          }
+        }
+      },
+      "applicability": {
+        "state": "available"
+      },
+      "is_preferred": false,
+      "command_only": true,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     },
     {
-      "arguments": [
-        "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1"
-      ],
-      "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
-      "command": "unsafe-review.explainWitnessRoute",
-      "kind": "quickfix",
-      "path": "src/lib.rs",
-      "payload": {
+      "action_id": "witness-route",
+      "title": "Explain unsafe-review witness route",
+      "kind": "source.unsafeReview.witnessRoute",
+      "diagnostic": {
         "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
-        "kind": "unsafe-review.witness_route",
-        "proof_path": "human_review_only",
-        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
-      },
-      "range": {
-        "end": {
-          "character": 45,
-          "line": 0
-        },
-        "start": {
-          "character": 0,
-          "line": 0
+        "path": "src/lib.rs",
+        "range": {
+          "end": {
+            "character": 45,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
         }
       },
-      "title": "Explain unsafe-review witness route"
+      "payload": {
+        "action_id": "witness-route",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "analysis": {
+          "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+          "generation": 0,
+          "tool_version": "0.3.8",
+          "scope": "diff",
+          "state": "current"
+        },
+        "agent_readiness": "requires_human_review"
+      },
+      "command": {
+        "command": "unsafe-review.explainWitnessRoute",
+        "arguments": {
+          "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+          "analysis": {
+            "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+            "generation": 0,
+            "tool_version": "0.3.8",
+            "scope": "diff",
+            "state": "current"
+          }
+        }
+      },
+      "applicability": {
+        "state": "available"
+      },
+      "is_preferred": false,
+      "command_only": true,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    {
+      "action_id": "witness-command",
+      "title": "Copy witness command (does not run)",
+      "kind": "source.unsafeReview.witnessCommand",
+      "diagnostic": {
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "path": "src/lib.rs",
+        "range": {
+          "end": {
+            "character": 45,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        }
+      },
+      "payload": {
+        "action_id": "witness-command",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "analysis": {
+          "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+          "generation": 0,
+          "tool_version": "0.3.8",
+          "scope": "diff",
+          "state": "current"
+        },
+        "agent_readiness": "requires_human_review"
+      },
+      "command": {
+        "command": "unsafe-review.collectWitnessCommand",
+        "arguments": {
+          "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+          "analysis": {
+            "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+            "generation": 0,
+            "tool_version": "0.3.8",
+            "scope": "diff",
+            "state": "current"
+          }
+        }
+      },
+      "applicability": {
+        "state": "disabled",
+        "reason_code": "no_witness_command",
+        "reason": "No witness command is available for this card."
+      },
+      "is_preferred": false,
+      "command_only": true,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    {
+      "action_id": "related-test",
+      "title": "Open related test",
+      "kind": "source.unsafeReview.relatedTest",
+      "diagnostic": {
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "path": "src/lib.rs",
+        "range": {
+          "end": {
+            "character": 45,
+            "line": 0
+          },
+          "start": {
+            "character": 0,
+            "line": 0
+          }
+        }
+      },
+      "payload": {
+        "action_id": "related-test",
+        "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+        "analysis": {
+          "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+          "generation": 0,
+          "tool_version": "0.3.8",
+          "scope": "diff",
+          "state": "current"
+        },
+        "agent_readiness": "requires_human_review"
+      },
+      "command": {
+        "command": "unsafe-review.openRelatedTest",
+        "arguments": {
+          "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
+          "analysis": {
+            "analysis_id": "fixture-analysis-public_unsafe_fn_missing_safety",
+            "generation": 0,
+            "tool_version": "0.3.8",
+            "scope": "diff",
+            "state": "current"
+          }
+        }
+      },
+      "applicability": {
+        "state": "disabled",
+        "reason_code": "no_related_test",
+        "reason": "No structured related test is available for this card."
+      },
+      "is_preferred": false,
+      "command_only": true,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     }
   ],
   "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

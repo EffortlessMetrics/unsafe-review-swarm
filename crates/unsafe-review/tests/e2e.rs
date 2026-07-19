@@ -406,12 +406,12 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .contains("does not prove the unsafe site executed")
     );
     assert_eq!(
-        lsp["code_actions"][0]["command"],
-        "unsafe-review.copyAgentPacket"
+        lsp["code_actions"][0]["command"]["command"],
+        "unsafe-review.collectAgentPacket"
     );
     assert_eq!(
-        lsp["code_actions"][0]["payload"]["kind"],
-        "unsafe-review.agent_packet"
+        lsp["code_actions"][0]["kind"],
+        "quickfix.unsafeReview.agentPacket"
     );
     assert_eq!(
         lsp["code_actions"][0]["payload"]["card_id"]
@@ -419,29 +419,29 @@ fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Bo
             .unwrap_or(""),
         card_id
     );
-    assert!(lsp["code_actions"][0]["arguments"].is_array());
+    assert!(lsp["code_actions"][0]["command"]["arguments"].is_object());
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
         actions
             .iter()
-            .any(|action| action["command"] == "unsafe-review.openRelatedTest")
+            .any(|action| action["command"]["command"] == "unsafe-review.openRelatedTest")
     }));
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
-            action["command"] == "unsafe-review.openRelatedTest"
-                && action["payload"]["kind"] == "unsafe-review.related_test"
+            action["command"]["command"] == "unsafe-review.openRelatedTest"
+                && action["kind"] == "source.unsafeReview.relatedTest"
                 && action["payload"]["card_id"].as_str() == Some(card_id)
-                && action["payload"]["file"] == "src/lib.rs"
-                && action["payload"]["line"] == 16
-                && action["payload"]["name"] == "reads_header"
+                && action["command"]["arguments"]["file"] == "src/lib.rs"
+                && action["command"]["arguments"]["line"] == 16
+                && action["command"]["arguments"]["name"] == "reads_header"
         })
     }));
     assert!(lsp["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
-            action["command"] == "unsafe-review.copyWitnessCommand"
+            action["command"]["command"] == "unsafe-review.collectWitnessCommand"
                 && action["title"] == "Copy witness command (does not run)"
-                && action["payload"]["kind"] == "unsafe-review.witness_command"
+                && action["kind"] == "source.unsafeReview.witnessCommand"
                 && action["payload"]["card_id"].as_str() == Some(card_id)
-                && action["payload"]["command"]
+                && lsp["diagnostics"][0]["witness_routes"][0]["command"]
                     .as_str()
                     .unwrap_or("")
                     .contains("cargo +nightly miri test read_header")
@@ -3402,7 +3402,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert_eq!(lsp["policy"], "advisory");
     assert_eq!(lsp["diagnostics"][0]["card_id"], card_id);
     assert_eq!(lsp["hovers"][0]["card_id"], card_id);
-    assert_eq!(lsp["code_actions"][0]["card_id"], card_id);
+    assert_eq!(lsp["code_actions"][0]["diagnostic"]["card_id"], card_id);
     assert!(
         lsp["trust_boundary"]
             .as_str()

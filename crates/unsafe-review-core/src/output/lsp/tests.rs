@@ -8,7 +8,7 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
     let output = fixture_output("raw_pointer_alignment")?;
     let value = parse_json(&render(&output))?;
 
-    assert_eq!(value["schema_version"], "0.1");
+    assert_eq!(value["schema_version"], "0.2");
     assert_eq!(value["tool"], "unsafe-review");
     assert_eq!(
         value["analysis"]["analysis_id"],
@@ -253,45 +253,44 @@ fn lsp_projection_is_parseable_and_read_only() -> Result<(), String> {
     assert!(hover_contents.contains("Handoff commands"));
     assert!(hover_contents.contains(&format!("unsafe-review explain {card_id}")));
     assert!(hover_contents.contains(&format!("unsafe-review context {card_id} --json")));
+    assert_eq!(value["code_actions"][0]["action_id"], "agent-packet");
     assert_eq!(
-        value["code_actions"][0]["command"],
-        "unsafe-review.copyAgentPacket"
-    );
-    assert_eq!(
-        value["code_actions"][0]["payload"]["kind"],
-        "unsafe-review.agent_packet"
+        value["code_actions"][0]["kind"],
+        "quickfix.unsafeReview.agentPacket"
     );
     assert_eq!(
         value["code_actions"][0]["payload"]["card_id"],
         value["diagnostics"][0]["card_id"]
     );
-    assert!(value["code_actions"][0]["arguments"].is_array());
+    assert_eq!(
+        value["code_actions"][0]["payload"]["analysis"],
+        value["analysis"]
+    );
+    assert_eq!(
+        value["code_actions"][0]["command"]["arguments"]["analysis"],
+        value["analysis"]
+    );
     assert!(value["code_actions"].as_array().is_some_and(|actions| {
         actions
             .iter()
-            .any(|action| action["command"] == "unsafe-review.openRelatedTest")
+            .any(|action| action["action_id"] == "related-test")
     }));
     assert!(value["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
-            action["command"] == "unsafe-review.openRelatedTest"
-                && action["payload"]["kind"] == "unsafe-review.related_test"
+            action["action_id"] == "related-test"
                 && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
-                && action["payload"]["file"] == "src/lib.rs"
-                && action["payload"]["line"] == 16
-                && action["payload"]["name"] == "reads_header"
+                && action["command"]["arguments"]["file"] == "src/lib.rs"
+                && action["command"]["arguments"]["line"] == 16
+                && action["command"]["arguments"]["name"] == "reads_header"
         })
     }));
     assert!(value["code_actions"].as_array().is_some_and(|actions| {
         actions.iter().any(|action| {
-            action["command"] == "unsafe-review.copyWitnessCommand"
+            action["action_id"] == "witness-command"
                 && action["title"] == "Copy witness command (does not run)"
-                && action["payload"]["kind"] == "unsafe-review.witness_command"
                 && action["payload"]["card_id"] == value["diagnostics"][0]["card_id"]
-                && action["payload"]["command"]
-                    .as_str()
-                    .unwrap_or("")
-                    .contains("cargo +nightly miri test read_header")
-                && action["payload"]["trust_boundary"]
+                && action["command"]["command"] == "unsafe-review.collectWitnessCommand"
+                && action["trust_boundary"]
                     .as_str()
                     .unwrap_or("")
                     .contains("not UB-free status")

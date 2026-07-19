@@ -29,6 +29,7 @@ interface AdapterState {
   bundle: ParsedBundle | undefined;
   bundleRoot: string | undefined;
   diagnosticsCollection: vscode.DiagnosticCollection;
+  diagnosticsByCardId: Map<string, vscode.Diagnostic>;
   hoversByPath: Map<string, BundleHover[]>;
   codeActionsByPath: Map<string, BundleCodeAction[]>;
   statusBar: vscode.StatusBarItem;
@@ -50,6 +51,7 @@ export function activate(context: vscode.ExtensionContext): void {
     bundle: undefined,
     bundleRoot: undefined,
     diagnosticsCollection,
+    diagnosticsByCardId: new Map(),
     hoversByPath: new Map(),
     codeActionsByPath: new Map(),
     statusBar,
@@ -67,7 +69,15 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.languages.registerCodeActionsProvider(
       [{ language: "rust" }, { pattern: "**/*.rs" }],
       new BundleCodeActionProvider(),
-      { providedCodeActionKinds: [vscode.CodeActionKind.Empty] },
+      {
+        providedCodeActionKinds: [
+          vscode.CodeActionKind.Empty.append("quickfix.unsafeReview.agentPacket"),
+          vscode.CodeActionKind.Empty.append("source.unsafeReview.reviewContext"),
+          vscode.CodeActionKind.Empty.append("source.unsafeReview.witnessRoute"),
+          vscode.CodeActionKind.Empty.append("source.unsafeReview.witnessCommand"),
+          vscode.CodeActionKind.Empty.append("source.unsafeReview.relatedTest"),
+        ],
+      },
     ),
     vscode.commands.registerCommand(`${EXTENSION_ID}.refreshBundle`, refreshBundle),
     vscode.commands.registerCommand(`${EXTENSION_ID}.openPrSummary`, openPrSummary),
@@ -75,6 +85,7 @@ export function activate(context: vscode.ExtensionContext): void {
     vscode.commands.registerCommand(`${EXTENSION_ID}.openRelatedTest`, openRelatedTest),
     vscode.commands.registerCommand(`${EXTENSION_ID}.copyAgentPacket`, copyAgentPacket),
     vscode.commands.registerCommand(`${EXTENSION_ID}.copyWitnessCommand`, copyWitnessCommand),
+    vscode.commands.registerCommand(`${EXTENSION_ID}.explainWitnessRoute`, explainWitnessRoute),
     vscode.workspace.onDidChangeConfiguration((event) => {
       if (event.affectsConfiguration("unsafeReview")) {
         rewireBundleWatcher();
@@ -220,6 +231,7 @@ function applyDiagnostics(
     return;
   }
   adapter.diagnosticsCollection.clear();
+  adapter.diagnosticsByCardId.clear();
 
   const capped = capDiagnosticsPerFile(bundle.diagnostics, settings.maxDiagnosticsPerFile);
   const grouped = diagnosticsByFile(capped);
@@ -238,6 +250,7 @@ function applyDiagnostics(
         );
         return [];
       }
+      adapter?.diagnosticsByCardId.set(entry.cardId, diagnostic);
       return [diagnostic];
     });
     adapter.diagnosticsCollection.set(uri, diags);
@@ -397,14 +410,31 @@ class BundleCodeActionProvider implements vscode.CodeActionProvider {
         }
       }
       const action = new vscode.CodeAction(
-        decorateCodeActionTitle(candidate),
-        vscode.CodeActionKind.Empty,
+        candidate.actionId === undefined ? decorateCodeActionTitle(candidate) : candidate.title,
+        candidate.kind === undefined
+          ? vscode.CodeActionKind.Empty
+          : vscode.CodeActionKind.Empty.append(candidate.kind),
       );
-      action.command = {
-        title: candidate.title,
-        command: extensionCommandFor(candidate.command),
-        arguments: [candidate.payload ?? {}],
-      };
+      action.isPreferred = candidate.isPreferred ?? false;
+      const diagnostic = candidate.payload?.cardId === undefined
+        ? undefined
+        : adapter.diagnosticsByCardId.get(candidate.payload.cardId);
+      if (diagnostic !== undefined) {
+        action.diagnostics = [diagnostic];
+      }
+      if (candidate.disabled !== undefined) {
+        action.disabled = { reason: candidate.disabled.reason };
+      } else if (candidate.command !== undefined) {
+        const extensionCommand = extensionCommandFor(candidate.command);
+        if (extensionCommand === undefined) {
+          continue;
+        }
+        action.command = {
+          title: candidate.title,
+          command: extensionCommand,
+          arguments: [candidate.commandArguments ?? candidate.payload ?? {}],
+        };
+      }
       actions.push(action);
     }
     return actions;
@@ -415,30 +445,45 @@ function decorateCodeActionTitle(action: BundleCodeAction): string {
   if (/\((copy|open)\)$/.test(action.title)) {
     return action.title;
   }
-  if (action.command.includes("copy")) {
+  if (action.command?.includes("copy")) {
     return `${action.title} (copy)`;
   }
-  if (action.command.includes("open") || action.command.includes("Open")) {
+  if (action.command?.includes("open") || action.command?.includes("Open")) {
     return `${action.title} (open)`;
   }
   return action.title;
 }
 
-function extensionCommandFor(bundleCommand: string): string {
+function extensionCommandFor(bundleCommand: string): string | undefined {
   switch (bundleCommand) {
     case "unsafe-review.copyAgentPacket":
+    case "unsafe-review.collectAgentPacket":
       return `${EXTENSION_ID}.copyAgentPacket`;
     case "unsafe-review.copyWitnessCommand":
+    case "unsafe-review.collectWitnessCommand":
       return `${EXTENSION_ID}.copyWitnessCommand`;
     case "unsafe-review.openRelatedTest":
       return `${EXTENSION_ID}.openRelatedTest`;
+    case "unsafe-review.explainWitnessRoute":
+      return `${EXTENSION_ID}.explainWitnessRoute`;
     case "unsafe-review.openPrSummary":
       return `${EXTENSION_ID}.openPrSummary`;
     case "unsafe-review.openWitnessPlan":
       return `${EXTENSION_ID}.openWitnessPlan`;
     default:
-      return `${EXTENSION_ID}.refreshBundle`;
+      return undefined;
   }
+}
+
+async function explainWitnessRoute(payload: unknown): Promise<void> {
+  const cardId = pickCardId(payload);
+  const diagnostic = adapter?.bundle?.diagnostics.find((item) => item.cardId === cardId);
+  const route = diagnostic?.witnessRoutes?.[0];
+  if (route === undefined) {
+    void vscode.window.showWarningMessage("No unsafe-review witness route is available.");
+    return;
+  }
+  await vscode.env.clipboard.writeText(JSON.stringify(route, undefined, 2));
 }
 
 async function openPrSummary(): Promise<void> {

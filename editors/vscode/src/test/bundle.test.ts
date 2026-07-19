@@ -13,6 +13,7 @@ import {
 } from "../bundle";
 
 const MINIMAL_BUNDLE = {
+  schema_version: "0.1",
   tool: "unsafe-review",
   status: {
     message: "1 unsafe-review card(s)",
@@ -115,7 +116,35 @@ test("parseBundle returns diagnostics, hovers, and code actions", () => {
   assert.equal(result.codeActions[0].command, "unsafe-review.copyAgentPacket");
   assert.equal(result.codeActions[0].payload?.cardId, "UR-foo");
   assert.equal(result.codeActions[0].payload?.proofPath, "source_route_only");
+  assert.deepEqual(result.warnings, ["code_action #0 uses legacy 0.1 action shape"]);
+});
+
+test("parseBundle preserves canonical 0.2 action semantics", () => {
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
+  const canonical = {
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis,
+    code_actions: [{
+      action_id: "agent-packet",
+      title: "Copy bounded unsafe-review agent packet",
+      kind: "quickfix.unsafeReview.agentPacket",
+      diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+      payload: { action_id: "agent-packet", card_id: "UR-foo", analysis, agent_readiness: "ready_for_agent" },
+      command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo", analysis } },
+      applicability: { state: "available" },
+      is_preferred: false,
+      command_only: true,
+      trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+    }],
+  };
+  const result = parseBundle(JSON.stringify(canonical));
   assert.equal(result.warnings.length, 0);
+  assert.equal(result.codeActions[0].actionId, "agent-packet");
+  assert.equal(result.codeActions[0].kind, "quickfix.unsafeReview.agentPacket");
+  assert.equal(result.codeActions[0].command, "unsafe-review.collectAgentPacket");
+  assert.equal(result.codeActions[0].payload?.readiness, "ready_for_agent");
+  assert.deepEqual(result.codeActions[0].commandArguments?.["analysis"], analysis);
 });
 
 test("parseBundle preserves the committed canonical saved diagnostic fields", async () => {
@@ -145,6 +174,36 @@ test("parseBundle preserves the committed canonical saved diagnostic fields", as
   assert.equal(diagnostic.range.start.character, 4);
   assert.equal(diagnostic.range.end.character, 42);
   assert.ok(diagnostic.cardId.startsWith("UR-raw-pointer-alignment-fixture"));
+  const witnessAction = result.codeActions.find((action) => action.actionId === "witness-command");
+  assert.ok(witnessAction);
+  assert.equal(
+    witnessAction.commandArguments?.["command"],
+    diagnostic.witnessRoutes?.find((route) => route.command !== undefined)?.command,
+  );
+});
+
+test("canonical available actions require matching capabilities and trust boundary", async () => {
+  const fixturePath = path.resolve(
+    __dirname,
+    "../../../../fixtures/raw_pointer_alignment/expected.lsp.json",
+  );
+  const original = JSON.parse(await readFile(fixturePath, "utf8"));
+
+  const noRoute = structuredClone(original);
+  noRoute.diagnostics[0].witness_routes = [];
+  const noRouteResult = parseBundle(JSON.stringify(noRoute));
+  assert.equal(noRouteResult.codeActions.some((action) => action.actionId === "witness-route"), false);
+
+  const incompleteTest = structuredClone(original);
+  const related = incompleteTest.code_actions.find((action: { action_id: string }) => action.action_id === "related-test");
+  delete related.command.arguments.file;
+  const incompleteTestResult = parseBundle(JSON.stringify(incompleteTest));
+  assert.equal(incompleteTestResult.codeActions.some((action) => action.actionId === "related-test"), false);
+
+  const missingBoundary = structuredClone(original);
+  delete missingBoundary.code_actions[0].trust_boundary;
+  const missingBoundaryResult = parseBundle(JSON.stringify(missingBoundary));
+  assert.equal(missingBoundaryResult.codeActions.some((action) => action.actionId === "agent-packet"), false);
 });
 
 test("parseBundle rejects non-JSON", () => {
@@ -156,9 +215,90 @@ test("parseBundle rejects non-object root", () => {
 });
 
 test("parseBundle uses default trust boundary when missing", () => {
-  const result = parseBundle(JSON.stringify({ tool: "unsafe-review" }));
+  const result = parseBundle(JSON.stringify({ schema_version: "0.1", tool: "unsafe-review" }));
   assert.ok(result.trustBoundary.length > 0);
   assert.ok(result.trustBoundary.toLowerCase().includes("not a proof"));
+});
+
+test("canonical actions reject cross-card command arguments", () => {
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
+  const action = {
+    action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
+    kind: "quickfix.unsafeReview.agentPacket",
+    diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+    payload: { action_id: "agent-packet", card_id: "UR-foo", analysis, agent_readiness: "ready_for_agent" },
+    command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-other", analysis } },
+    applicability: { state: "available" }, is_preferred: false, command_only: true,
+    trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+  };
+  const result = parseBundle(JSON.stringify({ ...MINIMAL_BUNDLE, schema_version: "0.2", analysis, code_actions: [action] }));
+  assert.equal(result.codeActions.length, 0);
+  assert.match(result.warnings[0], /inconsistent canonical identity/);
+});
+
+test("canonical actions require complete analysis identities", () => {
+  const action = {
+    action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
+    kind: "quickfix.unsafeReview.agentPacket",
+    diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+    payload: { action_id: "agent-packet", card_id: "UR-foo", agent_readiness: "ready_for_agent" },
+    command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo" } },
+    applicability: { state: "available" }, is_preferred: false, command_only: true,
+    trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+  };
+  const result = parseBundle(JSON.stringify({ ...MINIMAL_BUNDLE, schema_version: "0.2", code_actions: [action] }));
+  assert.equal(result.codeActions.length, 0);
+  assert.match(result.warnings[0], /inconsistent canonical identity/);
+
+  const emptyIdentity = {
+    ...action,
+    payload: { ...action.payload, analysis: {} },
+    command: { ...action.command, arguments: { ...action.command.arguments, analysis: {} } },
+  };
+  const emptyResult = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis: {},
+    code_actions: [emptyIdentity],
+  }));
+  assert.equal(emptyResult.codeActions.length, 0);
+  assert.match(emptyResult.warnings[0], /inconsistent canonical identity/);
+
+  const malformedAnalysis = {
+    analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8",
+    scope: "diff", state: "current", base_commit: 7, document_version: "oops",
+  };
+  const malformedIdentity = {
+    ...action,
+    payload: { ...action.payload, analysis: malformedAnalysis },
+    command: {
+      ...action.command,
+      arguments: { ...action.command.arguments, analysis: malformedAnalysis },
+    },
+  };
+  const malformedResult = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis: malformedAnalysis,
+    code_actions: [malformedIdentity],
+  }));
+  assert.equal(malformedResult.codeActions.length, 0);
+  assert.match(malformedResult.warnings[0], /inconsistent canonical identity/);
+});
+
+test("canonical actions reject diagnostic and applicability drift", () => {
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
+  const action = {
+    action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
+    kind: "quickfix.unsafeReview.agentPacket",
+    diagnostic: { card_id: "UR-foo", path: "src/other.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+    payload: { action_id: "agent-packet", card_id: "UR-foo", analysis, agent_readiness: "ready_for_agent" },
+    command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo", analysis } },
+    applicability: { state: "mystery" }, is_preferred: false, command_only: true,
+    trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+  };
+  const result = parseBundle(JSON.stringify({ ...MINIMAL_BUNDLE, schema_version: "0.2", analysis, code_actions: [action] }));
+  assert.equal(result.codeActions.length, 0);
 });
 
 test("parseBundle skips diagnostics that lack a renderable range", () => {
