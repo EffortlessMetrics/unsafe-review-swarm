@@ -263,6 +263,27 @@ test("canonical actions require complete analysis identities", () => {
   }));
   assert.equal(emptyResult.codeActions.length, 0);
   assert.match(emptyResult.warnings[0], /inconsistent canonical identity/);
+
+  const malformedAnalysis = {
+    analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8",
+    scope: "diff", state: "current", base_commit: 7, document_version: "oops",
+  };
+  const malformedIdentity = {
+    ...action,
+    payload: { ...action.payload, analysis: malformedAnalysis },
+    command: {
+      ...action.command,
+      arguments: { ...action.command.arguments, analysis: malformedAnalysis },
+    },
+  };
+  const malformedResult = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis: malformedAnalysis,
+    code_actions: [malformedIdentity],
+  }));
+  assert.equal(malformedResult.codeActions.length, 0);
+  assert.match(malformedResult.warnings[0], /inconsistent canonical identity/);
 });
 
 test("canonical actions reject diagnostic and applicability drift", () => {

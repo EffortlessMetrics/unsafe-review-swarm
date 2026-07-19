@@ -644,12 +644,17 @@ function isAnalysisIdentity(value: unknown): value is Record<string, unknown> {
     return false;
   }
   const generation = value["generation"];
+  const documentVersion = value["document_version"];
   const state = readString(value["state"]);
   return ["analysis_id", "tool_version", "scope"].every((field) => {
     const fieldValue = readString(value[field]);
     return fieldValue !== undefined && fieldValue.trim().length > 0;
   }) && typeof generation === "number" && Number.isSafeInteger(generation) && generation >= 0 &&
-    state !== undefined && ["current", "refreshing", "stale", "partial", "capped", "failed"].includes(state);
+    state !== undefined && ["current", "refreshing", "stale", "partial", "capped", "failed"].includes(state) &&
+    ["base_commit", "head_commit", "file_digest"].every((field) =>
+      value[field] === undefined || typeof value[field] === "string"
+    ) && (documentVersion === undefined ||
+      (typeof documentVersion === "number" && Number.isSafeInteger(documentVersion) && documentVersion >= 0));
 }
 
 export function diagnosticsByFile(
