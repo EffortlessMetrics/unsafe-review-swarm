@@ -103,6 +103,10 @@ struct LspProjection<'a> {
     trust_boundary: &'static str,
 }
 
+#[allow(
+    clippy::panic,
+    reason = "a card already owned by AnalyzeOutput must have a canonical diagnostic and action projection; silently dropping it would corrupt the saved artifact"
+)]
 impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
     fn from(output: &'a AnalyzeOutput) -> Self {
         Self {
@@ -118,7 +122,7 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             code_actions: output
                 .cards
                 .iter()
-                .map(|card| {
+                .flat_map(|card| {
                     super::actions_for_card(output, &card.id.0).unwrap_or_else(|error| {
                         panic!(
                             "canonical saved LSP actions must project for card `{}`: {error}",
@@ -126,7 +130,6 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
                         )
                     })
                 })
-                .flatten()
                 .collect(),
             trust_boundary: TRUST_BOUNDARY,
         }

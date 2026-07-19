@@ -9806,7 +9806,11 @@ fn require_lsp_code_action_title(
             "lsp.json code_action `{command}` has invalid agent packet title `{title}`"
         ));
     }
-    let expected = expected.expect("non-packet actions have exact titles");
+    let Some(expected) = expected else {
+        return Err(format!(
+            "lsp.json code_action `{command}` has no verifier-known title contract"
+        ));
+    };
     if title == expected {
         Ok(())
     } else {
@@ -10216,6 +10220,10 @@ fn check_lsp_diagnostic_witness_commands(diagnostic: &serde_json::Value) -> Resu
     Ok(())
 }
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "the verifier keeps each independently checked canonical relationship explicit"
+)]
 fn check_lsp_code_action_payload(
     action: &serde_json::Value,
     action_id: &str,
@@ -10390,7 +10398,11 @@ fn check_lsp_code_action_payload(
             .iter()
             .any(|route| route.command.is_some()),
         "related-test" => related_fields_present,
-        _ => unreachable!("closed action vocabulary checked above"),
+        other => {
+            return Err(format!(
+                "lsp.json code_action action_id `{other}` is not verifier-known"
+            ));
+        }
     };
     if (applicability_state == "available") != expected_available {
         return Err(format!(
@@ -10411,8 +10423,14 @@ fn check_lsp_code_action_payload(
                 "no_related_test",
                 "No structured related test is available for this card.",
             ),
-            "agent-packet" => unreachable!("agent packet is always available"),
-            _ => unreachable!("closed action vocabulary checked above"),
+            "agent-packet" => {
+                return Err("lsp.json code_action agent-packet must never be disabled".to_string());
+            }
+            other => {
+                return Err(format!(
+                    "lsp.json code_action action_id `{other}` is not verifier-known"
+                ));
+            }
         };
         super::require_json_str(
             applicability,

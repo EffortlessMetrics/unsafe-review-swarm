@@ -24617,10 +24617,10 @@ This artifact is static unsafe contract review. It routes reviewers to credible 
                     arguments[field] = value.clone();
                 }
             }
-        } else if action_id == "witness-command" {
-            if let Some(command) = action.get("payload").and_then(|value| value.get("command")) {
-                arguments["command"] = command.clone();
-            }
+        } else if action_id == "witness-command"
+            && let Some(command) = action.get("payload").and_then(|value| value.get("command"))
+        {
+            arguments["command"] = command.clone();
         }
         let title = match action_id {
             "agent-packet" => "Copy bounded unsafe-review agent packet".to_string(),
