@@ -1741,4 +1741,80 @@ mod tests {
         );
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): `priority` is a single
+    /// `ReviewCard.priority` fact, but `cards.json` (`JsonCard::from_with_status`),
+    /// the agent packet (`AgentCard::from`), and the repair queue
+    /// (`RepairQueueEntry::new`) each re-derive it independently via their own
+    /// `card.priority.as_str()` call rather than sharing one projection. Nothing
+    /// today would catch one call site alone being changed (e.g. to a different
+    /// card field) while the others kept the original value. This test proves
+    /// the three surfaces currently agree for one canonical fixture card; it
+    /// locks parity of already-correct behavior and asserts nothing about
+    /// memory safety, UB-freedom, or which priority value is "right".
+    #[test]
+    fn priority_is_identical_across_json_agent_and_repair_queue_surfaces() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+
+        // Surface 1: cards.json
+        let json_value = parse_json(&render(&output))?;
+        let card_id = json_value["cards"][0]["id"]
+            .as_str()
+            .ok_or("cards.json cards[0].id must be a string")?;
+        let json_priority = json_value["cards"][0]["priority"]
+            .as_str()
+            .ok_or("cards.json cards[0].priority must be a string")?;
+
+        // Surface 2: agent packet
+        let agent_value = parse_json(&crate::output::agent::render(card))?;
+        let agent_priority = agent_value["card"]["priority"]
+            .as_str()
+            .ok_or("agent packet card.priority must be a string")?;
+
+        // Surface 3: repair queue. The fixture card may be routed into more
+        // than one bucket (e.g. `repairable_by_guard` and
+        // `requires_witness_receipt`); every entry for this card id must
+        // carry the same priority as the other two surfaces.
+        let repair_value = parse_json(&crate::output::repair_queue::render(&output))?;
+        let buckets = repair_value["buckets"]
+            .as_object()
+            .ok_or("repair-queue buckets must be an object")?;
+        let mut repair_priorities = Vec::new();
+        for entries in buckets.values() {
+            let entries = entries
+                .as_array()
+                .ok_or("repair-queue bucket must be an array")?;
+            for entry in entries {
+                if entry["card_id"].as_str() == Some(card_id) {
+                    let repair_priority = entry["priority"]
+                        .as_str()
+                        .ok_or("repair-queue entry priority must be a string")?;
+                    repair_priorities.push(repair_priority);
+                }
+            }
+        }
+        if repair_priorities.is_empty() {
+            return Err(
+                "repair queue should contain at least one entry for the fixture card".to_string(),
+            );
+        }
+
+        assert_eq!(
+            json_priority, agent_priority,
+            "cards.json and agent packet priority must be identical"
+        );
+        for repair_priority in repair_priorities {
+            assert_eq!(
+                json_priority, repair_priority,
+                "cards.json and repair-queue priority must be identical"
+            );
+        }
+        assert_eq!(
+            json_priority, "high",
+            "raw_pointer_alignment fixture card priority is high"
+        );
+
+        Ok(())
+    }
 }
