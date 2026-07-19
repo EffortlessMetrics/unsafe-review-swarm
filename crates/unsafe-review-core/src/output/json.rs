@@ -2129,4 +2129,89 @@ mod tests {
 
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): agent-readiness
+    /// (`agent_lsp_readiness`) and receipt state (`witness_receipt_coverage`)
+    /// are single `CoverageBlock`-derived facts, but `cards.json`
+    /// (`JsonCoverageBlock`), the agent packet (`AgentCoverageBlock`), and the
+    /// saved LSP projection (`EditorCoverageBlock`) each build their own
+    /// coverage struct from the card independently -- and the LSP path even
+    /// recomputes readiness via `compute_agent_lsp_readiness`. Nothing today
+    /// would catch one projection reporting a different readiness or receipt
+    /// state than the others while the rest stayed correct. This test proves
+    /// the three surfaces currently agree on both fields for one canonical
+    /// fixture card; it locks parity of already-correct behavior and asserts
+    /// nothing about memory safety, UB-freedom, whether the site is actually
+    /// agent-ready, or whether a receipt is truly present.
+    #[test]
+    fn agent_readiness_and_receipt_state_are_identical_across_json_agent_and_lsp_surfaces()
+    -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+
+        // Surface 1: cards.json coverage block.
+        let json_value = parse_json(&render(&output))?;
+        let card_id = json_value["cards"][0]["id"]
+            .as_str()
+            .ok_or("cards.json cards[0].id must be a string")?;
+        let json_readiness = json_value["cards"][0]["coverage"]["agent_lsp_readiness"]
+            .as_str()
+            .ok_or("cards.json coverage.agent_lsp_readiness must be a string")?;
+        let json_receipt = json_value["cards"][0]["coverage"]["witness_receipt_coverage"]
+            .as_str()
+            .ok_or("cards.json coverage.witness_receipt_coverage must be a string")?;
+
+        // Surface 2: agent packet. `coverage` is top-level on the packet.
+        let agent_value = parse_json(&crate::output::agent::render(card))?;
+        let agent_readiness = agent_value["coverage"]["agent_lsp_readiness"]
+            .as_str()
+            .ok_or("agent packet coverage.agent_lsp_readiness must be a string")?;
+        let agent_receipt = agent_value["coverage"]["witness_receipt_coverage"]
+            .as_str()
+            .ok_or("agent packet coverage.witness_receipt_coverage must be a string")?;
+
+        // Surface 3: saved LSP projection, matched by `card_id`.
+        let lsp_value = parse_json(&crate::output::lsp::render(&output))?;
+        let diagnostics = lsp_value["diagnostics"]
+            .as_array()
+            .ok_or("lsp diagnostics must be an array")?;
+        let lsp_diagnostic = diagnostics
+            .iter()
+            .find(|entry| entry["card_id"].as_str() == Some(card_id))
+            .ok_or("lsp diagnostics should contain an entry for the fixture card")?;
+        let lsp_readiness = lsp_diagnostic["coverage"]["agent_lsp_readiness"]
+            .as_str()
+            .ok_or("lsp diagnostic coverage.agent_lsp_readiness must be a string")?;
+        let lsp_receipt = lsp_diagnostic["coverage"]["witness_receipt_coverage"]
+            .as_str()
+            .ok_or("lsp diagnostic coverage.witness_receipt_coverage must be a string")?;
+
+        assert_eq!(
+            json_readiness, agent_readiness,
+            "cards.json and agent packet agent_lsp_readiness must be identical"
+        );
+        assert_eq!(
+            json_readiness, lsp_readiness,
+            "cards.json and lsp diagnostic agent_lsp_readiness must be identical"
+        );
+        assert_eq!(
+            json_receipt, agent_receipt,
+            "cards.json and agent packet witness_receipt_coverage must be identical"
+        );
+        assert_eq!(
+            json_receipt, lsp_receipt,
+            "cards.json and lsp diagnostic witness_receipt_coverage must be identical"
+        );
+
+        assert_eq!(
+            json_readiness, "ready",
+            "raw_pointer_alignment fixture card agent_lsp_readiness is ready"
+        );
+        assert_eq!(
+            json_receipt, "missing",
+            "raw_pointer_alignment fixture card witness_receipt_coverage is missing"
+        );
+
+        Ok(())
+    }
 }
