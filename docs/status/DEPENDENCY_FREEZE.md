@@ -9,8 +9,8 @@ readable source is
 
 | Repository | Commit | `Cargo.lock` SHA-256 | `ra_ap_syntax` | `ignore` | `signal-hook` |
 | --- | --- | --- | --- | --- | --- |
-| swarm | `fb441124740681df8fbec853bce6a0f7698630cd` | `d8ba9f7081cb37ce3ca612e7f72750217f5cb79ae79d90940204f9a157283902` | 0.0.338 | 0.4.26 | 0.4.4 |
-| source | `209c76fef1da653172a21c3348d6e3a3fb1eedbd` | `63edc764a500fffcc20d78f4a960aae204a04597befdbdc1cf86b3a06d6da1dd` | 0.0.336 | 0.4.26 | 0.3.18 |
+| swarm | `d19a87de817c3a1b4ef7dc746f25e7cc0d117eee` | `625a362746db12f1735f337ff8bf168afc721213cc139f4d20efc4c7c5b15b5a` | 0.0.341 | 0.4.27 | 0.4.4 |
+| source | `4fc6eb806de1460c618d60869b8a1cb885f87eea` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
 
 These are two live repository baselines, not one frozen release candidate.
 The source candidate path remains owner-gated until its dependency PRs have
@@ -19,12 +19,12 @@ the targeted proof named in issue #1916.
 ## Candidate inputs
 
 - Source parser PR [#548](https://github.com/EffortlessMetrics/unsafe-review/pull/548)
-  proposes `ra_ap_syntax 0.0.341`; parser-specific tests, detector contracts,
+  merged `ra_ap_syntax 0.0.341`; parser-specific tests, detector contracts,
   fixture/calibration parity, determinism, relevant corpus checks, and full
-  `check-pr` remain required.
+  `check-pr` passed before the dependency identity was synced into swarm.
 - Source ignore PR [#547](https://github.com/EffortlessMetrics/unsafe-review/pull/547)
-  proposes `ignore 0.4.27`; directly affected discovery/path tests and the
-  normal workspace proof remain required.
+  merged `ignore 0.4.27`; directly affected core/workspace tests and the normal
+  repository proof passed before the dependency identity was synced into swarm.
 - Source signal-hook PR [#515](https://github.com/EffortlessMetrics/unsafe-review/pull/515)
   proposes `signal-hook 0.4.4`; directly affected signal-handling tests and
   the normal workspace proof remain required.
