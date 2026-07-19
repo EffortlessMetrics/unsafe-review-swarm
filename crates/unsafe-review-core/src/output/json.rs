@@ -2007,4 +2007,126 @@ mod tests {
 
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): a single unsafe site
+    /// (`ReviewCard.id` plus `ReviewCard.site.location`) is independently
+    /// re-encoded by three renderers, each with its own location shape.
+    /// `cards.json`'s `JsonSite` (`From<&ReviewCard> for JsonSite`, this
+    /// file) copies `card.site.location.line`/`.column` verbatim, so it is
+    /// 1-based. SARIF's `SarifRegion` (`output/sarif.rs::SarifLocation::from`)
+    /// also copies `card.site.location.line`/`.column` verbatim into
+    /// `startLine`/`startColumn`, so it too is 1-based and numerically equal
+    /// to cards.json. The saved LSP projection's `EditorRange`
+    /// (`output/lsp/projection.rs::position_for`) instead subtracts 1 from
+    /// each field to produce LSP's 0-based `range.start.line`/`.character`,
+    /// per the LSP spec. All three renderers also encode the file path via
+    /// the same `path_display` helper. Nothing today would catch one of the
+    /// three re-deriving the position from a stale field, dropping the file,
+    /// or getting the 0/1-based conversion wrong on only one side. This test
+    /// proves the three surfaces currently name the same card id and agree,
+    /// modulo the documented 0/1-based offset, on the same source file and
+    /// position for one canonical fixture card; it locks parity of
+    /// already-correct behavior and asserts nothing about memory safety,
+    /// UB-freedom, or which position is "right".
+    #[test]
+    fn card_id_and_source_range_are_identical_across_json_sarif_and_lsp_surfaces()
+    -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+
+        // Surface 1: cards.json carries the raw 1-based line/column plus the
+        // file path and card id.
+        let json_value = parse_json(&render(&output))?;
+        let json_card_id = json_value["cards"][0]["id"]
+            .as_str()
+            .ok_or("cards.json cards[0].id must be a string")?;
+        let json_file = json_value["cards"][0]["site"]["file"]
+            .as_str()
+            .ok_or("cards.json cards[0].site.file must be a string")?;
+        let json_line = json_value["cards"][0]["site"]["line"]
+            .as_u64()
+            .ok_or("cards.json cards[0].site.line must be a number")?;
+        let json_column = json_value["cards"][0]["site"]["column"]
+            .as_u64()
+            .ok_or("cards.json cards[0].site.column must be a number")?;
+
+        // Surface 2: SARIF, matched by the `cardId` result property. SARIF's
+        // `region.startLine`/`startColumn` are 1-based, same as cards.json.
+        let sarif_value = parse_json(&crate::output::sarif::render(&output))?;
+        let results = sarif_value["runs"][0]["results"]
+            .as_array()
+            .ok_or("sarif runs[0].results must be an array")?;
+        let sarif_result = results
+            .iter()
+            .find(|result| result["properties"]["cardId"].as_str() == Some(json_card_id))
+            .ok_or("sarif results should contain an entry for the fixture card")?;
+        let sarif_location = &sarif_result["locations"][0]["physicalLocation"];
+        let sarif_file = sarif_location["artifactLocation"]["uri"]
+            .as_str()
+            .ok_or("sarif physicalLocation.artifactLocation.uri must be a string")?;
+        let sarif_line = sarif_location["region"]["startLine"]
+            .as_u64()
+            .ok_or("sarif physicalLocation.region.startLine must be a number")?;
+        let sarif_column = sarif_location["region"]["startColumn"]
+            .as_u64()
+            .ok_or("sarif physicalLocation.region.startColumn must be a number")?;
+
+        // Surface 3: saved LSP projection, matched by `card_id`. LSP's
+        // `range.start` is 0-based, so it must be exactly one less than the
+        // 1-based cards.json/SARIF position on both axes.
+        let lsp_value = parse_json(&crate::output::lsp::render(&output))?;
+        let diagnostics = lsp_value["diagnostics"]
+            .as_array()
+            .ok_or("lsp diagnostics must be an array")?;
+        let lsp_diagnostic = diagnostics
+            .iter()
+            .find(|entry| entry["card_id"].as_str() == Some(json_card_id))
+            .ok_or("lsp diagnostics should contain an entry for the fixture card")?;
+        let lsp_path = lsp_diagnostic["path"]
+            .as_str()
+            .ok_or("lsp diagnostic path must be a string")?;
+        let lsp_start_line = lsp_diagnostic["range"]["start"]["line"]
+            .as_u64()
+            .ok_or("lsp diagnostic range.start.line must be a number")?;
+        let lsp_start_character = lsp_diagnostic["range"]["start"]["character"]
+            .as_u64()
+            .ok_or("lsp diagnostic range.start.character must be a number")?;
+
+        assert_eq!(
+            json_file, sarif_file,
+            "cards.json and sarif file path must be identical"
+        );
+        assert_eq!(
+            json_file, lsp_path,
+            "cards.json and lsp diagnostic file path must be identical"
+        );
+        assert_eq!(
+            json_line, sarif_line,
+            "cards.json and sarif line must be identical (both 1-based)"
+        );
+        assert_eq!(
+            json_column, sarif_column,
+            "cards.json and sarif column must be identical (both 1-based)"
+        );
+        assert_eq!(
+            json_line,
+            lsp_start_line + 1,
+            "lsp start.line must be exactly one less than cards.json's 1-based line"
+        );
+        assert_eq!(
+            json_column,
+            lsp_start_character + 1,
+            "lsp start.character must be exactly one less than cards.json's 1-based column"
+        );
+
+        assert_eq!(
+            json_line, 8,
+            "raw_pointer_alignment fixture card site.line is 8"
+        );
+        assert_eq!(
+            json_column, 5,
+            "raw_pointer_alignment fixture card site.column is 5"
+        );
+
+        Ok(())
+    }
 }
