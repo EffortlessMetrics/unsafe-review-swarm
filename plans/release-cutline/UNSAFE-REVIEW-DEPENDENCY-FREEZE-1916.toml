@@ -9,31 +9,31 @@ publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "fb441124740681df8fbec853bce6a0f7698630cd"
-lockfile_sha256 = "d8ba9f7081cb37ce3ca612e7f72750217f5cb79ae79d90940204f9a157283902"
-ra_ap_syntax = "0.0.338"
-ignore = "0.4.26"
+commit = "d19a87de817c3a1b4ef7dc746f25e7cc0d117eee"
+lockfile_sha256 = "625a362746db12f1735f337ff8bf168afc721213cc139f4d20efc4c7c5b15b5a"
+ra_ap_syntax = "0.0.341"
+ignore = "0.4.27"
 signal_hook = "0.4.4"
 
 [source]
-commit = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
-lockfile_sha256 = "63edc764a500fffcc20d78f4a960aae204a04597befdbdc1cf86b3a06d6da1dd"
-ra_ap_syntax = "0.0.336"
-ignore = "0.4.26"
+commit = "4fc6eb806de1460c618d60869b8a1cb885f87eea"
+lockfile_sha256 = "aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527"
+ra_ap_syntax = "0.0.341"
+ignore = "0.4.27"
 signal_hook = "0.3.18"
 
 [[candidate_input]]
 id = "SOURCE-548"
 surface = "ra_ap_syntax"
 version = "0.0.341"
-status = "owner_gated_targeted_proof_required"
+status = "accepted_merged_targeted_proof_green"
 reset_receipts = ["parser/input tests", "detector contracts", "fixture/calibration parity", "surface determinism", "real-PR/evidence-loss corpus where relevant", "full check-pr"]
 
 [[candidate_input]]
 id = "SOURCE-547"
 surface = "ignore"
 version = "0.4.27"
-status = "owner_gated_directly_affected_tests_required"
+status = "accepted_merged_directly_affected_tests_green"
 reset_receipts = ["workspace tests", "clippy", "check-pr", "discovery/path tests"]
 
 [[candidate_input]]
