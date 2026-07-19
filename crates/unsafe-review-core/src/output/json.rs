@@ -1817,4 +1817,93 @@ mod tests {
 
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): `baseline_state` and
+    /// `outcome_movement` are a single `CoverageBlock` fact
+    /// (`domain/coverage.rs::CoverageBlock::derive`), but `cards.json`
+    /// (`JsonCoverageBlock::from`), the agent packet (`AgentCoverageBlock::from`),
+    /// and the saved LSP projection (`EditorCoverageBlock::from`) each build
+    /// their own struct from that one `CoverageBlock` value independently
+    /// (`policy/spec-coverage.toml` names all three as canonical consumers of
+    /// both fields; `policy_report` is deliberately excluded here because it
+    /// does not project `outcome_movement` at all, per that manifest's note).
+    /// Nothing today would catch one projection alone drifting (e.g. mapping a
+    /// different `CoverageBlock` field) while the others kept the original
+    /// value. This test proves the three surfaces currently agree for one
+    /// canonical fixture card; it locks parity of already-correct behavior and
+    /// asserts nothing about memory safety, UB-freedom, or which movement
+    /// value is "right".
+    #[test]
+    fn baseline_state_and_outcome_movement_are_identical_across_json_agent_and_lsp_surfaces()
+    -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+
+        // Surface 1: cards.json
+        let json_value = parse_json(&render(&output))?;
+        let card_id = json_value["cards"][0]["id"]
+            .as_str()
+            .ok_or("cards.json cards[0].id must be a string")?;
+        let json_baseline_state = json_value["cards"][0]["coverage"]["baseline_state"]
+            .as_str()
+            .ok_or("cards.json cards[0].coverage.baseline_state must be a string")?;
+        let json_outcome_movement = json_value["cards"][0]["coverage"]["outcome_movement"]
+            .as_str()
+            .ok_or("cards.json cards[0].coverage.outcome_movement must be a string")?;
+
+        // Surface 2: agent packet. `coverage` is top-level on the packet (not
+        // nested under `card`, unlike `priority`).
+        let agent_value = parse_json(&crate::output::agent::render(card))?;
+        let agent_baseline_state = agent_value["coverage"]["baseline_state"]
+            .as_str()
+            .ok_or("agent packet coverage.baseline_state must be a string")?;
+        let agent_outcome_movement = agent_value["coverage"]["outcome_movement"]
+            .as_str()
+            .ok_or("agent packet coverage.outcome_movement must be a string")?;
+
+        // Surface 3: saved LSP projection. Match the diagnostic entry by
+        // `card_id` rather than assuming index 0, since `diagnostics` is a
+        // plain array keyed by card identity.
+        let lsp_value = parse_json(&crate::output::lsp::render(&output))?;
+        let diagnostics = lsp_value["diagnostics"]
+            .as_array()
+            .ok_or("lsp diagnostics must be an array")?;
+        let lsp_diagnostic = diagnostics
+            .iter()
+            .find(|entry| entry["card_id"].as_str() == Some(card_id))
+            .ok_or("lsp diagnostics should contain an entry for the fixture card")?;
+        let lsp_baseline_state = lsp_diagnostic["coverage"]["baseline_state"]
+            .as_str()
+            .ok_or("lsp diagnostic coverage.baseline_state must be a string")?;
+        let lsp_outcome_movement = lsp_diagnostic["coverage"]["outcome_movement"]
+            .as_str()
+            .ok_or("lsp diagnostic coverage.outcome_movement must be a string")?;
+
+        assert_eq!(
+            json_baseline_state, agent_baseline_state,
+            "cards.json and agent packet baseline_state must be identical"
+        );
+        assert_eq!(
+            json_baseline_state, lsp_baseline_state,
+            "cards.json and lsp diagnostic baseline_state must be identical"
+        );
+        assert_eq!(
+            json_outcome_movement, agent_outcome_movement,
+            "cards.json and agent packet outcome_movement must be identical"
+        );
+        assert_eq!(
+            json_outcome_movement, lsp_outcome_movement,
+            "cards.json and lsp diagnostic outcome_movement must be identical"
+        );
+        assert_eq!(
+            json_baseline_state, "new",
+            "raw_pointer_alignment fixture card baseline_state is new"
+        );
+        assert_eq!(
+            json_outcome_movement, "regressed",
+            "raw_pointer_alignment fixture card outcome_movement is regressed"
+        );
+
+        Ok(())
+    }
 }
