@@ -236,6 +236,21 @@ test("canonical actions reject cross-card command arguments", () => {
   assert.match(result.warnings[0], /inconsistent canonical identity/);
 });
 
+test("canonical actions require explicit analysis identities", () => {
+  const action = {
+    action_id: "agent-packet", title: "Copy bounded unsafe-review agent packet",
+    kind: "quickfix.unsafeReview.agentPacket",
+    diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+    payload: { action_id: "agent-packet", card_id: "UR-foo", agent_readiness: "ready_for_agent" },
+    command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo" } },
+    applicability: { state: "available" }, is_preferred: false, command_only: true,
+    trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+  };
+  const result = parseBundle(JSON.stringify({ ...MINIMAL_BUNDLE, schema_version: "0.2", code_actions: [action] }));
+  assert.equal(result.codeActions.length, 0);
+  assert.match(result.warnings[0], /inconsistent canonical identity/);
+});
+
 test("canonical actions reject diagnostic and applicability drift", () => {
   const analysis = { analysis_id: "analysis-1", generation: 1, scope: "diff", state: "current" };
   const action = {

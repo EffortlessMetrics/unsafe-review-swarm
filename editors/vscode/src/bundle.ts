@@ -423,6 +423,7 @@ function parseCanonicalCodeAction(
     vocabulary === undefined || vocabulary.command !== commandId || vocabulary.kind !== kind ||
     entry["is_preferred"] !== false || matchingDiagnostic === undefined ||
     actionTrustBoundary === undefined || actionTrustBoundary !== bundleTrustBoundary ||
+    !isRecord(bundleAnalysis) || !isRecord(payloadAnalysis) || !isRecord(argumentAnalysis) ||
     JSON.stringify(payloadAnalysis) !== JSON.stringify(bundleAnalysis) ||
     JSON.stringify(argumentAnalysis) !== JSON.stringify(bundleAnalysis)
   ) {
