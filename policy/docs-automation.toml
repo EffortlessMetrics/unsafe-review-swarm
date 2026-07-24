@@ -67,7 +67,7 @@ sources = [
 must_include = [
   "unsafe-review-swarm develops.",
   "unsafe-review publishes.",
-  "rtk cargo run --locked -p xtask -- source-divergence",
+  "cargo run --locked -p xtask -- source-divergence",
   "Use the repo source-of-truth stack",
   "Do not put durable repo operating state in `.codex`",
   "`ReviewCard` is the canonical product unit",
