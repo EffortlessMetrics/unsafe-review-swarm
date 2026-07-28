@@ -40,17 +40,17 @@ text = "The disposition record remains an audit artifact and does not become a s
 [[acceptance]]
 id = "AC-1"
 text = "The live disposition document records exact repository, PR, head, status, check, and chosen-history evidence for the required dependency/release queue."
-proof = ["rtk git diff --check"]
+proof = ["git diff --check"]
 
 [[acceptance]]
 id = "AC-2"
 text = "The swarm action-pin update and policy mirror pass the deterministic workflow and repository policy checks."
-proof = ["rtk cargo run --locked -p xtask -- check-policy", "rtk cargo run --locked -p xtask -- check-pr"]
+proof = ["cargo run --locked -p xtask -- check-policy", "cargo run --locked -p xtask -- check-pr"]
 
 [[acceptance]]
 id = "AC-3"
 text = "The change does not claim source promotion, publication, candidate freeze, memory safety, or dependency safety."
-proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+proof = ["cargo run --locked -p xtask -- source-divergence"]
 
 [[integration]]
 surface = "workflow_policy"
@@ -73,4 +73,3 @@ posture = "Maintenance and documentation-only release-prep slice; no analyzer, r
 
 [rollback]
 strategy = "Revert the paired workflow/allowlist commit and supersede the audit document with a refreshed live-state record; do not alter source history or publication state."
-
