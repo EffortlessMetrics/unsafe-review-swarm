@@ -68,7 +68,7 @@ files manually.
 Check for unresolved merge state:
 
 ```bash
-proxy git diff --check
+git diff --check
 rg "^<<<<<<<|^=======|^>>>>>>>" -n
 ```
 
@@ -95,17 +95,17 @@ cargo run --locked -p unsafe-review -- support
 Verify history and key tree state:
 
 ```bash
-proxy git merge-base --is-ancestor <key-swarm-commit> HEAD
-proxy git merge-base --is-ancestor swarm/main HEAD
-proxy git log --oneline --parents -1
+git merge-base --is-ancestor <key-swarm-commit> HEAD
+git merge-base --is-ancestor swarm/main HEAD
+git log --oneline --parents -1
 rg "raw.githubusercontent.com/EffortlessMetrics/unsafe-review/main/unsafe-review-logo.svg" crates/unsafe-review/README.md
 ```
 
 Also inspect the remaining tree difference from swarm:
 
 ```bash
-proxy git diff --stat swarm/main..HEAD
-proxy git diff --name-status swarm/main..HEAD
+git diff --stat swarm/main..HEAD
+git diff --name-status swarm/main..HEAD
 ```
 
 That diff must be explainable. It should not show accidental source-only stale

@@ -52,7 +52,7 @@ Bring the version, lock, and release-note files straight from source (these are
 safe wholesale checkouts):
 
 ```bash
-proxy git checkout public/main -- \
+git checkout public/main -- \
   Cargo.lock \
   crates/unsafe-review/Cargo.toml \
   crates/unsafe-review-cli/Cargo.toml \
@@ -93,7 +93,7 @@ Verify parity (should print nothing):
 ```bash
 diff \
   <(awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f' CHANGELOG.md) \
-  <(proxy git show public/main:CHANGELOG.md | awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f')
+  <(git show public/main:CHANGELOG.md | awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f')
 ```
 
 If source carries a duplicated or malformed dated section, do **not** mirror the
@@ -110,7 +110,7 @@ cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
 cargo test --workspace --locked
 cargo run --locked -p xtask -- check-pr
-proxy git diff --check
+git diff --check
 ```
 
 `check-source-sync` and `source-divergence` must report

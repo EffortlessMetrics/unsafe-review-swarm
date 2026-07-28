@@ -201,5 +201,6 @@ saved diff's expected source tree. A zero-card result from checkout drift is not
 dogfood evidence; record zero-card PR diffs only as explicit false-positive
 controls. Exploratory zero-card results for unsupported unsafe-adjacent classes
 belong in the handoff or objective-audit limitations instead of the active
-corpus table. When saving a raw diff from GitHub, use
-`proxy gh pr diff ...` so RTK does not compact away `diff --git` headers.
+corpus table. When streaming a raw diff from GitHub, pipe
+`gh pr diff ...` directly into `unsafe-review pr --diff -` so the raw
+`diff --git` headers are preserved.

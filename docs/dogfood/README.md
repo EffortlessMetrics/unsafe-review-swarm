@@ -121,11 +121,11 @@ needs a saved raw diff, use `git diff --output=<path>` so the saved file is not
 shaped by the shell:
 
 ```bash
-proxy git -C target/dogfood-work/hashbrown diff --no-ext-diff --binary \
+git -C target/dogfood-work/hashbrown diff --no-ext-diff --binary \
   --output=/absolute/path/to/target/dogfood-work/hashbrown-pr681.raw.diff \
   <base-sha> <head-sha>
 ```
 
-If a dogfood run must stream `gh pr diff`, use `proxy` and feed the stream
-directly to `unsafe-review pr --diff -`; do not save product-input patches
-through PowerShell redirection.
+If a dogfood run must stream `gh pr diff`, feed the stream directly to
+`unsafe-review pr --diff -`; do not save product-input patches through
+PowerShell redirection.
