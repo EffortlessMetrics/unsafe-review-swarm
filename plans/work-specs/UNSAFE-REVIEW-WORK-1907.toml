@@ -34,17 +34,17 @@ text = "The editor path remains read-only and advisory: no source edits, witness
 [[acceptance]]
 id = "AC-1907-2A-1"
 text = "The typed DTO exposes the card ID, class code, class-derived severity, operation/family, coverage movement/baseline/comment/readiness, and trust boundary from the same ReviewCard."
-proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+proof = ["cargo test -p unsafe-review-core lsp --locked"]
 
 [[acceptance]]
 id = "AC-1907-2A-2"
 text = "The canonical range helper counts UTF-16 code units, including non-BMP characters."
-proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+proof = ["cargo test -p unsafe-review-core lsp --locked"]
 
 [[acceptance]]
 id = "AC-1907-2A-3"
 text = "No live LSP, VS Code, freshness, action, packet, or repair behavior is migrated in this slice."
-proof = ["rtk git diff --name-only", "rtk git diff --check"]
+proof = ["git diff --name-only", "git diff --check"]
 
 [[integration]]
 surface = "1907-saved-live-vscode"

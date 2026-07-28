@@ -35,17 +35,17 @@ text = "Publication, source promotion, tags, GitHub Release, and public v1 remai
 [[acceptance]]
 id = "AC-1"
 text = "The draft records exact swarm/source SHAs, source-divergence posture, and an unresolved semver rationale."
-proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+proof = ["cargo run --locked -p xtask -- source-divergence"]
 
 [[acceptance]]
 id = "AC-2"
 text = "The cutline names required and deferred release inputs without claiming that open prerequisites are complete."
-proof = ["rtk cargo run --locked -p xtask -- check-doc-artifacts", "rtk cargo run --locked -p xtask -- check-pr"]
+proof = ["cargo run --locked -p xtask -- check-doc-artifacts", "cargo run --locked -p xtask -- check-pr"]
 
 [[acceptance]]
 id = "AC-3"
 text = "The machine-readable cutline is registered in the durable .allow graph and its human summary states the freeze and rollback rules."
-proof = ["rtk cargo-allow check --profile spec-system --mode audit", "rtk git diff --check"]
+proof = ["cargo-allow check --profile spec-system --mode audit", "git diff --check"]
 
 [[integration]]
 surface = "cargo_allow"

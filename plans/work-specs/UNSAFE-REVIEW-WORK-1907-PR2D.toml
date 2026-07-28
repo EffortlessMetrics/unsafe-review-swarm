@@ -44,7 +44,7 @@ proof = ["npm --prefix editors/vscode run compile", "npm --prefix editors/vscode
 [[acceptance]]
 id = "AC-1907-2D-3"
 text = "No live LSP, freshness, exact binding, packet, repair, source-edit, witness-execution, or policy behavior changes in this slice."
-proof = ["rtk git diff --name-only", "rtk git diff --check"]
+proof = ["git diff --name-only", "git diff --check"]
 
 [[integration]]
 surface = "1907-pr2c-canonical-live-saved"
