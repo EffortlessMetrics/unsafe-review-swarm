@@ -34,17 +34,17 @@ text = "The editor path remains read-only and advisory: no source edits, witness
 [[acceptance]]
 id = "AC-1907-2B-1"
 text = "EditorProjection stores canonical EditorDiagnostic values directly and serializes the same diagnostic object emitted by the saved lsp.json renderer."
-proof = ["rtk cargo test -p unsafe-review-core lsp --locked"]
+proof = ["cargo test -p unsafe-review-core lsp --locked"]
 
 [[acceptance]]
 id = "AC-1907-2B-2"
 text = "Saved projection tests lock card identity, class code, severity, and the complete serialized diagnostic against the typed DTO."
-proof = ["rtk cargo test -p unsafe-review-core lsp --locked", "rtk cargo run --locked -p xtask -- check-fixture-surface-parity"]
+proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo run --locked -p xtask -- check-fixture-surface-parity"]
 
 [[acceptance]]
 id = "AC-1907-2B-3"
 text = "No live LSP, VS Code, freshness, action, packet, or repair behavior is migrated in this slice."
-proof = ["rtk git diff --name-only", "rtk git diff --check"]
+proof = ["git diff --name-only", "git diff --check"]
 
 [[integration]]
 surface = "1907-pr2a-canonical-dto"
@@ -60,7 +60,7 @@ mitigation = "Compare typed DTO serialization with the saved wire value and run 
 
 [[risk]]
 id = "RISK-2"
-mitigation = "Keep live CLI and VS Code files outside the PR so overlapping migration work remains sequenced."
+mitigation = "Keep live CLI and VS Code files outside this PR so overlapping migration work remains sequenced."
 
 [compatibility]
 posture = "Internal Rust representation becomes typed and owned; serialized lsp.json remains wire-compatible for current consumers."
