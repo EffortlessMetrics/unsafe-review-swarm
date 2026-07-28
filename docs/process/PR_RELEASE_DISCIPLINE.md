@@ -61,12 +61,12 @@ states.
 Start from current repository state before every PR disposition pass:
 
 ```bash
-rtk git fetch origin
-rtk git status --short --branch
-rtk git pull --ff-only
-rtk gh pr list --repo EffortlessMetrics/unsafe-review-swarm --state open --limit 100
-rtk gh pr list --repo EffortlessMetrics/unsafe-review-swarm --state closed --limit 100
-rtk cargo run --locked -p xtask -- source-divergence
+git fetch origin
+git status --short --branch
+git pull --ff-only
+gh pr list --repo EffortlessMetrics/unsafe-review-swarm --state open --limit 100
+gh pr list --repo EffortlessMetrics/unsafe-review-swarm --state closed --limit 100
+cargo run --locked -p xtask -- source-divergence
 ```
 
 If local `main` was behind, refresh the conclusion after pulling. Do not use
@@ -126,8 +126,8 @@ Before saying publication is blocked, read the repository runbook and check the
 repo-specific credential path:
 
 ```bash
-rtk sed -n '1,180p' docs/releases/CRATES_IO_PATCH_RELEASE.md
-rtk rg -n "publish|crates.io|credential|token|CARGO|release" docs .cargo .github -S
+sed -n '1,180p' docs/releases/CRATES_IO_PATCH_RELEASE.md
+rg -n "publish|crates.io|credential|token|CARGO|release" docs .cargo .github -S
 ```
 
 Absence of `CARGO_REGISTRY_TOKEN` or a home cargo credentials file is not by
@@ -136,11 +136,11 @@ itself proof that the repository cannot publish.
 For synchronized unsafe-review patch releases, publish dependency crates first:
 
 ```bash
-rtk cargo publish -p unsafe-review-core
-rtk cargo publish -p unsafe-review-cli --dry-run
-rtk cargo publish -p unsafe-review-cli
-rtk cargo publish -p unsafe-review --dry-run
-rtk cargo publish -p unsafe-review
+cargo publish -p unsafe-review-core
+cargo publish -p unsafe-review-cli --dry-run
+cargo publish -p unsafe-review-cli
+cargo publish -p unsafe-review --dry-run
+cargo publish -p unsafe-review
 ```
 
 Downstream dry-run failures before upstream crates are published can be expected

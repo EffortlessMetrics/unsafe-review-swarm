@@ -53,27 +53,27 @@ Before publish, run the corpus-validation subset in [RELEASE_READINESS.md](RELEA
 For synchronized public crate bumps:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo package -p unsafe-review-core --list
-rtk cargo package -p unsafe-review-cli --list
-rtk cargo package -p unsafe-review --list
-rtk cargo publish -p unsafe-review-core --dry-run
-rtk cargo publish -p unsafe-review-cli --dry-run
-rtk cargo publish -p unsafe-review --dry-run
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo package -p unsafe-review-core --list
+cargo package -p unsafe-review-cli --list
+cargo package -p unsafe-review --list
+cargo publish -p unsafe-review-core --dry-run
+cargo publish -p unsafe-review-cli --dry-run
+cargo publish -p unsafe-review --dry-run
 ```
 
 For facade-only patches:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo package -p unsafe-review --list
-rtk cargo publish -p unsafe-review --dry-run
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo package -p unsafe-review --list
+cargo publish -p unsafe-review --dry-run
 ```
 
 For README/image hotfixes, inspect packaged README content before publishing.
@@ -118,15 +118,15 @@ emergency hotfix from a local clone).
 Publish dependency crates first when bumping all public crates:
 
 ```bash
-rtk cargo publish -p unsafe-review-core
-rtk cargo publish -p unsafe-review-cli
-rtk cargo publish -p unsafe-review
+cargo publish -p unsafe-review-core
+cargo publish -p unsafe-review-cli
+cargo publish -p unsafe-review
 ```
 
 Then smoke the installed crate from crates.io:
 
 ```bash
-rtk cargo install unsafe-review --version 0.3.4 --locked --root target/install-published-0.3.4
+cargo install unsafe-review --version 0.3.4 --locked --root target/install-published-0.3.4
 target/install-published-0.3.4/bin/unsafe-review --version
 target/install-published-0.3.4/bin/unsafe-review doctor
 target/install-published-0.3.4/bin/unsafe-review repo --help
@@ -137,7 +137,7 @@ cp -R fixtures/raw_pointer_alignment target/unsafe-review-published-0.3.4-fixtur
 mkdir -p target/unsafe-review-published-0.3.4-fixture/.unsafe-review/candidates
 target/install-published-0.3.4/bin/unsafe-review candidate import docs/examples/manual-candidates/textdecoder-sab.json --out target/unsafe-review-published-0.3.4-fixture/.unsafe-review/candidates/R4R2-S001.json
 target/install-published-0.3.4/bin/unsafe-review first-pr --root target/unsafe-review-published-0.3.4-fixture --diff target/unsafe-review-published-0.3.4-fixture/change.diff --out-dir target/unsafe-review-published-0.3.4-smoke
-rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.4-smoke
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-0.3.4-smoke
 target/install-published-0.3.4/bin/unsafe-review explain <card-id>
 target/install-published-0.3.4/bin/unsafe-review context <card-id> --json
 target/install-published-0.3.4/bin/unsafe-review support

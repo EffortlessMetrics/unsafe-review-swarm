@@ -54,12 +54,12 @@ must not be mistaken for a scheduler or for first-class cargo-allow support.
 ## Required evidence
 
 ```text
-rtk cargo run --locked -p xtask -- check-work-specs
-rtk cargo test --locked -p xtask work_specs
-rtk cargo-allow check --profile spec-system --mode audit
-rtk cargo run --locked -p xtask -- check-doc-artifacts
-rtk cargo run --locked -p xtask -- check-pr
-rtk git diff --check
+cargo run --locked -p xtask -- check-work-specs
+cargo test --locked -p xtask work_specs
+cargo-allow check --profile spec-system --mode audit
+cargo run --locked -p xtask -- check-doc-artifacts
+cargo run --locked -p xtask -- check-pr
+git diff --check
 ```
 
 ## Follow-up boundary

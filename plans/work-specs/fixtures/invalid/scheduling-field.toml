@@ -17,7 +17,7 @@ text = "A work spec does not choose the next issue."
 [[acceptance]]
 id = "AC-1"
 text = "The checker rejects priority."
-proof = ["rtk cargo run --locked -p xtask -- check-work-specs"]
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
 
 [[integration]]
 surface = "checker"

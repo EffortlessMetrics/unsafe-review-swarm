@@ -33,17 +33,17 @@ text = "The advisory boundary remains unchanged: no safety, UB-free, Miri, site-
 [[acceptance]]
 id = "AC-1"
 text = "The policy ledger names canonical producers and consumer surfaces for all fields required by #1907 through #1911."
-proof = ["rtk cargo run --locked -p xtask -- check-spec-coverage"]
+proof = ["cargo run --locked -p xtask -- check-spec-coverage"]
 
 [[acceptance]]
 id = "AC-2"
 text = "The map-only change contains no runtime implementation or fixture-output changes."
-proof = ["rtk git diff --check", "rtk git diff --name-only -- policy/spec-coverage.toml plans/work-specs/UNSAFE-REVIEW-WORK-1880.toml"]
+proof = ["git diff --check", "git diff --name-only -- policy/spec-coverage.toml plans/work-specs/UNSAFE-REVIEW-WORK-1880.toml"]
 
 [[acceptance]]
 id = "AC-3"
 text = "Freshness and structured action ownership are visible as follow-up seams rather than being presented as implemented behavior."
-proof = ["rtk rg -n 'freshness_identity|editor_action_contract|canonical producer to be introduced' policy/spec-coverage.toml"]
+proof = ["rg -n 'freshness_identity|editor_action_contract|canonical producer to be introduced' policy/spec-coverage.toml"]
 
 [[integration]]
 surface = "issue_1880"

@@ -35,17 +35,17 @@ text = "Any accepted dependency exception invalidates its affected qualification
 [[acceptance]]
 id = "AC-1"
 text = "The record contains exact live swarm/source commits, lockfile SHA-256 values, and named dependency versions."
-proof = ["rtk git diff --check"]
+proof = ["git diff --check"]
 
 [[acceptance]]
 id = "AC-2"
 text = "The issue-linked artifacts are registered and structurally valid without creating a scheduler or active freeze gate."
-proof = ["rtk cargo run --locked -p xtask -- check-work-specs", "rtk cargo run --locked -p xtask -- check-doc-artifacts", "rtk cargo run --locked -p xtask -- check-pr"]
+proof = ["cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-doc-artifacts", "cargo run --locked -p xtask -- check-pr"]
 
 [[acceptance]]
 id = "AC-3"
 text = "The snapshot keeps source divergence and publication boundaries explicit."
-proof = ["rtk cargo run --locked -p xtask -- source-divergence"]
+proof = ["cargo run --locked -p xtask -- source-divergence"]
 
 [[integration]]
 surface = "release_cutline"

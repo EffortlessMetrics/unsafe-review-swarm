@@ -35,12 +35,12 @@ text = "Acceptance and invariant identifiers remain stable while implementation 
 [[acceptance]]
 id = "AC-1"
 text = "A valid example contains objective, outcome, scope, invariants, acceptance proof, integrations, risks, rollback, and claim boundary."
-proof = ["rtk cargo run --locked -p xtask -- check-work-specs"]
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
 
 [[acceptance]]
 id = "AC-2"
 text = "Invalid fixtures reject duplicate criterion IDs and repository-wide scheduling fields."
-proof = ["rtk cargo test --locked -p xtask work_specs"]
+proof = ["cargo test --locked -p xtask work_specs"]
 
 [[integration]]
 surface = "cargo_allow"

@@ -44,15 +44,15 @@ swarm`.
 Fetch source and branch off swarm `main`:
 
 ```bash
-rtk git fetch public
-rtk git switch -c sync/source-<version>-publication origin/main
+git fetch public
+git switch -c sync/source-<version>-publication origin/main
 ```
 
 Bring the version, lock, and release-note files straight from source (these are
 safe wholesale checkouts):
 
 ```bash
-rtk proxy git checkout public/main -- \
+git checkout public/main -- \
   Cargo.lock \
   crates/unsafe-review/Cargo.toml \
   crates/unsafe-review-cli/Cargo.toml \
@@ -93,7 +93,7 @@ Verify parity (should print nothing):
 ```bash
 diff \
   <(awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f' CHANGELOG.md) \
-  <(rtk proxy git show public/main:CHANGELOG.md | awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f')
+  <(git show public/main:CHANGELOG.md | awk '/^## <version>/{f=1} f&&/^## <prev-version>/{exit} f')
 ```
 
 If source carries a duplicated or malformed dated section, do **not** mirror the
@@ -103,14 +103,14 @@ publication-sync handoff for separate source-side repair.
 ## Validation
 
 ```bash
-rtk cargo run --locked -p xtask -- check-source-sync
-rtk cargo run --locked -p xtask -- source-divergence   # expect new_source_commits=0
-rtk cargo fmt --all --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo run --locked -p xtask -- check-pr
-rtk proxy git diff --check
+cargo run --locked -p xtask -- check-source-sync
+cargo run --locked -p xtask -- source-divergence   # expect new_source_commits=0
+cargo fmt --all --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+git diff --check
 ```
 
 `check-source-sync` and `source-divergence` must report
