@@ -1,0 +1,87 @@
+name: Apply residual RTK guidance cleanup
+
+on:
+  push:
+    branches:
+      - agent/remove-residual-rtk-guidance
+    paths:
+      - .github/workflows/apply-remove-residual-rtk-guidance.yml
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout cleanup branch
+        uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          ref: agent/remove-residual-rtk-guidance
+          fetch-depth: 0
+
+      - name: Remove RTK from live guidance and work specs
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch origin main
+          python3 - <<'PY'
+          from pathlib import Path
+          import subprocess
+
+          paths = [
+              Path("docs/contributing/SOURCE_HISTORY_CATCHUP.md"),
+              Path("docs/contributing/SWARM_MIRROR.md"),
+              Path("docs/dogfood/README.md"),
+              Path("docs/dogfood/index.md"),
+              Path("docs/process/PR_RELEASE_DISCIPLINE.md"),
+              Path("docs/releases/CRATES_IO_PATCH_RELEASE.md"),
+              Path("docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md"),
+              Path("docs/status/OBJECTIVE_AUDIT.md"),
+              Path("plans/work-specs/UNSAFE-REVIEW-WORK-1880.toml"),
+              Path("plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"),
+              Path("plans/work-specs/examples/UNSAFE-REVIEW-WORK-1916-FREEZE.toml"),
+              Path("plans/work-specs/fixtures/invalid/scheduling-field.toml"),
+              Path("xtask/src/work_specs.rs"),
+          ]
+
+          changed = []
+          for path in paths:
+              raw = subprocess.check_output(
+                  ["git", "show", f"origin/main:{path.as_posix()}"]
+              )
+              count = raw.count(b"rtk ")
+              if count == 0:
+                  raise SystemExit(f"expected at least one RTK command in {path}")
+              path.write_bytes(raw.replace(b"rtk ", b""))
+              changed.append((str(path), count))
+
+          for path, count in changed:
+              print(f"{path}: removed {count} RTK prefix(es)")
+          PY
+
+          cargo fmt --all -- --check
+          git diff --check
+
+      - name: Commit cleanup
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "EffortlessSteven"
+          git config user.email "git@effortlesssteven.com"
+          git add \
+            docs/contributing/SOURCE_HISTORY_CATCHUP.md \
+            docs/contributing/SWARM_MIRROR.md \
+            docs/dogfood/README.md \
+            docs/dogfood/index.md \
+            docs/process/PR_RELEASE_DISCIPLINE.md \
+            docs/releases/CRATES_IO_PATCH_RELEASE.md \
+            docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md \
+            docs/status/OBJECTIVE_AUDIT.md \
+            plans/work-specs/UNSAFE-REVIEW-WORK-1880.toml \
+            plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml \
+            plans/work-specs/examples/UNSAFE-REVIEW-WORK-1916-FREEZE.toml \
+            plans/work-specs/fixtures/invalid/scheduling-field.toml \
+            xtask/src/work_specs.rs
+          git commit -m "docs: remove RTK from live runbooks and work specs"
+          git push origin HEAD:agent/remove-residual-rtk-guidance
