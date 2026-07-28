@@ -1,0 +1,59 @@
+name: Fix residual proxy guidance
+on:
+  pull_request:
+    types: [synchronize, reopened]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.event.pull_request.head.ref == 'agent/remove-residual-rtk-guidance' && github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0
+        with:
+          ref: agent/remove-residual-rtk-guidance
+          fetch-depth: 0
+      - name: Repair direct command guidance
+        shell: bash
+        run: |
+          set -euo pipefail
+          files=(
+            docs/contributing/SOURCE_HISTORY_CATCHUP.md
+            docs/contributing/SWARM_MIRROR.md
+            docs/dogfood/README.md
+            docs/dogfood/index.md
+          )
+          perl -pi -e 's/proxy git/git/g; s/proxy gh/gh/g' "${files[@]}"
+          python3 - <<'PY'
+          from pathlib import Path
+
+          readme = Path('docs/dogfood/README.md')
+          text = readme.read_text(encoding='utf-8')
+          text = text.replace(
+              'If a dogfood run must stream `gh pr diff`, use `proxy` and feed the stream\n'
+              'directly to `unsafe-review pr --diff -`; do not save product-input patches\n'
+              'through PowerShell redirection.',
+              'If a dogfood run must stream `gh pr diff`, feed the stream directly to\n'
+              '`unsafe-review pr --diff -`; do not save product-input patches through\n'
+              'PowerShell redirection.'
+          )
+          readme.write_text(text, encoding='utf-8')
+
+          index = Path('docs/dogfood/index.md')
+          text = index.read_text(encoding='utf-8')
+          text = text.replace(
+              'When saving a raw diff from GitHub, use\n'
+              '`gh pr diff ...` so RTK does not compact away `diff --git` headers.',
+              'When streaming a raw diff from GitHub, pipe\n'
+              '`gh pr diff ...` directly into `unsafe-review pr --diff -` so the raw\n'
+              '`diff --git` headers are preserved.'
+          )
+          index.write_text(text, encoding='utf-8')
+          PY
+          ! rg -n 'proxy (git|gh)|so RTK does not compact|use `proxy`' "${files[@]}"
+          git diff --check
+          git config user.name EffortlessSteven
+          git config user.email git@effortlesssteven.com
+          git add "${files[@]}"
+          git commit -m 'docs: repair direct Git and GitHub command guidance'
+          git push origin HEAD:agent/remove-residual-rtk-guidance
