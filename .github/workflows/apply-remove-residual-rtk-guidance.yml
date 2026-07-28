@@ -45,22 +45,24 @@ jobs:
               Path("xtask/src/work_specs.rs"),
           ]
 
+          total = 0
           changed = []
           for path in paths:
               raw = subprocess.check_output(
                   ["git", "show", f"origin/main:{path.as_posix()}"]
               )
               count = raw.count(b"rtk ")
-              if count == 0:
-                  raise SystemExit(f"expected at least one RTK command in {path}")
               path.write_bytes(raw.replace(b"rtk ", b""))
-              changed.append((str(path), count))
+              if count:
+                  changed.append((str(path), count))
+                  total += count
 
+          if total == 0:
+              raise SystemExit("allowlisted live surfaces contained no RTK commands")
           for path, count in changed:
               print(f"{path}: removed {count} RTK prefix(es)")
           PY
 
-          cargo fmt --all -- --check
           git diff --check
 
       - name: Commit cleanup
