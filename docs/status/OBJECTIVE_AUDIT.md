@@ -272,29 +272,29 @@ These are not failures; they are the next unsupported or weakly verified areas:
 Use these commands for a broad local proof pass:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo run --locked -p xtask -- check-pr
-rtk cargo run --locked -p xtask -- check-calibration
-rtk cargo run --locked -p xtask -- check-dogfood
-rtk cargo run --locked -p xtask -- check-doc-artifacts
-rtk cargo-allow check --profile spec-system --mode audit
-rtk cargo run --locked -p xtask -- source-divergence
-rtk git diff --check
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- check-calibration
+cargo run --locked -p xtask -- check-dogfood
+cargo run --locked -p xtask -- check-doc-artifacts
+cargo-allow check --profile spec-system --mode audit
+cargo run --locked -p xtask -- source-divergence
+git diff --check
 ```
 
 Targeted proof commands added by recent receipt work:
 
 ```bash
-rtk cargo test -p unsafe-review-core receipt_audit --locked
-rtk cargo test -p unsafe-review-core receipt --locked
-rtk cargo test -p unsafe-review-core imported_receipt --locked
-rtk cargo test -p unsafe-review-cli receipt_template --locked
-rtk cargo test -p unsafe-review-cli receipt_validate --locked
-rtk cargo test -p unsafe-review --test e2e receipt_template --locked
-rtk cargo test -p unsafe-review --test e2e receipt_validate --locked
+cargo test -p unsafe-review-core receipt_audit --locked
+cargo test -p unsafe-review-core receipt --locked
+cargo test -p unsafe-review-core imported_receipt --locked
+cargo test -p unsafe-review-cli receipt_template --locked
+cargo test -p unsafe-review-cli receipt_validate --locked
+cargo test -p unsafe-review --test e2e receipt_template --locked
+cargo test -p unsafe-review --test e2e receipt_validate --locked
 ```
 
 ## Recommended Next Lane

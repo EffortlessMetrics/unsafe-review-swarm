@@ -161,14 +161,14 @@ Selected real-crate targets:
 Validate the dogfood manifest:
 
 ```bash
-rtk cargo run --locked -p xtask -- check-dogfood
+cargo run --locked -p xtask -- check-dogfood
 ```
 
 Run one target by copying its command from [`corpus.toml`](corpus.toml). Compare
 saved snapshots when an analyzer change is meant to improve card quality:
 
 ```bash
-rtk cargo run --locked -p unsafe-review -- outcome \
+cargo run --locked -p unsafe-review -- outcome \
   --before target/dogfood-work/before.json \
   --after target/dogfood-work/after.json \
   --format markdown \
@@ -179,7 +179,7 @@ Holdout repo snapshots are release-readiness diagnostics. `dogfood-exec` skips
 them by default; run a holdout target only with an explicit opt-in:
 
 ```bash
-rtk cargo run --locked -p xtask -- dogfood-exec \
+cargo run --locked -p xtask -- dogfood-exec \
   --target getrandom-holdout --include-holdout --strict
 ```
 
@@ -202,4 +202,4 @@ dogfood evidence; record zero-card PR diffs only as explicit false-positive
 controls. Exploratory zero-card results for unsupported unsafe-adjacent classes
 belong in the handoff or objective-audit limitations instead of the active
 corpus table. When saving a raw diff from GitHub, use
-`rtk proxy gh pr diff ...` so RTK does not compact away `diff --git` headers.
+`proxy gh pr diff ...` so RTK does not compact away `diff --git` headers.

@@ -42,21 +42,21 @@ Create a source branch from current `unsafe-review/main`.
 Add or fetch the swarm remote:
 
 ```bash
-rtk git remote add swarm <swarm-remote-if-missing>
-rtk git fetch origin main
-rtk git fetch swarm main
+git remote add swarm <swarm-remote-if-missing>
+git fetch origin main
+git fetch swarm main
 ```
 
 Create the catch-up branch:
 
 ```bash
-rtk git switch -c sync/swarm-history-catchup origin/main
+git switch -c sync/swarm-history-catchup origin/main
 ```
 
 Merge swarm with real tree merge semantics:
 
 ```bash
-rtk git merge --allow-unrelated-histories --no-ff swarm/main
+git merge --allow-unrelated-histories --no-ff swarm/main
 ```
 
 Resolve conflicts deliberately. Prefer swarm for files where source is stale
@@ -68,44 +68,44 @@ files manually.
 Check for unresolved merge state:
 
 ```bash
-rtk proxy git diff --check
-rtk rg "^<<<<<<<|^=======|^>>>>>>>" -n
+proxy git diff --check
+rg "^<<<<<<<|^=======|^>>>>>>>" -n
 ```
 
 Run the source validation suite:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo run --locked -p xtask -- check-pr
-rtk cargo run --locked -p xtask -- check-calibration
-rtk cargo run --locked -p xtask -- check-dogfood
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- check-calibration
+cargo run --locked -p xtask -- check-dogfood
 ```
 
 Run a release-surface smoke:
 
 ```bash
-rtk cargo run --locked -p unsafe-review -- first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-history-catchup-smoke
-rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-history-catchup-smoke
-rtk cargo run --locked -p unsafe-review -- support
+cargo run --locked -p unsafe-review -- first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-history-catchup-smoke
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-history-catchup-smoke
+cargo run --locked -p unsafe-review -- support
 ```
 
 Verify history and key tree state:
 
 ```bash
-rtk proxy git merge-base --is-ancestor <key-swarm-commit> HEAD
-rtk proxy git merge-base --is-ancestor swarm/main HEAD
-rtk proxy git log --oneline --parents -1
-rtk rg "raw.githubusercontent.com/EffortlessMetrics/unsafe-review/main/unsafe-review-logo.svg" crates/unsafe-review/README.md
+proxy git merge-base --is-ancestor <key-swarm-commit> HEAD
+proxy git merge-base --is-ancestor swarm/main HEAD
+proxy git log --oneline --parents -1
+rg "raw.githubusercontent.com/EffortlessMetrics/unsafe-review/main/unsafe-review-logo.svg" crates/unsafe-review/README.md
 ```
 
 Also inspect the remaining tree difference from swarm:
 
 ```bash
-rtk proxy git diff --stat swarm/main..HEAD
-rtk proxy git diff --name-status swarm/main..HEAD
+proxy git diff --stat swarm/main..HEAD
+proxy git diff --name-status swarm/main..HEAD
 ```
 
 That diff must be explainable. It should not show accidental source-only stale

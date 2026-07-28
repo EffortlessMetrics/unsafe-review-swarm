@@ -427,7 +427,7 @@ mod tests {
     #[test]
     fn rejects_duplicate_acceptance_ids() -> Result<(), String> {
         let duplicate = format!(
-            "{}\n[[acceptance]]\nid = \"AC-1\"\ntext = \"Repeat\"\nproof = [\"rtk cargo test -p xtask\"]\n",
+            "{}\n[[acceptance]]\nid = \"AC-1\"\ntext = \"Repeat\"\nproof = [\"cargo test -p xtask\"]\n",
             valid_spec()
         );
         let value: toml::Value =
@@ -461,7 +461,7 @@ text = "The artifact must not choose the next issue."
 [[acceptance]]
 id = "AC-1"
 text = "Run the checker."
-proof = ["rtk cargo test -p xtask"]
+proof = ["cargo test -p xtask"]
 
 [[integration]]
 surface = "pr_body"
