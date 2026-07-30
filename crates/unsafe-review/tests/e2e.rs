@@ -7465,6 +7465,66 @@ fn baseline_init_out_override_never_writes_into_root() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn baseline_init_dry_run_is_read_only_and_json_matches_human_plan() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-baseline-preview-e2e")?;
+    let copied = temp.path().join("fixture");
+    copy_dir_all(&fixture, &copied)?;
+    let out_ledger = temp.path().join("out/preview-baseline.toml");
+
+    let json_output = run_success([
+        os("baseline"),
+        os("init"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--out"),
+        out_ledger.as_os_str().to_os_string(),
+        os("--dry-run"),
+        os("--format"),
+        os("json"),
+    ])?;
+    let proposal = parse_json(&stdout_text(&json_output)?)?;
+    let cards = proposal["cards"]
+        .as_array()
+        .ok_or("baseline preview JSON must contain cards")?;
+    let trust_boundary = proposal["trust_boundary"]
+        .as_str()
+        .ok_or("baseline preview JSON must contain trust_boundary")?;
+    assert_eq!(proposal["mode"], "preview");
+    assert_eq!(proposal["writes_files"], false);
+    assert_eq!(proposal["captured"], cards.len());
+    assert!(trust_boundary.contains("not prove"));
+    assert!(!out_ledger.exists());
+    assert!(!copied.join("policy/unsafe-review-baseline.toml").exists());
+    assert!(
+        !copied
+            .join("policy/unsafe-review-baseline-snapshot.toml")
+            .exists()
+    );
+
+    let human_output = run_success([
+        os("baseline"),
+        os("init"),
+        os("--root"),
+        copied.as_os_str().to_os_string(),
+        os("--out"),
+        out_ledger.as_os_str().to_os_string(),
+        os("--dry-run"),
+    ])?;
+    let human = stdout_text(&human_output)?;
+    assert!(human.contains("baseline init: preview (no files written)"));
+    assert!(
+        human.contains(&format!("captured: {}", proposal["captured"])),
+        "{human}"
+    );
+    assert!(human.contains("would write ledger:"));
+    assert!(human.contains("preview only; the scanned repository was not modified."));
+    assert!(!out_ledger.exists());
+
+    Ok(())
+}
+
+#[test]
 fn baseline_init_stdout_lists_debt_scope() -> Result<(), Box<dyn Error>> {
     // The atomic_pointer_state_fetch_ops fixture has 3 actionable cards
     // (class: requires_loom). Verify that baseline init outputs a debt scope

@@ -738,6 +738,12 @@ pub struct BaselineInitResult {
     pub cards: Vec<ReviewCard>,
 }
 
+struct BaselineInitPlan {
+    result: BaselineInitResult,
+    ledger_entries: Vec<crate::policy::LedgerEntry>,
+    snapshot_entries: BTreeMap<String, crate::policy::SnapshotCoverage>,
+}
+
 /// `baseline init` (SPEC-0030): scan the repo for open actionable cards, capture each
 /// card's identity and coverage state, and write both the baseline ledger and the coverage
 /// snapshot.  Idempotent — re-running overwrites with a fresh snapshot of the current state.
@@ -751,10 +757,30 @@ pub fn baseline_init(
     out: Option<&Path>,
     review_after: Option<&str>,
 ) -> Result<BaselineInitResult, String> {
+    let plan = baseline_init_plan(root, out, review_after)?;
+    crate::policy::merge_and_write_baseline_ledger(&plan.result.ledger_path, &plan.ledger_entries)?;
+    crate::policy::write_coverage_snapshot(&plan.result.snapshot_path, &plan.snapshot_entries)?;
+    Ok(plan.result)
+}
+
+/// Preview the baseline entries that `baseline init` would author without writing files.
+/// The returned result is the same plan used by the applying command, preserving one
+/// source of truth for card selection and output paths.
+pub fn baseline_init_preview(
+    root: &Path,
+    out: Option<&Path>,
+    review_after: Option<&str>,
+) -> Result<BaselineInitResult, String> {
+    Ok(baseline_init_plan(root, out, review_after)?.result)
+}
+
+fn baseline_init_plan(
+    root: &Path,
+    out: Option<&Path>,
+    review_after: Option<&str>,
+) -> Result<BaselineInitPlan, String> {
     use crate::domain::coverage::CoverageBlock;
-    use crate::policy::{
-        LedgerEntry, SnapshotCoverage, merge_and_write_baseline_ledger, write_coverage_snapshot,
-    };
+    use crate::policy::{LedgerEntry, SnapshotCoverage};
     use std::collections::BTreeMap;
 
     let ledger_path = out
@@ -809,16 +835,16 @@ pub fn baseline_init(
         }
     }
 
-    let captured = ledger_entries.len();
-    merge_and_write_baseline_ledger(&ledger_path, &ledger_entries)?;
-    write_coverage_snapshot(&snapshot_path, &snapshot_entries)?;
-
-    Ok(BaselineInitResult {
-        captured,
-        ledger_existed,
-        ledger_path,
-        snapshot_path,
-        cards: actionable_cards,
+    Ok(BaselineInitPlan {
+        result: BaselineInitResult {
+            captured: ledger_entries.len(),
+            ledger_existed,
+            ledger_path,
+            snapshot_path,
+            cards: actionable_cards,
+        },
+        ledger_entries,
+        snapshot_entries,
     })
 }
 

@@ -99,10 +99,12 @@ before opting into a no-new-debt policy. Do not run this from the PR branch
 being reviewed; otherwise new branch gaps can become baseline debt:
 
 ```bash
-unsafe-review baseline init --root .
+unsafe-review baseline init --root . --dry-run --format json
 ```
 
-This writes `policy/unsafe-review-baseline.toml` and
+Review the proposal first. This preview writes nothing. To author the
+baseline after review, run `unsafe-review baseline init --root .`; that writes
+`policy/unsafe-review-baseline.toml` and
 `policy/unsafe-review-baseline-snapshot.toml`. Review those files before
 committing them. Baseline entries are debt records, not safety records, witness
 results, or UB-free status.

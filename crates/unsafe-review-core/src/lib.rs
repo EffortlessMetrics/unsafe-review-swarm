@@ -35,7 +35,7 @@ pub use api::{
     RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, ReviewCardConfirmationProjection,
     ScanCost, Scope, analyze, analyze_with_discovery, analyze_with_discovery_and_progress,
     analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
-    baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
+    baseline_init_preview, baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
     bless_fixture_card_goldens_from_workspace, bless_fixture_surface_goldens,
     bless_fixture_surface_goldens_from_workspace, collect_context, collect_context_range,
     compare_outcome_json, discover_repo_files, evaluate_policy_report,

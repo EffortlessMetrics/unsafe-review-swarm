@@ -5,6 +5,7 @@ use crate::command::{
     ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions,
     ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
 };
+use serde_json::json;
 #[cfg(unix)]
 use signal_hook::consts::signal::{SIGINT, SIGTERM};
 #[cfg(unix)]
@@ -23,15 +24,16 @@ use unsafe_review_core::{
     ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
     SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
     analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
-    audit_witness_receipts, baseline_add, baseline_init, baseline_refresh_preview, baseline_status,
-    collect_context_range, compare_outcome_json, discover_repo_files, evaluate_policy_report,
-    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
-    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
-    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
-    render_gate_manifest, render_gate_manifest_repo, render_github_summary, render_human,
-    render_json, render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan,
-    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
+    baseline_refresh_preview, baseline_status, collect_context_range, compare_outcome_json,
+    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
+    lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
+    new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons,
+    render_baseline_refresh_human, render_baseline_refresh_json, render_baseline_status_human,
+    render_baseline_status_json, render_comment_plan, render_gate_manifest,
+    render_gate_manifest_repo, render_github_summary, render_human, render_json,
+    render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan, render_markdown,
+    render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif,
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
@@ -2804,12 +2806,64 @@ fn run_baseline_refresh(options: BaselineRefreshOptions) -> Result<(), String> {
 }
 
 fn run_baseline_init(options: BaselineInitOptions) -> Result<(), String> {
-    let result = baseline_init(
-        &options.root,
-        options.out.as_deref(),
-        options.review_after.as_deref(),
-    )?;
-    println!("baseline init: ok");
+    let result = if options.dry_run {
+        baseline_init_preview(
+            &options.root,
+            options.out.as_deref(),
+            options.review_after.as_deref(),
+        )?
+    } else {
+        baseline_init(
+            &options.root,
+            options.out.as_deref(),
+            options.review_after.as_deref(),
+        )?
+    };
+    match options.format {
+        Format::Json => println!("{}", render_baseline_init_json(&result, options.dry_run)?),
+        _ => print_baseline_init_human(&result, options.dry_run),
+    }
+    Ok(())
+}
+
+const BASELINE_INIT_TRUST_BOUNDARY: &str = "baseline entries are debt records, not safety records; a baseline init pass records pre-existing gaps and does not prove memory safety, UB-free status, Miri-clean status, or site execution";
+
+fn render_baseline_init_json(
+    result: &unsafe_review_core::BaselineInitResult,
+    dry_run: bool,
+) -> Result<String, String> {
+    let cards = result
+        .cards
+        .iter()
+        .map(|card| {
+            json!({
+                "card_id": card.id.0,
+                "path": repo_path_display(&card.site.location.file),
+                "line": card.site.location.line,
+                "operation_family": card.operation.family.as_str(),
+                "hazards": card.hazards.iter().map(|hazard| hazard.as_str()).collect::<Vec<_>>(),
+            })
+        })
+        .collect::<Vec<_>>();
+    serde_json::to_string_pretty(&json!({
+        "mode": if dry_run { "preview" } else { "apply" },
+        "writes_files": !dry_run,
+        "captured": result.captured,
+        "ledger_existed": result.ledger_existed,
+        "ledger_path": repo_path_display(&result.ledger_path),
+        "snapshot_path": repo_path_display(&result.snapshot_path),
+        "cards": cards,
+        "trust_boundary": BASELINE_INIT_TRUST_BOUNDARY,
+    }))
+    .map_err(|error| format!("render baseline init JSON failed: {error}"))
+}
+
+fn print_baseline_init_human(result: &unsafe_review_core::BaselineInitResult, dry_run: bool) {
+    if dry_run {
+        println!("baseline init: preview (no files written)");
+    } else {
+        println!("baseline init: ok");
+    }
     println!("captured: {} open actionable card(s)", result.captured);
     if !result.cards.is_empty() {
         println!("debt scope:");
@@ -2818,39 +2872,45 @@ fn run_baseline_init(options: BaselineInitOptions) -> Result<(), String> {
             let line = card.site.location.line;
             let family = card.operation.family.as_str();
             let hazards: Vec<&str> = card.hazards.iter().map(|h| h.as_str()).collect();
-            let hazard_list = hazards.join(", ");
             println!(
                 "  {}  {}:{}  {}  [{}]",
-                card.id.0, file, line, family, hazard_list
+                card.id.0,
+                file,
+                line,
+                family,
+                hazards.join(", ")
             );
         }
     }
-    println!("ledger: {}", result.ledger_path.display());
-    println!("snapshot: {}", result.snapshot_path.display());
-    if result.ledger_existed {
-        println!(
-            "note: ledger already existed; merged existing entries (new entries added, unchanged entries kept)."
-        );
+    if dry_run {
+        println!("would write ledger: {}", result.ledger_path.display());
+        println!("would write snapshot: {}", result.snapshot_path.display());
+        println!("note: preview only; the scanned repository was not modified.");
     } else {
-        println!("note: new ledger created.");
+        println!("ledger: {}", result.ledger_path.display());
+        println!("snapshot: {}", result.snapshot_path.display());
+        if result.ledger_existed {
+            println!(
+                "note: ledger already existed; merged existing entries (new entries added, unchanged entries kept)."
+            );
+        } else {
+            println!("note: new ledger created.");
+        }
+        println!();
+        println!("next:");
+        println!(
+            "  git add {} {}",
+            result.ledger_path.display(),
+            result.snapshot_path.display()
+        );
+        println!("  git commit -m 'baseline: record pre-existing debt floor'");
+        println!("  # from now on:");
+        println!(
+            "  unsafe-review check --policy no-new-debt   # fails only when the diff adds or worsens debt"
+        );
     }
     println!();
-    println!("next:");
-    println!(
-        "  git add {} {}",
-        result.ledger_path.display(),
-        result.snapshot_path.display()
-    );
-    println!("  git commit -m 'baseline: record pre-existing debt floor'");
-    println!("  # from now on:");
-    println!(
-        "  unsafe-review check --policy no-new-debt   # fails only when the diff adds or worsens debt"
-    );
-    println!();
-    println!(
-        "trust boundary: baseline entries are debt records, not safety records. A baseline init pass means only that the open actionable gaps were recorded as pre-existing; it does not prove memory safety, UB-free status, Miri-clean status, or that any unsafe site executed safely."
-    );
-    Ok(())
+    println!("trust boundary: {BASELINE_INIT_TRUST_BOUNDARY}.");
 }
 
 fn run_baseline_add(options: BaselineAddOptions) -> Result<(), String> {
@@ -3401,7 +3461,7 @@ fn print_baseline_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review baseline init [--root .] [--out policy/unsafe-review-baseline.toml] [--review-after YYYY-MM-DD]"
+        "  unsafe-review baseline init [--root .] [--out policy/unsafe-review-baseline.toml] [--review-after YYYY-MM-DD] [--dry-run] [--format human|json]"
     );
     println!(
         "  unsafe-review baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
@@ -3414,6 +3474,9 @@ fn print_baseline_help() {
     println!("What baseline does:");
     println!(
         "- `init` scans the repo for open actionable cards and records each as a baseline ledger entry with its current coverage state in the snapshot."
+    );
+    println!(
+        "- `init --dry-run` previews the same ledger and snapshot plan without writing repository files; `--format json` emits the same proposal fields in machine-readable form."
     );
     println!(
         "- `add` adds or updates a single ledger entry and its snapshot state without rescanning the entire ledger."
@@ -3429,6 +3492,7 @@ fn print_baseline_help() {
     );
     println!();
     println!("Brownfield onboarding:");
+    println!("  unsafe-review baseline init --dry-run --format json");
     println!("  unsafe-review baseline init");
     println!(
         "  git add policy/unsafe-review-baseline.toml policy/unsafe-review-baseline-snapshot.toml"
