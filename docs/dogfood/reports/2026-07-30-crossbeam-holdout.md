@@ -42,7 +42,7 @@ not represented by the RNG, no_std atomic, or SIMD holdouts.
 ## Commands
 
 ```bash
-gh api repos/crossbeam-rs/crossbeam/commits/HEAD --jq .sha
+test "$(gh api repos/crossbeam-rs/crossbeam/commits/b23b7e8eca2efdad9bdc1ceb1aee1207a852c03b --jq .sha)" = "b23b7e8eca2efdad9bdc1ceb1aee1207a852c03b"
 cargo run --locked -p xtask -- check-corpus-partitions
 cargo run --locked -p xtask -- dogfood-exec --target crossbeam-holdout --include-holdout --strict --clean --timeout 300
 cargo run --locked -p xtask -- dogfood-exec --target crossbeam-holdout --strict --timeout 30
