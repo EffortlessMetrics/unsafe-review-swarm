@@ -187,6 +187,60 @@ mod tests {
     }
 
     #[test]
+    fn absolute_and_traversal_diff_paths_are_indexed_inertly_not_escaped() -> Result<(), String> {
+        // Hostile-input regression coverage for the `+++ b/` path-traversal /
+        // absolute-path row of issue #1883. A unified diff whose changed-file
+        // header names an absolute path or a `../` traversal path must be
+        // accepted and indexed as the *literal* path string; the parser must
+        // never normalize, resolve, or open it. Because the diff index is only
+        // ever consulted by exact-match lookups keyed by files discovered under
+        // the scan root (all relative), a foreign path is inert -- it can never
+        // pull an out-of-root file into analysis (the "cannot escape configured
+        // roots" contract). This test pins that the path is stored verbatim and
+        // is NOT silently normalized to a root-relative form.
+        let diff = concat!(
+            "diff --git a/../../../../etc/passwd.rs b/../../../../etc/passwd.rs\n",
+            "--- a/../../../../etc/passwd.rs\n",
+            "+++ b/../../../../etc/passwd.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn escaped() {}\n",
+            "diff --git a//etc/shadow.rs b//etc/shadow.rs\n",
+            "--- a//etc/shadow.rs\n",
+            "+++ b//etc/shadow.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn absolute() {}\n",
+        );
+        let index = load_diff_index(&DiffSource::Text(diff.to_string()))?;
+
+        // Both foreign paths are accepted as structurally valid diff entries.
+        assert_eq!(
+            index.changed_file_count(),
+            2,
+            "both foreign-path files should be indexed"
+        );
+
+        // The traversal path is stored as the literal string after `+++ b/`,
+        // not resolved or stripped to a root-relative path.
+        let traversal = std::path::PathBuf::from("../../../../etc/passwd.rs");
+        assert!(
+            index.contains_in_range(&traversal, 1, 1),
+            "traversal path must be indexed under its literal, unresolved key"
+        );
+        assert!(
+            !index.contains_in_range(&std::path::PathBuf::from("etc/passwd.rs"), 1, 1),
+            "traversal must not be normalized to a root-relative key"
+        );
+
+        // The absolute path is likewise stored literally (leading slash kept).
+        let absolute = std::path::PathBuf::from("/etc/shadow.rs");
+        assert!(
+            index.contains_in_range(&absolute, 1, 1),
+            "absolute path must be indexed under its literal key"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
