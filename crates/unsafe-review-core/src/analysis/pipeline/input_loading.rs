@@ -327,6 +327,65 @@ mod tests {
     }
 
     #[test]
+    fn nul_and_control_chars_in_diff_paths_are_indexed_literally() -> Result<(), String> {
+        // Hostile-input regression coverage for the NUL / control-character
+        // path row of issue #1883. A `+++ b/` header containing an interior NUL
+        // byte or an ESC control character must be parsed without panicking and
+        // indexed under the LITERAL path string -- not silently sanitized to a
+        // normal path.
+        //
+        // Scope note: this pins literal indexing only, not "never opened". A NUL
+        // byte is not a legal Unix filename, so a NUL-keyed entry can never match
+        // a file discovered under the root and is therefore inert. An ESC byte,
+        // by contrast, is a legal filename character: if the checkout actually
+        // contained that file, workspace discovery would find it and it would be
+        // scanned like any other changed file -- which is correct behavior, not a
+        // leak. The invariant asserted here is only that the diff parser
+        // preserves control-bearing paths verbatim rather than crashing or
+        // rewriting them.
+        let diff = concat!(
+            "diff --git a/src/a\u{0}b.rs b/src/a\u{0}b.rs\n",
+            "--- a/src/a\u{0}b.rs\n",
+            "+++ b/src/a\u{0}b.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn nul_path() {}\n",
+            "diff --git a/src/e\u{1b}c.rs b/src/e\u{1b}c.rs\n",
+            "--- a/src/e\u{1b}c.rs\n",
+            "+++ b/src/e\u{1b}c.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn esc_path() {}\n",
+        );
+        let index = load_diff_index(&DiffSource::Text(diff.to_string()))?;
+
+        assert_eq!(
+            index.changed_file_count(),
+            2,
+            "both control-laden paths should be indexed"
+        );
+        // Each path is stored under its literal (control-char-carrying) key and
+        // does not collide with a sanitized/normal path.
+        let nul_path = std::path::PathBuf::from("src/a\u{0}b.rs");
+        assert!(
+            index.contains_in_range(&nul_path, 1, 1),
+            "NUL path must be indexed under its literal key"
+        );
+        assert!(
+            !index.contains_in_range(&std::path::PathBuf::from("src/ab.rs"), 1, 1),
+            "the NUL must not be silently stripped to a normal path"
+        );
+        let esc_path = std::path::PathBuf::from("src/e\u{1b}c.rs");
+        assert!(
+            index.contains_in_range(&esc_path, 1, 1),
+            "ESC-control path must be indexed under its literal key"
+        );
+        assert!(
+            !index.contains_in_range(&std::path::PathBuf::from("src/ec.rs"), 1, 1),
+            "the ESC must not be silently stripped to a normal path"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
