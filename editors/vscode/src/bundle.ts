@@ -131,6 +131,13 @@ export interface ParsedBundle {
   warnings: string[];
 }
 
+export interface DiagnosticCapSummary {
+  path: string;
+  total: number;
+  visible: number;
+  hidden: number;
+}
+
 const DEFAULT_TRUST_BOUNDARY =
   "Static unsafe contract review only; this is not a proof of memory safety, " +
   "not UB-free status, and not a Miri result unless a witness receipt is attached.";
@@ -767,6 +774,25 @@ export function capDiagnosticsPerFile(
     out.push(diag);
   }
   return out;
+}
+
+export function diagnosticCapSummaries(
+  diagnostics: BundleDiagnostic[],
+  max: number,
+): DiagnosticCapSummary[] {
+  if (max <= 0) {
+    return [];
+  }
+  const totals = new Map<string, number>();
+  for (const diagnostic of diagnostics) {
+    totals.set(diagnostic.path, (totals.get(diagnostic.path) ?? 0) + 1);
+  }
+  return [...totals].map(([path, total]) => ({
+    path,
+    total,
+    visible: Math.min(total, max),
+    hidden: Math.max(total - max, 0),
+  }));
 }
 
 export function positionInRange(position: BundleRangePosition, range: BundleRange): boolean {

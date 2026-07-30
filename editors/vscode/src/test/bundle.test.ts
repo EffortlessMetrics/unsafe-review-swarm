@@ -7,6 +7,7 @@ import {
   BundleParseError,
   capDiagnosticsPerFile,
   diagnosticsByFile,
+  diagnosticCapSummaries,
   parseBundle,
   positionInRange,
   rangesEqual,
@@ -522,6 +523,20 @@ test("capDiagnosticsPerFile caps per file and preserves order", () => {
 test("capDiagnosticsPerFile returns input when cap is non-positive", () => {
   const diagnostics = [sampleDiagnostic("x")];
   assert.equal(capDiagnosticsPerFile(diagnostics, 0).length, 1);
+});
+
+test("diagnosticCapSummaries reports hidden diagnostics by file", () => {
+  const diagnostics = [
+    { ...sampleDiagnostic("a"), path: "src/lib.rs" },
+    { ...sampleDiagnostic("b"), path: "src/lib.rs" },
+    { ...sampleDiagnostic("c"), path: "src/lib.rs" },
+    { ...sampleDiagnostic("d"), path: "src/other.rs" },
+  ];
+  assert.deepEqual(diagnosticCapSummaries(diagnostics, 2), [
+    { path: "src/lib.rs", total: 3, visible: 2, hidden: 1 },
+    { path: "src/other.rs", total: 1, visible: 1, hidden: 0 },
+  ]);
+  assert.deepEqual(diagnosticCapSummaries(diagnostics, 0), []);
 });
 
 test("range binding uses containment and intersection instead of proximity", () => {
