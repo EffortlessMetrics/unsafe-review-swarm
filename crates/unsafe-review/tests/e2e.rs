@@ -4393,6 +4393,61 @@ fn check_survives_oversized_hunk_line_number_without_panic() -> Result<(), Box<d
     Ok(())
 }
 
+// Fail-closed regression coverage for the artifact-write-failure row of issue
+// #1883. When the `--out` destination cannot be written -- here its parent path
+// is an existing regular file, so the directory cannot be created -- the CLI
+// must fail truthfully: a non-zero exit, an error that names the failing path,
+// and NO partially-written or misleadingly-successful artifact.
+#[test]
+fn check_reports_output_write_failure_without_partial_artifact() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-out-write-fail-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+
+    // A regular file where a directory would need to be created for `--out`.
+    let blocker = temp.path().join("blocker");
+    fs::write(&blocker, b"not a directory")?;
+    let cards_out = blocker.join("cards.json");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_ne!(
+        output.status.code(),
+        Some(0),
+        "an unwritable --out destination must fail the run"
+    );
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("blocker"),
+        "stderr should name the failing output path: {stderr}"
+    );
+    assert!(
+        stderr.contains("failed"),
+        "stderr should state the write/create failed: {stderr}"
+    );
+    assert!(
+        !cards_out.exists(),
+        "no artifact should be written when the output destination cannot be created"
+    );
+    assert_eq!(
+        stdout_text(&output)?.trim(),
+        "",
+        "stdout must not claim a successful result on write failure"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
