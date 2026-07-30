@@ -327,6 +327,53 @@ mod tests {
     }
 
     #[test]
+    fn nul_and_control_chars_in_diff_paths_are_indexed_inertly() -> Result<(), String> {
+        // Hostile-input regression coverage for the NUL / control-character
+        // path row of issue #1883. A `+++ b/` header containing an interior NUL
+        // byte or an ESC control character must be accepted and indexed under
+        // the literal path string, without panicking. The path is only ever an
+        // exact-match key (never opened -- passing a NUL path to the OS would
+        // otherwise be rejected at the syscall boundary), so a control-laden
+        // path is inert and never matches a normal discovered file.
+        let diff = concat!(
+            "diff --git a/src/a\u{0}b.rs b/src/a\u{0}b.rs\n",
+            "--- a/src/a\u{0}b.rs\n",
+            "+++ b/src/a\u{0}b.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn nul_path() {}\n",
+            "diff --git a/src/e\u{1b}c.rs b/src/e\u{1b}c.rs\n",
+            "--- a/src/e\u{1b}c.rs\n",
+            "+++ b/src/e\u{1b}c.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+pub unsafe fn esc_path() {}\n",
+        );
+        let index = load_diff_index(&DiffSource::Text(diff.to_string()))?;
+
+        assert_eq!(
+            index.changed_file_count(),
+            2,
+            "both control-laden paths should be indexed"
+        );
+        // Each path is stored under its literal (control-char-carrying) key and
+        // does not collide with a sanitized/normal path.
+        let nul_path = std::path::PathBuf::from("src/a\u{0}b.rs");
+        assert!(
+            index.contains_in_range(&nul_path, 1, 1),
+            "NUL path must be indexed under its literal key"
+        );
+        assert!(
+            !index.contains_in_range(&std::path::PathBuf::from("src/ab.rs"), 1, 1),
+            "the NUL must not be silently stripped to a normal path"
+        );
+        let esc_path = std::path::PathBuf::from("src/e\u{1b}c.rs");
+        assert!(
+            index.contains_in_range(&esc_path, 1, 1),
+            "ESC-control path must be indexed under its literal key"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
