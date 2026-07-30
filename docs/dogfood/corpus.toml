@@ -13,7 +13,7 @@ fixture = "fixtures/safe_code_no_cards"
 root = "fixtures/safe_code_no_cards"
 diff = "fixtures/safe_code_no_cards/change.diff"
 purpose = "fixture-level no-card control for quiet first-pr and JSON output; not real-crate precision evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root fixtures/safe_code_no_cards --diff fixtures/safe_code_no_cards/change.diff --format json --out target/dogfood-work/safe-code-no-cards.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- check --root fixtures/safe_code_no_cards --diff fixtures/safe_code_no_cards/change.diff --format json --out target/dogfood-work/safe-code-no-cards.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/safe-code-no-cards.unsafe-review.json"]
 
@@ -26,7 +26,7 @@ fixture = "fixtures/raw_pointer_alignment"
 root = "fixtures/raw_pointer_alignment"
 diff = "fixtures/raw_pointer_alignment/change.diff"
 purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json, manual-repair-queue.json, tokmd-packets.json, and review-kit handoff surfaces"
-command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
+command = "cargo run --locked -p xtask -- check-manual-candidate-examples"
 artifact_status = "local_untracked"
 artifacts = [
   "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
@@ -48,7 +48,7 @@ status = "active"
 commit = "bc8a854926a8d940164f6c4ad4fc6efe51962e93"
 root = "target/dogfood-work/smallvec"
 purpose = "capped repo snapshot for raw pointer, Vec::set_len, pointer arithmetic, and unsafe impl review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/smallvec --format json --max-cards 50 --out target/dogfood-work/smallvec.unsafe-review.after.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/smallvec --format json --max-cards 50 --out target/dogfood-work/smallvec.unsafe-review.after.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/smallvec.unsafe-review.after.json"]
 
@@ -61,7 +61,7 @@ status = "active"
 commit = "1bc606d8c83a34b8fae9dd117bfeab10f90d2ca7"
 root = "target/dogfood-work/arrayvec"
 purpose = "capped repo snapshot for MaybeUninit, Vec::set_len, raw pointer, UTF-8, and drop/deallocation cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/arrayvec --format json --max-cards 50 --out target/dogfood-work/arrayvec.unsafe-review.after.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/arrayvec --format json --max-cards 50 --out target/dogfood-work/arrayvec.unsafe-review.after.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec.unsafe-review.after.json"]
 
@@ -74,7 +74,7 @@ status = "active"
 commit = "db1a77d4b556a1321e136ca0514e43e74ea5fcc3"
 root = "target/dogfood-work/memchr"
 purpose = "capped repo snapshot for SIMD target-feature contracts, unchecked constructors, and pointer arithmetic cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/memchr --format json --max-cards 50 --out target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/memchr --format json --max-cards 50 --out target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/memchr.unsafe-review.after-target-feature-contract-evidence.json"]
 
@@ -87,7 +87,7 @@ status = "active"
 commit = "7b3bba6eb4b2f03636155c918552b5f30c1a05b3"
 root = "target/dogfood-work/hashbrown"
 purpose = "capped repo snapshot for syntax-scan performance, unsafe declarations, MaybeUninit, and unchecked operations"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/hashbrown --format json --max-cards 50 --out target/dogfood-work/hashbrown.unsafe-review.after-syntax-scan-performance.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/hashbrown --format json --max-cards 50 --out target/dogfood-work/hashbrown.unsafe-review.after-syntax-scan-performance.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown.unsafe-review.after-syntax-scan-performance.json"]
 
@@ -100,7 +100,7 @@ status = "active"
 commit = "245adff079eb0cb1a706d35bab5f68b2d51919f6"
 root = "target/dogfood-work/bytes"
 purpose = "capped repo snapshot for Vec::from_raw_parts, slice construction, and ownership-transfer review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bytes --format json --max-cards 50 --out target/dogfood-work/bytes.unsafe-review.after-vec-from-raw-parts.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bytes --format json --max-cards 50 --out target/dogfood-work/bytes.unsafe-review.after-vec-from-raw-parts.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/bytes.unsafe-review.after-vec-from-raw-parts.json"]
 
@@ -113,7 +113,7 @@ status = "active"
 commit = "03919fedb43cdbd0866aee0c77e0d6df8976b12f"
 root = "target/dogfood-work/crossbeam"
 purpose = "capped repo snapshot for unsafe Send/Sync, atomics, raw pointer, and ownership-transfer review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/crossbeam --format json --max-cards 50 --out target/dogfood-work/crossbeam.unsafe-review.capped.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/crossbeam --format json --max-cards 50 --out target/dogfood-work/crossbeam.unsafe-review.capped.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/crossbeam.unsafe-review.capped.json"]
 
@@ -126,7 +126,7 @@ status = "active"
 commit = "0d82f2a51a57d435f79f9cf77f1c6e3f84a587de"
 root = "target/dogfood-work/mio"
 purpose = "capped repo snapshot for unsafe fn call contracts, Vec::set_len, zeroed values, pointer operations, and unsafe Send/Sync route cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/mio --format json --max-cards 50 --out target/dogfood-work/mio.unsafe-review.capped.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/mio --format json --max-cards 50 --out target/dogfood-work/mio.unsafe-review.capped.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/mio.unsafe-review.capped.json"]
 
@@ -140,7 +140,7 @@ pr = 215
 root = "target/dogfood-work/memchr"
 diff = "target/dogfood-work/memchr-pr215.raw.diff"
 purpose = "PR diff for owner safety-contract inheritance on pointer arithmetic inside documented unsafe functions"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/memchr --diff target/dogfood-work/memchr-pr215.raw.diff --format json --max-cards 20 --out target/dogfood-work/memchr-pr215.owner-contract.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/memchr --diff target/dogfood-work/memchr-pr215.raw.diff --format json --max-cards 20 --out target/dogfood-work/memchr-pr215.owner-contract.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/memchr-pr215.owner-contract.json"]
 
@@ -154,7 +154,7 @@ pr = 407
 root = "target/dogfood-work/smallvec"
 diff = "target/dogfood-work/smallvec-pr407.raw.diff"
 purpose = "PR diff for comment-aware owner inference and owner-specific witness routing"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr407.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr407.owner-fix.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr407.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr407.owner-fix.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/smallvec-pr407.owner-fix.json"]
 
@@ -168,7 +168,7 @@ pr = 277
 root = "target/dogfood-work/smallvec"
 diff = "target/dogfood-work/smallvec-pr277.raw.diff"
 purpose = "PR diff for Vec::set_len start-bound shrink evidence and raw-pointer aliasing review cards"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr277.raw.diff --format json --max-cards 30 --out target/dogfood-work/smallvec-pr277.after-start-bound-shrink.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr277.raw.diff --format json --max-cards 30 --out target/dogfood-work/smallvec-pr277.after-start-bound-shrink.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/smallvec-pr277.after-start-bound-shrink.json"]
 
@@ -182,7 +182,7 @@ pr = 64
 root = "target/dogfood-work/smallvec"
 diff = "target/dogfood-work/smallvec-pr64.raw.diff"
 purpose = "PR diff for raw pointer read and Vec::set_len last-index shrink evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr64.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr64.after-last-index-shrink.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr64.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr64.after-last-index-shrink.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/smallvec-pr64.after-last-index-shrink.json"]
 
@@ -196,7 +196,7 @@ pr = 254
 root = "target/dogfood-work/smallvec"
 diff = "target/dogfood-work/smallvec-pr254.raw.diff"
 purpose = "PR diff for insertion-path pointer arithmetic, raw pointer writes, and Vec::set_len review cards"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr254.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr254.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/smallvec --diff target/dogfood-work/smallvec-pr254.raw.diff --format json --max-cards 20 --out target/dogfood-work/smallvec-pr254.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/smallvec-pr254.unsafe-review.json"]
 
@@ -210,7 +210,7 @@ pr = 308
 root = "target/dogfood-work/arrayvec"
 diff = "target/dogfood-work/arrayvec-pr308.raw.diff"
 purpose = "PR diff for raw pointer write review cards in extend_from_iter and related Miri-routed witness prompts"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr308.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr308.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr308.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr308.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr308.unsafe-review.json"]
 
@@ -224,7 +224,7 @@ pr = 137
 root = "target/dogfood-work/arrayvec-pr137-root"
 diff = "target/dogfood-work/arrayvec-pr137.raw.patch"
 purpose = "PR diff for replacing get_unchecked_mut-derived references with raw pointer accessors in a soundness fix"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec-pr137-root --diff target/dogfood-work/arrayvec-pr137.raw.patch --format json --max-cards 40 --out target/dogfood-work/arrayvec-pr137.raw.head.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec-pr137-root --diff target/dogfood-work/arrayvec-pr137.raw.patch --format json --max-cards 40 --out target/dogfood-work/arrayvec-pr137.raw.head.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr137.raw.head.json"]
 
@@ -238,7 +238,7 @@ pr = 138
 root = "target/dogfood-work/arrayvec"
 diff = "target/dogfood-work/arrayvec-pr138.raw.diff"
 purpose = "PR diff for doc-comment Safety prose, attributed unsafe fn dedupe, and UTF-8 raw pointer writes"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr138.raw.diff --format json --max-cards 30 --out target/dogfood-work/arrayvec-pr138.after-safety-colon-docs.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr138.raw.diff --format json --max-cards 30 --out target/dogfood-work/arrayvec-pr138.after-safety-colon-docs.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr138.after-safety-colon-docs.json"]
 
@@ -252,7 +252,7 @@ pr = 187
 root = "target/dogfood-work/arrayvec"
 diff = "target/dogfood-work/arrayvec-pr187.raw.diff"
 purpose = "PR diff for Safety prose contract evidence and len/capacity bounds evidence on raw pointer reads"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr187.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr187.after-len-capacity-bounds.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr187.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr187.after-len-capacity-bounds.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr187.after-len-capacity-bounds.json"]
 
@@ -266,7 +266,7 @@ pr = 174
 root = "target/dogfood-work/arrayvec"
 diff = "target/dogfood-work/arrayvec-pr174.raw.diff"
 purpose = "PR diff for inline unsafe operation dedupe and ptr::drop_in_place operation modeling"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr174.raw.diff --format json --max-cards 30 --out target/dogfood-work/arrayvec-pr174.after-drop-in-place.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr174.raw.diff --format json --max-cards 30 --out target/dogfood-work/arrayvec-pr174.after-drop-in-place.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr174.after-drop-in-place.json"]
 
@@ -280,7 +280,7 @@ pr = 288
 root = "target/dogfood-work/arrayvec"
 diff = "target/dogfood-work/arrayvec-pr288.raw.diff"
 purpose = "PR diff for Vec::set_len initialization, shrink, public unsafe contract, and unsafe-call argument evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr288.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr288.after-encode-call-evidence.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/arrayvec --diff target/dogfood-work/arrayvec-pr288.raw.diff --format json --max-cards 20 --out target/dogfood-work/arrayvec-pr288.after-encode-call-evidence.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/arrayvec-pr288.after-encode-call-evidence.json"]
 
@@ -294,7 +294,7 @@ pr = 469
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr469.raw.diff"
 purpose = "PR diff for unreachable_unchecked modeling, infallible-path evidence, and owner inference around impl Trait"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr469.raw.diff --format json --max-cards 60 --out target/dogfood-work/hashbrown-pr469.after-infallible-unreachable-evidence.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr469.raw.diff --format json --max-cards 60 --out target/dogfood-work/hashbrown-pr469.after-infallible-unreachable-evidence.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr469.after-infallible-unreachable-evidence.json"]
 
@@ -308,7 +308,7 @@ pr = 501
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr501.raw.diff"
 purpose = "PR diff for avoiding adjacent unchanged unsafe declaration cards near changed safe functions"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr501.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr501.after-declaration-range.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr501.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr501.after-declaration-range.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr501.after-declaration-range.json"]
 
@@ -322,7 +322,7 @@ pr = 556
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr556.raw.diff"
 purpose = "PR diff for syntax-scan performance on large changed files without changing analyzer truth"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr556.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr556.after-syntax-scan-performance.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr556.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr556.after-syntax-scan-performance.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr556.after-syntax-scan-performance.json"]
 
@@ -336,7 +336,7 @@ pr = 657
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr657.raw.diff"
 purpose = "PR diff for multi-line unsafe-call wrapper classification and missing contract prompts"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr657.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr657.after-multiline-unsafe-call.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr657.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr657.after-multiline-unsafe-call.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr657.after-multiline-unsafe-call.json"]
 
@@ -350,7 +350,7 @@ pr = 667
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr667.raw.diff"
 purpose = "PR diff for parent-call dedupe around nested NonNull::new_unchecked operations"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr667.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr667.after-nested-dedupe.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr667.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr667.after-nested-dedupe.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr667.after-nested-dedupe.json"]
 
@@ -364,7 +364,7 @@ pr = 692
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr692.raw.diff"
 purpose = "PR diff for mutable slice construction, raw pointer write_bytes, pointer arithmetic, and private contract evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr692.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr692.after-maybeuninit-raw-write.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr692.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr692.after-maybeuninit-raw-write.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr692.after-maybeuninit-raw-write.json"]
 
@@ -378,7 +378,7 @@ pr = 681
 root = "target/dogfood-work/hashbrown-pr681-root"
 diff = "target/dogfood-work/hashbrown-pr681.raw.diff"
 purpose = "PR diff for HashSet replace-key unsafe wrappers, raw pointer dereference, and unsafe function call contract evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown-pr681-root --diff target/dogfood-work/hashbrown-pr681.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr681.replace-key.head.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown-pr681-root --diff target/dogfood-work/hashbrown-pr681.raw.diff --format json --max-cards 40 --out target/dogfood-work/hashbrown-pr681.replace-key.head.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr681.replace-key.head.json"]
 
@@ -392,7 +392,7 @@ pr = 693
 root = "target/dogfood-work/hashbrown"
 diff = "target/dogfood-work/hashbrown-pr693.raw.diff"
 purpose = "PR diff for unwrap_unchecked modeling and local Fallibility::Infallible result evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr693.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr693.after-infallible-unwrap-evidence.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/hashbrown --diff target/dogfood-work/hashbrown-pr693.raw.diff --format json --max-cards 30 --out target/dogfood-work/hashbrown-pr693.after-infallible-unwrap-evidence.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/hashbrown-pr693.after-infallible-unwrap-evidence.json"]
 
@@ -406,7 +406,7 @@ pr = 826
 root = "target/dogfood-work/bytes"
 diff = "target/dogfood-work/bytes-pr826.raw.diff"
 purpose = "PR diff for Vec::from_raw_parts operation classification and ownership-transfer obligations"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/bytes --diff target/dogfood-work/bytes-pr826.raw.diff --format json --max-cards 30 --out target/dogfood-work/bytes-pr826.after-vec-from-raw-parts.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/bytes --diff target/dogfood-work/bytes-pr826.raw.diff --format json --max-cards 30 --out target/dogfood-work/bytes-pr826.after-vec-from-raw-parts.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/bytes-pr826.after-vec-from-raw-parts.json"]
 
@@ -420,7 +420,7 @@ pr = 1226
 root = "target/dogfood-work/crossbeam-pr1226-root"
 diff = "target/dogfood-work/crossbeam-pr1226.raw.diff"
 purpose = "PR diff for strict-provenance Miri cfg atomic pointer unsafe blocks and contract evidence"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/crossbeam-pr1226-root --diff target/dogfood-work/crossbeam-pr1226.raw.diff --format json --max-cards 40 --out target/dogfood-work/crossbeam-pr1226.strict-provenance.head.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/crossbeam-pr1226-root --diff target/dogfood-work/crossbeam-pr1226.raw.diff --format json --max-cards 40 --out target/dogfood-work/crossbeam-pr1226.strict-provenance.head.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/crossbeam-pr1226.strict-provenance.head.json"]
 
@@ -434,7 +434,7 @@ pr = 1187
 root = "target/dogfood-work/crossbeam-pr1187-root"
 diff = "target/dogfood-work/crossbeam-pr1187.raw.diff"
 purpose = "PR diff for atomic pointer null swap state transitions in drop/deallocation invariants"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/crossbeam-pr1187-root --diff target/dogfood-work/crossbeam-pr1187.raw.diff --format json --max-cards 40 --out target/dogfood-work/crossbeam-pr1187.after-atomic-pointer-state.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/crossbeam-pr1187-root --diff target/dogfood-work/crossbeam-pr1187.raw.diff --format json --max-cards 40 --out target/dogfood-work/crossbeam-pr1187.after-atomic-pointer-state.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/crossbeam-pr1187.after-atomic-pointer-state.json"]
 
@@ -448,7 +448,7 @@ pr = 1388
 root = "target/dogfood-work/mio-pr1388-root"
 diff = "target/dogfood-work/mio-pr1388.raw.patch"
 purpose = "PR diff for socket address layout conversions, zeroed values, transmute removal, raw pointer writes, and raw pointer dereferences"
-command = "rtk cargo run --locked -p unsafe-review -- check --root target/dogfood-work/mio-pr1388-root --diff target/dogfood-work/mio-pr1388.raw.patch --format json --max-cards 60 --out target/dogfood-work/mio-pr1388.after-local-safety-colon.json"
+command = "cargo run --locked -p unsafe-review -- check --root target/dogfood-work/mio-pr1388-root --diff target/dogfood-work/mio-pr1388.raw.patch --format json --max-cards 60 --out target/dogfood-work/mio-pr1388.after-local-safety-colon.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/mio-pr1388.after-local-safety-colon.json"]
 
@@ -461,7 +461,7 @@ status = "active"
 commit = "300040d66d1fb35b96ba6529b6f1ff0e0ea075bc"
 root = "target/dogfood-work/bumpalo"
 purpose = "capped repo snapshot for pointer arithmetic, slice construction, str_from_utf8_unchecked, unsafe fn call, and unsafe impl review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bumpalo --format json --max-cards 50 --out target/dogfood-work/bumpalo.fresh.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bumpalo --format json --max-cards 50 --out target/dogfood-work/bumpalo.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/bumpalo.fresh.json"]
 
@@ -474,7 +474,7 @@ status = "active"
 commit = "a1e4346070a48c936d808de75191dee5d01e433c"
 root = "target/dogfood-work/slab"
 purpose = "capped repo snapshot for pointer arithmetic, unsafe fn call, and unsafe impl review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/slab --format json --max-cards 50 --out target/dogfood-work/slab.fresh.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/slab --format json --max-cards 50 --out target/dogfood-work/slab.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/slab.fresh.json"]
 
@@ -487,7 +487,7 @@ status = "active"
 commit = "164cedda0eae131bc6cb67902599f4ec253642ca"
 root = "target/dogfood-work/bytemuck"
 purpose = "capped repo snapshot for MaybeUninit assume_init, unsafe fn call, unsafe impl, and raw pointer dereference review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bytemuck --format json --max-cards 50 --out target/dogfood-work/bytemuck.fresh.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/bytemuck --format json --max-cards 50 --out target/dogfood-work/bytemuck.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/bytemuck.fresh.json"]
 
@@ -500,7 +500,7 @@ status = "active"
 commit = "80fe900b21f6d76c1a2ed74d3343e8a3a88c46d0"
 root = "target/dogfood-work/once_cell"
 purpose = "capped repo snapshot for unsafe fn call, raw pointer dereference, and unsafe impl review cards including witness-receipt-routing cases"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/once_cell --format json --max-cards 50 --out target/dogfood-work/once_cell.fresh.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/once_cell --format json --max-cards 50 --out target/dogfood-work/once_cell.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/once_cell.fresh.json"]
 
@@ -513,7 +513,7 @@ status = "active"
 commit = "d20d71e5a8955ec1d2a53e3659142a505476bb3d"
 root = "target/dogfood-work/parking_lot"
 purpose = "capped repo snapshot for unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/parking_lot --format json --max-cards 50 --out target/dogfood-work/parking_lot.fresh.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/parking_lot --format json --max-cards 50 --out target/dogfood-work/parking_lot.fresh.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/parking_lot.fresh.json"]
 
@@ -526,7 +526,7 @@ status = "active"
 commit = "fb799660ccde39c22aed6f653b70e35b35bdcfe8"
 root = "target/dogfood-work/nix"
 purpose = "capped repo snapshot for FFI/extern unsafe fn call and cfg-gated platform-branch review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/nix --format json --max-cards 50 --out target/dogfood-work/nix-capped.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/nix --format json --max-cards 50 --out target/dogfood-work/nix-capped.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/nix-capped.unsafe-review.json"]
 
@@ -539,7 +539,7 @@ status = "active"
 commit = "641d57f313df57354246d2b68d4778c092e076c3"
 root = "target/dogfood-work/simdutf8"
 purpose = "capped repo snapshot for SIMD target_feature unsafe fn call and intrinsic review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/simdutf8 --format json --max-cards 50 --out target/dogfood-work/simdutf8-capped.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/simdutf8 --format json --max-cards 50 --out target/dogfood-work/simdutf8-capped.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/simdutf8-capped.unsafe-review.json"]
 
@@ -552,7 +552,7 @@ status = "active"
 commit = "d35c00e208880d325eaf13ec99e3a413ac163c4c"
 root = "target/dogfood-work/zerocopy"
 purpose = "capped repo snapshot for raw pointer dereference, transmute, and byte-cast review cards"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/zerocopy --format json --max-cards 50 --out target/dogfood-work/zerocopy-capped.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/zerocopy --format json --max-cards 50 --out target/dogfood-work/zerocopy-capped.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/zerocopy-capped.unsafe-review.json"]
 
@@ -566,6 +566,6 @@ status = "active"
 commit = "5e7cd5733536844a9856dc7259bd4696bbe5e3ae"
 root = "target/dogfood-work/getrandom-holdout"
 purpose = "release-readiness holdout repo snapshot for platform RNG unsafe declarations, FFI-style bindings, and raw pointer cards; first result is recorded before tuning"
-command = "rtk cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/getrandom-holdout --format json --max-cards 50 --out target/dogfood-work/getrandom-holdout.unsafe-review.json"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/getrandom-holdout --format json --max-cards 50 --out target/dogfood-work/getrandom-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/getrandom-holdout.unsafe-review.json"]
