@@ -4218,6 +4218,64 @@ fn check_bad_base_ref_emits_actionable_hint() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn diff_scope_does_not_follow_symlinked_external_path() -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::symlink;
+
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-diff-symlink-e2e")?;
+    let scan_root = temp.path().join("scan-root");
+    copy_dir_all(&fixture, &scan_root)?;
+
+    // The only changed path is a symlink inside the root that resolves to
+    // unsafe code outside the configured root. Diff-scoped analysis must not
+    // turn that path into an external file selection.
+    let external = temp.path().join("external-tree");
+    fs::create_dir_all(external.join("src"))?;
+    fs::write(
+        external.join("src/lib.rs"),
+        "pub unsafe fn outside_root(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    symlink(&external, scan_root.join("external-link"))?;
+
+    let diff = temp.path().join("symlink.diff");
+    fs::write(
+        &diff,
+        "diff --git a/external-link/src/lib.rs b/external-link/src/lib.rs\n\
+         --- a/external-link/src/lib.rs\n\
+         +++ b/external-link/src/lib.rs\n\
+         @@ -0,0 +1,1 @@\n\
+         +pub unsafe fn outside_root(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        scan_root.as_os_str().to_os_string(),
+        os("--diff"),
+        diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+    ])?;
+    let report = parse_json(&stdout_text(&output)?)?;
+
+    assert_eq!(report["scope"], "diff");
+    assert_eq!(report["summary"]["changed_files"], 1);
+    assert_eq!(
+        report["summary"]["cards"], 0,
+        "a diff path through an external symlink must not widen the scan root: {report}"
+    );
+    assert!(
+        report["cards"]
+            .as_array()
+            .is_some_and(|cards| cards.is_empty()),
+        "the external symlink must not produce a selected card: {report}"
+    );
+
+    Ok(())
+}
+
 // issue #1883 (hostile-input regression coverage): a diff file that is not valid
 // UTF-8 must fail closed — the CLI exits non-zero, writes nothing, and never
 // treats the unreadable input as an empty/zero-change diff. The read fails before
