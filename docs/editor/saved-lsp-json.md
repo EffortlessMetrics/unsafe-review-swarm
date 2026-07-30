@@ -75,7 +75,8 @@ Open `target/unsafe-review/lsp.json` and look for:
 - `hovers`: compact card explanations with required conditions, evidence
   summaries, missing evidence, next action, witness route, and trust boundary,
 - `code_actions`: command-shaped copy/open actions with stable object
-  `payload` fields and legacy positional `arguments`.
+  `payload` fields and legacy positional `arguments`; agent-packet actions also
+  carry the exact bounded JSON packet in `payload.agent_packet`.
 
 The projection is useful when checking whether a card would be explainable in
 an editor before any live client exists.
@@ -113,7 +114,7 @@ A future editor adapter should consume this same artifact shape first:
 
 - show diagnostics from `diagnostics`,
 - show hover text from `hovers`,
-- copy bounded agent packets through existing `context` data,
+- copy bounded agent packets from the canonical `payload.agent_packet` value,
 - copy witness commands from existing witness routes,
 - open related tests when static reach evidence exists.
 

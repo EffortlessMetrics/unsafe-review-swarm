@@ -53,7 +53,7 @@
       },
       {
         "command": "unsafe-review.copyAgentPacket",
-        "title": "Unsafe Review: Copy Agent Packet Command (copy)",
+        "title": "Unsafe Review: Copy Agent Packet (copy)",
         "category": "Unsafe Review"
       },
       {

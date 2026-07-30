@@ -171,8 +171,9 @@ The MVP is acceptable when:
   immediately shows diagnostics for the changed unsafe sites.
 - Hovering over a diagnostic shows the saved obligation, missing evidence,
   and next action, plus the trust boundary footer.
-- `Unsafe Review: Copy Agent Packet (copy)` writes the bounded packet to the
-  clipboard with no side effects on the file.
+- `Unsafe Review: Copy Agent Packet (copy)` writes the bounded JSON packet from
+  the canonical saved bundle to the clipboard with no side effects on the
+  file; a missing or mismatched packet is refused.
 - `Unsafe Review: Refresh Bundle` re-reads the saved file without running
   any subprocess.
 - The extension never edits source, never starts a long-running process,
