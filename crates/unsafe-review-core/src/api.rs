@@ -710,7 +710,8 @@ pub fn collect_context_range(
         .collect();
 
     let statuses = comment_plan::card_statuses(output);
-    agent::render_range_scan_with_identity(
+    agent::render_range_scan_with_output(
+        output,
         queried_display,
         line_start,
         line_end,
@@ -718,8 +719,6 @@ pub fn collect_context_range(
         &file_cards,
         None,
         &statuses,
-        &output.coverage_snapshot,
-        output.analysis_identity.clone(),
     )
 }
 

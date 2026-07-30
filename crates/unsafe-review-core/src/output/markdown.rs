@@ -5,6 +5,7 @@ use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
 };
 use crate::output::declaration_summary::{self, DeclarationGroup};
+use crate::output::target_feature_summary::{self, TargetFeatureGroup};
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY, UNKNOWN_OWNER,
 };
@@ -102,6 +103,7 @@ fn render_repo_posture(output: &AnalyzeOutput) -> String {
 
     render_related_sink_clusters(&mut out, output);
     render_declaration_summary(&mut out, output);
+    render_target_feature_summary(&mut out, output);
 
     out.push_str("## Cards\n\n");
     if output.cards.is_empty() {
@@ -373,6 +375,7 @@ pub(crate) fn render_pr_summary(output: &AnalyzeOutput) -> String {
     render_pr_summary_reviewer_cockpit(&mut out, ranked.first().copied());
     render_pr_summary_card_table(&mut out, &ranked);
     render_declaration_summary(&mut out, output);
+    render_target_feature_summary(&mut out, output);
     render_pr_summary_witness_plan(&mut out, &ranked);
     render_pr_summary_trust_boundary(&mut out);
     out
@@ -421,6 +424,63 @@ fn render_declaration_summary(out: &mut String, output: &AnalyzeOutput) {
 /// to the full membership when the group exceeds the representative cap.
 /// Never dumps the complete `underlying_card_ids` list inline.
 fn render_declaration_representatives(group: &DeclarationGroup) -> String {
+    if group.representatives.is_empty() {
+        return "`none`".to_string();
+    }
+    let mut rendered = group
+        .representatives
+        .iter()
+        .map(|id| format!("`{}`", md_cell(id)))
+        .collect::<Vec<_>>();
+    let remaining = group.total.saturating_sub(group.representatives.len());
+    if remaining > 0 {
+        rendered.push(format!("+{remaining} more (see `cards.json`)"));
+    }
+    rendered.join(", ")
+}
+
+/// Bounded, deterministic grouping summary for `target_feature`-family
+/// `ReviewCard`s (issue #1894).
+///
+/// This is a presentation-only projection derived from the same
+/// `ReviewCard`/`CoverageBlock` data as every other surface -- it does not
+/// mutate, drop, or reclassify a card, and it is not a second truth surface.
+/// The complete per-site inventory (every id, class, and policy status)
+/// stays in `cards.json`. Renders nothing when there are no `target_feature`
+/// cards, so quiet PRs stay quiet. Grouping is report-only volume reduction:
+/// it is not a classifier, not a discharge, and not a soundness claim about
+/// the grouped sites -- architecture/feature literals are metadata, not
+/// group identity, and cards whose obligation, class, movement, baseline
+/// state, receipt state, or next action differ never collapse together.
+fn render_target_feature_summary(out: &mut String, output: &AnalyzeOutput) {
+    let groups = target_feature_summary::target_feature_groups(output);
+    if groups.is_empty() {
+        return;
+    }
+
+    out.push_str("\n## Target-feature summary\n\n");
+    out.push_str(
+        "Grouped from existing `target_feature` ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals such as `avx2` or `neon` are metadata, not group identity). This is a report-only volume summary, not a new classifier and not a discharge -- every site keeps its own card, class, and policy status in `cards.json` (the complete per-site inventory). Cards whose obligation, class, movement, baseline state, receipt state, or next action differ never collapse into the same group.\n\n",
+    );
+    out.push_str("| File | Class | Sites | Feature variants | Representative cards |\n");
+    out.push_str("|---|---|---:|---|---|\n");
+    for group in &groups {
+        out.push_str(&format!(
+            "| `{}` | `{}` | {} | {} | {} |\n",
+            md_cell(&group.module_or_file),
+            group.class,
+            group.total,
+            render_backtick_string_list(&group.features, 4),
+            render_target_feature_representatives(group),
+        ));
+    }
+    out.push('\n');
+}
+
+/// Render a group's bounded representative card IDs plus a "+N more" pointer
+/// to the full membership when the group exceeds the representative cap.
+/// Never dumps the complete `underlying_card_ids` list inline.
+fn render_target_feature_representatives(group: &TargetFeatureGroup) -> String {
     if group.representatives.is_empty() {
         return "`none`".to_string();
     }
@@ -1686,6 +1746,119 @@ mod tests {
             !quiet.contains("## Declaration summary"),
             "a fixture with no declaration cards must not render the section:\n{quiet}"
         );
+        Ok(())
+    }
+
+    // issue #1894: ties the `target_feature_simd_dispatch_repetition` fixture
+    // to the rendered grouped projection AND the comment-plan's
+    // `grouped_repetition` selection end-to-end, so a regression in either
+    // surface (or in the post-eligibility representative-selection refactor,
+    // finding 1) is caught by a real run rather than only by synthetic unit
+    // fixtures.
+    #[test]
+    fn target_feature_summary_renders_grouped_projection_for_the_fixture() -> Result<(), String> {
+        let pr = render_pr_summary(&fixture_output("target_feature_simd_dispatch_repetition")?);
+        assert!(
+            pr.contains("## Target-feature summary"),
+            "pr-summary must render the target-feature summary section:\n{pr}"
+        );
+        // Three undocumented arch variants (avx2/sse2/neon) share file, class,
+        // coverage state, and normalized shape -> one grouped row, 3 sites.
+        assert!(
+            pr.contains("| `src/lib.rs` | `contract_missing` | 3 |"),
+            "grouped contract_missing row must report 3 sites:\n{pr}"
+        );
+        for feature in ["avx2", "sse2", "neon"] {
+            assert!(
+                pr.contains(feature),
+                "feature-variant metadata must list `{feature}`:\n{pr}"
+            );
+        }
+        // The documented avx512 site has a different class (unsafe_unreached)
+        // and a satisfied obligation; it must never collapse into the
+        // contract_missing group.
+        assert!(
+            pr.contains("| `src/lib.rs` | `unsafe_unreached` | 1 |"),
+            "the differently-classed site must render its own singleton row:\n{pr}"
+        );
+        assert!(
+            pr.contains("avx512f"),
+            "the singleton row must list its own feature variant:\n{pr}"
+        );
+
+        let repo = render_repo_posture(&repo_fixture_output(
+            "target_feature_simd_dispatch_repetition",
+        )?);
+        assert!(
+            repo.contains("## Target-feature summary"),
+            "repo posture must render the target-feature summary section:\n{repo}"
+        );
+
+        let quiet = render_pr_summary(&fixture_output("raw_pointer_alignment")?);
+        assert!(
+            !quiet.contains("## Target-feature summary"),
+            "a fixture with no target_feature cards must not render the section:\n{quiet}"
+        );
+
+        // Issue #1894 finding 1: grouping is applied strictly after
+        // eligibility, on the eligible members' importance-rank order --
+        // exactly one representative (avx2, the only tiebreak-relevant
+        // ordering here is line order since priority/confidence/coverage
+        // are tied) is selected; the other two equivalent sites are
+        // recorded `grouped_repetition`; the differently-classed avx512
+        // site is excluded for its own unrelated reason.
+        let output = fixture_output("target_feature_simd_dispatch_repetition")?;
+        let plan_json = crate::output::comment_plan::render(&output);
+        let plan: serde_json::Value = serde_json::from_str(&plan_json)
+            .map_err(|err| format!("comment-plan JSON parse failed: {err}"))?;
+        let comments = plan["comments"]
+            .as_array()
+            .ok_or_else(|| "comments should be an array".to_string())?;
+        assert_eq!(
+            comments.len(),
+            1,
+            "exactly one representative must be selected: {plan_json}"
+        );
+        assert!(
+            comments[0]["operation"]
+                .as_str()
+                .unwrap_or("")
+                .contains("avx2"),
+            "the representative must be the avx2 site: {}",
+            comments[0]
+        );
+        let not_selected = plan["not_selected"]
+            .as_array()
+            .ok_or_else(|| "not_selected should be an array".to_string())?;
+        let grouped: Vec<&serde_json::Value> = not_selected
+            .iter()
+            .filter(|card| card["reason_code"] == "grouped_repetition")
+            .collect();
+        assert_eq!(
+            grouped.len(),
+            2,
+            "sse2 and neon must be recorded grouped_repetition, and nothing else: {not_selected:?}"
+        );
+        for entry in &grouped {
+            let operation = entry["operation"].as_str().unwrap_or("");
+            assert!(
+                operation.contains("sse2") || operation.contains("neon"),
+                "unexpected grouped_repetition entry: {entry}"
+            );
+        }
+        let avx512_entry = not_selected
+            .iter()
+            .find(|card| {
+                card["operation"]
+                    .as_str()
+                    .is_some_and(|op| op.contains("avx512"))
+            })
+            .ok_or_else(|| "avx512 site must be in not_selected".to_string())?;
+        assert_ne!(
+            avx512_entry["reason_code"], "grouped_repetition",
+            "the differently-classed avx512 site must never be tagged grouped_repetition: {avx512_entry}"
+        );
+
         Ok(())
     }
 

@@ -214,6 +214,11 @@ the current `unsafe-review badges` repo projection.
   bounded declaration-summary grouping (SPEC-0011 §3.2, issue #1895) when at
   least one `unsafe_declaration` ReviewCard is present, and omits the section
   entirely otherwise.
+- Repo Markdown for a `target_feature`-repetition-heavy fixture additionally
+  reports the bounded target-feature-summary grouping (SPEC-0011 §3.2, issue
+  #1894) when at least one `target_feature` ReviewCard is present, and omits
+  the section entirely otherwise. Badge counts keep reading raw card counts,
+  never group counts.
 - Badge JSON for a fixture reports open unsafe-review gaps rather than raw
   unsafe count or safe/unsafe status.
 - The `unsafe-review+` badge message equals the evidence-quality component sum:

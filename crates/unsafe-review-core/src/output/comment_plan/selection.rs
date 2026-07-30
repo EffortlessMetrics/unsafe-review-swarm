@@ -1,7 +1,10 @@
+use crate::api::AnalyzeOutput;
 use crate::domain::coverage::{Coverage, WitnessReceiptCoverage};
 use crate::domain::{Confidence, Priority, ReviewCard, ReviewClass, UnsafeSiteKind};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
+use crate::output::target_feature_summary;
+use std::collections::{BTreeMap, BTreeSet};
 
 /// Importance rank used to select the best candidates within the comment-plan
 /// budget (SPEC-0022 §5, SPEC-0032).
@@ -95,6 +98,18 @@ pub(super) const OPERATION_FAMILY_BUDGET_REASON: ReviewBudgetReason = ReviewBudg
 pub(super) const MAX_COMMENT_BUDGET_REASON: ReviewBudgetReason = ReviewBudgetReason {
     code: "budget_exhausted",
     message: "comment-plan max of three candidates reached",
+};
+/// Applied to a `target_feature` card that is a non-representative member of
+/// a target-feature-repetition group (issue #1894): at most one
+/// representative per equivalent group (same file, class, movement,
+/// coverage state, and next action; architecture/feature literal only
+/// differs) is eligible for an inline comment slot. The rest are recorded
+/// here rather than silently dropped -- they stay in `cards.json` and
+/// `not_selected[]`; see the target-feature summary for the selected
+/// representative and `underlying_card_ids` for the full group membership.
+pub(super) const GROUPED_REPETITION_REASON: ReviewBudgetReason = ReviewBudgetReason {
+    code: "grouped_repetition",
+    message: "grouped with an equivalent repetitive target_feature site; see the target-feature summary for the selected representative",
 };
 
 // Selection reasons referencing coverage gap (SPEC-0032).
@@ -225,6 +240,68 @@ pub(super) fn should_plan_comment(card: &ReviewCard) -> bool {
         && comment_surfacing_disposition(card).allows_inline_comment()
         && (matches!(card.priority, Priority::High) || matches!(card.confidence, Confidence::High))
         && !matches!(card.confidence, Confidence::Low | Confidence::Unknown)
+}
+
+/// The set of `target_feature` card ids that are ELIGIBLE (per
+/// [`should_plan_comment`]) non-representative members of a target-feature
+/// repetition group (`target_feature_summary::target_feature_groups`, issue
+/// #1894 finding 1).
+///
+/// Grouping is applied strictly AFTER eligibility, on the eligible subset of
+/// each equivalence group only:
+///
+/// - An equivalence group can contain a mix of eligible and ineligible
+///   cards (e.g. one member's site is outside the changed hunk while
+///   another is a fresh, actionable, high-confidence site). Ineligible
+///   members are never touched by this function and never appear in its
+///   result -- they keep flowing through the normal `should_plan_comment` /
+///   `non_selection_reason` path with their own canonical reason
+///   (`outside_changed_hunk`, class-not-eligible, low relevance, ...).
+///   Applying `grouped_repetition` to an ineligible card would hide that
+///   canonical reason behind an unrelated grouping label.
+/// - Among a group's eligible members (2 or more), the representative is
+///   the highest-importance member by the SAME `importance_rank` order the
+///   normal budget loop already uses to rank candidates -- not by source
+///   line or card id. An ineligible earliest-line card can therefore never
+///   "own" the representative slot and silently suppress a later, genuinely
+///   actionable sibling.
+/// - Groups with 0 or 1 eligible members produce no exclusions: there is
+///   nothing to suppress when at most one member is even competing for a
+///   slot.
+///
+/// This is the single source of truth for the exclusion set: both
+/// `model::CommentPlan::from` and `card_statuses` (`comment_plan/mod.rs`,
+/// SPEC-0029 single-truth) call this function, so a card's comment-plan
+/// disposition -- selected / grouped_repetition / canonically not-selected /
+/// not-eligible -- can never drift between the two surfaces.
+pub(super) fn target_feature_grouped_repetition_ids(output: &AnalyzeOutput) -> BTreeSet<String> {
+    let by_id: BTreeMap<&str, &ReviewCard> = output
+        .cards
+        .iter()
+        .map(|card| (card.id.0.as_str(), card))
+        .collect();
+
+    let mut omitted = BTreeSet::new();
+    for group in target_feature_summary::target_feature_groups(output) {
+        let mut eligible_members: Vec<&ReviewCard> = group
+            .underlying_card_ids
+            .iter()
+            .filter_map(|id| by_id.get(id.as_str()).copied())
+            .filter(|card| should_plan_comment(card))
+            .collect();
+        if eligible_members.len() < 2 {
+            continue;
+        }
+        eligible_members.sort_by(|a, b| {
+            importance_rank(a)
+                .cmp(&importance_rank(b))
+                .then_with(|| a.id.0.cmp(&b.id.0))
+        });
+        for card in eligible_members.into_iter().skip(1) {
+            omitted.insert(card.id.0.clone());
+        }
+    }
+    omitted
 }
 
 pub(super) fn non_selection_reason(card: &ReviewCard) -> ReviewBudgetReason {

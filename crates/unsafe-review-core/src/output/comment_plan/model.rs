@@ -13,10 +13,11 @@ use serde::Serialize;
 use std::collections::BTreeSet;
 
 use super::selection::{
-    MAX_COMMENT_BUDGET_REASON, NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON,
-    OPERATION_FAMILY_BUDGET_REASON, ReviewBudgetReason, actionability, comment_body, coverage_gap,
-    importance_rank, non_selection_reason, owner_card_covered_by_specific_operation, relevance,
-    selection_reason, should_plan_comment,
+    GROUPED_REPETITION_REASON, MAX_COMMENT_BUDGET_REASON,
+    NOT_SELECTED_COVERED_BY_OPERATION_CARD_REASON, OPERATION_FAMILY_BUDGET_REASON,
+    ReviewBudgetReason, actionability, comment_body, coverage_gap, importance_rank,
+    non_selection_reason, owner_card_covered_by_specific_operation, relevance, selection_reason,
+    should_plan_comment, target_feature_grouped_repetition_ids,
 };
 
 const MAX_PLANNED_COMMENTS: usize = 3;
@@ -51,10 +52,31 @@ impl From<&AnalyzeOutput> for CommentPlan {
         // per family fills each budget slot rather than the first one in file order.
         // The global card order (output.cards = file/line) is preserved for all
         // other output surfaces; only the comment-plan candidate selection re-ranks.
-        let (mut eligible, ineligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = output
+        let (all_eligible, ineligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = output
             .cards
             .iter()
             .partition(|card| should_plan_comment(card));
+
+        // Non-representative ELIGIBLE members of a `target_feature`-
+        // repetition group (issue #1894, applied strictly after
+        // eligibility -- see `selection::target_feature_grouped_repetition_ids`).
+        // At most one eligible member per equivalent group (same file,
+        // class, movement, coverage state, structured unsatisfied-obligation
+        // set, and next action -- architecture/feature literal is metadata,
+        // not identity) competes for a budget slot below, chosen by the same
+        // importance-rank order the budget loop already uses. The rest are
+        // recorded with the `grouped_repetition` reason further down --
+        // never dropped, never merged into the survivor's card, and never
+        // applied to an ineligible sibling (that card keeps its own
+        // canonical `non_selection_reason` instead). Both this function and
+        // `card_statuses` (mod.rs, SPEC-0029 single-truth) call the exact
+        // same `target_feature_grouped_repetition_ids` so a card's
+        // `comment_plan_status` can never drift from its comment-plan.json
+        // disposition.
+        let repetition_omitted = target_feature_grouped_repetition_ids(output);
+        let (repetitive, mut eligible): (Vec<&ReviewCard>, Vec<&ReviewCard>) = all_eligible
+            .into_iter()
+            .partition(|card| repetition_omitted.contains(card.id.0.as_str()));
         eligible.sort_by(|a, b| {
             importance_rank(a)
                 .cmp(&importance_rank(b))
@@ -85,6 +107,12 @@ impl From<&AnalyzeOutput> for CommentPlan {
                 non_selection_reason(card)
             };
             not_selected.push(NotSelectedCard::from_reason(card, reason));
+        }
+        for card in repetitive {
+            not_selected.push(NotSelectedCard::from_reason(
+                card,
+                GROUPED_REPETITION_REASON,
+            ));
         }
 
         // Compute before moving comments/not_selected into the struct literal.

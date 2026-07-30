@@ -50,6 +50,14 @@ source of analyzer truth. It carries:
 - stop conditions
 - the static-review trust boundary
 
+When the selected card belongs to a repetitive `target_feature` group, the
+packet also carries the presentation-only canonical group projection: stable
+group identity, total, bounded representatives, feature metadata, and every
+underlying card ID with its exact `unsafe-review context <card-id> --json`
+lookup command. The enclosing packet still authorizes work on only its own
+card/site. Editing a representative does not repair, discharge, or resolve any
+sibling card, and group metadata never changes readiness or allowed repairs.
+
 For compatibility with the initial context-packet scaffold, the packet keeps
 top-level `card_id`, `required_safety_conditions`, `missing`, and string-array
 `allowed_repairs` fields while adding richer structured fields.
