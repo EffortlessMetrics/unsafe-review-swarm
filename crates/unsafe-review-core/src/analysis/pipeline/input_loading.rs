@@ -327,14 +327,22 @@ mod tests {
     }
 
     #[test]
-    fn nul_and_control_chars_in_diff_paths_are_indexed_inertly() -> Result<(), String> {
+    fn nul_and_control_chars_in_diff_paths_are_indexed_literally() -> Result<(), String> {
         // Hostile-input regression coverage for the NUL / control-character
         // path row of issue #1883. A `+++ b/` header containing an interior NUL
-        // byte or an ESC control character must be accepted and indexed under
-        // the literal path string, without panicking. The path is only ever an
-        // exact-match key (never opened -- passing a NUL path to the OS would
-        // otherwise be rejected at the syscall boundary), so a control-laden
-        // path is inert and never matches a normal discovered file.
+        // byte or an ESC control character must be parsed without panicking and
+        // indexed under the LITERAL path string -- not silently sanitized to a
+        // normal path.
+        //
+        // Scope note: this pins literal indexing only, not "never opened". A NUL
+        // byte is not a legal Unix filename, so a NUL-keyed entry can never match
+        // a file discovered under the root and is therefore inert. An ESC byte,
+        // by contrast, is a legal filename character: if the checkout actually
+        // contained that file, workspace discovery would find it and it would be
+        // scanned like any other changed file -- which is correct behavior, not a
+        // leak. The invariant asserted here is only that the diff parser
+        // preserves control-bearing paths verbatim rather than crashing or
+        // rewriting them.
         let diff = concat!(
             "diff --git a/src/a\u{0}b.rs b/src/a\u{0}b.rs\n",
             "--- a/src/a\u{0}b.rs\n",
