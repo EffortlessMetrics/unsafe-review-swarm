@@ -4337,6 +4337,62 @@ fn check_accepts_traversal_diff_path_without_escaping_root() -> Result<(), Box<d
     Ok(())
 }
 
+// Hostile-input regression coverage for the oversized-hunk row of issue #1883.
+// A hunk header whose `+` start line is far beyond `usize::MAX` must not crash
+// the CLI: the coordinate falls back to the degenerate line 0, so even when the
+// oversized hunk names a real changed file (`src/lib.rs`, which holds the
+// fixture's actual unsafe site) it cannot spuriously surface that site, and the
+// run completes successfully. Pins "bad inputs fail truthfully rather than
+// panicking" at the CLI boundary.
+#[test]
+fn check_survives_oversized_hunk_line_number_without_panic() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-oversized-hunk-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+
+    let oversized_diff = temp.path().join("oversized.diff");
+    fs::write(
+        &oversized_diff,
+        concat!(
+            "diff --git a/src/lib.rs b/src/lib.rs\n",
+            "--- a/src/lib.rs\n",
+            "+++ b/src/lib.rs\n",
+            "@@ -0,0 +999999999999999999999999999999,1 @@\n",
+            "+// oversized hunk start line\n",
+        ),
+    )?;
+
+    let cards_out = temp.path().join("cards.json");
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        oversized_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "an oversized hunk line number is valid-if-degenerate input and must not crash the run"
+    );
+
+    // The degenerate line-0 coordinate cannot match the real unsafe site, so no
+    // card is spuriously produced.
+    let cards = parse_json(&fs::read_to_string(&cards_out)?)?;
+    assert_eq!(
+        cards["summary"]["cards"], 0,
+        "the degenerate fallback coordinate must not surface the real unsafe site"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
