@@ -75,16 +75,20 @@ pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
         push_candidate(
             &mut candidates,
             card,
-            RepairCandidateKind::SafetyDocs,
-            "add-safety-contract",
-            vec!["the contract obligation remains undischarged".to_string()],
-            "add or expose the local safety contract for this card's obligations",
-            vec![
-                "SAFETY comment alone".to_string(),
-                "broad suppression".to_string(),
-                "claiming a contract is proof".to_string(),
-            ],
-            "contract_coverage",
+            CandidateSpec {
+                kind: RepairCandidateKind::SafetyDocs,
+                repair_id: "add-safety-contract".to_string(),
+                preconditions: vec!["the contract obligation remains undischarged".to_string()],
+                allowed_change:
+                    "add or expose the local safety contract for this card's obligations"
+                        .to_string(),
+                forbidden_substitutes: vec![
+                    "SAFETY comment alone".to_string(),
+                    "broad suppression".to_string(),
+                    "claiming a contract is proof".to_string(),
+                ],
+                evidence_slot: "contract_coverage",
+            },
         );
     }
 
@@ -102,19 +106,21 @@ pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
         push_candidate(
             &mut candidates,
             card,
-            RepairCandidateKind::Guard,
-            &repair_id,
-            vec![evidence.obligation.description.clone()],
-            &format!(
-                "add a same-origin executable guard for the `{}` obligation at this card's unsafe site",
-                evidence.obligation.key
-            ),
-            vec![
-                "SAFETY comment alone".to_string(),
-                "debug_assert only".to_string(),
-                "broad suppression".to_string(),
-            ],
-            "guard_coverage",
+            CandidateSpec {
+                kind: RepairCandidateKind::Guard,
+                repair_id,
+                preconditions: vec![evidence.obligation.description.clone()],
+                allowed_change: format!(
+                    "add a same-origin executable guard for the `{}` obligation at this card's unsafe site",
+                    evidence.obligation.key
+                ),
+                forbidden_substitutes: vec![
+                    "SAFETY comment alone".to_string(),
+                    "debug_assert only".to_string(),
+                    "broad suppression".to_string(),
+                ],
+                evidence_slot: "guard_coverage",
+            },
         );
     }
 
@@ -126,15 +132,20 @@ pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
         push_candidate(
             &mut candidates,
             card,
-            RepairCandidateKind::Test,
-            "add-focused-test",
-            vec!["the owner or unsafe seam lacks focused test reach evidence".to_string()],
-            "add or point to a focused test that exercises this owner or seam",
-            vec![
-                "test mention without exercising the unsafe owner".to_string(),
-                "broad suppression".to_string(),
-            ],
-            "test_reach_coverage",
+            CandidateSpec {
+                kind: RepairCandidateKind::Test,
+                repair_id: "add-focused-test".to_string(),
+                preconditions: vec![
+                    "the owner or unsafe seam lacks focused test reach evidence".to_string(),
+                ],
+                allowed_change: "add or point to a focused test that exercises this owner or seam"
+                    .to_string(),
+                forbidden_substitutes: vec![
+                    "test mention without exercising the unsafe owner".to_string(),
+                    "broad suppression".to_string(),
+                ],
+                evidence_slot: "test_reach_coverage",
+            },
         );
     }
 
@@ -142,48 +153,50 @@ pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
         push_candidate(
             &mut candidates,
             card,
-            RepairCandidateKind::WitnessRoute,
-            "attach-witness-receipt",
-            vec!["the selected witness route remains unconfirmed".to_string()],
-            "attach a scoped witness receipt after running the suggested command outside unsafe-review",
-            vec![
-                "treating a suggested command as an executed witness".to_string(),
-                "using an unrelated receipt as proof".to_string(),
-            ],
-            "witness_receipt_coverage",
+            CandidateSpec {
+                kind: RepairCandidateKind::WitnessRoute,
+                repair_id: "attach-witness-receipt".to_string(),
+                preconditions: vec!["the selected witness route remains unconfirmed".to_string()],
+                allowed_change: "attach a scoped witness receipt after running the suggested command outside unsafe-review".to_string(),
+                forbidden_substitutes: vec![
+                    "treating a suggested command as an executed witness".to_string(),
+                    "using an unrelated receipt as proof".to_string(),
+                ],
+                evidence_slot: "witness_receipt_coverage",
+            },
         );
     }
 
     candidates
 }
 
-fn push_candidate(
-    candidates: &mut Vec<RepairCandidate>,
-    card: &ReviewCard,
+struct CandidateSpec {
     kind: RepairCandidateKind,
-    repair_id: &str,
+    repair_id: String,
     preconditions: Vec<String>,
-    allowed_change: &str,
+    allowed_change: String,
     forbidden_substitutes: Vec<String>,
     evidence_slot: &'static str,
-) {
+}
+
+fn push_candidate(candidates: &mut Vec<RepairCandidate>, card: &ReviewCard, spec: CandidateSpec) {
     if candidates
         .iter()
-        .any(|candidate| candidate.repair_id == repair_id)
+        .any(|candidate| candidate.repair_id == spec.repair_id)
     {
         return;
     }
-    let applicability = applicability(card, &kind);
+    let applicability = applicability(card, &spec.kind);
     candidates.push(RepairCandidate {
-        repair_id: repair_id.to_string(),
-        kind: kind.clone(),
+        repair_id: spec.repair_id,
+        kind: spec.kind,
         target: target(card),
-        preconditions,
-        allowed_change: allowed_change.to_string(),
-        forbidden_substitutes,
+        preconditions: spec.preconditions,
+        allowed_change: spec.allowed_change,
+        forbidden_substitutes: spec.forbidden_substitutes,
         verification: card.next_action.verify_commands.clone(),
         expected_evidence_movement: vec![RepairEvidenceMovement {
-            slot: evidence_slot,
+            slot: spec.evidence_slot,
             from: "missing",
             to: "present",
         }],
@@ -365,14 +378,14 @@ mod tests {
     }
 
     #[test]
-    fn witness_route_candidate_is_receipt_gated() {
+    fn witness_route_candidate_is_receipt_gated() -> Result<(), String> {
         let mut card = candidate_card();
         card.missing
             .push(MissingEvidence::new("witness", "no receipt"));
         let witness = build(&card)
             .into_iter()
             .find(|candidate| candidate.kind == RepairCandidateKind::WitnessRoute)
-            .expect("witness gap should produce a typed route candidate");
+            .ok_or_else(|| "witness gap should produce a typed route candidate".to_string())?;
 
         assert_eq!(
             witness.applicability,
@@ -382,17 +395,19 @@ mod tests {
             witness.expected_evidence_movement[0].slot,
             "witness_receipt_coverage"
         );
+        Ok(())
     }
 
     #[test]
-    fn weak_confidence_candidate_is_human_only() {
+    fn weak_confidence_candidate_is_human_only() -> Result<(), String> {
         let mut card = candidate_card();
         card.confidence = crate::domain::Confidence::Low;
         let guard = build(&card)
             .into_iter()
             .find(|candidate| candidate.kind == RepairCandidateKind::Guard)
-            .expect("guard gap should produce a typed candidate");
+            .ok_or_else(|| "guard gap should produce a typed candidate".to_string())?;
 
         assert_eq!(guard.applicability, RepairCandidateApplicability::HumanOnly);
+        Ok(())
     }
 }
