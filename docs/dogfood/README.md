@@ -39,6 +39,7 @@ Snapshot reports:
 - [2026-07-29 simdutf8 holdout](reports/2026-07-29-simdutf8-holdout.md)
 - [2026-07-30 crossbeam holdout](reports/2026-07-30-crossbeam-holdout.md)
 - [2026-07-30 rkyv holdout](reports/2026-07-30-rkyv-holdout.md)
+- [2026-07-30 slab holdout](reports/2026-07-30-slab-holdout.md)
 - [2026-07-29 portable-atomic holdout](reports/2026-07-29-portable-atomic-holdout.md)
 - [2026-07-19 holdout contract audit](reports/2026-07-19-holdout-contract-audit.md)
 - [2026-06-19 generalization validation closeout](reports/2026-06-19-generalization-validation-closeout.md)
