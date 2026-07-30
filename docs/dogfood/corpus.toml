@@ -597,3 +597,17 @@ purpose = "release-readiness holdout repo snapshot for SIMD target-feature contr
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/simdutf8-holdout --format json --max-cards 50 --out target/dogfood-work/simdutf8-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/simdutf8-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "crossbeam-holdout"
+crate = "crossbeam"
+repository = "crossbeam-rs/crossbeam"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "b23b7e8eca2efdad9bdc1ceb1aee1207a852c03b"
+root = "target/dogfood-work/crossbeam-holdout"
+purpose = "release-readiness holdout repo snapshot for concurrency, atomics, strict-provenance pointers, and ownership-transfer contracts; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/crossbeam-holdout --format json --max-cards 50 --out target/dogfood-work/crossbeam-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/crossbeam-holdout.unsafe-review.json"]
