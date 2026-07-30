@@ -29,12 +29,12 @@ external snapshots and diffs are never checked into the swarm repo.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 17 |
-| Total targets | 44 |
-| Capped repo snapshots | 19 |
+| Repositories | 18 |
+| Total targets | 45 |
+| Capped repo snapshots | 20 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
-| Holdout targets | 4 |
+| Holdout targets | 5 |
 | Checked-in scan outputs | 0 |
 
 ## Selected Judgment Sample
@@ -81,6 +81,7 @@ Selected real-crate targets:
 | `rust-lang/hashbrown` | 1 | 8 | Large-file syntax scanning, `MaybeUninit`, pointer arithmetic, unchecked/infallible operations, unsafe-call contract gaps, dedupe |
 | `tokio-rs/bytes` | 1 | 1 | `Vec::from_raw_parts`, slice construction, ownership-transfer review cards |
 | `crossbeam-rs/crossbeam` | 2 | 2 | Unsafe Send/Sync, atomics, raw pointer, ownership-transfer, strict-provenance Miri cfg cards, atomic pointer state transitions, and release-readiness holdout |
+| `rkyv/rkyv` | 1 | 0 | Macro-heavy generated code, allocation, raw pointers, byte casts, and release-readiness holdout |
 | `tokio-rs/mio` | 1 | 1 | Unsafe function call contracts, `Vec::set_len`, zeroed values, pointer operations, socket address layout conversions, and unsafe Send/Sync route cards |
 | `fitzgen/bumpalo` | 1 | 0 | Pointer arithmetic, slice construction, `str_from_utf8_unchecked`, unsafe fn call, and unsafe impl cards; fresh-crate capstone |
 | `tokio-rs/slab` | 1 | 0 | Pointer arithmetic, unsafe fn call, and unsafe impl cards; fresh-crate capstone |
@@ -121,6 +122,7 @@ Selected real-crate targets:
 - `portable-atomic-holdout` (holdout; run only with explicit release-readiness opt-in)
 - `simdutf8-holdout` (holdout; run only with explicit release-readiness opt-in)
 - `crossbeam-holdout` (holdout; run only with explicit release-readiness opt-in)
+- `rkyv-holdout` (holdout; run only with explicit release-readiness opt-in)
 
 ### PR Diffs
 
@@ -183,7 +185,7 @@ them by default; run a holdout target only with an explicit opt-in:
 
 ```bash
 cargo run --locked -p xtask -- dogfood-exec \
-  --target crossbeam-holdout --include-holdout --strict
+  --target rkyv-holdout --include-holdout --strict
 ```
 
 Update this index only when the corpus manifest or recorded outcome evidence

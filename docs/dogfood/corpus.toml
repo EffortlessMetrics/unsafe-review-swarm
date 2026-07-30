@@ -611,3 +611,17 @@ purpose = "release-readiness holdout repo snapshot for concurrency, atomics, str
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/crossbeam-holdout --format json --max-cards 50 --out target/dogfood-work/crossbeam-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/crossbeam-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "rkyv-holdout"
+crate = "rkyv"
+repository = "rkyv/rkyv"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "46e143d6e4c8c5a5f4ce5e19a24201e577e5706d"
+root = "target/dogfood-work/rkyv-holdout"
+purpose = "release-readiness holdout repo snapshot for macro-heavy generated code, allocation, raw pointers, and byte-cast contracts; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/rkyv-holdout --format json --max-cards 50 --out target/dogfood-work/rkyv-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/rkyv-holdout.unsafe-review.json"]

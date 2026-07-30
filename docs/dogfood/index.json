@@ -5,19 +5,19 @@
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 17,
-    "targets": 44,
-    "repo_snapshots": 19,
+    "repositories": 18,
+    "targets": 45,
+    "repo_snapshots": 20,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
     "partitions": {
       "conformance": 2,
       "regression": 38,
-      "holdout": 4
+      "holdout": 5
     },
     "artifact_statuses": {
-      "local_untracked": 44
+      "local_untracked": 45
     }
   },
   "repositories": [
@@ -122,6 +122,12 @@
       "snapshot_targets": ["portable-atomic-holdout"],
       "pr_diff_targets": [],
       "primary_exercise": "Release-readiness holdout for no_std atomics, pointer state, and platform-specific unsafe contracts; recorded before tuning"
+    },
+    {
+      "repository": "rkyv/rkyv",
+      "snapshot_targets": ["rkyv-holdout"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Release-readiness holdout for macro-heavy generated code, allocation, raw pointers, and byte-cast contracts; recorded before tuning"
     }
   ],
   "recorded_outcomes": [
