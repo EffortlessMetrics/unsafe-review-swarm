@@ -48,6 +48,201 @@
         "bucket_reason": "guard_evidence_missing",
         "context_command": "unsafe-review context UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1 --json",
         "applicable_edit": "add a same-pointer live/nullability guard before this operation",
+        "repair_candidates": [
+          {
+            "repair_id": "add-raw_pointer_read-pointer-live-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "pointer is live and dereferenceable for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `pointer-live` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-initialized-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "memory is initialized for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `initialized` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-allocation-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "access remains inside one live allocation"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `allocation` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -93,6 +288,201 @@
         "bucket_reason": "reach_evidence_missing",
         "context_command": "unsafe-review context UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1 --json",
         "applicable_edit": "add a same-pointer live/nullability guard before this operation",
+        "repair_candidates": [
+          {
+            "repair_id": "add-raw_pointer_read-pointer-live-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "pointer is live and dereferenceable for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `pointer-live` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-initialized-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "memory is initialized for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `initialized` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-allocation-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "access remains inside one live allocation"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `allocation` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -137,6 +527,201 @@
         "bucket_reason": "witness_receipt_missing",
         "context_command": "unsafe-review context UR-raw-pointer-alignment-is-aligned-guard-src-lib-rs-read-header-operation-raw_pointer_read-raw-pointer-read-2ac86bae2dcf-pointer_validity-c1 --json",
         "applicable_edit": "add a same-pointer live/nullability guard before this operation",
+        "repair_candidates": [
+          {
+            "repair_id": "add-raw_pointer_read-pointer-live-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "pointer is live and dereferenceable for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `pointer-live` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-initialized-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "memory is initialized for the accessed type"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `initialized` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-raw_pointer_read-allocation-guard",
+            "kind": "guard",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "access remains inside one live allocation"
+            ],
+            "allowed_change": "add a same-origin executable guard for the `allocation` obligation at this card's unsafe site",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "debug_assert only",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "guard_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "candidate",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 11,
+                  "column": 5
+                },
+                "end": {
+                  "line": 11,
+                  "column": 5
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [
+              "cargo +nightly miri test read_header",
+              "cargo +nightly careful test read_header"
+            ],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",

@@ -2045,6 +2045,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains(card_id));
 
     let review_kit = parse_json(&fs::read_to_string(out_dir.join("review-kit.json"))?)?;
+    let repair_queue = parse_json(&fs::read_to_string(out_dir.join("repair-queue.json"))?)?;
     assert_eq!(review_kit["schema_version"], "0.1");
     assert_eq!(review_kit["tool"], "unsafe-review");
     assert_eq!(review_kit["mode"], "review_kit_manifest");
@@ -2151,6 +2152,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         "witness_receipt_missing"
     );
     assert_eq!(card_queue[0]["agent_readiness"]["state"], "ready_for_agent");
+    assert_eq!(
+        card_queue[0]["repair_candidates"],
+        repair_queue["buckets"]["repairable_by_guard"][0]["repair_candidates"],
+        "review-kit card queue must preserve repair-queue typed candidates"
+    );
     assert!(
         card_queue[0]["explain"]
             .as_str()

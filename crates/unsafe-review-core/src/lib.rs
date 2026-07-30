@@ -14,6 +14,10 @@ mod output;
 mod policy;
 mod util;
 
+pub use output::agent::{
+    RepairCandidate, RepairCandidateApplicability, RepairCandidateKind, RepairCandidatePosition,
+    RepairCandidateRange, RepairCandidateTarget, RepairEvidenceMovement,
+};
 pub use output::comment_plan::COMMENT_BODY_WORD_LIMIT;
 pub use output::lsp::{
     EditorActionApplicability, EditorActionArguments, EditorActionCommand, EditorActionContract,

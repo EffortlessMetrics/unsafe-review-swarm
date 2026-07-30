@@ -7,7 +7,7 @@ const CLAIM_BOUNDARY: &str = "advisory repair candidate only; not a patch, execu
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum RepairCandidateKind {
+pub enum RepairCandidateKind {
     SafetyDocs,
     Guard,
     Test,
@@ -16,49 +16,49 @@ pub(crate) enum RepairCandidateKind {
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
-pub(crate) enum RepairCandidateApplicability {
+pub enum RepairCandidateApplicability {
     Candidate,
     HumanOnly,
     RequiresWitness,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub(crate) struct RepairCandidate {
-    pub(crate) repair_id: String,
-    pub(crate) kind: RepairCandidateKind,
-    pub(crate) target: RepairCandidateTarget,
-    pub(crate) preconditions: Vec<String>,
-    pub(crate) allowed_change: String,
-    pub(crate) forbidden_substitutes: Vec<String>,
-    pub(crate) verification: Vec<String>,
-    pub(crate) expected_evidence_movement: Vec<RepairEvidenceMovement>,
-    pub(crate) applicability: RepairCandidateApplicability,
-    pub(crate) claim_boundary: &'static str,
+pub struct RepairCandidate {
+    pub repair_id: String,
+    pub kind: RepairCandidateKind,
+    pub target: RepairCandidateTarget,
+    pub preconditions: Vec<String>,
+    pub allowed_change: String,
+    pub forbidden_substitutes: Vec<String>,
+    pub verification: Vec<String>,
+    pub expected_evidence_movement: Vec<RepairEvidenceMovement>,
+    pub applicability: RepairCandidateApplicability,
+    pub claim_boundary: &'static str,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub(crate) struct RepairCandidateTarget {
-    pub(crate) file: String,
-    pub(crate) range: RepairCandidateRange,
+pub struct RepairCandidateTarget {
+    pub file: String,
+    pub range: RepairCandidateRange,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub(crate) struct RepairCandidateRange {
-    pub(crate) start: RepairCandidatePosition,
-    pub(crate) end: RepairCandidatePosition,
+pub struct RepairCandidateRange {
+    pub start: RepairCandidatePosition,
+    pub end: RepairCandidatePosition,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub(crate) struct RepairCandidatePosition {
-    pub(crate) line: usize,
-    pub(crate) column: usize,
+pub struct RepairCandidatePosition {
+    pub line: usize,
+    pub column: usize,
 }
 
 #[derive(Clone, Debug, Serialize, PartialEq, Eq)]
-pub(crate) struct RepairEvidenceMovement {
-    pub(crate) slot: &'static str,
-    pub(crate) from: &'static str,
-    pub(crate) to: &'static str,
+pub struct RepairEvidenceMovement {
+    pub slot: &'static str,
+    pub from: &'static str,
+    pub to: &'static str,
 }
 
 pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {

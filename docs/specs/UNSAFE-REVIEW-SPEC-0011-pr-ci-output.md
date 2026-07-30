@@ -640,6 +640,9 @@ LSP `Error` severity in the default advisory projection.
 
 Code actions must be command-only. They must not include `WorkspaceEdit` or
 source-edit fields in the action or nested payloads.
+The `agent-packet` action payload may carry the canonical typed
+`repair_candidates` array from the ReviewCard-derived agent projection; it is
+advisory data and must not be interpreted as an applied edit.
 `copyWitnessCommand` actions must copy only a command already projected from the
 same ReviewCard's verify commands.
 
@@ -707,6 +710,7 @@ missing_evidence
 agent_readiness
 bucket_reason
 context_command
+repair_candidates
 do_not_do
 trust_boundary
 ```

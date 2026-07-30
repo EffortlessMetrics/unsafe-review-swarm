@@ -48,6 +48,114 @@
         "bucket_reason": "safety_docs_evidence_missing",
         "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
+        "repair_candidates": [
+          {
+            "repair_id": "add-safety-contract",
+            "kind": "safety_docs",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the contract obligation remains undischarged"
+            ],
+            "allowed_change": "add or expose the local safety contract for this card's obligations",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "broad suppression",
+              "claiming a contract is proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "contract_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -91,6 +199,114 @@
         "bucket_reason": "reach_evidence_missing",
         "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
+        "repair_candidates": [
+          {
+            "repair_id": "add-safety-contract",
+            "kind": "safety_docs",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the contract obligation remains undischarged"
+            ],
+            "allowed_change": "add or expose the local safety contract for this card's obligations",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "broad suppression",
+              "claiming a contract is proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "contract_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -134,6 +350,114 @@
         "bucket_reason": "witness_receipt_missing",
         "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
         "applicable_edit": "add or expose the local safety contract for this card",
+        "repair_candidates": [
+          {
+            "repair_id": "add-safety-contract",
+            "kind": "safety_docs",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the contract obligation remains undischarged"
+            ],
+            "allowed_change": "add or expose the local safety contract for this card's obligations",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "broad suppression",
+              "claiming a contract is proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "contract_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -176,6 +500,114 @@
         },
         "bucket_reason": "human_review_required",
         "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
+        "repair_candidates": [
+          {
+            "repair_id": "add-safety-contract",
+            "kind": "safety_docs",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the contract obligation remains undischarged"
+            ],
+            "allowed_change": "add or expose the local safety contract for this card's obligations",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "broad suppression",
+              "claiming a contract is proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "contract_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",
@@ -218,6 +650,114 @@
         },
         "bucket_reason": "not_ready_for_automatic_repair",
         "context_command": "unsafe-review context UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1 --json",
+        "repair_candidates": [
+          {
+            "repair_id": "add-safety-contract",
+            "kind": "safety_docs",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the contract obligation remains undischarged"
+            ],
+            "allowed_change": "add or expose the local safety contract for this card's obligations",
+            "forbidden_substitutes": [
+              "SAFETY comment alone",
+              "broad suppression",
+              "claiming a contract is proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "contract_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "add-focused-test",
+            "kind": "test",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the owner or unsafe seam lacks focused test reach evidence"
+            ],
+            "allowed_change": "add or point to a focused test that exercises this owner or seam",
+            "forbidden_substitutes": [
+              "test mention without exercising the unsafe owner",
+              "broad suppression"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "test_reach_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "human_only",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          },
+          {
+            "repair_id": "attach-witness-receipt",
+            "kind": "witness_route",
+            "target": {
+              "file": "src/lib.rs",
+              "range": {
+                "start": {
+                  "line": 2,
+                  "column": 1
+                },
+                "end": {
+                  "line": 2,
+                  "column": 1
+                }
+              }
+            },
+            "preconditions": [
+              "the selected witness route remains unconfirmed"
+            ],
+            "allowed_change": "attach a scoped witness receipt after running the suggested command outside unsafe-review",
+            "forbidden_substitutes": [
+              "treating a suggested command as an executed witness",
+              "using an unrelated receipt as proof"
+            ],
+            "verification": [],
+            "expected_evidence_movement": [
+              {
+                "slot": "witness_receipt_coverage",
+                "from": "missing",
+                "to": "present"
+              }
+            ],
+            "applicability": "requires_witness",
+            "claim_boundary": "advisory repair candidate only; not a patch, execution result, witness receipt, proof, or safety claim"
+          }
+        ],
         "do_not_do": [
           "do not widen unsafe code without reducing the missing evidence",
           "do not suppress this card instead of adding, exposing, or explicitly waiving evidence",

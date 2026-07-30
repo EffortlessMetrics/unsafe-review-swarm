@@ -6,6 +6,10 @@ use serde::Serialize;
 use std::collections::BTreeMap;
 
 pub(crate) use queue::{AgentQueueProjection, AgentReadiness, card_has_scoped_repairs};
+pub use repairs::candidates::{
+    RepairCandidate, RepairCandidateApplicability, RepairCandidateKind, RepairCandidatePosition,
+    RepairCandidateRange, RepairCandidateTarget, RepairEvidenceMovement,
+};
 
 pub(crate) const DO_NOT_DO: &[&str] = &[
     "do not widen unsafe code without reducing the missing evidence",
