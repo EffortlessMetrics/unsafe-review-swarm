@@ -181,6 +181,30 @@ fn agent_packet_is_parseable_bounded_and_card_sourced() -> Result<(), String> {
     assert!(allowed_repairs.contains("alignment guard"));
     assert!(allowed_repairs.contains("unaligned operation"));
     assert!(allowed_repairs.contains("witness receipt"));
+    let repair_candidates = value["repair_candidates"]
+        .as_array()
+        .ok_or("repair_candidates should be an array when typed candidates exist")?;
+    let guard_candidate = repair_candidates
+        .iter()
+        .find(|candidate| candidate["repair_id"] == "add-raw_pointer_read-alignment-guard")
+        .ok_or("raw-pointer fixture should expose a typed alignment candidate")?;
+    assert_eq!(
+        guard_candidate["repair_id"],
+        "add-raw_pointer_read-alignment-guard"
+    );
+    assert_eq!(guard_candidate["target"]["file"], "src/lib.rs");
+    assert_eq!(guard_candidate["target"]["range"]["start"]["line"], 8);
+    assert_eq!(guard_candidate["applicability"], "candidate");
+    assert_eq!(
+        guard_candidate["expected_evidence_movement"][0]["slot"],
+        "guard_coverage"
+    );
+    assert!(
+        guard_candidate["claim_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a patch")
+    );
     assert_eq!(value["repair_scope"], "this card only");
     let witness_routes = value["witness_routes"]
         .as_array()
@@ -848,6 +872,7 @@ fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), Strin
     assert!(!allowed_repairs.contains("same raw pointer"));
     assert!(!allowed_repairs.contains("all-zero bit pattern"));
     assert!(!allowed_repairs.contains("target_feature"));
+    assert!(value["repair_candidates"].is_null());
     assert_eq!(value["agent_readiness"]["ready"], false);
     assert_eq!(value["agent_readiness"]["state"], "requires_human_review");
     let reasons = serde_json::to_string(&value["agent_readiness"]["reasons"])

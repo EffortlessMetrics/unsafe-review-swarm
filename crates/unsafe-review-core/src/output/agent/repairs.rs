@@ -1,6 +1,7 @@
 use super::queue::AllowedRepairs;
 use crate::domain::ReviewCard;
 
+pub(super) mod candidates;
 mod card_missing;
 mod common;
 mod operation;
@@ -19,5 +20,6 @@ pub(super) fn build(card: &ReviewCard) -> AllowedRepairs {
     AllowedRepairs {
         repairs: common::dedupe_preserve_order(repairs),
         has_card_scoped_repairs,
+        candidates: candidates::build(card),
     }
 }

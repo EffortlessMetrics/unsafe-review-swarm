@@ -113,7 +113,7 @@ name = "repair_applicability"
 canonical_source = "output/agent/queue.rs::repair_queue_projection (AgentQueueProjection)"
 surfaces = ["json", "repair_queue", "lsp", "agent", "pr_summary", "github_summary"]
 single_truth = true
-note = "Buckets, bounded allowed-repair hints, and readiness are derived from the shared repair projection. The repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
+note = "Buckets, bounded allowed-repair hints, typed repair candidates, and readiness are derived from the shared repair projection. The repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
 
 [[field]]
 name = "freshness_identity"
