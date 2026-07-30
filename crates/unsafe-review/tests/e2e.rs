@@ -4448,6 +4448,51 @@ fn check_reports_output_write_failure_without_partial_artifact() -> Result<(), B
     Ok(())
 }
 
+// Regression coverage for the missing-manifest / partial-workspace row of issue
+// #1883. unsafe-review is syntax-first and build-free by design, so a scan root
+// with no `Cargo.toml` must not error or silently produce nothing: the analyzer
+// still discovers the `.rs` source and its unsafe site. Removing the manifest
+// must not change the detection result versus a manifested run.
+#[test]
+fn check_analyzes_manifest_less_root_without_error() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-no-manifest-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+
+    // Remove the workspace manifest, leaving only the source tree and the diff.
+    fs::remove_file(temp.path().join("Cargo.toml"))?;
+
+    let cards_out = temp.path().join("cards.json");
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "a manifest-less root is a supported syntax-first scan target, not an error"
+    );
+
+    // The unsafe site is still detected without a manifest -- identical to the
+    // manifested run (this fixture yields exactly one card).
+    let cards = parse_json(&fs::read_to_string(&cards_out)?)?;
+    assert_eq!(
+        cards["summary"]["cards"], 1,
+        "removing the manifest must not change the detection result"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
