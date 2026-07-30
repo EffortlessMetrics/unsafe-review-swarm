@@ -286,6 +286,47 @@ mod tests {
     }
 
     #[test]
+    fn duplicated_file_headers_merge_deterministically_into_one_entry() -> Result<(), String> {
+        // Hostile-input regression coverage for the duplicated / conflicting
+        // file-header row of issue #1883. A diff that names the same file in two
+        // separate `diff --git` / `+++ b/` blocks must not double-count the file
+        // or drop either block's changed lines: the parser keys the index by
+        // path and merges the line sets (`entry(path).or_default()` preserves
+        // the existing set), so the result is one entry carrying the union of
+        // both blocks' lines. This pins that the merge is deterministic rather
+        // than last-block-wins or a duplicate entry.
+        let diff = concat!(
+            "diff --git a/src/lib.rs b/src/lib.rs\n",
+            "--- a/src/lib.rs\n",
+            "+++ b/src/lib.rs\n",
+            "@@ -0,0 +1,1 @@\n",
+            "+first block change\n",
+            "diff --git a/src/lib.rs b/src/lib.rs\n",
+            "--- a/src/lib.rs\n",
+            "+++ b/src/lib.rs\n",
+            "@@ -0,0 +5,1 @@\n",
+            "+second block change\n",
+        );
+        let index = load_diff_index(&DiffSource::Text(diff.to_string()))?;
+
+        assert_eq!(
+            index.changed_file_count(),
+            1,
+            "a file named in two header blocks must be indexed exactly once"
+        );
+        let path = std::path::PathBuf::from("src/lib.rs");
+        assert!(
+            index.contains_in_range(&path, 1, 1),
+            "the first block's changed line must survive the merge"
+        );
+        assert!(
+            index.contains_in_range(&path, 5, 5),
+            "the second block's changed line must survive the merge"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
