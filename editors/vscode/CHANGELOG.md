@@ -11,10 +11,14 @@
 - Settings: `unsafeReview.bundlePath`, `unsafeReview.autoRefreshOnSave`,
   `unsafeReview.maxDiagnosticsPerFile`.
 - Commands: Refresh Bundle, Open PR Summary, Open Witness Plan, Copy Agent
-  Packet Command, Copy Witness Command. All actions are `Empty` kind; no
+  Packet, Copy Witness Command, and structured related-test / witness-route
+  actions. All actions are command-only; no
   `WorkspaceEdit` / `TextEdit` is ever issued.
 - Unit tests for the bundle parser (no `vscode` mock required) run via
   `node --test`.
+- A compiled extension-host smoke harness covers activation, adjacent
+  card-scoped hovers/actions, human-only readiness, stale or missing packets,
+  and diagnostic-cap visibility.
 - Non-goals (unchanged): no live LSP server, no analyzer subprocess
   invocation, no witness execution, no source edits, no PR comment posting,
   no telemetry, no memory-safety / UB-free / Miri-clean / site-execution
