@@ -370,6 +370,10 @@ mod tests {
             index.contains_in_range(&esc_path, 1, 1),
             "ESC-control path must be indexed under its literal key"
         );
+        assert!(
+            !index.contains_in_range(&std::path::PathBuf::from("src/ec.rs"), 1, 1),
+            "the ESC must not be silently stripped to a normal path"
+        );
         Ok(())
     }
 
