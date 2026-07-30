@@ -62,7 +62,9 @@ pub(crate) struct RepairEvidenceMovement {
 }
 
 pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
-    if !supports_bounded_candidates(&card.operation.family) {
+    if !supports_bounded_candidates(&card.operation.family)
+        && !supports_human_only_contract_candidate(&card.operation.family)
+    {
         return Vec::new();
     }
 
@@ -251,6 +253,10 @@ fn supports_bounded_candidates(family: &OperationFamily) -> bool {
     )
 }
 
+fn supports_human_only_contract_candidate(family: &OperationFamily) -> bool {
+    matches!(family, OperationFamily::UnsafeDeclaration)
+}
+
 fn supports_guard_candidate(family: &OperationFamily, key: &str) -> bool {
     match family {
         OperationFamily::RawPointerDeref
@@ -408,6 +414,60 @@ mod tests {
             .ok_or_else(|| "guard gap should produce a typed candidate".to_string())?;
 
         assert_eq!(guard.applicability, RepairCandidateApplicability::HumanOnly);
+        Ok(())
+    }
+
+    #[test]
+    fn public_unsafe_declaration_contract_candidate_is_human_only() -> Result<(), String> {
+        let mut card = candidate_card();
+        card.operation.family = OperationFamily::UnsafeDeclaration;
+        card.missing = vec![MissingEvidence::new(
+            "contract",
+            "public unsafe declaration is missing a safety contract",
+        )];
+
+        let contract = build(&card)
+            .into_iter()
+            .find(|candidate| candidate.kind == RepairCandidateKind::SafetyDocs)
+            .ok_or_else(|| "unsafe declaration should expose a contract candidate".to_string())?;
+
+        assert_eq!(contract.repair_id, "add-safety-contract");
+        assert_eq!(
+            contract.applicability,
+            RepairCandidateApplicability::HumanOnly
+        );
+        assert_eq!(
+            contract.expected_evidence_movement[0].slot,
+            "contract_coverage"
+        );
+        assert!(contract.allowed_change.contains("safety contract"));
+        Ok(())
+    }
+
+    #[test]
+    fn focused_test_candidate_tracks_reach_evidence() -> Result<(), String> {
+        let mut card = candidate_card();
+        card.missing.push(MissingEvidence::new(
+            "reach",
+            "no focused test reaches the unsafe owner",
+        ));
+
+        let test_candidate = build(&card)
+            .into_iter()
+            .find(|candidate| candidate.kind == RepairCandidateKind::Test)
+            .ok_or_else(|| "reach gap should produce a typed test candidate".to_string())?;
+
+        assert_eq!(test_candidate.repair_id, "add-focused-test");
+        assert_eq!(
+            test_candidate.expected_evidence_movement[0].slot,
+            "test_reach_coverage"
+        );
+        assert!(
+            test_candidate
+                .forbidden_substitutes
+                .iter()
+                .any(|item| { item.contains("without exercising the unsafe owner") })
+        );
         Ok(())
     }
 }

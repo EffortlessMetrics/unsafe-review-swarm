@@ -889,6 +889,39 @@ fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), Strin
 }
 
 #[test]
+fn agent_packet_exposes_human_only_safety_docs_candidate_for_unsafe_declaration()
+-> Result<(), String> {
+    let output = fixture_output("public_unsafe_fn_safety_comment_not_docs")?;
+    let card = output
+        .cards
+        .iter()
+        .find(|card| card.operation.family == crate::domain::OperationFamily::UnsafeDeclaration)
+        .ok_or_else(|| "fixture should emit an unsafe declaration card".to_string())?;
+    let value = parse_json(&render(card))?;
+    let candidates = value["repair_candidates"]
+        .as_array()
+        .ok_or("unsafe declaration should expose typed candidates")?;
+    let contract = candidates
+        .iter()
+        .find(|candidate| candidate["kind"] == "safety_docs")
+        .ok_or("unsafe declaration should expose a safety-docs candidate")?;
+
+    assert_eq!(contract["applicability"], "human_only");
+    assert_eq!(contract["target"]["file"], "src/lib.rs");
+    assert_eq!(
+        contract["expected_evidence_movement"][0]["slot"],
+        "contract_coverage"
+    );
+    assert!(
+        contract["claim_boundary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("not a patch")
+    );
+    Ok(())
+}
+
+#[test]
 fn agent_packet_scopes_unsafe_fn_call_repairs_to_callee_contract() -> Result<(), String> {
     let output = fixture_output("unsafe_fn_call_wrapper")?;
     let Some(card) = output.cards.first() else {

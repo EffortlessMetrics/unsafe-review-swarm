@@ -69,11 +69,14 @@ top-level `card_id`, `required_safety_conditions`, `missing`, and string-array
 and aggregate `applicable_edit` remain compatibility projections; consumers must
 not parse their prose to recover typed repair intent.
 
-The initial typed candidate projection is deliberately narrow. It is derived
+The typed candidate projection is deliberately narrow. It is derived
 from the same ReviewCard operation family and obligation evidence as the legacy
 repair projection, and it does not parse `allowed_repairs` prose. Candidate
 `kind` values are `safety_docs`, `guard`, `test`, and `witness_route`.
 Applicability is one of `candidate`, `human_only`, or `requires_witness`.
+Public unsafe-declaration contract gaps may emit a `safety_docs` candidate, but
+their applicability is always `human_only`; this makes the review boundary
+explicit without presenting the declaration as an automatic repair task.
 Ambiguous FFI, assembly, concurrency, ownership, and semantic families remain
 without typed candidates until a later representative-family lane establishes
 their evidence contract. A typed candidate is still advisory intent: it never
