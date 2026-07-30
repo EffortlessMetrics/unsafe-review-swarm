@@ -115,7 +115,8 @@ Diagnostics are taken directly from the saved projection. The MVP must:
 
 The extension may cap diagnostics per file at `unsafeReview.maxDiagnosticsPerFile`
 to keep editor UI responsive on very noisy bundles; capping always discards
-extras, never reorders.
+extras, never reorders, and reports the hidden count in the status bar and
+Output channel with the configured bundle path for the complete set.
 
 ## Code actions shape
 

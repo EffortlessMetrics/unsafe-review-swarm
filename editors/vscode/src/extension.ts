@@ -8,6 +8,7 @@ import {
   BundleHover,
   BundleParseError,
   BundleRange,
+  diagnosticCapSummaries,
   ParsedBundle,
   capDiagnosticsPerFile,
   diagnosticsByFile,
@@ -219,25 +220,38 @@ async function refreshBundle(): Promise<void> {
 
   adapter.bundle = parsed;
   adapter.bundleRoot = folder.uri.fsPath;
-  applyDiagnostics(parsed, settings, folder);
+  const hiddenDiagnostics = applyDiagnostics(parsed, settings, folder);
   applyHovers(parsed, folder);
   applyCodeActions(parsed, folder);
 
-  setStatus(parsed.status.message, parsed.status.trustBoundary);
+  const capNotice = hiddenDiagnostics === 0
+    ? ""
+    : ` (${hiddenDiagnostics} diagnostic(s) hidden by per-file cap; complete bundle: ${settings.bundlePath})`;
+  setStatus(`${parsed.status.message}${capNotice}`, parsed.status.trustBoundary);
 }
 
 function applyDiagnostics(
   bundle: ParsedBundle,
   settings: AdapterSettings,
   folder: vscode.WorkspaceFolder,
-): void {
+): number {
   if (adapter === undefined) {
-    return;
+    return 0;
   }
   adapter.diagnosticsCollection.clear();
   adapter.diagnosticsByCardId.clear();
 
   const capped = capDiagnosticsPerFile(bundle.diagnostics, settings.maxDiagnosticsPerFile);
+  const capSummaries = diagnosticCapSummaries(bundle.diagnostics, settings.maxDiagnosticsPerFile);
+  for (const summary of capSummaries) {
+    if (summary.hidden === 0) {
+      continue;
+    }
+    adapter.output.appendLine(
+      `bundle warning: ${summary.hidden} diagnostic(s) hidden for ${summary.path} by ` +
+      `maxDiagnosticsPerFile=${settings.maxDiagnosticsPerFile}; complete set remains in ${settings.bundlePath}`,
+    );
+  }
   const grouped = diagnosticsByFile(capped);
   for (const [relativePath, list] of grouped) {
     const absolute = resolveWorkspaceFile(folder, relativePath);
@@ -259,6 +273,7 @@ function applyDiagnostics(
     });
     adapter.diagnosticsCollection.set(uri, diags);
   }
+  return capSummaries.reduce((hidden, summary) => hidden + summary.hidden, 0);
 }
 
 function applyHovers(bundle: ParsedBundle, folder: vscode.WorkspaceFolder): void {

@@ -21,6 +21,8 @@ test, or witness. It does not prove the code free of UB.
 - Loads `${workspace}/target/unsafe-review/lsp.json` on activation and on
   request.
 - Publishes diagnostics from the saved `diagnostics[]` entries.
+- Reports any per-file diagnostic cap in the status bar and Output channel,
+  including the configured bundle path containing the complete set.
 - Renders hovers from the saved `hovers[]` entries, ensuring the trust boundary
   is present as a footer.
 - Registers per-card command-only actions from the saved `code_actions[]` and
@@ -62,7 +64,7 @@ for the long-form contract for the eventual live-LSP extension.
 |---|---|---|
 | `unsafeReview.bundlePath` | `target/unsafe-review/lsp.json` | Workspace-relative path to the saved bundle. |
 | `unsafeReview.autoRefreshOnSave` | `false` | Re-read the bundle when it changes on disk. |
-| `unsafeReview.maxDiagnosticsPerFile` | `200` | Discards extras for editor UI responsiveness. The full bundle remains on disk. |
+| `unsafeReview.maxDiagnosticsPerFile` | `200` | Discards extras for editor UI responsiveness, reports the hidden count, and keeps the full bundle on disk. |
 
 ## Refresh flow
 
