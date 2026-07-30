@@ -2214,4 +2214,66 @@ mod tests {
 
         Ok(())
     }
+
+    /// Cross-consumer contract lock (issue #1880 PR2): the advisory
+    /// trust-boundary string is a single canonical constant
+    /// (`REVIEWCARD_TRUST_BOUNDARY`), but `cards.json`, the agent packet, the
+    /// saved LSP projection, and SARIF each embed their own copy of it. Nothing
+    /// today would catch one surface emitting a different, weaker, or
+    /// overclaiming boundary string while the others stayed correct -- which
+    /// would be a claim-boundary regression, not merely field drift. This test
+    /// proves all four surfaces emit the identical canonical string for one
+    /// fixture card and that it is exactly `REVIEWCARD_TRUST_BOUNDARY`. It
+    /// asserts wording parity only; it makes no memory-safety, UB-free,
+    /// Miri-clean, or site-execution claim of its own.
+    #[test]
+    fn trust_boundary_is_identical_across_json_agent_lsp_and_sarif_surfaces() -> Result<(), String>
+    {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output.cards.first().ok_or("fixture should emit one card")?;
+
+        // Surface 1: cards.json top-level trust_boundary.
+        let json_value = parse_json(&render(&output))?;
+        let json_tb = json_value["trust_boundary"]
+            .as_str()
+            .ok_or("cards.json trust_boundary must be a string")?;
+
+        // Surface 2: agent packet top-level trust_boundary.
+        let agent_value = parse_json(&crate::output::agent::render(card))?;
+        let agent_tb = agent_value["trust_boundary"]
+            .as_str()
+            .ok_or("agent packet trust_boundary must be a string")?;
+
+        // Surface 3: saved LSP top-level trust_boundary.
+        let lsp_value = parse_json(&crate::output::lsp::render(&output))?;
+        let lsp_tb = lsp_value["trust_boundary"]
+            .as_str()
+            .ok_or("lsp trust_boundary must be a string")?;
+
+        // Surface 4: SARIF run-level trust boundary (camelCase property).
+        let sarif_value = parse_json(&crate::output::sarif::render(&output))?;
+        let sarif_tb = sarif_value["runs"][0]["properties"]["trustBoundary"]
+            .as_str()
+            .ok_or("sarif runs[0].properties.trustBoundary must be a string")?;
+
+        assert_eq!(
+            json_tb, agent_tb,
+            "cards.json and agent packet trust_boundary must be identical"
+        );
+        assert_eq!(
+            json_tb, lsp_tb,
+            "cards.json and lsp trust_boundary must be identical"
+        );
+        assert_eq!(
+            json_tb, sarif_tb,
+            "cards.json and sarif trust_boundary must be identical"
+        );
+        assert_eq!(
+            json_tb,
+            crate::output::REVIEWCARD_TRUST_BOUNDARY,
+            "every surface must emit the canonical REVIEWCARD_TRUST_BOUNDARY string"
+        );
+
+        Ok(())
+    }
 }
