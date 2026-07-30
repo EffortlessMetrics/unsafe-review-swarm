@@ -4268,6 +4268,75 @@ fn check_reports_non_utf8_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+// Hostile-input regression coverage for the path-traversal / absolute-path row
+// of issue #1883. A diff whose changed-file header names a `../` traversal path
+// (here pointing outside the scan root, at a `.rs` file that WOULD be analyzed
+// if the tool ever opened diff paths) must be accepted without crashing, but it
+// must not pull any out-of-root file into analysis: the diff index is only ever
+// matched against files discovered under the root, so a foreign path surfaces
+// zero cards. This pins the "path traversal cannot escape configured roots"
+// contract at the CLI boundary.
+#[test]
+fn check_accepts_traversal_diff_path_without_escaping_root() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-traversal-diff-e2e")?;
+    copy_dir_all(&fixture, temp.path())?;
+
+    // The diff's only changed file is a traversal path escaping the root, with
+    // added unsafe code. The root itself still contains a real unsafe site
+    // (src/lib.rs), but it is not named by this diff.
+    let traversal_diff = temp.path().join("traversal.diff");
+    fs::write(
+        &traversal_diff,
+        concat!(
+            "diff --git a/../../../../etc/passwd.rs b/../../../../etc/passwd.rs\n",
+            "--- a/../../../../etc/passwd.rs\n",
+            "+++ b/../../../../etc/passwd.rs\n",
+            "@@ -0,0 +1,3 @@\n",
+            "+pub unsafe fn escaped() {\n",
+            "+    let _p = core::ptr::null::<u8>();\n",
+            "+}\n",
+        ),
+    )?;
+
+    let cards_out = temp.path().join("cards.json");
+
+    let output = run_success([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        traversal_diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        cards_out.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "a traversal diff path is valid input and must not fail the run"
+    );
+
+    // The foreign path matched no discovered file, so no cards were produced --
+    // the tool did not follow the traversal path out of the root.
+    let cards = parse_json(&fs::read_to_string(&cards_out)?)?;
+    assert_eq!(
+        cards["summary"]["cards"], 0,
+        "a traversal diff path must not surface any cards"
+    );
+    let cards_array = cards["cards"]
+        .as_array()
+        .ok_or("cards.json cards must be an array")?;
+    assert!(
+        cards_array.is_empty(),
+        "no card should reference an out-of-root traversal path"
+    );
+
+    Ok(())
+}
+
 #[test]
 fn check_reports_unparseable_diff_as_cli_failure() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
