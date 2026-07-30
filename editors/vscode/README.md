@@ -84,6 +84,7 @@ unsafe-review first-pr --base origin/main
 npm ci
 npm run compile
 npm test
+npm run smoke:extension-host
 npx @vscode/vsce package --out ../../target/unsafe-review-vscode.vsix
 ```
 

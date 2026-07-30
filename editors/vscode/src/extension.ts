@@ -8,6 +8,7 @@ import {
   BundleHover,
   BundleParseError,
   BundleRange,
+  BundleStructuredObject,
   diagnosticCapSummaries,
   ParsedBundle,
   capDiagnosticsPerFile,
@@ -452,13 +453,25 @@ class BundleCodeActionProvider implements vscode.CodeActionProvider {
         action.command = {
           title: candidate.title,
           command: extensionCommand,
-          arguments: [candidate.commandArguments ?? candidate.payload ?? {}],
+          arguments: [commandArgumentsFor(candidate)],
         };
       }
       actions.push(action);
     }
     return actions;
   }
+}
+
+function commandArgumentsFor(candidate: BundleCodeAction): BundleStructuredObject {
+  const argumentsValue: BundleStructuredObject = candidate.commandArguments ??
+    (candidate.payload === undefined ? {} : { ...candidate.payload });
+  if (candidate.actionId !== "agent-packet") {
+    return argumentsValue;
+  }
+  return {
+    ...argumentsValue,
+    agent_packet: candidate.payload?.agentPacket,
+  };
 }
 
 function toBundleRange(range: vscode.Range): BundleRange {

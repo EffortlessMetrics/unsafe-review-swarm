@@ -87,7 +87,8 @@
   "scripts": {
     "compile": "tsc -p ./",
     "watch": "tsc -watch -p ./",
-    "test": "node --test out/test/*.test.js"
+    "test": "node --test out/test/*.test.js",
+    "smoke:extension-host": "node scripts/extension-host-smoke.cjs"
   },
   "devDependencies": {
     "@types/node": "^20.17.57",

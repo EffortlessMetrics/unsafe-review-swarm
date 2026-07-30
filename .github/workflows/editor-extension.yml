@@ -47,6 +47,9 @@ jobs:
       - name: Run extension unit tests
         run: npm test
 
+      - name: Run extension host smoke
+        run: npm run smoke:extension-host
+
       - name: Package VSIX
         run: |
           mkdir -p ../../target
