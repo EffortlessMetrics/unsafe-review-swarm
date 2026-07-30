@@ -30,11 +30,11 @@ external snapshots and diffs are never checked into the swarm repo.
 | Measure | Count |
 |---|---:|
 | Repositories | 17 |
-| Total targets | 42 |
-| Capped repo snapshots | 17 |
+| Total targets | 43 |
+| Capped repo snapshots | 18 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
-| Holdout targets | 2 |
+| Holdout targets | 3 |
 | Checked-in scan outputs | 0 |
 
 ## Selected Judgment Sample
@@ -88,7 +88,7 @@ Selected real-crate targets:
 | `matklad/once_cell` | 1 | 0 | Unsafe fn call, raw pointer dereference, and unsafe impl cards including witness-receipt-routing cases; fresh-crate capstone |
 | `Amanieu/parking_lot` | 1 | 0 | Unsafe fn call, unsafe impl, raw pointer dereference, and pointer arithmetic cards; fresh-crate capstone |
 | `nix-rust/nix` | 1 | 0 | FFI/extern unsafe fn call and cfg-gated platform-branch cards; control-plane validation |
-| `rusticstuff/simdutf8` | 1 | 0 | SIMD `target_feature` unsafe fn call and intrinsic cards; control-plane validation |
+| `rusticstuff/simdutf8` | 2 | 0 | SIMD `target_feature` unsafe fn call, intrinsic, and unchecked UTF-8 cards; control-plane validation and release-readiness holdout |
 | `google/zerocopy` | 1 | 0 | Raw pointer dereference, `transmute`, and byte-cast cards; control-plane validation |
 | `rust-random/getrandom` | 1 | 0 | Release-readiness holdout for platform RNG unsafe declarations, FFI-style bindings, and raw pointer cards; recorded before tuning |
 
@@ -119,6 +119,7 @@ Selected real-crate targets:
 - `zerocopy-capped`
 - `getrandom-holdout` (holdout; run only with explicit release-readiness opt-in)
 - `portable-atomic-holdout` (holdout; run only with explicit release-readiness opt-in)
+- `simdutf8-holdout` (holdout; run only with explicit release-readiness opt-in)
 
 ### PR Diffs
 
@@ -181,7 +182,7 @@ them by default; run a holdout target only with an explicit opt-in:
 
 ```bash
 cargo run --locked -p xtask -- dogfood-exec \
-  --target portable-atomic-holdout --include-holdout --strict
+  --target simdutf8-holdout --include-holdout --strict
 ```
 
 Update this index only when the corpus manifest or recorded outcome evidence
