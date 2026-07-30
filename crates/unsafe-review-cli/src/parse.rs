@@ -403,6 +403,21 @@ fn parse_baseline_init(args: Vec<String>) -> Result<BaselineInitOptions, String>
             arg if arg.starts_with("--review-after=") => {
                 options.review_after = Some(parse_inline_iso_date_value(arg, "--review-after")?);
             }
+            "--dry-run" => options.dry_run = true,
+            "--json" => options.format = Format::Json,
+            "--format" => {
+                idx += 1;
+                options.format = human_or_json_format(
+                    parse_format(value(&args, idx, "--format")?)?,
+                    "baseline init",
+                )?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = human_or_json_format(
+                    parse_format(inline_value(arg, "--format")?)?,
+                    "baseline init",
+                )?;
+            }
             other => return Err(format!("unknown baseline init argument `{other}`")),
         }
         idx += 1;
@@ -3891,6 +3906,41 @@ mod tests {
         assert_eq!(options.root, PathBuf::from("."));
         assert_eq!(options.format, Format::Human);
         Ok(())
+    }
+
+    #[test]
+    fn parses_baseline_init_preview_and_json_format() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "baseline",
+            "init",
+            "--dry-run",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Baseline(BaselineCommand::Init(options)) = command else {
+            return Err("expected baseline init command".to_string());
+        };
+        assert!(options.dry_run);
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn baseline_init_rejects_non_human_json_format() {
+        let err = parse(args([
+            "unsafe-review",
+            "baseline",
+            "init",
+            "--format",
+            "sarif",
+        ]))
+        .err()
+        .unwrap_or_default();
+        assert!(
+            err.contains("baseline init only supports human or json output"),
+            "{err}"
+        );
     }
 
     #[test]

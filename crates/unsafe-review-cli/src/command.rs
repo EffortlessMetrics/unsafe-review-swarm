@@ -248,6 +248,10 @@ pub(crate) struct BaselineInitOptions {
     pub out: Option<PathBuf>,
     /// Override the default `review_after` date (ISO 8601 YYYY-MM-DD).
     pub review_after: Option<String>,
+    /// Preview the baseline plan without writing the ledger or snapshot.
+    pub dry_run: bool,
+    /// Output encoding for the baseline plan/result.
+    pub format: Format,
 }
 
 impl Default for BaselineInitOptions {
@@ -256,6 +260,8 @@ impl Default for BaselineInitOptions {
             root: PathBuf::from("."),
             out: None,
             review_after: None,
+            dry_run: false,
+            format: Format::Human,
         }
     }
 }

@@ -58,6 +58,12 @@ the existing required fields (`card_id`, `owner`, `reason`, `evidence`,
 `review_after` date. `baseline init` never marks anything safe; it records that a
 gap pre-existed.
 
+`baseline init --dry-run` previews this same plan without writing the ledger or
+snapshot. The preview is read-only and may use `--format json` for automation;
+human and JSON output carry the same card identities, locations, proposed paths,
+and advisory trust boundary. The default `baseline init` apply behavior is
+unchanged and remains explicit.
+
 The coverage snapshot is written as a sibling of the ledger, derived from the
 ledger file name (`<ledger-stem>-snapshot.toml`). The default ledger path keeps
 the canonical `policy/unsafe-review-baseline-snapshot.toml`; a custom `--out`
