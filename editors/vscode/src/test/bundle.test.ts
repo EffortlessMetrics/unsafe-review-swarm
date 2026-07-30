@@ -8,6 +8,9 @@ import {
   capDiagnosticsPerFile,
   diagnosticsByFile,
   parseBundle,
+  positionInRange,
+  rangesEqual,
+  rangesIntersect,
   resolveWorkspaceFilePath,
   supportedDiagnosticSeverity,
 } from "../bundle";
@@ -125,6 +128,11 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
     ...MINIMAL_BUNDLE,
     schema_version: "0.2",
     analysis,
+    hovers: [{
+      ...MINIMAL_BUNDLE.hovers[0],
+      analysis,
+      range: MINIMAL_BUNDLE.diagnostics[0].range,
+    }],
     code_actions: [{
       action_id: "agent-packet",
       title: "Copy bounded unsafe-review agent packet",
@@ -145,6 +153,34 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
   assert.equal(result.codeActions[0].command, "unsafe-review.collectAgentPacket");
   assert.equal(result.codeActions[0].payload?.readiness, "ready_for_agent");
   assert.deepEqual(result.codeActions[0].commandArguments?.["analysis"], analysis);
+  assert.deepEqual(result.hovers[0].analysis, analysis);
+  assert.deepEqual(result.hovers[0].range, MINIMAL_BUNDLE.diagnostics[0].range);
+});
+
+test("canonical hovers reject cross-card or cross-analysis identity drift", () => {
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
+  const hover = {
+    ...MINIMAL_BUNDLE.hovers[0],
+    analysis,
+    range: MINIMAL_BUNDLE.diagnostics[0].range,
+  };
+  const wrongCard = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis,
+    hovers: [{ ...hover, card_id: "UR-other" }],
+  }));
+  assert.equal(wrongCard.hovers.length, 0);
+  assert.match(wrongCard.warnings[0], /inconsistent canonical identity/);
+
+  const wrongAnalysis = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis,
+    hovers: [{ ...hover, analysis: { ...analysis, generation: 2 } }],
+  }));
+  assert.equal(wrongAnalysis.hovers.length, 0);
+  assert.match(wrongAnalysis.warnings[0], /inconsistent canonical identity/);
 });
 
 test("parseBundle preserves the committed canonical saved diagnostic fields", async () => {
@@ -432,6 +468,17 @@ test("capDiagnosticsPerFile caps per file and preserves order", () => {
 test("capDiagnosticsPerFile returns input when cap is non-positive", () => {
   const diagnostics = [sampleDiagnostic("x")];
   assert.equal(capDiagnosticsPerFile(diagnostics, 0).length, 1);
+});
+
+test("range binding uses containment and intersection instead of proximity", () => {
+  const range = { start: { line: 7, character: 4 }, end: { line: 7, character: 42 } };
+  assert.equal(positionInRange({ line: 7, character: 4 }, range), true);
+  assert.equal(positionInRange({ line: 7, character: 42 }, range), true);
+  assert.equal(positionInRange({ line: 7, character: 3 }, range), false);
+  assert.equal(positionInRange({ line: 8, character: 4 }, range), false);
+  assert.equal(rangesIntersect(range, { start: { line: 7, character: 20 }, end: { line: 7, character: 21 } }), true);
+  assert.equal(rangesIntersect(range, { start: { line: 8, character: 0 }, end: { line: 8, character: 1 } }), false);
+  assert.equal(rangesEqual(range, { ...range, start: { ...range.start } }), true);
 });
 
 test("resolveWorkspaceFilePath keeps paths inside workspace", () => {

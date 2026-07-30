@@ -99,8 +99,8 @@ Diagnostics are taken directly from the saved projection. The MVP must:
 
 - preserve the canonical ReviewClass/rule `code` in `Diagnostic.code` (string),
 - retain `card_id` in the parsed adapter diagnostic and card-scoped action
-  payloads; exact diagnostic-to-card selection remains the separate #1910
-  binding lane,
+  payloads; hovers and actions bind to the exact saved card/range/analysis
+  identity rather than selecting by nearby lines,
 - use the projection's `severity` field and skip missing or unsupported
   severity values with an output warning,
 - preserve `source` as the literal string `unsafe-review`,

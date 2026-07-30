@@ -118,7 +118,11 @@ impl<'a> From<&'a AnalyzeOutput> for LspProjection<'a> {
             scope: scope_label(output),
             status: status_for(output),
             diagnostics: diagnostics_for(output),
-            hovers: output.cards.iter().map(LspHover::from).collect(),
+            hovers: output
+                .cards
+                .iter()
+                .map(|card| LspHover::from_card(card, &output.analysis_identity))
+                .collect(),
             code_actions: output
                 .cards
                 .iter()
@@ -406,19 +410,23 @@ impl From<&WitnessRoute> for EditorWitnessRoute {
 
 #[derive(Serialize)]
 struct LspHover<'a> {
+    analysis: &'a AnalysisIdentity,
     card_id: &'a str,
     path: String,
     position: EditorPosition,
+    range: EditorRange,
     contents: String,
     trust_boundary: &'static str,
 }
 
-impl<'a> From<&'a ReviewCard> for LspHover<'a> {
-    fn from(card: &'a ReviewCard) -> Self {
+impl<'a> LspHover<'a> {
+    fn from_card(card: &'a ReviewCard, analysis: &'a AnalysisIdentity) -> Self {
         Self {
+            analysis,
             card_id: &card.id.0,
             path: path_display(&card.site.location.file),
             position: position_for(card),
+            range: range_for(card),
             contents: hover::contents(card),
             trust_boundary: TRUST_BOUNDARY,
         }
