@@ -6,18 +6,18 @@
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
     "repositories": 18,
-    "targets": 45,
-    "repo_snapshots": 20,
+    "targets": 46,
+    "repo_snapshots": 21,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
     "partitions": {
       "conformance": 2,
       "regression": 38,
-      "holdout": 5
+      "holdout": 6
     },
     "artifact_statuses": {
-      "local_untracked": 45
+      "local_untracked": 46
     }
   },
   "repositories": [
@@ -71,9 +71,9 @@
     },
     {
       "repository": "tokio-rs/slab",
-      "snapshot_targets": ["slab-capped"],
+      "snapshot_targets": ["slab-capped", "slab-holdout"],
       "pr_diff_targets": [],
-      "primary_exercise": "Pointer arithmetic, unsafe fn call, and unsafe impl review cards; fresh-crate capstone validation"
+      "primary_exercise": "Pointer arithmetic, unsafe fn call, unsafe impl review cards, and a comparatively quiet release-readiness holdout; fresh-crate capstone validation"
     },
     {
       "repository": "Lokathor/bytemuck",

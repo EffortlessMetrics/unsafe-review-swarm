@@ -625,3 +625,17 @@ purpose = "release-readiness holdout repo snapshot for macro-heavy generated cod
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/rkyv-holdout --format json --max-cards 50 --out target/dogfood-work/rkyv-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/rkyv-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "slab-holdout"
+crate = "slab"
+repository = "tokio-rs/slab"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "a1e4346070a48c936d808de75191dee5d01e433c"
+root = "target/dogfood-work/slab-holdout"
+purpose = "release-readiness holdout repo snapshot for a comparatively quiet unsafe surface, pointer arithmetic, and unsafe implementation contracts; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/slab-holdout --format json --max-cards 50 --out target/dogfood-work/slab-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/slab-holdout.unsafe-review.json"]
