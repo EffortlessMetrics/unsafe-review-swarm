@@ -251,12 +251,29 @@
   ],
   "hovers": [
     {
+      "analysis": {
+        "analysis_id": "fixture-analysis-raw_pointer_alignment",
+        "generation": 0,
+        "scope": "diff",
+        "state": "current",
+        "tool_version": "0.3.8"
+      },
       "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
       "contents": "Card: `UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1`; priority `high`; confidence `medium`\n\nLocation: src/lib.rs:8\n\nWhy this card exists:\n- The changed code contains a `raw_pointer_read` unsafe operation that unsafe-review classifies as `guard_missing`.\n- Operation: `unsafe { ptr.cast::<Header>().read() }`\n\nProof path: `source_route_only`\n\nRelevant hazard families:\n- `pointer_validity`\n- `alignment`\n- `initialized_memory`\n- `same_allocation`\n\nRequired safety conditions:\n- pointer is live and dereferenceable for the accessed type\n- buffer has enough bytes for the accessed type\n- pointer is aligned for the accessed type\n- memory is initialized for the accessed type\n- access remains inside one live allocation\n\nEvidence found:\n- Contract [present]: Nearby `SAFETY:` comment was detected\n- Guard/discharge [missing]: Some inferred safety obligations are missing local guard evidence\n- Reach [owner_reached]: 1 related test file(s) mention owner `read_header`\n- Witness [missing]: No imported witness receipt was found\n\nEvidence missing:\n- Missing visible local guard for inferred safety obligations\n- No witness receipt imported for this card\n\nWhat would resolve this:\n- Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.\n\nVerify commands:\n- `cargo +nightly miri test read_header`\n- `cargo +nightly careful test read_header`\n\nWhat would not resolve this:\n- A `SAFETY:` comment alone does not discharge missing guard evidence.\n- A related test mention is not proof that this unsafe site executed.\n- Do not claim witness proof unless a matching receipt exists.\n- Do not widen unsafe scope, suppress the card, or change unrelated unsafe code to silence this review item.\n\nWitness route: `miri` because Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported.\n\nReach note: static related-test evidence does not prove the unsafe site executed.\n\nHandoff commands:\n- Explain: `unsafe-review explain UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1`\n- Agent context: `unsafe-review context UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1 --json`\n\nTrust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
       "path": "src/lib.rs",
       "position": {
         "character": 4,
         "line": 7
+      },
+      "range": {
+        "end": {
+          "character": 42,
+          "line": 7
+        },
+        "start": {
+          "character": 4,
+          "line": 7
+        }
       },
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     }

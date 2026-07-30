@@ -27,6 +27,18 @@ export interface BundleRange {
   end: BundleRangePosition;
 }
 
+export interface BundleAnalysisIdentity {
+  analysis_id: string;
+  generation: number;
+  tool_version: string;
+  scope: string;
+  base_commit?: string;
+  head_commit?: string;
+  document_version?: number;
+  file_digest?: string;
+  state: string;
+}
+
 export interface BundleCoverage {
   baselineState?: string;
   movement?: string;
@@ -72,9 +84,11 @@ export interface BundleDiagnostic {
 }
 
 export interface BundleHover {
+  analysis?: BundleAnalysisIdentity;
   cardId: string;
   path: string;
   position: BundleRangePosition;
+  range?: BundleRange;
   contents: string;
   trustBoundary?: string;
 }
@@ -148,7 +162,7 @@ export function parseBundle(text: string): ParsedBundle {
   const status = parseStatus(raw["status"], trustBoundary);
 
   const diagnostics = parseDiagnostics(raw["diagnostics"], warnings);
-  const hovers = parseHovers(raw["hovers"], warnings);
+  const hovers = parseHovers(raw["hovers"], warnings, schemaVersion, raw["analysis"], diagnostics);
   const codeActions = parseCodeActions(
     raw["code_actions"], warnings, schemaVersion, raw["analysis"], diagnostics, trustBoundary,
   );
@@ -286,7 +300,13 @@ function parseWitnessRoutes(value: unknown): BundleWitnessRoute[] | undefined {
   return out;
 }
 
-function parseHovers(value: unknown, warnings: string[]): BundleHover[] {
+function parseHovers(
+  value: unknown,
+  warnings: string[],
+  schemaVersion: string,
+  bundleAnalysis: unknown,
+  diagnostics: BundleDiagnostic[],
+): BundleHover[] {
   if (value === undefined || value === null) {
     return [];
   }
@@ -302,7 +322,8 @@ function parseHovers(value: unknown, warnings: string[]): BundleHover[] {
       continue;
     }
     const position = parsePosition(entry["position"]);
-    if (position === undefined) {
+    const range = parseRange(entry["range"]);
+    if (position === undefined && range === undefined) {
       warnings.push(`hover #${i} has no position; skipped`);
       continue;
     }
@@ -313,10 +334,35 @@ function parseHovers(value: unknown, warnings: string[]): BundleHover[] {
       warnings.push(`hover #${i} is missing path/card_id/contents; skipped`);
       continue;
     }
+    if (schemaVersion === "0.2") {
+      const analysis = isAnalysisIdentity(entry["analysis"]) ? entry["analysis"] : undefined;
+      const matchingDiagnostic = diagnostics.find((item) =>
+        item.cardId === cardId && item.path === path && range !== undefined &&
+        rangesEqual(item.range, range),
+      );
+      if (
+        range === undefined || analysis === undefined || !isAnalysisIdentity(bundleAnalysis) ||
+        JSON.stringify(analysis) !== JSON.stringify(bundleAnalysis) || matchingDiagnostic === undefined
+      ) {
+        warnings.push(`hover #${i} has inconsistent canonical identity; skipped`);
+        continue;
+      }
+      out.push({
+        analysis,
+        cardId,
+        path,
+        position: position ?? range.start,
+        range,
+        contents,
+        trustBoundary: readString(entry["trust_boundary"]),
+      });
+      continue;
+    }
     out.push({
       cardId,
       path,
-      position,
+      position: position ?? range!.start,
+      range,
       contents,
       trustBoundary: readString(entry["trust_boundary"]),
     });
@@ -550,7 +596,7 @@ function canonicalActionVocabulary(
   }
 }
 
-function rangesEqual(left: BundleRange, right: BundleRange): boolean {
+export function rangesEqual(left: BundleRange, right: BundleRange): boolean {
   return left.start.line === right.start.line && left.start.character === right.start.character &&
     left.end.line === right.end.line && left.end.character === right.end.character;
 }
@@ -639,20 +685,21 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === "object" && value !== null && !Array.isArray(value);
 }
 
-function isAnalysisIdentity(value: unknown): value is Record<string, unknown> {
+function isAnalysisIdentity(value: unknown): value is BundleAnalysisIdentity {
   if (!isRecord(value)) {
     return false;
   }
-  const generation = value["generation"];
-  const documentVersion = value["document_version"];
-  const state = readString(value["state"]);
+  const record = value as Record<string, unknown>;
+  const generation = record["generation"];
+  const documentVersion = record["document_version"];
+  const state = readString(record["state"]);
   return ["analysis_id", "tool_version", "scope"].every((field) => {
-    const fieldValue = readString(value[field]);
+    const fieldValue = readString(record[field]);
     return fieldValue !== undefined && fieldValue.trim().length > 0;
   }) && typeof generation === "number" && Number.isSafeInteger(generation) && generation >= 0 &&
     state !== undefined && ["current", "refreshing", "stale", "partial", "capped", "failed"].includes(state) &&
     ["base_commit", "head_commit", "file_digest"].every((field) =>
-      value[field] === undefined || typeof value[field] === "string"
+      record[field] === undefined || typeof record[field] === "string"
     ) && (documentVersion === undefined ||
       (typeof documentVersion === "number" && Number.isSafeInteger(documentVersion) && documentVersion >= 0));
 }
@@ -690,6 +737,21 @@ export function capDiagnosticsPerFile(
     out.push(diag);
   }
   return out;
+}
+
+export function positionInRange(position: BundleRangePosition, range: BundleRange): boolean {
+  return comparePositions(range.start, position) <= 0 && comparePositions(position, range.end) <= 0;
+}
+
+export function rangesIntersect(left: BundleRange, right: BundleRange): boolean {
+  return comparePositions(left.start, right.end) <= 0 && comparePositions(right.start, left.end) <= 0;
+}
+
+function comparePositions(left: BundleRangePosition, right: BundleRangePosition): number {
+  if (left.line !== right.line) {
+    return left.line - right.line;
+  }
+  return left.character - right.character;
 }
 
 export function supportedDiagnosticSeverity(value: number | undefined): number | undefined {

@@ -7,10 +7,14 @@ import {
   BundleDiagnostic,
   BundleHover,
   BundleParseError,
+  BundleRange,
   ParsedBundle,
   capDiagnosticsPerFile,
   diagnosticsByFile,
   parseBundle,
+  positionInRange,
+  rangesEqual,
+  rangesIntersect,
   resolveWorkspaceFilePath,
   supportedDiagnosticSeverity,
 } from "./bundle";
@@ -369,16 +373,15 @@ class BundleHoverProvider implements vscode.HoverProvider {
     if (candidates === undefined || candidates.length === 0) {
       return undefined;
     }
-    let chosen: BundleHover | undefined;
-    let chosenDelta = Number.MAX_SAFE_INTEGER;
-    for (const hover of candidates) {
-      const delta = Math.abs(hover.position.line - position.line);
-      if (delta < chosenDelta) {
-        chosen = hover;
-        chosenDelta = delta;
-      }
-    }
-    if (chosen === undefined || chosenDelta > 3) {
+    const chosen = candidates.find((hover) =>
+      hover.range === undefined
+        ? hover.position.line === position.line && hover.position.character === position.character
+        : positionInRange(
+            { line: position.line, character: position.character },
+            hover.range,
+          ),
+    );
+    if (chosen === undefined) {
       return undefined;
     }
     const md = new vscode.MarkdownString();
@@ -403,11 +406,15 @@ class BundleCodeActionProvider implements vscode.CodeActionProvider {
     }
     const actions: vscode.CodeAction[] = [];
     for (const candidate of candidates) {
-      if (candidate.range !== undefined) {
-        const cardLine = candidate.range.start.line;
-        if (Math.abs(cardLine - range.start.line) > 5) {
-          continue;
-        }
+      if (candidate.range === undefined || candidate.payload?.cardId === undefined) {
+        continue;
+      }
+      const matchingDiagnostic = adapter.bundle?.diagnostics.find((entry) =>
+        entry.cardId === candidate.payload?.cardId && entry.path === candidate.path &&
+        rangesEqual(entry.range, candidate.range!),
+      );
+      if (matchingDiagnostic === undefined || !rangesIntersect(candidate.range, toBundleRange(range))) {
+        continue;
       }
       const action = new vscode.CodeAction(
         candidate.actionId === undefined ? decorateCodeActionTitle(candidate) : candidate.title,
@@ -416,9 +423,7 @@ class BundleCodeActionProvider implements vscode.CodeActionProvider {
           : vscode.CodeActionKind.Empty.append(candidate.kind),
       );
       action.isPreferred = candidate.isPreferred ?? false;
-      const diagnostic = candidate.payload?.cardId === undefined
-        ? undefined
-        : adapter.diagnosticsByCardId.get(candidate.payload.cardId);
+      const diagnostic = adapter.diagnosticsByCardId.get(matchingDiagnostic.cardId);
       if (diagnostic !== undefined) {
         action.diagnostics = [diagnostic];
       }
@@ -439,6 +444,13 @@ class BundleCodeActionProvider implements vscode.CodeActionProvider {
     }
     return actions;
   }
+}
+
+function toBundleRange(range: vscode.Range): BundleRange {
+  return {
+    start: { line: range.start.line, character: range.start.character },
+    end: { line: range.end.line, character: range.end.character },
+  };
 }
 
 function decorateCodeActionTitle(action: BundleCodeAction): string {
