@@ -583,3 +583,17 @@ purpose = "release-readiness holdout repo snapshot for no_std atomics, pointer s
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/portable-atomic-holdout --format json --max-cards 50 --out target/dogfood-work/portable-atomic-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/portable-atomic-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "simdutf8-holdout"
+crate = "simdutf8"
+repository = "rusticstuff/simdutf8"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "641d57f313df57354246d2b68d4778c092e076c3"
+root = "target/dogfood-work/simdutf8-holdout"
+purpose = "release-readiness holdout repo snapshot for SIMD target-feature contracts, intrinsics, and unchecked UTF-8 operations; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/simdutf8-holdout --format json --max-cards 50 --out target/dogfood-work/simdutf8-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/simdutf8-holdout.unsafe-review.json"]
