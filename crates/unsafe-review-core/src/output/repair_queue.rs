@@ -1,6 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::ReviewCard;
-use crate::output::{REPAIR_QUEUE_TRUST_BOUNDARY as TRUST_BOUNDARY, agent};
+use crate::output::{REPAIR_QUEUE_TRUST_BOUNDARY as TRUST_BOUNDARY, agent, agent::RepairCandidate};
 use crate::util::path_display;
 use serde::Serialize;
 
@@ -134,6 +134,7 @@ struct RepairQueueEntry {
     /// `requires_human_review` is the sole reason the card is queued.
     #[serde(skip_serializing_if = "Option::is_none")]
     applicable_edit: Option<String>,
+    repair_candidates: Vec<RepairCandidate>,
     do_not_do: &'static [&'static str],
     trust_boundary: &'static str,
 }
@@ -160,6 +161,7 @@ impl RepairQueueEntry {
             bucket_reason: bucket_reason(bucket),
             context_command: format!("unsafe-review context {} --json", card.id),
             applicable_edit: applicable_edit(bucket, &projection.allowed_repairs),
+            repair_candidates: projection.repair_candidates.clone(),
             do_not_do: agent::DO_NOT_DO,
             trust_boundary: TRUST_BOUNDARY,
         }
@@ -377,6 +379,20 @@ mod tests {
             return Err("do_not_auto_repair entry must not have applicable_edit".to_string());
         }
 
+        Ok(())
+    }
+
+    #[test]
+    fn repair_queue_projects_canonical_typed_candidates() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let value = parse_json(&render(&output))?;
+        let projection = agent::repair_queue_projection(&output.cards[0]);
+        let expected = serde_json::to_value(&projection.repair_candidates)
+            .map_err(|err| format!("serialize repair candidates failed: {err}"))?;
+        assert_eq!(
+            value["buckets"]["repairable_by_guard"][0]["repair_candidates"], expected,
+            "repair queue must project the same typed candidates as the agent projection"
+        );
         Ok(())
     }
 

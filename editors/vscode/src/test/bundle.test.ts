@@ -154,6 +154,7 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
         analysis,
         agent_readiness: "ready_for_agent",
         agent_packet: agentPacket(analysis),
+        repair_candidates: [{ repair_id: "add-focused-test", applicability: "candidate" }],
       },
       command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo", analysis } },
       applicability: { state: "available" },
@@ -168,6 +169,9 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
   assert.equal(result.codeActions[0].kind, "quickfix.unsafeReview.agentPacket");
   assert.equal(result.codeActions[0].command, "unsafe-review.collectAgentPacket");
   assert.equal(result.codeActions[0].payload?.readiness, "ready_for_agent");
+  assert.deepEqual(result.codeActions[0].payload?.repairCandidates, [
+    { repair_id: "add-focused-test", applicability: "candidate" },
+  ]);
   assert.equal(JSON.parse(result.codeActions[0].payload?.agentPacket ?? "{}").card_id, "UR-foo");
   assert.deepEqual(result.codeActions[0].commandArguments?.["analysis"], analysis);
   assert.deepEqual(result.hovers[0].analysis, analysis);

@@ -619,6 +619,9 @@ fn review_kit_review_card_queue_entry(
                 "reasons": ["missing repair-queue projection"],
             })
         });
+    let repair_candidates = repair_queue
+        .map(|projection| projection.repair_candidates.clone())
+        .unwrap_or_default();
 
     json!({
         "card_id": card.id.to_string(),
@@ -638,6 +641,7 @@ fn review_kit_review_card_queue_entry(
         "repair_queue_buckets": repair_queue_buckets,
         "repair_queue_bucket_reasons": repair_queue_bucket_reasons,
         "agent_readiness": agent_readiness,
+        "repair_candidates": repair_candidates,
         "explain": explain_command(root, &card.id),
         "context_json": context_command(root, &card.id),
         "trust_boundary": "Static unsafe contract review only; copy-only ReviewCard queue entry projected from cards.json and repair-queue.json; it is not a proof of memory safety, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so. unsafe-review did not run agents, run witnesses, edit source, post comments, suppress cards, resolve cards, or enforce blocking policy.",
@@ -663,6 +667,7 @@ struct ReviewKitRepairQueueProjection {
     buckets: Vec<String>,
     bucket_reasons: Vec<String>,
     agent_readiness: serde_json::Value,
+    repair_candidates: Vec<serde_json::Value>,
 }
 
 fn review_kit_repair_queue_index(
@@ -696,6 +701,11 @@ fn review_kit_repair_queue_index(
                         .get("agent_readiness")
                         .cloned()
                         .unwrap_or(serde_json::Value::Null),
+                    repair_candidates: entry
+                        .get("repair_candidates")
+                        .and_then(serde_json::Value::as_array)
+                        .cloned()
+                        .unwrap_or_default(),
                 }
             });
             if !projection

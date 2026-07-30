@@ -1188,6 +1188,19 @@ fn agent_packet_repair_queue_matches_aggregate_projection() -> Result<(), String
             projection.agent_readiness.reasons,
             "{fixture} context packet must match aggregate repair queue readiness reasons"
         );
+        let expected_candidates = serde_json::to_value(&projection.repair_candidates)
+            .map_err(|err| format!("serialize repair candidates failed: {err}"))?;
+        if projection.repair_candidates.is_empty() {
+            assert!(
+                value["repair_candidates"].is_null(),
+                "{fixture} should omit an empty repair candidate projection"
+            );
+        } else {
+            assert_eq!(
+                value["repair_candidates"], expected_candidates,
+                "{fixture} context packet must retain the canonical typed repair candidates"
+            );
+        }
     }
     Ok(())
 }

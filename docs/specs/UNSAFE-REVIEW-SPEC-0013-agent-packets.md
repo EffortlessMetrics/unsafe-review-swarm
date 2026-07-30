@@ -81,9 +81,10 @@ Ambiguous FFI, assembly, concurrency, ownership, and semantic families remain
 without typed candidates until a later representative-family lane establishes
 their evidence contract. A typed candidate is still advisory intent: it never
 authorizes a source edit, WorkspaceEdit, witness execution, proof claim, or
-automatic resolution. The agent packet is the first serialized consumer;
-aggregate queue, saved/live LSP, and other projections must adopt the same
-schema in later parity work rather than deriving a second candidate truth.
+automatic resolution. The agent packet, aggregate repair queue, saved/live LSP
+agent action, and bounded review-kit card queue project the same candidate
+objects. These consumers must preserve candidate identity and applicability
+without reclassifying or parsing the compatibility prose fields.
 
 `source_context` is intentionally bounded. It may include the unsafe site
 snippet, ReviewCard-derived summaries for nearby contract and guard evidence,
@@ -187,6 +188,11 @@ auto-application is safe. Cards may appear in more than
 one bucket only when the reasons are distinct and card-scoped, such as a card
 that is repairable by guard evidence but still requires a witness receipt for a
 stronger review signal. A card must not repeat within the same bucket.
+Entries also carry `repair_candidates`, the canonical typed candidate array
+from the card-scoped agent projection. The saved/live LSP `agent-packet`
+action payload and bounded `review-kit.json` card queue preserve this same
+array. Human-only and witness-required applicability values remain visible;
+these fields do not authorize edits or witness execution.
 The aggregate summary must also project the canonical input diff file counts
 from `cards.json`, so mixed-language scope remains visible without creating
 non-Rust repair tasks.

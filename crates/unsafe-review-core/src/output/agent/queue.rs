@@ -1,5 +1,6 @@
 use super::{readiness, repairs};
 use crate::domain::ReviewCard;
+use repairs::candidates::RepairCandidate;
 use serde::Serialize;
 
 pub(super) struct PacketRepairProjection {
@@ -13,6 +14,7 @@ pub(super) struct PacketRepairProjection {
 pub(crate) struct AgentQueueProjection {
     pub(crate) agent_readiness: AgentReadiness,
     pub(crate) repair_queue: AgentRepairQueue,
+    pub(crate) repair_candidates: Vec<RepairCandidate>,
     /// Card-scoped allowed repair strings, threaded from `packet_repair_projection`
     /// for use by the aggregate repair queue artifact. Not emitted into context
     /// packet JSON because the field is skipped during serialization.
@@ -79,6 +81,7 @@ pub(crate) fn repair_queue_projection(card: &ReviewCard) -> AgentQueueProjection
     AgentQueueProjection {
         agent_readiness: projection.agent_readiness,
         repair_queue: projection.repair_queue,
+        repair_candidates: projection.repair_candidates,
         allowed_repairs: projection.allowed_repairs,
     }
 }

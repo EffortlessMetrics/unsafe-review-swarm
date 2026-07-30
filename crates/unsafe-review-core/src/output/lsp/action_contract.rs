@@ -42,6 +42,8 @@ pub struct EditorActionPayload {
     pub card_id: String,
     pub analysis: AnalysisIdentity,
     pub agent_readiness: EditorActionReadiness,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub repair_candidates: Vec<serde_json::Value>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub agent_packet: Option<String>,
 }
@@ -196,6 +198,15 @@ fn action(
             card_id: card.id.0.clone(),
             analysis: output.analysis_identity.clone(),
             agent_readiness: readiness,
+            repair_candidates: if action_id == ACTION_AGENT_PACKET {
+                crate::output::agent::repair_queue_projection(card)
+                    .repair_candidates
+                    .into_iter()
+                    .map(repair_candidate_value)
+                    .collect()
+            } else {
+                Vec::new()
+            },
             agent_packet: (action_id == ACTION_AGENT_PACKET)
                 .then(|| crate::output::agent::render_with_output(output, card)),
         },
@@ -208,6 +219,13 @@ fn action(
         command_only: true,
         trust_boundary: REVIEWCARD_TRUST_BOUNDARY.to_string(),
     }
+}
+
+fn repair_candidate_value(candidate: crate::output::agent::RepairCandidate) -> serde_json::Value {
+    serde_json::to_value(candidate).unwrap_or_else(|error| {
+        debug_assert!(false, "repair candidate serialization failed: {error}");
+        serde_json::Value::Null
+    })
 }
 
 fn available_if(available: bool, reason_code: &str, reason: &str) -> EditorActionApplicability {
@@ -316,6 +334,21 @@ mod tests {
             actions
                 .iter()
                 .all(|action| action.command_only && !action.is_preferred)
+        );
+        let expected_candidates = serde_json::to_value(
+            &crate::output::agent::repair_queue_projection(&output.cards[0]).repair_candidates,
+        )
+        .map_err(|err| err.to_string())?;
+        assert_eq!(
+            serde_json::to_value(&actions[0].payload.repair_candidates)
+                .map_err(|err| err.to_string())?,
+            expected_candidates,
+            "saved/live LSP agent action must project canonical typed candidates"
+        );
+        assert!(
+            actions[1..]
+                .iter()
+                .all(|action| action.payload.repair_candidates.is_empty())
         );
         let json = serde_json::to_string(&actions).map_err(|err| err.to_string())?;
         assert!(!json.contains("workspace_edit"));

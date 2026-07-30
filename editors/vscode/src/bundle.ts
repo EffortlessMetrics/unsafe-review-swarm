@@ -98,6 +98,7 @@ export interface BundleCodeActionPayload {
   actionId?: string;
   analysis?: BundleStructuredObject;
   agentPacket?: string;
+  repairCandidates?: BundleStructuredObject[];
   readiness?: string;
   kind?: string;
   command?: string;
@@ -460,6 +461,7 @@ function parseCanonicalCodeAction(
   const commandOnly = entry["command_only"] === true;
   const payloadAnalysis = payload === undefined ? undefined : payload["analysis"];
   const agentPacket = payload === undefined ? undefined : readString(payload["agent_packet"]);
+  const repairCandidates = payload === undefined ? undefined : readObjectArray(payload["repair_candidates"]);
   const argumentsValue = command === undefined || !isRecord(command["arguments"])
     ? undefined : command["arguments"];
   const argumentAnalysis = argumentsValue?.["analysis"];
@@ -557,6 +559,7 @@ function parseCanonicalCodeAction(
       cardId: payloadCardId,
       analysis: isRecord(payload["analysis"]) ? payload["analysis"] : undefined,
       agentPacket,
+      repairCandidates,
       readiness,
       trustBoundary: actionTrustBoundary,
       file: isRecord(command["arguments"]) ? readString(command["arguments"]["file"]) : undefined,

@@ -892,6 +892,7 @@ state, buckets, bucket reasons, and readiness reasons
 github-summary.md top-card agent handoff line projects repair-queue.json
 readiness state, buckets, bucket reasons, and readiness reasons
 repair-queue.json entries carry do-not-do boundaries
+repair-queue.json entries preserve the ReviewCard-derived typed repair_candidates array
 repair-queue.json human-review and do-not-auto-repair entries are not agent-ready
 repair-queue.json does not claim agent execution or repair success
 review-kit.json handoff.review_cards has a bounded card_queue with limit and
@@ -903,6 +904,8 @@ review-kit.json handoff.review_cards entries project cards.json verify commands
 and witness routes
 review-kit.json handoff.review_cards entries project repair-queue.json buckets,
 bucket reasons, and agent-readiness state
+review-kit.json handoff.review_cards entries preserve repair-queue.json typed
+repair_candidates without reclassification
 review-kit.json handoff.review_cards stays ReviewCard-only and excludes manual
 candidate marker fields
 review-kit.json handoff.review_cards carries copy-only trust boundary wording
