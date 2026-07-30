@@ -40,6 +40,11 @@ source of analyzer truth. It carries:
 - missing evidence
 - allowed repairs scoped to the current card, derived from the ReviewCard
   operation family and missing obligation evidence
+- `repair_candidates`, an optional typed projection of bounded repair intent;
+  each candidate has a stable repair ID and kind, exact card target, explicit
+  preconditions, allowed change, forbidden substitutes, verification commands,
+  expected evidence movement, closed-vocabulary applicability, and a claim
+  boundary
 - `agent_readiness`, an advisory classification of whether this card is a
   bounded repair-delegation candidate
 - `repair_queue`, a compact card-scoped grouping such as
@@ -60,7 +65,22 @@ sibling card, and group metadata never changes readiness or allowed repairs.
 
 For compatibility with the initial context-packet scaffold, the packet keeps
 top-level `card_id`, `required_safety_conditions`, `missing`, and string-array
-`allowed_repairs` fields while adding richer structured fields.
+`allowed_repairs` fields while adding richer structured fields. `allowed_repairs`
+and aggregate `applicable_edit` remain compatibility projections; consumers must
+not parse their prose to recover typed repair intent.
+
+The initial typed candidate projection is deliberately narrow. It is derived
+from the same ReviewCard operation family and obligation evidence as the legacy
+repair projection, and it does not parse `allowed_repairs` prose. Candidate
+`kind` values are `safety_docs`, `guard`, `test`, and `witness_route`.
+Applicability is one of `candidate`, `human_only`, or `requires_witness`.
+Ambiguous FFI, assembly, concurrency, ownership, and semantic families remain
+without typed candidates until a later representative-family lane establishes
+their evidence contract. A typed candidate is still advisory intent: it never
+authorizes a source edit, WorkspaceEdit, witness execution, proof claim, or
+automatic resolution. The agent packet is the first serialized consumer;
+aggregate queue, saved/live LSP, and other projections must adopt the same
+schema in later parity work rather than deriving a second candidate truth.
 
 `source_context` is intentionally bounded. It may include the unsafe site
 snippet, ReviewCard-derived summaries for nearby contract and guard evidence,

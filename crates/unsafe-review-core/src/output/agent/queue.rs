@@ -6,6 +6,7 @@ pub(super) struct PacketRepairProjection {
     pub(super) allowed_repairs: Vec<String>,
     pub(super) agent_readiness: AgentReadiness,
     pub(super) repair_queue: AgentRepairQueue,
+    pub(super) repair_candidates: Vec<repairs::candidates::RepairCandidate>,
 }
 
 #[derive(Clone, Serialize)]
@@ -58,6 +59,7 @@ impl AgentReadiness {
 pub(super) struct AllowedRepairs {
     pub(super) repairs: Vec<String>,
     pub(super) has_card_scoped_repairs: bool,
+    pub(super) candidates: Vec<repairs::candidates::RepairCandidate>,
 }
 
 pub(super) fn packet_repair_projection(card: &ReviewCard) -> PacketRepairProjection {
@@ -68,6 +70,7 @@ pub(super) fn packet_repair_projection(card: &ReviewCard) -> PacketRepairProject
         allowed_repairs: allowed_repairs.repairs,
         agent_readiness,
         repair_queue,
+        repair_candidates: allowed_repairs.candidates,
     }
 }
 

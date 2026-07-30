@@ -6,6 +6,7 @@ use super::queue::{
     AgentReadiness, AgentRepairQueue, READY_FOR_AGENT, REQUIRES_HUMAN_REVIEW,
     REQUIRES_WITNESS_RECEIPT, packet_repair_projection,
 };
+use super::repairs::candidates::RepairCandidate;
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
 use crate::api::AnalyzeOutput;
 use crate::domain::{
@@ -173,6 +174,8 @@ pub(super) struct AgentPacket<'a> {
     allowed_repairs: Vec<String>,
     agent_readiness: AgentReadiness,
     repair_queue: AgentRepairQueue,
+    #[serde(skip_serializing_if = "Vec::is_empty")]
+    repair_candidates: Vec<RepairCandidate>,
     repair_scope: &'static str,
     witness_routes: Vec<AgentWitnessRoute<'a>>,
     verify_commands: &'a [String],
@@ -297,6 +300,7 @@ impl<'a> AgentPacket<'a> {
             allowed_repairs: repairs.allowed_repairs,
             agent_readiness: repairs.agent_readiness,
             repair_queue: repairs.repair_queue,
+            repair_candidates: repairs.repair_candidates,
             repair_scope: "this card only",
             witness_routes: card.routes.iter().map(AgentWitnessRoute::from).collect(),
             verify_commands: &card.next_action.verify_commands,
