@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-06-19
+Date: 2026-07-29
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -29,12 +29,12 @@ external snapshots and diffs are never checked into the swarm repo.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 16 |
-| Total targets | 41 |
-| Capped repo snapshots | 16 |
+| Repositories | 17 |
+| Total targets | 42 |
+| Capped repo snapshots | 17 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
-| Holdout targets | 1 |
+| Holdout targets | 2 |
 | Checked-in scan outputs | 0 |
 
 ## Selected Judgment Sample
@@ -118,6 +118,7 @@ Selected real-crate targets:
 - `simdutf8-capped`
 - `zerocopy-capped`
 - `getrandom-holdout` (holdout; run only with explicit release-readiness opt-in)
+- `portable-atomic-holdout` (holdout; run only with explicit release-readiness opt-in)
 
 ### PR Diffs
 
@@ -180,7 +181,7 @@ them by default; run a holdout target only with an explicit opt-in:
 
 ```bash
 cargo run --locked -p xtask -- dogfood-exec \
-  --target getrandom-holdout --include-holdout --strict
+  --target portable-atomic-holdout --include-holdout --strict
 ```
 
 Update this index only when the corpus manifest or recorded outcome evidence

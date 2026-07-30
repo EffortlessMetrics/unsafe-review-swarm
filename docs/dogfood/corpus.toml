@@ -569,3 +569,17 @@ purpose = "release-readiness holdout repo snapshot for platform RNG unsafe decla
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/getrandom-holdout --format json --max-cards 50 --out target/dogfood-work/getrandom-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/getrandom-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "portable-atomic-holdout"
+crate = "portable-atomic"
+repository = "taiki-e/portable-atomic"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "5716e951b47494703a3926403c27a20add27fa9b"
+root = "target/dogfood-work/portable-atomic-holdout"
+purpose = "release-readiness holdout repo snapshot for no_std atomics, pointer state, and platform-specific unsafe contracts; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/portable-atomic-holdout --format json --max-cards 50 --out target/dogfood-work/portable-atomic-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/portable-atomic-holdout.unsafe-review.json"]
