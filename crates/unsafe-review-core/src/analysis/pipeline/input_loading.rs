@@ -241,6 +241,51 @@ mod tests {
     }
 
     #[test]
+    fn oversized_hunk_numbers_and_long_lines_are_handled_without_panic() -> Result<(), String> {
+        // Hostile-input regression coverage for the oversized-hunk / extreme
+        // line-length row of issue #1883. A hunk header whose `+` start line is
+        // too large to fit in `usize` must not panic: `parse_new_start` returns
+        // `None`, so the coordinate simply stays at its default rather than
+        // overflowing, and the added line is still indexed (at the degenerate
+        // line 0, which no real 1-based site query can match -- fail-safe). An
+        // extremely long added line must likewise be handled without panic. The
+        // parser advances the coordinate with `saturating_add`, so large inputs
+        // truncate rather than crash.
+        let long_line = "a".repeat(200_000);
+        let diff = format!(
+            concat!(
+                "diff --git a/src/huge.rs b/src/huge.rs\n",
+                "--- a/src/huge.rs\n",
+                "+++ b/src/huge.rs\n",
+                // A `+` start line far beyond usize::MAX on any platform.
+                "@@ -0,0 +999999999999999999999999999999,1 @@\n",
+                "+{}\n",
+            ),
+            long_line
+        );
+        let index = load_diff_index(&DiffSource::Text(diff))?;
+
+        // The diff is accepted (structurally valid) and the file is indexed.
+        assert_eq!(
+            index.changed_file_count(),
+            1,
+            "an oversized-hunk diff should still index its changed file"
+        );
+        // The unparseable start line fell back to the degenerate coordinate 0,
+        // which cannot collide with a real 1-based unsafe-site query.
+        let path = std::path::PathBuf::from("src/huge.rs");
+        assert!(
+            index.contains_in_range(&path, 0, 0),
+            "the added line falls back to the degenerate line-0 coordinate"
+        );
+        assert!(
+            !index.contains_in_range(&path, 1, usize::MAX),
+            "no real 1-based line range should match the degenerate fallback"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn empty_string_is_accepted_as_empty_index() -> Result<(), String> {
         let source = DiffSource::Text(String::new());
         let index = load_diff_index(&source)?;
