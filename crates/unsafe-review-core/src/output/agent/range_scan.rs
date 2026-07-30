@@ -6,6 +6,7 @@
 
 use super::packet::AgentPacket;
 use super::{DO_NOT_DO, TRUST_BOUNDARY};
+use crate::api::AnalyzeOutput;
 use crate::domain::coverage::BaselineState;
 use crate::domain::{CardId, CommentPlanStatus, ReviewCard};
 use crate::freshness::AnalysisIdentity;
@@ -72,6 +73,7 @@ impl<'a> FileRangeScanEnvelope<'a> {
         statuses: &HashMap<CardId, CommentPlanStatus>,
         coverage_snapshot: &BTreeMap<String, SnapshotCoverage>,
         analysis: Option<AnalysisIdentity>,
+        output: Option<&'a AnalyzeOutput>,
     ) -> Self {
         let packets = cards
             .into_iter()
@@ -81,7 +83,11 @@ impl<'a> FileRangeScanEnvelope<'a> {
                     .copied()
                     .unwrap_or(CommentPlanStatus::NotEligible);
                 let snapshot = coverage_snapshot.get(&card.id.0);
-                AgentPacket::from_with_analysis(card, status, snapshot, analysis.clone())
+                if let Some(output) = output {
+                    AgentPacket::from_with_output(output, card, status, snapshot)
+                } else {
+                    AgentPacket::from_with_analysis(card, status, snapshot, analysis.clone())
+                }
             })
             .collect();
         Self {

@@ -760,6 +760,70 @@ fn agent_packet_scopes_target_feature_repairs_to_dispatch_invariant() -> Result<
 }
 
 #[test]
+fn grouped_target_feature_packet_preserves_membership_and_per_site_authority() -> Result<(), String>
+{
+    let output = fixture_output("target_feature_simd_dispatch_repetition")?;
+    let card = output
+        .cards
+        .first()
+        .ok_or_else(|| "repetition fixture should emit cards".to_string())?;
+    let value = parse_json(&render_with_output(&output, card))?;
+    let group = &value["target_feature_group"];
+    let underlying = group["underlying_cards"]
+        .as_array()
+        .ok_or_else(|| "grouped packet should expose underlying cards".to_string())?;
+
+    assert!(group["total"].as_u64().is_some_and(|total| total > 1));
+    assert_eq!(
+        underlying.len() as u64,
+        group["total"].as_u64().unwrap_or(0)
+    );
+    assert!(underlying.iter().any(|member| {
+        member["card_id"] == card.id.0
+            && member["context_command"] == format!("unsafe-review context {} --json", card.id.0)
+    }));
+    assert!(
+        group["representatives"]
+            .as_array()
+            .is_some_and(|items| items.len() <= 3)
+    );
+    assert!(
+        group["edit_authority"]
+            .as_str()
+            .unwrap_or("")
+            .contains("this card/site only")
+    );
+    assert!(
+        group["edit_authority"]
+            .as_str()
+            .unwrap_or("")
+            .contains("does not repair or discharge any sibling")
+    );
+
+    let sibling_id = underlying
+        .iter()
+        .filter_map(|member| member["card_id"].as_str())
+        .find(|id| *id != card.id.0)
+        .ok_or_else(|| "group should contain a sibling card".to_string())?;
+    let sibling = output
+        .cards
+        .iter()
+        .find(|candidate| candidate.id.0 == sibling_id)
+        .ok_or_else(|| "sibling id should resolve through cards.json truth".to_string())?;
+    let sibling_value = parse_json(&render_with_output(&output, sibling))?;
+    assert_ne!(value["card_id"], sibling_value["card_id"]);
+    assert_eq!(
+        group["group_id"],
+        sibling_value["target_feature_group"]["group_id"]
+    );
+    assert_eq!(
+        group["underlying_cards"],
+        sibling_value["target_feature_group"]["underlying_cards"]
+    );
+    Ok(())
+}
+
+#[test]
 fn agent_packet_routes_non_miri_cards_without_overclaiming() -> Result<(), String> {
     let output = fixture_output("ffi_sanitizer_route")?;
     let Some(card) = output.cards.first() else {
@@ -1562,6 +1626,40 @@ fn output_range_scan_carries_analysis_identity() -> Result<(), String> {
         output.analysis_identity.generation
     );
     assert!(value["staleness_marker"].get("analyzed_base").is_none());
+    Ok(())
+}
+
+#[test]
+fn narrow_range_packet_keeps_complete_target_feature_group() -> Result<(), String> {
+    let output = fixture_output("target_feature_simd_dispatch_repetition")?;
+    let card = output
+        .cards
+        .first()
+        .ok_or_else(|| "repetition fixture should emit cards".to_string())?;
+    let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("../../fixtures/target_feature_simd_dispatch_repetition");
+    let line = card.site.location.line as u32;
+    let envelope = parse_json(&crate::api::collect_context_range(
+        &output,
+        &root,
+        &card.site.location.file,
+        line,
+        line,
+        false,
+    ))?;
+    let packets = envelope["packets"]
+        .as_array()
+        .ok_or_else(|| "range scan should expose packets".to_string())?;
+    let packet = packets
+        .iter()
+        .find(|packet| packet["card_id"] == card.id.0)
+        .ok_or_else(|| "range scan should contain the queried card".to_string())?;
+    let group = &packet["target_feature_group"];
+    assert!(group["total"].as_u64().is_some_and(|total| total > 1));
+    assert_eq!(
+        group["underlying_cards"].as_array().map(Vec::len),
+        group["total"].as_u64().map(|total| total as usize)
+    );
     Ok(())
 }
 

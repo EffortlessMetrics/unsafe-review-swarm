@@ -80,6 +80,13 @@ packets whose unsafe site overlaps the requested range, plus the
 cap) and ordered deterministically by site line. An empty list means no
 reviewable seam overlaps those lines — never "these lines are safe".
 
+For repetitive `target_feature` evidence, each returned per-card packet derives
+its optional group from the complete `AnalyzeOutput` before file, range, or
+changed-line filtering. A one-line query therefore keeps the complete canonical
+membership and lookup commands while the packet's edit authority remains the
+single returned card/site. Range-local regrouping is forbidden because it would
+silently hide siblings outside the queried range.
+
 ### Changed-line filter
 
 A PR agent passes the diff so it sees only diff-touched obligations:

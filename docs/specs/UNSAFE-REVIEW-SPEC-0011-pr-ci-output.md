@@ -335,6 +335,9 @@ target-feature summary, when at least one `target_feature`-family
   every underlying card keeps its own id, class, and policy status in
   `cards.json` and the card table above; this section only bounds what is
   printed inline
+  human Markdown and agent/context packets consume the same
+  `target_feature_groups` producer; agent packets preserve the complete card
+  membership and explicitly retain per-card/site edit authority
   the comment-plan (SPEC-0022/0032) selects at most one representative per
   group for an inline comment slot; every other member is recorded in
   `not_selected[]` with reason_code `grouped_repetition` -- never dropped

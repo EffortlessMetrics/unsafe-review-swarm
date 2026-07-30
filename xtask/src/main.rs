@@ -29,6 +29,7 @@ mod corpus_partitions;
 mod corpus_usefulness;
 mod detector_contracts;
 mod docs_automation_paths;
+mod dogfood_density;
 mod dogfood_exec;
 mod dogfood_usefulness;
 mod evidence_loss_challenges;
@@ -3396,6 +3397,7 @@ fn check_dogfood() -> Result<(), String> {
     check_dogfood_judgment_schema_docs()?;
     let judgment_stats = check_dogfood_judgments(&ids, &target_kinds)?;
     check_dogfood_real_crate_judgment_sample_index(&judgment_stats)?;
+    dogfood_density::check(&value)?;
     dogfood_usefulness::check()?;
 
     println!(

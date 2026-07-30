@@ -21,6 +21,8 @@ inventory requirements for `ripr` are tracked in
 [`ripr-bun-diff-first-requirements.md`](ripr-bun-diff-first-requirements.md).
 Bun packet preset requirements for `tokmd` are tracked in
 [`tokmd-bun-packet-presets.md`](tokmd-bun-packet-presets.md).
+Presentation-density observations follow the
+[`dogfood density receipt schema`](density-receipts/README.md).
 Reviewer judgment files follow the [`dogfood judgment schema`](judgments/README.md).
 External read-only pilot receipts follow the
 [`external pilot receipt schema`](pilots/README.md).
