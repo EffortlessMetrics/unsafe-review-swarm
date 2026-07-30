@@ -997,6 +997,61 @@ fn repo_capped_scan_operator_json_uses_card_level_wording() -> Result<(), Box<dy
     Ok(())
 }
 
+/// Hostile source-shape regression: a large but valid Rust file must remain a
+/// truthful repo scan input rather than panic, silently fall back, or emit an
+/// empty success report.
+#[test]
+fn repo_huge_source_file_scans_without_panic_or_scope_fallback() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-cli-huge-source-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"huge-source-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    let padding = "// bounded hostile-source padding for scan coverage\n".repeat(24_000);
+    let source = format!(
+        "{padding}pub unsafe fn read_byte(ptr: *const u8) -> u8 {{\n    unsafe {{ *ptr }}\n}}\n"
+    );
+    assert!(
+        source.len() > 1_000_000,
+        "fixture must exercise a large source file"
+    );
+    fs::write(scan_root.join("src/lib.rs"), source)?;
+
+    let report_path = temp.path().join("repo.json");
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("repo")
+        .arg("--root")
+        .arg(&scan_root)
+        .arg("--format")
+        .arg("json")
+        .arg("--out")
+        .arg(&report_path)
+        .output()?;
+
+    assert!(
+        output.status.success(),
+        "large source scan must not panic or fail: status={:?}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr),
+    );
+    let report: Value = serde_json::from_str(&fs::read_to_string(&report_path)?)?;
+    assert_eq!(report["scope"], "repo");
+    assert_eq!(report["summary"]["rust_files"], 1);
+    assert!(report["summary"]["cards"].as_u64().unwrap_or(0) >= 1);
+    assert!(
+        report["cards"]
+            .as_array()
+            .into_iter()
+            .flatten()
+            .any(|card| card["operation_family"] == "raw_pointer_deref"),
+        "large source scan must preserve the raw-pointer dereference card: {report}"
+    );
+    Ok(())
+}
+
 fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),
