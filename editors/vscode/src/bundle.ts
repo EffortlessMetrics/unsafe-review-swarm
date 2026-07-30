@@ -97,6 +97,7 @@ export interface BundleCodeActionPayload {
   cardId?: string;
   actionId?: string;
   analysis?: BundleStructuredObject;
+  agentPacket?: string;
   readiness?: string;
   kind?: string;
   command?: string;
@@ -451,6 +452,7 @@ function parseCanonicalCodeAction(
   const payloadActionId = payload === undefined ? undefined : readString(payload["action_id"]);
   const commandOnly = entry["command_only"] === true;
   const payloadAnalysis = payload === undefined ? undefined : payload["analysis"];
+  const agentPacket = payload === undefined ? undefined : readString(payload["agent_packet"]);
   const argumentsValue = command === undefined || !isRecord(command["arguments"])
     ? undefined : command["arguments"];
   const argumentAnalysis = argumentsValue?.["analysis"];
@@ -472,7 +474,8 @@ function parseCanonicalCodeAction(
     !isAnalysisIdentity(bundleAnalysis) || !isAnalysisIdentity(payloadAnalysis) ||
     !isAnalysisIdentity(argumentAnalysis) ||
     JSON.stringify(payloadAnalysis) !== JSON.stringify(bundleAnalysis) ||
-    JSON.stringify(argumentAnalysis) !== JSON.stringify(bundleAnalysis)
+    JSON.stringify(argumentAnalysis) !== JSON.stringify(bundleAnalysis) ||
+    (actionId === "agent-packet" && !isMatchingAgentPacket(agentPacket, cardId, bundleAnalysis))
   ) {
     warnings.push(`code_action #${index} has inconsistent canonical identity; skipped`);
     return undefined;
@@ -546,6 +549,7 @@ function parseCanonicalCodeAction(
       actionId: payloadActionId,
       cardId: payloadCardId,
       analysis: isRecord(payload["analysis"]) ? payload["analysis"] : undefined,
+      agentPacket,
       readiness,
       trustBoundary: actionTrustBoundary,
       file: isRecord(command["arguments"]) ? readString(command["arguments"]["file"]) : undefined,
@@ -553,6 +557,32 @@ function parseCanonicalCodeAction(
       name: isRecord(command["arguments"]) ? readString(command["arguments"]["name"]) : undefined,
     },
   };
+}
+
+const MAX_AGENT_PACKET_CHARS = 256 * 1024;
+
+function isMatchingAgentPacket(
+  packetText: string | undefined,
+  cardId: string,
+  bundleAnalysis: unknown,
+): boolean {
+  if (packetText === undefined || packetText.length === 0 || packetText.length > MAX_AGENT_PACKET_CHARS) {
+    return false;
+  }
+  let packet: unknown;
+  try {
+    packet = JSON.parse(packetText);
+  } catch {
+    return false;
+  }
+  if (!isRecord(packet) || !isAnalysisIdentity(bundleAnalysis)) {
+    return false;
+  }
+  return readString(packet["schema_version"]) === "0.1" &&
+    readString(packet["mode"]) === "bounded_repair_packet" &&
+    readString(packet["card_id"]) === cardId &&
+    isAnalysisIdentity(packet["analysis"]) &&
+    JSON.stringify(packet["analysis"]) === JSON.stringify(bundleAnalysis);
 }
 
 function canonicalDisabledReason(

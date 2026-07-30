@@ -42,6 +42,8 @@ pub struct EditorActionPayload {
     pub card_id: String,
     pub analysis: AnalysisIdentity,
     pub agent_readiness: EditorActionReadiness,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub agent_packet: Option<String>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -194,6 +196,8 @@ fn action(
             card_id: card.id.0.clone(),
             analysis: output.analysis_identity.clone(),
             agent_readiness: readiness,
+            agent_packet: (action_id == ACTION_AGENT_PACKET)
+                .then(|| crate::output::agent::render_with_output(output, card)),
         },
         command: EditorActionCommand {
             command: command.to_string(),
@@ -324,6 +328,22 @@ mod tests {
                 && action.diagnostic.path == diagnostics[0].path
                 && action.diagnostic.range == diagnostics[0].range
         }));
+        let packet = actions[0]
+            .payload
+            .agent_packet
+            .as_deref()
+            .ok_or("agent-packet action must carry the bounded packet")?;
+        let packet: serde_json::Value =
+            serde_json::from_str(packet).map_err(|err| err.to_string())?;
+        assert_eq!(packet["card_id"], diagnostics[0].card_id);
+        let analysis =
+            serde_json::to_value(&output.analysis_identity).map_err(|err| err.to_string())?;
+        assert_eq!(packet["analysis"], analysis);
+        assert!(
+            actions[1..]
+                .iter()
+                .all(|action| action.payload.agent_packet.is_none())
+        );
         assert_eq!(actions, actions_for_card(&output, &output.cards[0].id.0)?);
         Ok(())
     }

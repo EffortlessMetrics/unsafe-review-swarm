@@ -559,17 +559,18 @@ async function openWorkspaceFile(
 }
 
 async function copyAgentPacket(payload: unknown): Promise<void> {
-  const cardId = pickCardId(payload);
-  if (cardId === undefined) {
+  const packet = isRecord(payload) && typeof payload["agent_packet"] === "string"
+    ? payload["agent_packet"]
+    : undefined;
+  if (packet === undefined || packet.length === 0) {
     void vscode.window.showInformationMessage(
-      "unsafe-review: no card id in selection; right-click an unsafe-review diagnostic and select Copy Agent Packet.",
+      "unsafe-review: this saved bundle has no valid bounded agent packet; refresh it with schema 0.2.",
     );
     return;
   }
-  const command = `unsafe-review context ${shellQuote(cardId)} --json`;
-  await vscode.env.clipboard.writeText(command);
+  await vscode.env.clipboard.writeText(packet);
   void vscode.window.showInformationMessage(
-    `unsafe-review: copied \`${command}\`. Run it in your terminal to print the bounded agent packet.`,
+    "unsafe-review: copied the bounded agent packet for the selected card.",
   );
 }
 

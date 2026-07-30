@@ -85,6 +85,15 @@ const MINIMAL_BUNDLE = {
   ],
 };
 
+function agentPacket(analysis: object, cardId = "UR-foo"): string {
+  return JSON.stringify({
+    schema_version: "0.1",
+    mode: "bounded_repair_packet",
+    card_id: cardId,
+    analysis,
+  });
+}
+
 test("parseBundle returns diagnostics, hovers, and code actions", () => {
   const result = parseBundle(JSON.stringify(MINIMAL_BUNDLE));
   assert.equal(result.diagnostics.length, 1);
@@ -138,7 +147,13 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
       title: "Copy bounded unsafe-review agent packet",
       kind: "quickfix.unsafeReview.agentPacket",
       diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
-      payload: { action_id: "agent-packet", card_id: "UR-foo", analysis, agent_readiness: "ready_for_agent" },
+      payload: {
+        action_id: "agent-packet",
+        card_id: "UR-foo",
+        analysis,
+        agent_readiness: "ready_for_agent",
+        agent_packet: agentPacket(analysis),
+      },
       command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo", analysis } },
       applicability: { state: "available" },
       is_preferred: false,
@@ -152,9 +167,48 @@ test("parseBundle preserves canonical 0.2 action semantics", () => {
   assert.equal(result.codeActions[0].kind, "quickfix.unsafeReview.agentPacket");
   assert.equal(result.codeActions[0].command, "unsafe-review.collectAgentPacket");
   assert.equal(result.codeActions[0].payload?.readiness, "ready_for_agent");
+  assert.equal(JSON.parse(result.codeActions[0].payload?.agentPacket ?? "{}").card_id, "UR-foo");
   assert.deepEqual(result.codeActions[0].commandArguments?.["analysis"], analysis);
   assert.deepEqual(result.hovers[0].analysis, analysis);
   assert.deepEqual(result.hovers[0].range, MINIMAL_BUNDLE.diagnostics[0].range);
+});
+
+test("canonical agent packets reject stale card or analysis identity", () => {
+  const analysis = { analysis_id: "analysis-1", generation: 1, tool_version: "0.3.8", scope: "diff", state: "current" };
+  const action = {
+    action_id: "agent-packet",
+    title: "Copy bounded unsafe-review agent packet",
+    kind: "quickfix.unsafeReview.agentPacket",
+    diagnostic: { card_id: "UR-foo", path: "src/lib.rs", range: MINIMAL_BUNDLE.diagnostics[0].range },
+    payload: {
+      action_id: "agent-packet",
+      card_id: "UR-foo",
+      analysis,
+      agent_readiness: "ready_for_agent",
+      agent_packet: agentPacket(analysis),
+    },
+    command: { command: "unsafe-review.collectAgentPacket", arguments: { card_id: "UR-foo", analysis } },
+    applicability: { state: "available" },
+    is_preferred: false,
+    command_only: true,
+    trust_boundary: MINIMAL_BUNDLE.trust_boundary,
+  };
+  const staleCard = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis,
+    code_actions: [{ ...action, payload: { ...action.payload, agent_packet: agentPacket(analysis, "UR-other") } }],
+  }));
+  assert.equal(staleCard.codeActions.length, 0);
+
+  const staleAnalysis = { ...analysis, generation: 2 };
+  const staleAnalysisResult = parseBundle(JSON.stringify({
+    ...MINIMAL_BUNDLE,
+    schema_version: "0.2",
+    analysis,
+    code_actions: [{ ...action, payload: { ...action.payload, agent_packet: agentPacket(staleAnalysis) } }],
+  }));
+  assert.equal(staleAnalysisResult.codeActions.length, 0);
 });
 
 test("canonical hovers reject cross-card or cross-analysis identity drift", () => {

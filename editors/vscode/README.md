@@ -30,8 +30,9 @@ test, or witness. It does not prove the code free of UB.
     `target/unsafe-review/pr-summary.md` in the editor.
   - **Unsafe Review: Open Witness Plan (open)** — open
     `target/unsafe-review/witness-plan.md` in the editor.
-  - **Unsafe Review: Copy Agent Packet Command (copy)** — copy
-    `unsafe-review context <card-id> --json` to the clipboard.
+  - **Unsafe Review: Copy Agent Packet (copy)** — copy the bounded JSON packet
+    embedded in the canonical saved bundle to the clipboard. Legacy bundles
+    without a matching packet are refused.
   - **Unsafe Review: Copy Witness Command (copy)** — copy the saved
     witness command (e.g. `cargo +nightly miri test ...`) to the
     clipboard.
