@@ -63,7 +63,7 @@ pub(crate) struct RepairEvidenceMovement {
 
 pub(super) fn build(card: &ReviewCard) -> Vec<RepairCandidate> {
     if !supports_bounded_candidates(&card.operation.family)
-        && !supports_human_only_contract_candidate(&card.operation.family)
+        && !supports_unsafe_declaration_candidates(card)
     {
         return Vec::new();
     }
@@ -253,8 +253,9 @@ fn supports_bounded_candidates(family: &OperationFamily) -> bool {
     )
 }
 
-fn supports_human_only_contract_candidate(family: &OperationFamily) -> bool {
-    matches!(family, OperationFamily::UnsafeDeclaration)
+fn supports_unsafe_declaration_candidates(card: &ReviewCard) -> bool {
+    card.site.public_api_surface
+        && matches!(card.operation.family, OperationFamily::UnsafeDeclaration)
 }
 
 fn supports_guard_candidate(family: &OperationFamily, key: &str) -> bool {
@@ -421,6 +422,7 @@ mod tests {
     fn public_unsafe_declaration_contract_candidate_is_human_only() -> Result<(), String> {
         let mut card = candidate_card();
         card.operation.family = OperationFamily::UnsafeDeclaration;
+        card.site.public_api_surface = true;
         card.missing = vec![MissingEvidence::new(
             "contract",
             "public unsafe declaration is missing a safety contract",
@@ -442,6 +444,18 @@ mod tests {
         );
         assert!(contract.allowed_change.contains("safety contract"));
         Ok(())
+    }
+
+    #[test]
+    fn private_unsafe_declaration_has_no_typed_contract_candidate() {
+        let mut card = candidate_card();
+        card.operation.family = OperationFamily::UnsafeDeclaration;
+        card.missing = vec![MissingEvidence::new(
+            "contract",
+            "private unsafe declaration is missing a safety contract",
+        )];
+
+        assert!(build(&card).is_empty());
     }
 
     #[test]
