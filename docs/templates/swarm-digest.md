@@ -19,7 +19,7 @@ promotion, calibration claim, policy decision, or source-promotion request.
 Source divergence:
 
 ```bash
-rtk cargo run --locked -p xtask -- source-divergence
+cargo run --locked -p xtask -- source-divergence
 ```
 
 Observed result:
@@ -56,13 +56,13 @@ free-form prose.
 Record only commands actually run for this digest:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo run --locked -p xtask -- check-pr
-rtk cargo run --locked -p xtask -- source-divergence
-rtk git diff --check
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- source-divergence
+git diff --check
 ```
 
 Observed result:

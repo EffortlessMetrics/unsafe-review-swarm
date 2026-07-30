@@ -3,7 +3,7 @@ target = "memchr-capped"
 repository = "BurntSushi/memchr"
 commit = "db1a77d4b556a1321e136ca0514e43e74ea5fcc3"
 family = "target_feature"
-scan_command = "rtk cargo run --locked -p xtask -- dogfood-exec --target memchr-capped --strict --max-cards 2000"
+scan_command = "cargo run --locked -p xtask -- dogfood-exec --target memchr-capped --strict --max-cards 2000"
 trust_boundary = "Static unsafe contract review density receipt only; grouping does not change ReviewCards, prove target-feature availability, prove site execution, not a proof of memory safety, not UB-free status, not Miri-clean status, or establish calibrated precision/recall."
 
 [inventory_before]

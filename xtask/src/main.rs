@@ -13030,7 +13030,7 @@ fixture = "fixtures/raw_pointer_alignment"
 root = "fixtures/raw_pointer_alignment"
 diff = "fixtures/raw_pointer_alignment/change.diff"
 purpose = "fixture-level first-pr smoke for committed Bun manual-candidate projection through manual-candidates.json and review-kit handoff surfaces"
-command = "rtk cargo run --locked -p xtask -- check-manual-candidate-examples"
+command = "cargo run --locked -p xtask -- check-manual-candidate-examples"
 artifact_status = "local_untracked"
 artifacts = [
   "target/unsafe-review-manual-candidate-smoke/manual-candidates.json",
@@ -13064,7 +13064,7 @@ status = "active"
 commit = "0123456789abcdef0123456789abcdef01234567"
 root = "fixtures/raw_pointer_alignment"
 purpose = "external repo snapshot dogfood target that must stay local_untracked"
-command = "rtk cargo run --locked -p unsafe-review -- first-pr --format json"
+command = "cargo run --locked -p unsafe-review -- first-pr --format json"
 artifact_status = "checked_in"
 artifacts = [
   "target/unsafe-review-external-snapshot/cards.json",
@@ -13094,7 +13094,7 @@ pr = 42
 root = "fixtures/raw_pointer_alignment"
 diff = "fixtures/raw_pointer_alignment/change.diff"
 purpose = "external pr-diff dogfood target that must stay local_untracked"
-command = "rtk cargo run --locked -p unsafe-review -- first-pr --format json"
+command = "cargo run --locked -p unsafe-review -- first-pr --format json"
 artifact_status = "remote_manual"
 artifacts = [
   "target/unsafe-review-external-pr/cards.json",

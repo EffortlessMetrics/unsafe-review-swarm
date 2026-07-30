@@ -27,17 +27,17 @@ Published in dependency order:
 Record the exact source commit and commands run:
 
 ```bash
-rtk cargo fmt --check
-rtk cargo check --workspace --all-targets --locked
-rtk cargo clippy --workspace --all-targets --locked -- -D warnings
-rtk cargo test --workspace --locked
-rtk cargo run --locked -p xtask -- check-pr
-rtk cargo run --locked -p xtask -- check-calibration
-rtk cargo run --locked -p xtask -- check-dogfood
-rtk cargo package -p unsafe-review-core --list
-rtk cargo package -p unsafe-review-cli --list
-rtk cargo package -p unsafe-review --list
-rtk cargo publish -p unsafe-review-core --dry-run
+cargo fmt --check
+cargo check --workspace --all-targets --locked
+cargo clippy --workspace --all-targets --locked -- -D warnings
+cargo test --workspace --locked
+cargo run --locked -p xtask -- check-pr
+cargo run --locked -p xtask -- check-calibration
+cargo run --locked -p xtask -- check-dogfood
+cargo package -p unsafe-review-core --list
+cargo package -p unsafe-review-cli --list
+cargo package -p unsafe-review --list
+cargo publish -p unsafe-review-core --dry-run
 ```
 
 Observed result:
@@ -49,14 +49,14 @@ Observed result:
 Record exact commands and observed registry propagation:
 
 ```bash
-rtk cargo publish -p unsafe-review-core
-rtk cargo search unsafe-review-core --limit 10
-rtk cargo publish -p unsafe-review-cli --dry-run
-rtk cargo publish -p unsafe-review-cli
-rtk cargo search unsafe-review-cli --limit 10
-rtk cargo publish -p unsafe-review --dry-run
-rtk cargo publish -p unsafe-review
-rtk cargo search unsafe-review --limit 10
+cargo publish -p unsafe-review-core
+cargo search unsafe-review-core --limit 10
+cargo publish -p unsafe-review-cli --dry-run
+cargo publish -p unsafe-review-cli
+cargo search unsafe-review-cli --limit 10
+cargo publish -p unsafe-review --dry-run
+cargo publish -p unsafe-review
+cargo search unsafe-review --limit 10
 ```
 
 Observed result:
@@ -69,13 +69,13 @@ Install the published facade from crates.io into an isolated location or with an
 explicit `--force` owner decision:
 
 ```bash
-rtk cargo install unsafe-review --locked --force
-rtk unsafe-review --version
-rtk unsafe-review doctor
-rtk unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-smoke
-rtk cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-smoke
-rtk unsafe-review explain --root fixtures/raw_pointer_alignment <card-id>
-rtk unsafe-review support
+cargo install unsafe-review --locked --force
+unsafe-review --version
+unsafe-review doctor
+unsafe-review first-pr --root fixtures/raw_pointer_alignment --diff fixtures/raw_pointer_alignment/change.diff --out-dir target/unsafe-review-published-smoke
+cargo run --locked -p xtask -- check-first-pr-artifacts target/unsafe-review-published-smoke
+unsafe-review explain --root fixtures/raw_pointer_alignment <card-id>
+unsafe-review support
 ```
 
 Observed result:
@@ -87,9 +87,9 @@ Observed result:
 Check the exact version URLs:
 
 ```bash
-rtk curl -I https://docs.rs/unsafe-review-core/<version>/unsafe_review_core/
-rtk curl -I https://docs.rs/unsafe-review-cli/<version>/unsafe_review_cli/
-rtk curl -I https://docs.rs/unsafe-review/<version>/unsafe_review/
+curl -I https://docs.rs/unsafe-review-core/<version>/unsafe_review_core/
+curl -I https://docs.rs/unsafe-review-cli/<version>/unsafe_review_cli/
+curl -I https://docs.rs/unsafe-review/<version>/unsafe_review/
 ```
 
 Observed result:
@@ -102,8 +102,8 @@ Create the release tag only after the publication receipt records the verified
 crate URLs, docs.rs checks, and install smoke:
 
 ```bash
-rtk git tag -a v<version> <source-commit> -m "unsafe-review <version>"
-rtk git push origin v<version>
+git tag -a v<version> <source-commit> -m "unsafe-review <version>"
+git push origin v<version>
 ```
 
 Observed result:
