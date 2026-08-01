@@ -99,15 +99,23 @@ fn ensure_review_root(root: &Path) -> Result<(), String> {
     if root.is_dir() {
         return Ok(());
     }
+    Err(review_root_error(root, &root.try_exists(), root.is_file()))
+}
+
+/// Explain why a `--root` is not a usable scan directory.
+///
+/// `existence` is `Path::try_exists`, not `Path::exists`. `exists` collapses a
+/// failed stat into `false`, so an unreadable directory would be reported as
+/// missing and send the user hunting for a typo instead of a permission.
+fn review_root_error(root: &Path, existence: &io::Result<bool>, is_file: bool) -> String {
     let hint =
         "Pass --root <dir> pointing at a Rust crate or workspace (default: the current directory).";
-    if root.exists() {
-        Err(format!(
-            "--root {} is a file, not a directory. {hint}",
-            root.display()
-        ))
-    } else {
-        Err(format!("--root {} does not exist. {hint}", root.display()))
+    let root = root.display();
+    match existence {
+        Ok(true) if is_file => format!("--root {root} is a file, not a directory. {hint}"),
+        Ok(true) => format!("--root {root} is not a directory. {hint}"),
+        Ok(false) => format!("--root {root} does not exist. {hint}"),
+        Err(err) => format!("--root {root} cannot be read: {err}. {hint}"),
     }
 }
 
@@ -3787,8 +3795,9 @@ mod tests {
     use super::{
         RepoScanScopeMetadata, ensure_review_root, git_ref_error,
         render_repo_scan_incomplete_status, render_repo_scan_status, repo_status_operator_json,
-        resolve_diff_path, shell_path_arg, writable_status, yes_no,
+        resolve_diff_path, review_root_error, shell_path_arg, writable_status, yes_no,
     };
+    use std::io;
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
         DiscoveryOptions, PerFileScanStats, RepoScanPhase, RepoScanStatus, RepoStopReason,
@@ -3829,6 +3838,33 @@ mod tests {
         assert!(err.contains("is a file, not a directory"), "{err}");
         assert!(err.contains("Pass --root <dir>"), "{err}");
         Ok(())
+    }
+
+    #[test]
+    fn review_root_error_separates_unreadable_from_missing() {
+        // `Path::exists` reports a permission failure as "not there"; the user
+        // needs to know the path could not be read at all.
+        let unreadable = review_root_error(
+            Path::new("/srv/restricted"),
+            &Err(io::Error::from(io::ErrorKind::PermissionDenied)),
+            false,
+        );
+        assert!(unreadable.contains("cannot be read"), "{unreadable}");
+        assert!(!unreadable.contains("does not exist"), "{unreadable}");
+
+        let missing = review_root_error(Path::new("/srv/gone"), &Ok(false), false);
+        assert!(missing.contains("does not exist"), "{missing}");
+
+        let file = review_root_error(Path::new("/srv/lib.rs"), &Ok(true), true);
+        assert!(file.contains("is a file, not a directory"), "{file}");
+
+        let other = review_root_error(Path::new("/srv/sock"), &Ok(true), false);
+        assert!(other.contains("is not a directory"), "{other}");
+        assert!(!other.contains("is a file"), "{other}");
+
+        for message in [unreadable, missing, file, other] {
+            assert!(message.contains("Pass --root <dir>"), "{message}");
+        }
     }
 
     #[test]
