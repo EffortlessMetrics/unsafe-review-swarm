@@ -3920,6 +3920,80 @@ fn first_pr_comment_plan_explains_not_selected_cards() -> Result<(), Box<dyn Err
 }
 
 #[test]
+fn check_rejects_a_missing_root_with_an_actionable_message() -> Result<(), Box<dyn Error>> {
+    let output = run_failure([os("check"), os("--root"), os("no-such-directory-4c1e")])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains("--root no-such-directory-4c1e does not exist"),
+        "{text}"
+    );
+    assert!(text.contains("Pass --root <dir>"), "{text}");
+
+    Ok(())
+}
+
+#[test]
+fn check_rejects_a_file_root_instead_of_reporting_a_clean_review() -> Result<(), Box<dyn Error>> {
+    // Regression: a `--root` naming a file used to walk zero Rust files and
+    // print `cards: 0`, which reads as a clean review of a repo never scanned.
+    let temp = TempDir::new("unsafe-review-file-root-e2e")?;
+    let file = temp.path().join("not-a-directory.rs");
+    fs::write(&file, "fn main() {}\n")?;
+
+    let output = run_failure([os("check"), os("--root"), file.as_os_str().to_os_string()])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("is a file, not a directory"), "{text}");
+    let stdout = stdout_text(&output)?;
+    assert!(
+        !stdout.contains("cards: 0"),
+        "a file root must not render a clean review: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn repo_rejects_a_missing_root_with_the_same_message_as_check() -> Result<(), Box<dyn Error>> {
+    let output = run_failure([os("repo"), os("--root"), os("no-such-directory-4c1e")])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains("--root no-such-directory-4c1e does not exist"),
+        "{text}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn check_base_outside_a_git_repository_names_the_condition() -> Result<(), Box<dyn Error>> {
+    // Outside a work tree git answers with its whole `diff --no-index` usage
+    // block; the user needs the condition and the way out, not the manual page.
+    let temp = TempDir::new("unsafe-review-no-git-e2e")?;
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--base"),
+        os("origin/main"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("not inside a git repository"), "{text}");
+    assert!(text.contains("--diff <file>"), "{text}");
+    assert!(!text.contains("usage: git diff --no-index"), "{text}");
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;
@@ -8437,8 +8511,12 @@ fn candidate_list_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("is not a directory"),
-        "stderr should mention 'is not a directory': {stderr}"
+        stderr.contains("does not exist"),
+        "stderr should say the root does not exist: {stderr}"
+    );
+    assert!(
+        stderr.contains("Pass --root <dir>"),
+        "stderr should name the flag to fix: {stderr}"
     );
     Ok(())
 }
@@ -8486,8 +8564,12 @@ fn receipt_validate_nonexistent_root_exits_2() -> Result<(), Box<dyn Error>> {
     );
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("is not a directory"),
-        "stderr should mention 'is not a directory': {stderr}"
+        stderr.contains("does not exist"),
+        "stderr should say the root does not exist: {stderr}"
+    );
+    assert!(
+        stderr.contains("Pass --root <dir>"),
+        "stderr should name the flag to fix: {stderr}"
     );
     Ok(())
 }

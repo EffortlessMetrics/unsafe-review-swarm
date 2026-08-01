@@ -1,4 +1,4 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use unsafe_review_core::{DiscoveryOptions, PolicyMode};
 
 /// Query surface for `context` — either a single card by id or a file:line range.
@@ -393,4 +393,64 @@ pub(crate) enum Command {
     Outcome(OutcomeOptions),
     PolicyReport(CheckOptions),
     Lsp,
+}
+
+impl Command {
+    /// The directory this command will scan, when it takes a `--root`.
+    ///
+    /// Used to validate the root once, before any scan starts. A missing or
+    /// non-directory root would otherwise surface as a walker IO string or —
+    /// worse, when `--root` names a file — as an empty scan that reads like a
+    /// clean review.
+    ///
+    /// Commands that take no root, or whose root is a write target rather than
+    /// a scan target, return `None`.
+    pub(crate) fn review_root(&self) -> Option<&Path> {
+        match self {
+            Command::Doctor { root }
+            | Command::Badges { root, .. }
+            | Command::Explain { root, .. }
+            | Command::Context { root, .. }
+            | Command::ReceiptValidate { root } => Some(root),
+            Command::Check(options)
+            | Command::Pilot(options)
+            | Command::ReceiptAudit(options)
+            | Command::PolicyReport(options) => Some(&options.root),
+            Command::Repo(options) => Some(&options.check.root),
+            Command::FirstPr(options) => Some(&options.check.root),
+            Command::Confirm(options) => Some(&options.root),
+            Command::Candidate(command) => match command {
+                CandidateCommand::List(options) => Some(&options.root),
+                CandidateCommand::WitnessPlan(options) => Some(&options.root),
+                CandidateCommand::New(_)
+                | CandidateCommand::Import(_)
+                | CandidateCommand::Lint(_) => None,
+            },
+            Command::Baseline(command) => match command {
+                BaselineCommand::Init(options) => Some(&options.root),
+                BaselineCommand::Add(options) => Some(&options.root),
+                BaselineCommand::Status(options) => Some(&options.root),
+                BaselineCommand::Refresh(options) => Some(&options.root),
+                BaselineCommand::Help => None,
+            },
+            Command::Help
+            | Command::RepoHelp
+            | Command::CandidateHelp
+            | Command::BaselineHelp
+            | Command::SubcommandHelp(_)
+            | Command::Version
+            | Command::Support
+            | Command::ReceiptTemplate(_)
+            | Command::ReceiptImportMiri(_)
+            | Command::ReceiptImportCareful(_)
+            | Command::ReceiptImportSanitizer(_)
+            | Command::ReceiptImportConcurrency(_)
+            | Command::ReceiptImportProof(_)
+            | Command::Outcome(_)
+            // `pr-setup` only prints commands; its --root names where the
+            // caller will check the external PR out, which need not exist yet.
+            | Command::PrSetup(_)
+            | Command::Lsp => None,
+        }
+    }
 }
