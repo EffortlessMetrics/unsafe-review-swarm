@@ -4008,6 +4008,88 @@ fn check_base_outside_a_git_repository_names_the_condition() -> Result<(), Box<d
 }
 
 #[test]
+fn missing_diff_file_names_the_flag_and_the_ways_to_supply_one() -> Result<(), Box<dyn Error>> {
+    // The most likely first-hour failure after a typo. It used to surface a bare
+    // `read diff <path> failed: No such file or directory (os error 2)` from deep in
+    // the pipeline — the fault, never the fix.
+    let temp = TempDir::new("unsafe-review-missing-diff-e2e")?;
+    let missing = temp.path().join("nonexistent.diff");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        missing.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("diff file {} does not exist", missing.display())),
+        "{text}"
+    );
+    // All three ways out are named, because which one applies depends on why the
+    // path was wrong and the user cannot be assumed to know any of them exist.
+    assert!(text.contains("git diff --binary --full-index"), "{text}");
+    assert!(text.contains("--diff -"), "{text}");
+    assert!(text.contains("--base <ref>"), "{text}");
+    // Fault-only wording must not survive as the whole message.
+    assert!(!text.contains("read diff"), "{text}");
+
+    Ok(())
+}
+
+#[test]
+fn relative_diff_path_explains_that_it_resolved_against_root() -> Result<(), Box<dyn Error>> {
+    // `resolve_diff_path` joins a relative --diff onto --root, so a user who ran
+    // from a different directory sees a path they never typed. Say where it came from.
+    let temp = TempDir::new("unsafe-review-relative-diff-e2e")?;
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        os("typo.diff"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("resolved against --root"), "{text}");
+    assert!(text.contains("typo.diff"), "{text}");
+    // The resolved path is shown, not just the name the user typed.
+    assert!(
+        text.contains(&temp.path().join("typo.diff").display().to_string()),
+        "{text}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn directory_passed_to_diff_is_rejected_as_a_directory() -> Result<(), Box<dyn Error>> {
+    // Reading a directory yields a confusing os error ("Is a directory"), which
+    // reads like a corrupt-file problem rather than a wrong-argument problem.
+    let temp = TempDir::new("unsafe-review-dir-diff-e2e")?;
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("is a directory, not a file"), "{text}");
+    assert!(text.contains("--diff"), "{text}");
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;
@@ -4252,11 +4334,16 @@ fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>
     ])?;
 
     assert_eq!(output.status.code(), Some(2));
+    // The load-bearing guarantee: a missing diff is a hard failure with empty
+    // stdout, never a silent zero-card review of a diff that was never read.
     assert_eq!(stdout_text(&output)?.trim(), "");
     let stderr = String::from_utf8_lossy(&output.stderr);
+    // This used to assert the fault-only `read diff <path> failed: <io error>`
+    // wording. The failure is unchanged; only the message now names the fix
+    // (see `missing_diff_file_names_the_flag_and_the_ways_to_supply_one`).
     assert!(
-        stderr.contains("unsafe-review: read diff"),
-        "stderr should identify diff read failure: {stderr}"
+        stderr.contains("unsafe-review: diff file"),
+        "stderr should identify the unusable diff input: {stderr}"
     );
     assert!(
         stderr.contains("missing.diff"),

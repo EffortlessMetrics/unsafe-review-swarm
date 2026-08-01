@@ -1653,7 +1653,11 @@ fn write_artifact(path: &Path, rendered: String) -> Result<u64, String> {
 fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
     if let Some(diff) = &options.diff {
         return match diff {
-            DiffInput::File(path) => Ok(DiffSource::File(resolve_diff_path(&options.root, path))),
+            DiffInput::File(path) => {
+                let resolved = resolve_diff_path(&options.root, path);
+                ensure_readable_diff(path, &resolved, &options.root)?;
+                Ok(DiffSource::File(resolved))
+            }
             DiffInput::Stdin => read_stdin_diff(),
         };
     }
@@ -1703,7 +1707,16 @@ fn git_ref_error(base: &str, git_stderr: &str) -> String {
              or supply --diff <file> instead."
         );
     }
-    format!("git diff failed: {git_stderr}")
+    // Every other git failure — dubious repository ownership, a shallow clone with no
+    // merge base, a corrupt object — still shows git's own text, because that text is
+    // the only description of the problem we have. Keep it, but stop ending there: the
+    // two escape hatches are the same regardless of which git error it was, and a user
+    // reading raw git output has no reason to know either exists.
+    format!(
+        "git diff failed while resolving --base '{base}': {git_stderr}. \
+         Fix the repository state git is reporting, or supply --diff <file> to review a \
+         saved patch instead."
+    )
 }
 
 fn validate_expected_head_sha(
@@ -1818,6 +1831,59 @@ fn git_dirty_worktree(root: &Path) -> Option<bool> {
         return None;
     }
     Some(!output.stdout.is_empty())
+}
+
+/// Reject an unusable `--diff` argument before any scan runs, naming the flag and
+/// the fix rather than surfacing a bare `io::Error` from deep in the pipeline
+/// (SPEC-0023 §9.2: an input failure prints an actionable message naming the exact
+/// flag to use).
+///
+/// The relative-path case gets its own sentence because `resolve_diff_path` joins a
+/// relative `--diff` onto `--root`: a user who ran from a different directory would
+/// otherwise see a path they never typed, with nothing explaining where it came
+/// from. `requested` is what they wrote; `resolved` is what was opened.
+///
+/// This reports on reading the file only. It is not a claim that the diff is
+/// well-formed — parse rejection stays where it is, in the pipeline — and says
+/// nothing about memory safety, UB-free status, or Miri-clean status.
+fn ensure_readable_diff(requested: &Path, resolved: &Path, root: &Path) -> Result<(), String> {
+    // `try_exists` distinguishes "absent" from "cannot be determined": an unreadable
+    // parent directory is a permission problem, not a typo, and must not be reported
+    // as a missing file (matching `ensure_review_root`).
+    let existence = resolved.try_exists().map_err(|err| {
+        format!(
+            "diff file {} could not be read: {err}. Check the path and its directory \
+             permissions, then pass a readable file to --diff.",
+            resolved.display()
+        )
+    })?;
+    let relative_note = if requested == resolved {
+        String::new()
+    } else {
+        format!(
+            " The relative path `{}` was resolved against --root, giving `{}`; \
+             pass an absolute path to --diff if that is not what you meant.",
+            requested.display(),
+            root.join(requested).display()
+        )
+    };
+    if !existence {
+        return Err(format!(
+            "diff file {} does not exist.{relative_note} Capture one with \
+             `git diff --binary --full-index --output=<file> <base-sha>...<head-sha>`, \
+             pass `--diff -` to read a diff from stdin, or use `--base <ref>` to let \
+             unsafe-review run the diff itself.",
+            resolved.display()
+        ));
+    }
+    if resolved.is_dir() {
+        return Err(format!(
+            "diff file {} is a directory, not a file.{relative_note} Pass the unified-diff \
+             file itself to --diff.",
+            resolved.display()
+        ));
+    }
+    Ok(())
 }
 
 fn resolve_diff_path(root: &Path, path: &Path) -> PathBuf {
@@ -3793,7 +3859,7 @@ fn print_candidate_help() {
 #[cfg(test)]
 mod tests {
     use super::{
-        RepoScanScopeMetadata, ensure_review_root, git_ref_error,
+        RepoScanScopeMetadata, ensure_readable_diff, ensure_review_root, git_ref_error,
         render_repo_scan_incomplete_status, render_repo_scan_status, repo_status_operator_json,
         resolve_diff_path, review_root_error, shell_path_arg, writable_status, yes_no,
     };
@@ -3880,6 +3946,54 @@ mod tests {
         assert!(err.contains("--diff <file>"), "{err}");
     }
 
+    /// A git failure we do not specifically classify still keeps git's own text —
+    /// it is the only description of the problem we have — but must not end there.
+    /// Drift-lock: restore the bare `git diff failed: {stderr}` fallback → RED.
+    #[test]
+    fn git_ref_error_fallback_keeps_git_text_and_adds_a_way_out() {
+        let err = git_ref_error(
+            "origin/main",
+            "fatal: detected dubious ownership in repository at '/repo'",
+        );
+        assert!(err.contains("detected dubious ownership"), "{err}");
+        assert!(err.contains("--base 'origin/main'"), "{err}");
+        assert!(err.contains("--diff <file>"), "{err}");
+    }
+
+    #[test]
+    fn ensure_readable_diff_accepts_an_existing_file() -> Result<(), String> {
+        let root = Path::new(".");
+        let existing = Path::new("Cargo.toml");
+        ensure_readable_diff(existing, existing, root)
+    }
+
+    #[test]
+    fn ensure_readable_diff_notes_root_resolution_only_when_it_happened()
+    -> Result<(), Box<dyn std::error::Error>> {
+        let root = Path::new("/workspace/project");
+        let requested = Path::new("missing.diff");
+        let resolved = root.join(requested);
+
+        let relative = match ensure_readable_diff(requested, &resolved, root) {
+            Err(message) => message,
+            Ok(()) => return Err("a missing diff file must be rejected".into()),
+        };
+        assert!(relative.contains("resolved against --root"), "{relative}");
+
+        // An absolute path was not resolved against --root, so explaining the
+        // resolution would describe something that did not happen.
+        let absolute = Path::new("/tmp/missing.diff");
+        let untouched = match ensure_readable_diff(absolute, absolute, root) {
+            Err(message) => message,
+            Ok(()) => return Err("a missing diff file must be rejected".into()),
+        };
+        assert!(
+            !untouched.contains("resolved against --root"),
+            "{untouched}"
+        );
+        Ok(())
+    }
+
     #[test]
     fn git_ref_error_names_a_missing_repository_instead_of_echoing_git_usage() {
         // Outside a work tree git replies with its whole `diff --no-index`
@@ -3895,10 +4009,25 @@ mod tests {
         assert!(!err.contains("usage: git diff --no-index"), "{err}");
     }
 
+    /// An unclassified git failure must keep git's own text — we cannot describe a
+    /// condition we did not recognize, and paraphrasing would lose the only
+    /// diagnosis available.
+    ///
+    /// This originally asserted byte-equality with a bare `git diff failed: {stderr}`.
+    /// The guarantee it exists to protect is the *preservation* of git's text, not the
+    /// absence of anything after it, so it now asserts preservation directly and
+    /// leaves room for the escape hatches (which are the same whatever git said).
     #[test]
     fn git_ref_error_preserves_unclassified_git_failures() {
         let err = git_ref_error("origin/main", "fatal: something else entirely");
-        assert_eq!(err, "git diff failed: fatal: something else entirely");
+        assert!(
+            err.contains("fatal: something else entirely"),
+            "git's own text is the only diagnosis for an unclassified failure: {err}"
+        );
+        assert!(
+            err.starts_with("git diff failed"),
+            "the message must still lead with the failure, not the remedy: {err}"
+        );
     }
 
     #[test]
