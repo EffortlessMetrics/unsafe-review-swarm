@@ -4008,6 +4008,83 @@ fn check_base_outside_a_git_repository_names_the_condition() -> Result<(), Box<d
 }
 
 #[test]
+fn no_new_debt_without_a_ledger_says_every_gap_counts_as_new() -> Result<(), Box<dyn Error>> {
+    // `--policy no-new-debt` with no ledger has no recorded floor, so every open
+    // actionable gap is counted "new" — including debt that predates the change.
+    // The bare count is indistinguishable from a real regression against a
+    // baseline, so the failure has to say which situation the user is in.
+    let temp = TempDir::new("unsafe-review-no-ledger-e2e")?;
+    let root = temp.path();
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"no-ledger-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    let diff = root.join("change.diff");
+    fs::write(
+        &diff,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,1 @@\n\
+         +pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let run = |args: Vec<std::ffi::OsString>| run_failure(args);
+    let args = vec![
+        os("check"),
+        os("--root"),
+        root.as_os_str().to_os_string(),
+        os("--diff"),
+        diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ];
+
+    let without_ledger = run(args.clone())?;
+    // Exit code and counts are unchanged — this is diagnosis, not a policy change.
+    assert_eq!(
+        without_ledger.status.code(),
+        Some(1),
+        "the note must not change the policy-violation exit code"
+    );
+    let text = String::from_utf8(without_ledger.stderr.clone())?;
+    assert!(text.contains("no-new-debt policy:"), "{text}");
+    assert!(text.contains("No baseline ledger at"), "{text}");
+    assert!(
+        text.contains("every open actionable gap counts as new"),
+        "{text}"
+    );
+    assert!(text.contains("unsafe-review baseline init"), "{text}");
+    // Adoption guidance from the front door: record the floor from a clean base.
+    assert!(text.contains("clean base branch"), "{text}");
+
+    // With a ledger present the count means what the flag implies, so the note
+    // must disappear — otherwise it would be noise on every gated run.
+    fs::create_dir_all(root.join("policy"))?;
+    fs::write(
+        root.join("policy/unsafe-review-baseline.toml"),
+        "status = \"active\"\n",
+    )?;
+    let with_ledger = run(args)?;
+    assert_eq!(with_ledger.status.code(), Some(1));
+    let text = String::from_utf8(with_ledger.stderr.clone())?;
+    assert!(text.contains("no-new-debt policy:"), "{text}");
+    assert!(
+        !text.contains("No baseline ledger at"),
+        "the absent-ledger note must not fire when a ledger exists: {text}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn missing_diff_file_names_the_flag_and_the_ways_to_supply_one() -> Result<(), Box<dyn Error>> {
     // The most likely first-hour failure after a typo. It used to surface a bare
     // `read diff <path> failed: No such file or directory (os error 2)` from deep in

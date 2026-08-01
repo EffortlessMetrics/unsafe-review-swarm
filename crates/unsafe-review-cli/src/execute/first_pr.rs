@@ -299,7 +299,9 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
     parts.join(" ")
 }
 
-fn baseline_init_command(root: &Path) -> String {
+/// Shared with `execute` so the no-new-debt diagnostic names the same adoption
+/// command the front-door handoff prints, rather than a second copy that can drift.
+pub(super) fn baseline_init_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline init --root {}",
         shell_arg(&root.display().to_string())

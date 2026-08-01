@@ -26,6 +26,7 @@ pub use output::lsp::{
     EditorPosition, EditorProjection, EditorRange, EditorReachEvidence, EditorSafetyCondition,
     EditorSimpleEvidence, EditorWitnessRoute, actions_for_card,
 };
+pub use policy::baseline_ledger_path;
 
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineHealthCounts, BaselineHealthEntry,

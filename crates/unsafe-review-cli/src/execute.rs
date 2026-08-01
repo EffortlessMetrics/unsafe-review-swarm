@@ -1613,6 +1613,36 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     Ok(())
 }
 
+/// Explain a `no-new-debt` failure that has no baseline ledger to compare against,
+/// or return an empty string when a ledger exists.
+///
+/// An absent ledger is not an error — brownfield adoption starts there, and the
+/// loader correctly treats "no ledger" as "no recorded floor". But the resulting
+/// count then means something different from what the flag's name implies: with
+/// no floor, *every* open actionable gap is "new", including debt that predates
+/// the change under review. The bare count cannot be told apart from a genuine
+/// regression against a recorded baseline, so say which one this is.
+///
+/// Diagnosis only. The exit code, the counts, and what counts as new debt are all
+/// unchanged, and this is not a memory-safety, UB-free, Miri-clean, or
+/// site-execution claim.
+fn absent_baseline_note(root: &Path) -> String {
+    let ledger = unsafe_review_core::baseline_ledger_path(root);
+    // `is_file` (not `try_exists`): an unreadable ledger is a load failure that
+    // surfaces its own error before policy is evaluated, so reaching here with an
+    // unreadable path is not a case this note should try to describe.
+    if ledger.is_file() {
+        return String::new();
+    }
+    format!(
+        ". No baseline ledger at {}, so every open actionable gap counts as new — \
+         this is not necessarily debt your change introduced. Record the current \
+         state as the floor with `{}` from a clean base branch, then re-run.",
+        ledger.display(),
+        first_pr::baseline_init_command(root)
+    )
+}
+
 fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), crate::RunFailure> {
     match output.policy {
         PolicyMode::Advisory => Ok(()),
@@ -1626,8 +1656,10 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), crat
                 Ok(())
             } else {
                 Err(crate::RunFailure::PolicyViolation(format!(
-                    "no-new-debt policy: {} new gap(s), {} worsened gap(s)",
-                    new, worsened
+                    "no-new-debt policy: {} new gap(s), {} worsened gap(s){}",
+                    new,
+                    worsened,
+                    absent_baseline_note(&output.root)
                 )))
             }
         }
