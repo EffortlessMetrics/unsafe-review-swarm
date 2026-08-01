@@ -228,7 +228,30 @@ The top-level help output includes a one-line hint pointing users at
 `unsafe-review pr`:
 
 ```text
-  pr      first-run PR review bundle: auto-detects root and base ref
+  pr        first-run PR review bundle: auto-detects root and base ref
 ```
 
 `unsafe-review pr --help` routes to the `first-pr` subcommand help page.
+
+### 9.5 Top-level help shape
+
+The top-level help is an overview, not a flag reference. Per-command help pages
+own the full flag list, defaults, and examples; the overview owns orientation.
+It contains, in order:
+
+- the product sentence
+  (`unsafe-review finds unsafe Rust changes missing a safety contract, guard,
+  test, or witness.`);
+- a `Usage:` block whose second line routes the reader to
+  `unsafe-review <command> --help` for full flags and examples;
+- a `Start here:` block of runnable first-run commands;
+- task-grouped command lists under `Review a change:`, `Inspect a finding:`,
+  `Track and discharge coverage debt:`, and `Repository posture:`;
+- the flag-syntax note, the exit-code table, and the trust boundary.
+
+Every command the argument parser routes appears in exactly one task group, so
+no shipped entrypoint — including `lsp` — is reachable only by reading the
+parser. The overview never claims proof, UB-free status, Miri-clean status,
+site execution, or calibrated precision/recall, and it restates that
+unsafe-review does not run witnesses, post comments, edit source, or block by
+default.

@@ -437,7 +437,7 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(output.stdout)?;
 
     assert!(
-        stdout.contains("  pr      first-run PR review bundle"),
+        stdout.contains("  pr        first-run PR review bundle"),
         "help must mention the `pr` first-run entry point: {stdout}"
     );
     assert!(
@@ -445,13 +445,142 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
         "help must say pr auto-detects first-run inputs: {stdout}"
     );
     assert!(
-        stdout
-            .contains("pr-setup print read-only external GitHub PR checkout and raw-diff commands"),
+        stdout.contains(
+            "pr-setup  print read-only external GitHub PR checkout and raw-diff commands"
+        ),
         "help must mention the read-only external PR setup helper: {stdout}"
     );
 
     Ok(())
 }
+
+#[test]
+fn help_output_routes_to_per_command_help() -> Result<(), Box<dyn Error>> {
+    // The top-level help is an overview, so it must tell the reader where the
+    // full flag list for a single command lives.
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("unsafe-review <command> --help"),
+        "top-level help must point at per-command help: {stdout}"
+    );
+    assert!(
+        stdout.contains("Start here:"),
+        "top-level help must offer a first-run entry point: {stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, or witness."
+        ),
+        "top-level help must state the product sentence: {stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "unsafe-review does not run witnesses, post comments, edit source, or block by default."
+        ),
+        "top-level help must state the advisory default posture: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    let groups = [
+        "Review a change:",
+        "Inspect a finding:",
+        "Track and discharge coverage debt:",
+        "Repository posture:",
+    ];
+    for group in groups {
+        assert!(
+            stdout.contains(group),
+            "top-level help must group commands by task, missing `{group}`: {stdout}"
+        );
+    }
+
+    // Collect the command entries listed inside the task groups. A group runs
+    // from its header to the next blank line; an entry is a line indented by
+    // exactly two spaces (continuation lines are indented further).
+    let mut listed: Vec<&str> = Vec::new();
+    let mut in_group = false;
+    for line in stdout.lines() {
+        if groups.contains(&line) {
+            in_group = true;
+            continue;
+        }
+        if line.trim().is_empty() {
+            in_group = false;
+            continue;
+        }
+        if !in_group {
+            continue;
+        }
+        let Some(rest) = line.strip_prefix("  ") else {
+            continue;
+        };
+        if rest.starts_with(' ') {
+            continue;
+        }
+        let name = rest.split(' ').next().unwrap_or_default();
+        listed.push(name);
+
+        // Descriptions share one column so each group reads as a table.
+        let description_column = line.len() - rest.trim_start_matches(name).trim_start().len();
+        assert_eq!(
+            description_column, HELP_DESCRIPTION_COLUMN,
+            "command `{name}` description must start at column {HELP_DESCRIPTION_COLUMN}: {line:?}"
+        );
+    }
+
+    // Every command the parser routes appears in exactly one task group,
+    // including the editor entrypoint, and the groups list nothing else.
+    let mut expected = vec![
+        "check",
+        "repo",
+        "pr",
+        "pr-setup",
+        "first-pr",
+        "review",
+        "pilot",
+        "badges",
+        "explain",
+        "context",
+        "lsp",
+        "candidate",
+        "baseline",
+        "confirm",
+        "support",
+        "outcome",
+        "policy",
+        "receipt",
+        "doctor",
+    ];
+    expected.sort_unstable();
+    let mut actual = listed.clone();
+    actual.sort_unstable();
+    assert_eq!(
+        actual, expected,
+        "task groups must list every routed command exactly once: {stdout}"
+    );
+
+    Ok(())
+}
+
+/// Column (0-indexed) where every top-level help command description starts.
+const HELP_DESCRIPTION_COLUMN: usize = 12;
 
 #[test]
 fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
