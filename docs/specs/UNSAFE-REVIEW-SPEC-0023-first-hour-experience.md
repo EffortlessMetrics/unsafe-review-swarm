@@ -249,9 +249,14 @@ It contains, in order:
   `Track and discharge coverage debt:`, and `Repository posture:`;
 - the flag-syntax note, the exit-code table, and the trust boundary.
 
-Every command the argument parser routes appears in exactly one task group, so
-no shipped entrypoint — including `lsp` — is reachable only by reading the
-parser. The overview never claims proof, UB-free status, Miri-clean status,
-site execution, or calibrated precision/recall, and it restates that
-unsafe-review does not run witnesses, post comments, edit source, or block by
-default.
+Every command the argument parser routes is reachable from the overview, so no
+shipped entrypoint — including `lsp` — is discoverable only by reading the
+parser. Each command takes exactly one entry line in exactly one task group,
+and every entry's description starts at the same column so a group reads as a
+table. A compatibility alias whose name does not fit that column — currently
+`receipt-template`, which routes to `receipt template` — is named in the text
+of the entry it routes into rather than taking an entry of its own.
+
+The overview never claims proof, UB-free status, Miri-clean status, site
+execution, or calibrated precision/recall, and it restates that unsafe-review
+does not run witnesses, post comments, edit source, or block by default.

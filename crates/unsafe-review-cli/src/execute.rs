@@ -3567,6 +3567,7 @@ fn print_help() {
     );
     println!("            --dry-run previews without executing");
     println!("  receipt   create, import, validate, and audit witness receipts");
+    println!("            `receipt-template` is a compatibility name for `receipt template`");
     println!("  candidate import and project manual advisory candidates");
     println!();
     println!("Repository posture:");
