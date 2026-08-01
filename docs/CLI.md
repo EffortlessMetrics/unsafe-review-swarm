@@ -91,6 +91,25 @@ classification explanations, limitations, unmatched baseline entries, and
 invalid-ledger-entry fields. It does not block, execute witnesses, or create
 broad suppression authority.
 
+## Pilot
+
+For a fast first look at a diff, `pilot` runs the same diff-scoped analysis as
+`check` but defaults `--max-cards` to 5:
+
+```bash
+unsafe-review pilot --base origin/main
+```
+
+```bash
+unsafe-review pilot --diff change.diff --format json
+unsafe-review pilot --base origin/main --max-cards 10
+```
+
+`pilot` accepts every `check` flag except `--policy` (it is always advisory) and
+`--out`. Because it caps cards by default, a `pilot` run is a sample of the
+diff's cards, not a complete inventory — use `check` or `pr` when you need the
+full card list.
+
 ## First PR Bundle
 
 For a first local review pass, write the standard advisory artifact bundle:
@@ -599,6 +618,73 @@ run witnesses, post policy decisions, or claim repository safety. It is not
 memory-safety proof, not UB-free status, not Miri-clean status, not
 site-execution evidence, not calibrated precision/recall, and not policy-ready
 status.
+
+## Baseline
+
+`baseline` records pre-existing debt as the coverage floor (SPEC-0030), so
+`--policy no-new-debt` can flag only what a change adds. The ledger is
+`policy/unsafe-review-baseline.toml` and the snapshot is
+`policy/unsafe-review-baseline-snapshot.toml`.
+
+Preview the ledger and snapshot plan without writing anything:
+
+```bash
+unsafe-review baseline init --dry-run --format json
+```
+
+Record the floor, then commit both generated files:
+
+```bash
+unsafe-review baseline init
+git add policy/unsafe-review-baseline.toml policy/unsafe-review-baseline-snapshot.toml
+git commit -m 'baseline: record pre-existing debt floor'
+```
+
+Run `init` from a clean base or default branch before feature changes, not from
+the PR branch under review. From then on:
+
+```bash
+unsafe-review check --policy no-new-debt
+```
+
+### Subcommands
+
+| Subcommand | Purpose | Writes |
+|---|---|---|
+| `baseline init` | Scan the repo for open actionable cards and record each as a ledger entry with its current coverage state | ledger + snapshot (nothing under `--dry-run`) |
+| `baseline add` | Add or update one ledger entry and its snapshot state without rescanning the whole ledger | ledger + snapshot |
+| `baseline status` | Read-only health report classifying every ledger entry and every unbaselined open actionable card | nothing |
+| `baseline refresh --dry-run` | Preview the per-entry action a maintainer could take | plan artifact only when `--out` is given |
+
+```bash
+unsafe-review baseline add \
+  --card-id UR-...-c1 \
+  --owner <name> \
+  --reason <text> \
+  --evidence <text>
+
+unsafe-review baseline status [--root .] [--format human|json]
+unsafe-review baseline refresh --dry-run [--root .] [--out target/baseline-refresh]
+```
+
+`status` sorts every entry into one of ten SPEC-0030 buckets:
+`active_unchanged`, `active_improved`, `active_worsened`, `resolved`,
+`review_due`, `snapshot_missing_or_invalid`, `duplicate_or_conflicting_entry`,
+`suppression_overlap`, `identity_unmatched`, and `new_unbaselined`. Check it
+before refreshing a ledger.
+
+`refresh --dry-run` previews per-entry actions (`keep`, `update_snapshot`,
+`mark_resolved`, `advance_review_after`, `add_new_debt`, `conflict`). It leaves
+policy, source, and snapshot state unchanged, and **there is no apply mode** —
+refreshing a ledger is a manual edit.
+
+`init` and `status` run a full repository scan, so their cost scales with repo
+size rather than diff size — see [Scan cost and large-repo
+scoping](#scan-cost-and-large-repo-scoping).
+
+Baseline entries are debt records, not safety records. Recording a card as
+pre-existing debt does not prove memory safety, UB-free status, Miri-clean
+status, or that any unsafe site executed safely.
 
 ## Witness Receipts
 
