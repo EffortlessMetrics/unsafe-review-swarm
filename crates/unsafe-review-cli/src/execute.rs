@@ -90,7 +90,39 @@ const FIRST_PR_ARTIFACTS: [&str; 18] = [
     "repair-queue.json",
 ];
 
+/// Reject a `--root` that cannot be scanned, before any command runs.
+///
+/// Without this check a missing root surfaces the directory walker's raw IO
+/// string, and a root that names a file scans nothing at all and reports
+/// `cards: 0` — a clean review the user never actually ran.
+fn ensure_review_root(root: &Path) -> Result<(), String> {
+    if root.is_dir() {
+        return Ok(());
+    }
+    Err(review_root_error(root, &root.try_exists(), root.is_file()))
+}
+
+/// Explain why a `--root` is not a usable scan directory.
+///
+/// `existence` is `Path::try_exists`, not `Path::exists`. `exists` collapses a
+/// failed stat into `false`, so an unreadable directory would be reported as
+/// missing and send the user hunting for a typo instead of a permission.
+fn review_root_error(root: &Path, existence: &io::Result<bool>, is_file: bool) -> String {
+    let hint =
+        "Pass --root <dir> pointing at a Rust crate or workspace (default: the current directory).";
+    let root = root.display();
+    match existence {
+        Ok(true) if is_file => format!("--root {root} is a file, not a directory. {hint}"),
+        Ok(true) => format!("--root {root} is not a directory. {hint}"),
+        Ok(false) => format!("--root {root} does not exist. {hint}"),
+        Err(err) => format!("--root {root} cannot be read: {err}. {hint}"),
+    }
+}
+
 pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
+    if let Some(root) = command.review_root() {
+        ensure_review_root(root).map_err(crate::RunFailure::Tool)?;
+    }
     match command {
         Command::Help => {
             print_help();
@@ -1656,14 +1688,22 @@ fn git_ref_error(base: &str, git_stderr: &str) -> String {
         || git_stderr.contains("not a tree object")
         || git_stderr.contains("does not exist");
     if is_ref_error {
-        format!(
+        return format!(
             "base ref '{base}' could not be resolved by git ({git_stderr}). \
              Pass a branch, tag, or commit SHA that exists in the repository \
              (e.g. --base origin/main), or supply --diff <file> instead."
-        )
-    } else {
-        format!("git diff failed: {git_stderr}")
+        );
     }
+    // Outside a work tree git answers with its full `diff --no-index` usage
+    // text, which buries the actual problem. Name the condition instead.
+    if git_stderr.contains("Not a git repository") || git_stderr.contains("not a git repository") {
+        return format!(
+            "--root is not inside a git repository, so --base '{base}' cannot be \
+             resolved. Run unsafe-review from a git checkout, pass --root <repo>, \
+             or supply --diff <file> instead."
+        );
+    }
+    format!("git diff failed: {git_stderr}")
 }
 
 fn validate_expected_head_sha(
@@ -3753,9 +3793,11 @@ fn print_candidate_help() {
 #[cfg(test)]
 mod tests {
     use super::{
-        RepoScanScopeMetadata, render_repo_scan_incomplete_status, render_repo_scan_status,
-        repo_status_operator_json, resolve_diff_path, shell_path_arg, writable_status, yes_no,
+        RepoScanScopeMetadata, ensure_review_root, git_ref_error,
+        render_repo_scan_incomplete_status, render_repo_scan_status, repo_status_operator_json,
+        resolve_diff_path, review_root_error, shell_path_arg, writable_status, yes_no,
     };
+    use std::io;
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
         DiscoveryOptions, PerFileScanStats, RepoScanPhase, RepoScanStatus, RepoStopReason,
@@ -3763,6 +3805,100 @@ mod tests {
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
         RepoScanScopeMetadata::new(Path::new("/tmp/repo"), &DiscoveryOptions::repo_defaults())
+    }
+
+    #[test]
+    fn ensure_review_root_accepts_a_directory() -> Result<(), String> {
+        ensure_review_root(Path::new("."))
+    }
+
+    #[test]
+    fn ensure_review_root_rejects_a_missing_root_by_name() -> Result<(), String> {
+        let Err(err) = ensure_review_root(Path::new("definitely-not-here-9a1f")) else {
+            return Err("a missing root must not scan".to_string());
+        };
+        assert!(
+            err.contains("--root definitely-not-here-9a1f does not exist"),
+            "{err}"
+        );
+        assert!(err.contains("Pass --root <dir>"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn ensure_review_root_rejects_a_file_root_instead_of_reporting_a_clean_scan()
+    -> Result<(), String> {
+        // A file root walks to zero Rust files, which would otherwise render as
+        // `cards: 0` — a clean review the user never ran.
+        let file = Path::new(env!("CARGO_MANIFEST_DIR")).join("Cargo.toml");
+        assert!(file.is_file(), "test needs an existing file path");
+        let Err(err) = ensure_review_root(&file) else {
+            return Err("a file root must not scan".to_string());
+        };
+        assert!(err.contains("is a file, not a directory"), "{err}");
+        assert!(err.contains("Pass --root <dir>"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn review_root_error_separates_unreadable_from_missing() {
+        // `Path::exists` reports a permission failure as "not there"; the user
+        // needs to know the path could not be read at all.
+        let unreadable = review_root_error(
+            Path::new("/srv/restricted"),
+            &Err(io::Error::from(io::ErrorKind::PermissionDenied)),
+            false,
+        );
+        assert!(unreadable.contains("cannot be read"), "{unreadable}");
+        assert!(!unreadable.contains("does not exist"), "{unreadable}");
+
+        let missing = review_root_error(Path::new("/srv/gone"), &Ok(false), false);
+        assert!(missing.contains("does not exist"), "{missing}");
+
+        let file = review_root_error(Path::new("/srv/lib.rs"), &Ok(true), true);
+        assert!(file.contains("is a file, not a directory"), "{file}");
+
+        let other = review_root_error(Path::new("/srv/sock"), &Ok(true), false);
+        assert!(other.contains("is not a directory"), "{other}");
+        assert!(!other.contains("is a file"), "{other}");
+
+        for message in [unreadable, missing, file, other] {
+            assert!(message.contains("Pass --root <dir>"), "{message}");
+        }
+    }
+
+    #[test]
+    fn git_ref_error_names_an_unresolvable_ref() {
+        let err = git_ref_error(
+            "origin/nope",
+            "fatal: ambiguous argument 'origin/nope...HEAD': unknown revision",
+        );
+        assert!(
+            err.contains("base ref 'origin/nope' could not be resolved by git"),
+            "{err}"
+        );
+        assert!(err.contains("--diff <file>"), "{err}");
+    }
+
+    #[test]
+    fn git_ref_error_names_a_missing_repository_instead_of_echoing_git_usage() {
+        // Outside a work tree git replies with its whole `diff --no-index`
+        // usage block; the user needs the condition, not the manual page.
+        let git_stderr = "warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>";
+        let err = git_ref_error("origin/main", git_stderr);
+        assert!(
+            err.contains("--root is not inside a git repository"),
+            "{err}"
+        );
+        assert!(err.contains("--base 'origin/main'"), "{err}");
+        assert!(err.contains("--diff <file>"), "{err}");
+        assert!(!err.contains("usage: git diff --no-index"), "{err}");
+    }
+
+    #[test]
+    fn git_ref_error_preserves_unclassified_git_failures() {
+        let err = git_ref_error("origin/main", "fatal: something else entirely");
+        assert_eq!(err, "git diff failed: fatal: something else entirely");
     }
 
     #[test]
