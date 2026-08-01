@@ -3921,12 +3921,23 @@ fn first_pr_comment_plan_explains_not_selected_cards() -> Result<(), Box<dyn Err
 
 #[test]
 fn check_rejects_a_missing_root_with_an_actionable_message() -> Result<(), Box<dyn Error>> {
-    let output = run_failure([os("check"), os("--root"), os("no-such-directory-4c1e")])?;
+    // A relative name would resolve against the test process's working
+    // directory and could exist there, silently stopping this from exercising
+    // the missing-root path at all (see #1817). Use an uncreated child of a
+    // fresh temp dir.
+    let temp = TempDir::new("unsafe-review-missing-root-e2e")?;
+    let missing = temp.path().join("missing");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        missing.as_os_str().to_os_string(),
+    ])?;
 
     assert_eq!(output.status.code(), Some(2));
     let text = String::from_utf8(output.stderr.clone())?;
     assert!(
-        text.contains("--root no-such-directory-4c1e does not exist"),
+        text.contains(&format!("--root {} does not exist", missing.display())),
         "{text}"
     );
     assert!(text.contains("Pass --root <dir>"), "{text}");
@@ -3958,12 +3969,15 @@ fn check_rejects_a_file_root_instead_of_reporting_a_clean_review() -> Result<(),
 
 #[test]
 fn repo_rejects_a_missing_root_with_the_same_message_as_check() -> Result<(), Box<dyn Error>> {
-    let output = run_failure([os("repo"), os("--root"), os("no-such-directory-4c1e")])?;
+    let temp = TempDir::new("unsafe-review-missing-root-repo-e2e")?;
+    let missing = temp.path().join("missing");
+
+    let output = run_failure([os("repo"), os("--root"), missing.as_os_str().to_os_string()])?;
 
     assert_eq!(output.status.code(), Some(2));
     let text = String::from_utf8(output.stderr.clone())?;
     assert!(
-        text.contains("--root no-such-directory-4c1e does not exist"),
+        text.contains(&format!("--root {} does not exist", missing.display())),
         "{text}"
     );
 
