@@ -8,8 +8,8 @@ use super::shell_arg;
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
-    AnalyzeOutput, ManualCandidate, ReviewCard, Scope, baseline_status,
-    manual_candidate_implementer_handoff, project_review_card_confirmation, render_repair_queue,
+    AnalyzeOutput, ManualCandidate, ReviewCard, Scope, manual_candidate_implementer_handoff,
+    project_review_card_confirmation, render_repair_queue,
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
@@ -111,7 +111,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     );
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
-    print_baseline_onboarding_handoff(report.terminal_command, report.root);
+    print_baseline_onboarding_handoff(report.root);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
@@ -129,7 +129,7 @@ fn print_policy_report_handoff(out_dir: &Path) {
     println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
 }
 
-fn print_baseline_onboarding_handoff(terminal_command: &str, root: &Path) {
+fn print_baseline_onboarding_handoff(root: &Path) {
     println!("Brownfield baseline (optional):");
     if root
         .join("policy")
@@ -138,6 +138,15 @@ fn print_baseline_onboarding_handoff(terminal_command: &str, root: &Path) {
     {
         // Issue #1893 §Integration: point to `baseline status` before suggesting
         // `baseline init` again when a ledger already exists.
+        //
+        // This pointer is free — a file-existence check — and it names the exact
+        // command an operator would run either way.  Issue #2004 retired the
+        // `pr`-only health *warning* that used to follow it: deciding whether to
+        // call the ledger "unhealthy" cost a full-repository classification scan
+        // (`Scope::Repo`, `max_cards: None`), which on this repository made `pr`
+        // ~235x slower than `first-pr` on identical input for one conditional
+        // adjective on a command that is printed here regardless.  The scan lives
+        // on in `baseline status`, where paying for it is the user's choice.
         println!("  a baseline ledger already exists; check its health before re-running init:");
         println!("  {}", baseline_status_command(root));
     }
@@ -148,63 +157,6 @@ fn print_baseline_onboarding_handoff(terminal_command: &str, root: &Path) {
         "  records current open actionable gaps as pre-existing debt; review generated policy files before committing"
     );
     println!("  not a safety record, not UB-free status, and not a witness result");
-    // Issue #1893 §Integration: `pr` (not `first-pr`) surfaces a bounded one-line
-    // warning naming the exact `baseline status` command when the ledger needs
-    // attention. Bounded to `pr` and gated on the ledger existing so the common
-    // (no baseline yet) case never pays for the extra full-repo classification scan.
-    if terminal_command == "pr" {
-        print_baseline_health_warning(root);
-    }
-}
-
-/// Bounded, advisory-only `pr` warning (issue #1893 §Integration). Reuses
-/// `baseline_status` verbatim — no second movement model. This is a one-line hint, not a
-/// gate, and must never fail the primary `pr` command. A classification *error* (e.g. an
-/// unparseable baseline ledger, a broken suppression ledger, or a source-scan failure)
-/// is itself surfaced as a non-blocking warning rather than swallowed — a ledger that
-/// cannot even be classified is exactly when the operator most needs the pointer to
-/// `baseline status`, so silence there would hide the problem, not reduce noise.
-fn print_baseline_health_warning(root: &Path) {
-    if !root
-        .join("policy")
-        .join("unsafe-review-baseline.toml")
-        .is_file()
-    {
-        return;
-    }
-    // `baseline_status` runs a full repository scan (`Scope::Repo`, `max_cards: None`),
-    // so this one advisory line costs far more than the diff-scoped review that produced
-    // everything above it. On this repository the release binary takes ~0.15s for
-    // `first-pr` and ~35s for `pr` on the same input; the entire difference is this call.
-    //
-    // The cost is the documented issue #1893 §Integration stance and is not changed here.
-    // What is changed is that the wait is no longer unexplained: without this line the
-    // front door prints most of its report, stops dead partway through the "Brownfield
-    // baseline" block with no cursor movement, and then resumes — which reads as a hang,
-    // not as work. Announce the scan before starting it so the pause is legible.
-    //
-    // Printed before the scan, and via `println!` (Rust's stdout is a `LineWriter`, so the
-    // trailing newline flushes it) — a notice that appeared only after the scan finished
-    // would explain a pause the user had already sat through.
-    println!(
-        "  checking ledger health (full repository scan; slower than the review above on large repos)"
-    );
-    let report = match baseline_status(root) {
-        Ok(report) => report,
-        Err(_) => {
-            println!(
-                "  warning: baseline ledger could not be classified — run `{}`",
-                baseline_status_command(root)
-            );
-            return;
-        }
-    };
-    if !report.counts.is_fully_healthy() {
-        println!(
-            "  warning: baseline ledger needs attention — run `{}`",
-            baseline_status_command(root)
-        );
-    }
 }
 
 fn print_manual_candidate_handoff(

@@ -9399,83 +9399,86 @@ fn baseline_refresh_dry_run_is_required_and_writes_only_to_out() -> Result<(), B
     Ok(())
 }
 
-// issue #1893 §Integration: `pr` (not `first-pr`) surfaces a bounded one-line warning
-// naming the exact `baseline status` command when the ledger needs attention, and
-// `init` onboarding (the `pr`/`first-pr` "Brownfield baseline" handoff) points to
-// `baseline status` before suggesting `baseline init` again when a ledger already
-// exists. The `raw_pointer_deref_brownfield_inherited` fixture ships a baseline entry
-// with no coverage snapshot, so its ledger is unhealthy (snapshot_missing_or_invalid).
+// issue #2004 (revising the issue #1893 §Integration stance): the `pr`-only ledger-health
+// warning is retired.  Deciding whether to call the ledger "unhealthy" required a full
+// repository classification scan, which made `pr` ~235x slower than `first-pr` on
+// identical input in exchange for one conditional adjective on a command that the
+// ledger-exists pointer already prints unconditionally and for free.
+//
+// What both entrypoints must still do is point at `baseline status` when a ledger exists.
+// What neither may do is scan the repository to decide how to word that pointer.
+//
+// The `raw_pointer_deref_brownfield_inherited` fixture ships a baseline entry with no
+// coverage snapshot, so its ledger *is* unhealthy (snapshot_missing_or_invalid) — this
+// fixture is exactly the case that used to trigger the warning, which is what makes it
+// the right drift-lock: if the scan comes back, it comes back here first.
 #[test]
-fn pr_warns_about_unhealthy_baseline_but_first_pr_does_not() -> Result<(), Box<dyn Error>> {
+fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Result<(), Box<dyn Error>>
+{
     let fixture = fixture_root("raw_pointer_deref_brownfield_inherited");
-    let out_dir = TempDir::new("unsafe-review-pr-baseline-warning-e2e")?;
 
-    let pr_output = run_success([
-        os("pr"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        fixture.join("change.diff").into_os_string(),
-        os("--out-dir"),
-        out_dir.path().as_os_str().to_os_string(),
-    ])?;
-    let pr_stdout = stdout_text(&pr_output)?;
-    assert!(
-        pr_stdout.contains("a baseline ledger already exists; check its health"),
-        "{pr_stdout}"
-    );
-    assert!(
-        pr_stdout.contains(&format!(
-            "unsafe-review baseline status --root {}",
-            fixture.display()
-        )),
-        "{pr_stdout}"
-    );
-    assert!(
-        pr_stdout.contains("warning: baseline ledger needs attention"),
-        "{pr_stdout}"
-    );
-    // The health check runs a full repository scan, so `pr` announces it before starting
-    // rather than leaving the front door looking hung partway through its own report.
-    let notice = "  checking ledger health (full repository scan";
-    assert!(pr_stdout.contains(notice), "{pr_stdout}");
-    let notice_at = pr_stdout
-        .find(notice)
-        .ok_or("expected the ledger-health notice in `pr` stdout")?;
-    let warning_at = pr_stdout
-        .find("warning: baseline ledger needs attention")
-        .ok_or("expected the ledger-health warning in `pr` stdout")?;
-    assert!(
-        notice_at < warning_at,
-        "the notice must precede the scan it announces, otherwise it explains a pause the \
-         user already sat through: {pr_stdout}"
-    );
+    let run_entrypoint = |command: &str, label: &str| -> Result<String, Box<dyn Error>> {
+        let out_dir = TempDir::new(label)?;
+        let output = run_success([
+            os(command),
+            os("--root"),
+            fixture.as_os_str().to_os_string(),
+            os("--diff"),
+            fixture.join("change.diff").into_os_string(),
+            os("--out-dir"),
+            out_dir.path().as_os_str().to_os_string(),
+        ])?;
+        stdout_text(&output)
+    };
 
-    let first_pr_out_dir = TempDir::new("unsafe-review-first-pr-baseline-warning-e2e")?;
-    let first_pr_output = run_success([
-        os("first-pr"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        fixture.join("change.diff").into_os_string(),
-        os("--out-dir"),
-        first_pr_out_dir.path().as_os_str().to_os_string(),
-    ])?;
-    let first_pr_stdout = stdout_text(&first_pr_output)?;
-    assert!(
-        !first_pr_stdout.contains("warning: baseline ledger needs attention"),
-        "the bounded warning is `pr`-only (issue #1893 §Integration): {first_pr_stdout}"
-    );
-    // `first-pr` never runs the scan, so it must not announce one either.
-    assert!(
-        !first_pr_stdout.contains("checking ledger health"),
-        "the ledger-health scan and its notice are both `pr`-only: {first_pr_stdout}"
-    );
-    // The ledger-exists pointer to `baseline status` is shown for both entrypoints —
-    // only the bounded warning line is `pr`-specific.
-    assert!(
-        first_pr_stdout.contains("a baseline ledger already exists; check its health"),
-        "{first_pr_stdout}"
+    let pr_stdout = run_entrypoint("pr", "unsafe-review-pr-baseline-pointer-e2e")?;
+    let first_pr_stdout =
+        run_entrypoint("first-pr", "unsafe-review-first-pr-baseline-pointer-e2e")?;
+
+    for (entrypoint, stdout) in [("pr", &pr_stdout), ("first-pr", &first_pr_stdout)] {
+        // The free pointer survives: a ledger exists, so name the command to inspect it.
+        assert!(
+            stdout.contains("a baseline ledger already exists; check its health"),
+            "`{entrypoint}` must still point at the ledger when one exists: {stdout}"
+        );
+        assert!(
+            stdout.contains(&format!(
+                "unsafe-review baseline status --root {}",
+                fixture.display()
+            )),
+            "`{entrypoint}` must name the exact `baseline status` command: {stdout}"
+        );
+        // The scan and everything it paid for are gone, on both entrypoints.
+        assert!(
+            !stdout.contains("warning: baseline ledger needs attention"),
+            "`{entrypoint}` must not classify ledger health on the front door (#2004): {stdout}"
+        );
+        assert!(
+            !stdout.contains("checking ledger health"),
+            "`{entrypoint}` must not announce a ledger-health scan it no longer runs: {stdout}"
+        );
+        assert!(
+            !stdout.contains("baseline ledger could not be classified"),
+            "`{entrypoint}` must not report a classification it no longer attempts: {stdout}"
+        );
+    }
+
+    // `pr` and `first-pr` now say the same thing about the baseline ledger.  The
+    // divergence existed only to carry the warning; with the warning retired, a
+    // difference here would mean the scan survived on one path.
+    let baseline_block = |stdout: &str| -> String {
+        stdout
+            .lines()
+            .skip_while(|line| !line.starts_with("Brownfield baseline"))
+            .take_while(|line| !line.starts_with("Manual candidates:"))
+            .collect::<Vec<_>>()
+            .join("\n")
+    };
+    assert_eq!(
+        baseline_block(&pr_stdout),
+        baseline_block(&first_pr_stdout),
+        "the Brownfield baseline block must be identical across entrypoints once the \
+         `pr`-only health warning is retired"
     );
 
     Ok(())
