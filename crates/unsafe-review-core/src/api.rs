@@ -252,6 +252,42 @@ pub struct Summary {
     pub improved_gaps: usize,
     pub resolved_gaps: usize,
     pub inherited_gaps: usize,
+    /// True when the scan emitted fewer cards than it discovered because the
+    /// `max_cards` cap was exceeded and spread-selection dropped the remainder
+    /// (SPEC-0035 `stop_reason=max_cards`).
+    ///
+    /// This is *projected* from the pipeline's cap decision, never re-derived by
+    /// a consumer from `unsafe_sites > cards` (registry FM8, project-vs-re-derive).
+    /// Every count in this summary is understated while it is true, so any surface
+    /// that renders a count must also disclose the cap.
+    pub scan_capped: bool,
+    /// The `max_cards` value in effect when `scan_capped` is true; `None` on an
+    /// uncapped run.
+    pub card_cap: Option<usize>,
+}
+
+impl Summary {
+    /// One-line disclosure for a capped scan, or `None` when the scan was complete.
+    ///
+    /// Single source of the wording so the terminal, PR summary, and witness plan
+    /// cannot drift apart. It reports coverage of the emitted card set only: it is
+    /// not a memory-safety, UB-free, Miri-clean, site-execution, or
+    /// precision/recall claim, and a complete scan is not one either.
+    pub fn capped_scan_notice(&self) -> Option<String> {
+        if !self.scan_capped {
+            return None;
+        }
+        let cap = match self.card_cap {
+            Some(cap) => format!("--max-cards {cap}"),
+            None => "the card cap".to_string(),
+        };
+        Some(format!(
+            "Partial scan: {} of {} discovered unsafe sites are shown ({cap}). \
+             Every count above is capped, not a complete inventory — rerun without \
+             the cap to see the rest.",
+            self.cards, self.unsafe_sites
+        ))
+    }
 }
 
 #[derive(Clone, Debug)]

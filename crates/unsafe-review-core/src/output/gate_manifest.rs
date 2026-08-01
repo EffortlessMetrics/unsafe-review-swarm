@@ -55,6 +55,8 @@ pub(crate) fn render_repo(output: &AnalyzeOutput, report_filename: &str) -> Stri
         dialect: "unsafe-review",
         status: "advisory",
         summary: GateMovementSummary::from(&output.summary),
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
         artifacts: GateArtifactsRepo {
             cards: report_filename.to_owned(),
         },
@@ -80,6 +82,13 @@ struct GateManifestRepo {
     dialect: &'static str,
     status: &'static str,
     summary: GateMovementSummary,
+    /// Scan completeness, sibling to `summary` rather than inside it: the movement
+    /// block is SPEC-0030's five buckets copied verbatim, and completeness is a
+    /// property of the run, not a movement counter.  True means every count in
+    /// `summary` is understated (SPEC-0035 `stop_reason=max_cards`).
+    scan_capped: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    card_cap: Option<usize>,
     artifacts: GateArtifactsRepo,
     trust_boundary: &'static str,
     tool: &'static str,
@@ -103,6 +112,10 @@ struct GateManifest {
     dialect: &'static str,
     status: &'static str,
     summary: GateMovementSummary,
+    /// See `GateManifestRepo::scan_capped`.
+    scan_capped: bool,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    card_cap: Option<usize>,
     artifacts: GateArtifacts,
     trust_boundary: &'static str,
     tool: &'static str,
@@ -116,6 +129,8 @@ impl From<&AnalyzeOutput> for GateManifest {
             dialect: "unsafe-review",
             status: "advisory",
             summary: GateMovementSummary::from(&output.summary),
+            scan_capped: output.summary.scan_capped,
+            card_cap: output.summary.card_cap,
             artifacts: GateArtifacts::from(output),
             trust_boundary: GATE_MANIFEST_TRUST_BOUNDARY,
             tool: "unsafe-review",

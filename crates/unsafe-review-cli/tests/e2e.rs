@@ -974,6 +974,190 @@ fn cargo_bin_policy_violation_exits_1_not_2() -> Result<(), Box<dyn Error>> {
     Ok(())
 }
 
+/// #2006 regression: a `--max-cards` capped `first-pr` run must not be
+/// indistinguishable from a complete one on the front door.
+///
+/// Before the fix the capped run printed a smaller "Review cards" / "Open
+/// actionable gaps" pair and nothing else, so it was byte-shaped exactly like a
+/// genuine smaller result. The same root is run twice — capped and complete —
+/// and only the capped run may carry the disclosure.
+///
+/// Drift-lock: drop the `capped_scan_notice` print in `print_first_pr_overview` → RED.
+#[test]
+fn capped_first_pr_run_discloses_the_cap_on_the_terminal() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-cli-capped-disclosure-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"capped-disclosure-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        scan_root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+         pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    // first-pr is diff-scoped; supply the change that introduced both sites so the
+    // run does not fall back to `git diff` against a non-repository.
+    let diff_path = scan_root.join("change.diff");
+    fs::write(
+        &diff_path,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,2 @@\n\
+         +pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+         +pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let run = |out_dir: &Path, cap: Option<&str>| -> Result<String, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("first-pr")
+            .arg("--root")
+            .arg(&scan_root)
+            .arg("--diff")
+            .arg(&diff_path)
+            .arg("--out-dir")
+            .arg(out_dir);
+        if let Some(cap) = cap {
+            command.arg("--max-cards").arg(cap);
+        }
+        let output = command.output()?;
+        assert!(
+            output.status.success(),
+            "first-pr run must exit 0: status={:?}\nstderr:\n{}",
+            output.status.code(),
+            String::from_utf8_lossy(&output.stderr),
+        );
+        Ok(String::from_utf8_lossy(&output.stdout).to_string())
+    };
+
+    let capped = run(&temp.path().join("capped"), Some("1"))?;
+    let complete = run(&temp.path().join("complete"), None)?;
+
+    assert!(
+        capped.contains("Partial scan:"),
+        "a capped run must disclose the cap on the terminal, got:\n{capped}"
+    );
+    assert!(
+        capped.contains("--max-cards 1"),
+        "the disclosure must name the cap that bound the run, got:\n{capped}"
+    );
+    assert!(
+        !complete.contains("Partial scan:"),
+        "a complete run must not claim to be partial, got:\n{complete}"
+    );
+    // The disclosure is the ONLY thing distinguishing the two headline blocks —
+    // that is precisely the bug, so assert the counts really do differ.
+    assert!(
+        capped.contains("- Review cards: 1"),
+        "capped run must report the reduced card count, got:\n{capped}"
+    );
+    assert!(
+        !complete.contains("- Review cards: 1"),
+        "fixture must yield more than one card uncapped, got:\n{complete}"
+    );
+
+    Ok(())
+}
+
+/// #2006 regression: the capped state must reach the structured artifacts too,
+/// so a machine consumer cannot read a truncated bundle as a complete inventory.
+///
+/// Drift-lock: stop projecting `scan_capped` into `cards.json` or the gate
+/// manifest → RED.
+#[test]
+fn capped_first_pr_run_marks_cards_json_and_gate_manifest() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-cli-capped-artifacts-e2e")?;
+    let scan_root = temp.path().join("fixture");
+    fs::create_dir_all(scan_root.join("src"))?;
+    fs::write(
+        scan_root.join("Cargo.toml"),
+        "[package]\nname = \"capped-artifacts-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        scan_root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+         pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    // first-pr is diff-scoped; supply the change that introduced both sites so the
+    // run does not fall back to `git diff` against a non-repository.
+    let diff_path = scan_root.join("change.diff");
+    fs::write(
+        &diff_path,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,2 @@\n\
+         +pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+         +pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let out_dir = temp.path().join("bundle");
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("first-pr")
+        .arg("--root")
+        .arg(&scan_root)
+        .arg("--diff")
+        .arg(&diff_path)
+        .arg("--out-dir")
+        .arg(&out_dir)
+        .arg("--max-cards")
+        .arg("1")
+        .output()?;
+    assert!(
+        output.status.success(),
+        "capped first-pr must exit 0: {:?}\nstderr:\n{}",
+        output.status.code(),
+        String::from_utf8_lossy(&output.stderr),
+    );
+
+    let cards: Value = serde_json::from_str(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    assert_eq!(
+        cards["summary"]["scan_capped"], true,
+        "cards.json summary must mark the run capped: {}",
+        cards["summary"]
+    );
+    assert_eq!(
+        cards["summary"]["card_cap"], 1,
+        "cards.json summary must carry the cap: {}",
+        cards["summary"]
+    );
+    assert!(
+        cards["summary"]["unsafe_sites"].as_u64() > cards["summary"]["cards"].as_u64(),
+        "a capped run must show more discovered sites than emitted cards: {}",
+        cards["summary"]
+    );
+
+    let gate: Value = serde_json::from_str(&fs::read_to_string(
+        out_dir.join("unsafe-review-gate.json"),
+    )?)?;
+    assert_eq!(
+        gate["scan_capped"], true,
+        "the gate manifest must disclose the cap alongside its movement counts: {gate}"
+    );
+    assert_eq!(
+        gate["card_cap"], 1,
+        "the gate manifest must carry the cap value: {gate}"
+    );
+    // The manifest stays advisory — disclosure is not a verdict.
+    assert_eq!(
+        gate["status"], "advisory",
+        "cap disclosure must not change the advisory posture: {gate}"
+    );
+
+    let pr_summary = fs::read_to_string(out_dir.join("pr-summary.md"))?;
+    assert!(
+        pr_summary.contains("Partial scan:"),
+        "the PR summary must disclose the cap next to its counts:\n{pr_summary}"
+    );
+
+    Ok(())
+}
+
 /// Bug A regression: a capped repo scan must report stop_reason=max_cards and exit 0
 /// even when `--timeout-seconds` is supplied.  Before the fix, the timed_out()
 /// guard could fire on the terminal capped event (stop_reason=MaxCards) if the

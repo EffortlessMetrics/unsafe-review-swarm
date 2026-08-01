@@ -274,6 +274,11 @@ fn analyze_with_receipts(
         policy_state.baseline_ids(),
         &policy_state,
         &candidate_files,
+        // Carry the cap decision onto the summary so every consumer projects the
+        // same partial-scan truth the status event already reports, instead of
+        // re-deriving it from unsafe_sites > cards.
+        scan_capped,
+        input.max_cards,
     );
     let coverage_snapshot = policy_state.coverage_snapshot.clone();
     let output = AnalyzeOutput {
@@ -507,6 +512,10 @@ fn partial_analyze_output(
         baseline_ids,
         policy_state,
         candidate_files,
+        // A partial event is emitted mid-scan, before the cap is applied, so it is
+        // never a capped result.
+        false,
+        None,
     );
     AnalyzeOutput {
         analysis_identity: AnalysisIdentity::new(input.scope.as_str()),
@@ -6600,6 +6609,145 @@ evidence = "test fixture"
             "summary.unsafe_sites ({}) must reflect all scanned sites before the cap \
              (at least 4 unsafe fn/block seams across 4 functions)",
             output.summary.unsafe_sites
+        );
+        Ok(())
+    }
+
+    /// Verify that the cap decision is projected onto `summary.scan_capped` /
+    /// `summary.card_cap`, so every consumer can tell a truncated scan from a
+    /// complete one that genuinely found fewer gaps (#2006).
+    ///
+    /// A capped and an uncapped run over the same root are compared: only the
+    /// capped one carries the flag, the cap value, and the disclosure line.
+    ///
+    /// Drift-lock: stop passing `scan_capped` into `summarize` → RED.
+    #[test]
+    fn summary_projects_the_cap_decision_for_capped_scans_only() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-cap-projected")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"cap-projected-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n\
+             pub unsafe fn bravo(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+
+        let scan = |max_cards: Option<usize>| {
+            analyze(AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Repo,
+                diff: DiffSource::NoneRepoScan,
+                mode: AnalysisMode::Repo,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards,
+            })
+        };
+
+        let capped = scan(Some(1))?;
+        let complete = scan(None)?;
+        let _ = fs::remove_dir_all(&root);
+
+        assert!(
+            capped.summary.scan_capped,
+            "a scan that dropped cards to honour --max-cards must set scan_capped"
+        );
+        assert_eq!(
+            capped.summary.card_cap,
+            Some(1),
+            "a capped summary must carry the cap that bound it"
+        );
+        assert!(
+            capped.summary.capped_scan_notice().is_some_and(|notice| {
+                notice.contains("Partial scan") && notice.contains("--max-cards 1")
+            }),
+            "a capped summary must render a disclosure naming the cap, got {:?}",
+            capped.summary.capped_scan_notice()
+        );
+
+        assert!(
+            !complete.summary.scan_capped,
+            "an uncapped scan must not claim to be capped"
+        );
+        assert_eq!(
+            complete.summary.card_cap, None,
+            "an uncapped scan carries no cap value"
+        );
+        assert!(
+            complete.summary.capped_scan_notice().is_none(),
+            "a complete scan must render no partial-scan disclosure"
+        );
+        // The point of the flag: the two runs report different card counts, and only
+        // the flag distinguishes "capped at 1" from "found exactly 1".
+        assert!(
+            complete.summary.cards > capped.summary.cards,
+            "fixture must produce more cards uncapped ({}) than capped ({})",
+            complete.summary.cards,
+            capped.summary.cards
+        );
+        Ok(())
+    }
+
+    /// A run whose card count happens to equal the cap exactly is NOT capped:
+    /// nothing was dropped, so no disclosure may be emitted.
+    ///
+    /// This is the case the weaker `cards.len() == max_cards` heuristic gets
+    /// wrong, and the reason the flag is projected rather than re-derived.
+    ///
+    /// Drift-lock: re-derive `scan_capped` as `cards == max_cards` → RED.
+    #[test]
+    fn summary_is_not_capped_when_card_count_merely_equals_the_cap() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-cap-exact")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create dirs failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"cap-exact-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+        )
+        .map_err(|err| format!("write src/lib.rs failed: {err}"))?;
+
+        // Discover the exact uncapped card count, then re-run with the cap set to it.
+        let complete = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let exact = complete.summary.cards;
+        let at_cap = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: Some(exact),
+        })?;
+        let _ = fs::remove_dir_all(&root);
+
+        assert_eq!(
+            at_cap.summary.cards, exact,
+            "a cap equal to the card count must not drop cards"
+        );
+        assert!(
+            !at_cap.summary.scan_capped,
+            "reaching the cap without dropping any card is a complete scan, not a capped one"
+        );
+        assert!(
+            at_cap.summary.capped_scan_notice().is_none(),
+            "a complete scan must not warn about truncation it did not perform"
         );
         Ok(())
     }
