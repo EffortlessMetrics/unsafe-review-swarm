@@ -480,8 +480,18 @@ fn collect_todo_findings(value: &serde_json::Value, path: &str, problems: &mut V
     }
 }
 
+/// Look up one manual advisory candidate by id.
+///
+/// An id that cannot name a manual candidate at all — a `UR-` ReviewCard id, a
+/// path separator, a non-ASCII byte — is a miss, not a malformed request: this
+/// is a lookup, and callers layer it behind ReviewCard lookup. Returning the
+/// authoring-time validation error here surfaced "manual candidate id must be
+/// path-safe, non-UR" to users who had correctly passed a ReviewCard id.
+/// Authoring and import paths still validate strictly.
 pub fn load_manual_candidate(root: &Path, id: &str) -> Result<Option<ManualCandidate>, String> {
-    validate_candidate_id(id)?;
+    if validate_candidate_id(id).is_err() {
+        return Ok(None);
+    }
     let path = manual_candidate_path(root, id);
     if !path.exists() {
         return Ok(None);
@@ -1072,6 +1082,36 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert_eq!(candidate.id, "R4R2-S001");
+        Ok(())
+    }
+
+    #[test]
+    fn load_manual_candidate_treats_an_unusable_id_as_a_miss() -> Result<(), String> {
+        // A lookup answers "is there one?", so an id that cannot name a manual
+        // candidate is a miss. Returning the authoring-time validation error
+        // here leaked "must be path-safe, non-UR" to `explain`/`context` users
+        // who had correctly passed a ReviewCard id.
+        // No candidate directory is needed: an unusable id never reaches disk.
+        let root = unique_temp_dir("unsafe-review-manual-candidate-miss")?;
+
+        for id in ["UR-some-card-id-c1", "has/separator", "has\\separator", ""] {
+            assert!(
+                load_manual_candidate(&root, id)?.is_none(),
+                "id {id:?} must be a miss, not an error"
+            );
+        }
+
+        Ok(())
+    }
+
+    #[test]
+    fn manual_candidate_authoring_still_rejects_an_unusable_id() -> Result<(), String> {
+        // The lookup relaxation must not relax authoring or import.
+        let Err(err) = ManualCandidate::from_json_str(&example_json_with_id("UR-not-allowed"))
+        else {
+            return Err("authoring must reject a UR- id".to_string());
+        };
+        assert!(err.contains("non-UR"), "{err}");
         Ok(())
     }
 
