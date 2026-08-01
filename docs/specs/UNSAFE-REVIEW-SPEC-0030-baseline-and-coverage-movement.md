@@ -223,8 +223,8 @@ Classification precedence puts every entry-only bucket ahead of the
 scan-dependent `resolved` bucket: `review_due` (a past `review_after`, derivable
 from the entry and `today` alone) is evaluated before `resolved`, so a degraded,
 scan-unavailable run cannot mask a due entry as `resolved` — inflating that count,
-flipping the ledger to "fully healthy", and suppressing the bounded `pr` warning
-the `review_due` signal is meant to raise.
+flipping the ledger to "fully healthy" and hiding the `review_due` signal from
+the `baseline status` report it belongs in.
 
 Human and JSON output project from the same report, so both always report
 identical bucket counts and entry identities. `unsafe-review baseline refresh
@@ -243,12 +243,25 @@ that do not depend on the card scan (`identity_unmatched`,
 `duplicate_or_conflicting_entry`, `suppression_overlap`) keep their normal
 `conflict` action.
 
-`unsafe-review pr` (not `first-pr`) surfaces a bounded one-line warning naming
-the exact `baseline status` command when the ledger has any entry outside the
-`active_unchanged`/`resolved` buckets. The `pr`/`first-pr` brownfield-baseline
-handoff points to `baseline status` before suggesting `baseline init` again when
-a ledger already exists. Neither surface invents a second movement model, changes
-`policy_status`, or touches badges, the gate manifest, or agent/LSP surfaces.
+The `pr`/`first-pr` brownfield-baseline handoff points to `baseline status`
+before suggesting `baseline init` again when a ledger already exists. It does
+not invent a second movement model, change `policy_status`, or touch badges, the
+gate manifest, or agent/LSP surfaces.
+
+**Stance revision (issue #2004).** `pr` previously also surfaced a bounded
+one-line warning when the ledger had any entry outside the
+`active_unchanged`/`resolved` buckets. That warning is retired. Classifying the
+ledger required a full repository scan (`Scope::Repo`, `max_cards: None`) on a
+command whose actual review is diff-scoped, which measured ~235x the cost of the
+identical `first-pr` run on this repository and was paid on every `pr` run by
+exactly the repositories that had adopted baselines. What it bought was a
+conditional adjective in front of a `baseline status` command the handoff above
+already prints unconditionally and for free. The health report itself is
+unchanged and still available on demand — `baseline status` is where the scan
+belongs, because there the user has asked for it.
+
+Neither entrypoint may reintroduce repository-scanning work to decide how to
+word the front-door baseline pointer.
 
 ## Adoption flow
 
@@ -303,8 +316,11 @@ plan artifact only when the explicit `--out` option is given.
   / `baseline status` / `baseline refresh` argument parsing, including the
   required `--dry-run` refusal.
 - `cargo test -p unsafe-review --test e2e baseline` — `baseline status` human/JSON
-  parity, `baseline refresh --dry-run` writes-nothing and determinism, and the
-  bounded `pr`-only health warning.
+  parity, and `baseline refresh --dry-run` writes-nothing and determinism.
+- `cargo test -p unsafe-review --test e2e neither_entrypoint_scans_the_repository_for_baseline_ledger_health`
+  — the retired `pr`-only health warning (issue #2004): both entrypoints still
+  print the free `baseline status` pointer, neither classifies ledger health, and
+  their brownfield-baseline blocks are byte-identical.
 - `cargo test -p unsafe-review-cli` — `baseline init` / `baseline add` parsing
   and ledger round-trip; `--policy no-new-debt` exit codes for the
   pre-existing-debt-only, new-debt, and empty-baseline cases.
