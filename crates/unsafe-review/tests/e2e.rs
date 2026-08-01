@@ -4144,6 +4144,58 @@ fn relative_diff_path_explains_that_it_resolved_against_root() -> Result<(), Box
     Ok(())
 }
 
+/// An existing file the process cannot open must be rejected at the preflight too.
+/// `try_exists` answers "is there something here", not "can I read it", so this case
+/// used to slip past validation and fail inside the pipeline with the bare
+/// `read diff … failed: Permission denied` that the preflight exists to replace.
+///
+/// Root bypasses file permission bits, so the test probes first and skips rather than
+/// asserting something the environment cannot produce — a chmod-based assertion would
+/// pass as an unprivileged user and fail under root, which is worse than not running.
+#[cfg(unix)]
+#[test]
+fn unreadable_diff_file_is_rejected_at_the_preflight() -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = TempDir::new("unsafe-review-unreadable-diff-e2e")?;
+    let diff = temp.path().join("locked.diff");
+    fs::write(
+        &diff,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,1 @@\n\
+         +pub fn f() {}\n",
+    )?;
+    fs::set_permissions(&diff, fs::Permissions::from_mode(0o000))?;
+
+    if fs::read_to_string(&diff).is_ok() {
+        // Running with privileges that ignore the mode (root, or a permissive
+        // filesystem). The condition under test cannot be created here.
+        return Ok(());
+    }
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        diff.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("diff file {} could not be read", diff.display())),
+        "{text}"
+    );
+    assert!(text.contains("--diff"), "{text}");
+    // The deep pipeline error must not be what the user sees.
+    assert!(!text.contains("read diff"), "{text}");
+
+    Ok(())
+}
+
 #[test]
 fn directory_passed_to_diff_is_rejected_as_a_directory() -> Result<(), Box<dyn Error>> {
     // Reading a directory yields a confusing os error ("Is a directory"), which

@@ -1882,13 +1882,6 @@ fn ensure_readable_diff(requested: &Path, resolved: &Path, root: &Path) -> Resul
     // `try_exists` distinguishes "absent" from "cannot be determined": an unreadable
     // parent directory is a permission problem, not a typo, and must not be reported
     // as a missing file (matching `ensure_review_root`).
-    let existence = resolved.try_exists().map_err(|err| {
-        format!(
-            "diff file {} could not be read: {err}. Check the path and its directory \
-             permissions, then pass a readable file to --diff.",
-            resolved.display()
-        )
-    })?;
     let relative_note = if requested == resolved {
         String::new()
     } else {
@@ -1899,6 +1892,14 @@ fn ensure_readable_diff(requested: &Path, resolved: &Path, root: &Path) -> Resul
             root.join(requested).display()
         )
     };
+    let unreadable = |err: &dyn std::fmt::Display| {
+        format!(
+            "diff file {} could not be read: {err}.{relative_note} Check the path and its \
+             directory permissions, then pass a readable file to --diff.",
+            resolved.display()
+        )
+    };
+    let existence = resolved.try_exists().map_err(|err| unreadable(&err))?;
     if !existence {
         return Err(format!(
             "diff file {} does not exist.{relative_note} Capture one with \
@@ -1915,6 +1916,11 @@ fn ensure_readable_diff(requested: &Path, resolved: &Path, root: &Path) -> Resul
             resolved.display()
         ));
     }
+    // Existence is not readability: a file the process cannot open passes `try_exists`
+    // and would then fail inside the pipeline with the bare `read diff … failed` error
+    // this preflight exists to replace. Open it here so the permission case is reported
+    // at the boundary like every other unusable-input case.
+    std::fs::File::open(resolved).map_err(|err| unreadable(&err))?;
     Ok(())
 }
 
