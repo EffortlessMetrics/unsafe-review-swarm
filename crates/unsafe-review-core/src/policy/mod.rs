@@ -2,7 +2,7 @@ use crate::domain::CardId;
 use crate::domain::coverage::CoverageBlock;
 use std::collections::{BTreeMap, BTreeSet};
 use std::fs;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 
 /// Baseline health classification (issue #1893): `baseline status` / `baseline refresh`.
 /// Pure, deterministic classification built on the same signals as this module
@@ -104,14 +104,21 @@ pub(crate) struct PolicyState {
     pub(crate) coverage_snapshot: BTreeMap<String, SnapshotCoverage>,
 }
 
+/// Canonical location of the baseline debt ledger for a scan root.
+///
+/// Exported so a consumer that needs to *report on* the ledger — for example to
+/// explain that `--policy no-new-debt` has no floor to compare against — asks
+/// this module where the file is instead of re-deriving `policy/…toml` and
+/// drifting from the loader that actually reads it.
+pub fn baseline_ledger_path(root: &Path) -> PathBuf {
+    root.join("policy").join("unsafe-review-baseline.toml")
+}
+
 impl PolicyState {
     pub(crate) fn load(root: &Path) -> Result<Self, String> {
         let policy_dir = root.join("policy");
         Ok(Self {
-            baseline_ids: load_ledger_ids(
-                &policy_dir.join("unsafe-review-baseline.toml"),
-                LedgerKind::Baseline,
-            )?,
+            baseline_ids: load_ledger_ids(&baseline_ledger_path(root), LedgerKind::Baseline)?,
             suppression_ids: load_ledger_ids(
                 &policy_dir.join("unsafe-review-suppressions.toml"),
                 LedgerKind::Suppression,

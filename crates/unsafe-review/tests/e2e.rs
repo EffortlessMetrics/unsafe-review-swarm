@@ -4008,6 +4008,217 @@ fn check_base_outside_a_git_repository_names_the_condition() -> Result<(), Box<d
 }
 
 #[test]
+fn no_new_debt_without_a_ledger_says_every_gap_counts_as_new() -> Result<(), Box<dyn Error>> {
+    // `--policy no-new-debt` with no ledger has no recorded floor, so every open
+    // actionable gap is counted "new" — including debt that predates the change.
+    // The bare count is indistinguishable from a real regression against a
+    // baseline, so the failure has to say which situation the user is in.
+    let temp = TempDir::new("unsafe-review-no-ledger-e2e")?;
+    let root = temp.path();
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"no-ledger-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    let diff = root.join("change.diff");
+    fs::write(
+        &diff,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,1 @@\n\
+         +pub unsafe fn alpha(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+
+    let run = |args: Vec<std::ffi::OsString>| run_failure(args);
+    let args = vec![
+        os("check"),
+        os("--root"),
+        root.as_os_str().to_os_string(),
+        os("--diff"),
+        diff.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--policy"),
+        os("no-new-debt"),
+    ];
+
+    let without_ledger = run(args.clone())?;
+    // Exit code and counts are unchanged — this is diagnosis, not a policy change.
+    assert_eq!(
+        without_ledger.status.code(),
+        Some(1),
+        "the note must not change the policy-violation exit code"
+    );
+    let text = String::from_utf8(without_ledger.stderr.clone())?;
+    assert!(text.contains("no-new-debt policy:"), "{text}");
+    assert!(text.contains("No baseline ledger at"), "{text}");
+    assert!(
+        text.contains("every open actionable gap counts as new"),
+        "{text}"
+    );
+    assert!(text.contains("unsafe-review baseline init"), "{text}");
+    // Adoption guidance from the front door: record the floor from a clean base.
+    assert!(text.contains("clean base branch"), "{text}");
+
+    // With a ledger present the count means what the flag implies, so the note
+    // must disappear — otherwise it would be noise on every gated run.
+    fs::create_dir_all(root.join("policy"))?;
+    fs::write(
+        root.join("policy/unsafe-review-baseline.toml"),
+        "status = \"active\"\n",
+    )?;
+    let with_ledger = run(args)?;
+    assert_eq!(with_ledger.status.code(), Some(1));
+    let text = String::from_utf8(with_ledger.stderr.clone())?;
+    assert!(text.contains("no-new-debt policy:"), "{text}");
+    assert!(
+        !text.contains("No baseline ledger at"),
+        "the absent-ledger note must not fire when a ledger exists: {text}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn missing_diff_file_names_the_flag_and_the_ways_to_supply_one() -> Result<(), Box<dyn Error>> {
+    // The most likely first-hour failure after a typo. It used to surface a bare
+    // `read diff <path> failed: No such file or directory (os error 2)` from deep in
+    // the pipeline — the fault, never the fix.
+    let temp = TempDir::new("unsafe-review-missing-diff-e2e")?;
+    let missing = temp.path().join("nonexistent.diff");
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        missing.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("diff file {} does not exist", missing.display())),
+        "{text}"
+    );
+    // All three ways out are named, because which one applies depends on why the
+    // path was wrong and the user cannot be assumed to know any of them exist.
+    assert!(text.contains("git diff --binary --full-index"), "{text}");
+    assert!(text.contains("--diff -"), "{text}");
+    assert!(text.contains("--base <ref>"), "{text}");
+    // Fault-only wording must not survive as the whole message.
+    assert!(!text.contains("read diff"), "{text}");
+
+    Ok(())
+}
+
+#[test]
+fn relative_diff_path_explains_that_it_resolved_against_root() -> Result<(), Box<dyn Error>> {
+    // `resolve_diff_path` joins a relative --diff onto --root, so a user who ran
+    // from a different directory sees a path they never typed. Say where it came from.
+    let temp = TempDir::new("unsafe-review-relative-diff-e2e")?;
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        os("typo.diff"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("resolved against --root"), "{text}");
+    assert!(text.contains("typo.diff"), "{text}");
+    // The resolved path is shown, not just the name the user typed.
+    assert!(
+        text.contains(&temp.path().join("typo.diff").display().to_string()),
+        "{text}"
+    );
+
+    Ok(())
+}
+
+/// An existing file the process cannot open must be rejected at the preflight too.
+/// `try_exists` answers "is there something here", not "can I read it", so this case
+/// used to slip past validation and fail inside the pipeline with the bare
+/// `read diff … failed: Permission denied` that the preflight exists to replace.
+///
+/// Root bypasses file permission bits, so the test probes first and skips rather than
+/// asserting something the environment cannot produce — a chmod-based assertion would
+/// pass as an unprivileged user and fail under root, which is worse than not running.
+#[cfg(unix)]
+#[test]
+fn unreadable_diff_file_is_rejected_at_the_preflight() -> Result<(), Box<dyn Error>> {
+    use std::os::unix::fs::PermissionsExt;
+
+    let temp = TempDir::new("unsafe-review-unreadable-diff-e2e")?;
+    let diff = temp.path().join("locked.diff");
+    fs::write(
+        &diff,
+        "diff --git a/src/lib.rs b/src/lib.rs\n\
+         --- a/src/lib.rs\n\
+         +++ b/src/lib.rs\n\
+         @@ -1,0 +1,1 @@\n\
+         +pub fn f() {}\n",
+    )?;
+    fs::set_permissions(&diff, fs::Permissions::from_mode(0o000))?;
+
+    if fs::read_to_string(&diff).is_ok() {
+        // Running with privileges that ignore the mode (root, or a permissive
+        // filesystem). The condition under test cannot be created here.
+        return Ok(());
+    }
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        diff.as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("diff file {} could not be read", diff.display())),
+        "{text}"
+    );
+    assert!(text.contains("--diff"), "{text}");
+    // The deep pipeline error must not be what the user sees.
+    assert!(!text.contains("read diff"), "{text}");
+
+    Ok(())
+}
+
+#[test]
+fn directory_passed_to_diff_is_rejected_as_a_directory() -> Result<(), Box<dyn Error>> {
+    // Reading a directory yields a confusing os error ("Is a directory"), which
+    // reads like a corrupt-file problem rather than a wrong-argument problem.
+    let temp = TempDir::new("unsafe-review-dir-diff-e2e")?;
+
+    let output = run_failure([
+        os("check"),
+        os("--root"),
+        temp.path().as_os_str().to_os_string(),
+        os("--diff"),
+        temp.path().as_os_str().to_os_string(),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("is a directory, not a file"), "{text}");
+    assert!(text.contains("--diff"), "{text}");
+
+    Ok(())
+}
+
+#[test]
 fn explain_reports_an_unknown_card_id_as_not_found() -> Result<(), Box<dyn Error>> {
     // Regression: an unknown `UR-` id fell through to the manual-candidate
     // lookup, whose authoring-time validation rejects `UR-` prefixes. The user
@@ -4357,11 +4568,16 @@ fn check_reports_missing_diff_file_as_cli_failure() -> Result<(), Box<dyn Error>
     ])?;
 
     assert_eq!(output.status.code(), Some(2));
+    // The load-bearing guarantee: a missing diff is a hard failure with empty
+    // stdout, never a silent zero-card review of a diff that was never read.
     assert_eq!(stdout_text(&output)?.trim(), "");
     let stderr = String::from_utf8_lossy(&output.stderr);
+    // This used to assert the fault-only `read diff <path> failed: <io error>`
+    // wording. The failure is unchanged; only the message now names the fix
+    // (see `missing_diff_file_names_the_flag_and_the_ways_to_supply_one`).
     assert!(
-        stderr.contains("unsafe-review: read diff"),
-        "stderr should identify diff read failure: {stderr}"
+        stderr.contains("unsafe-review: diff file"),
+        "stderr should identify the unusable diff input: {stderr}"
     );
     assert!(
         stderr.contains("missing.diff"),
