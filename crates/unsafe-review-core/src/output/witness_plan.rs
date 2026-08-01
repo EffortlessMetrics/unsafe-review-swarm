@@ -58,6 +58,10 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         "- Open actionable gaps: {}\n",
         output.summary.open_actionable_gaps
     ));
+    // A capped run routes witnesses for the kept cards only; say so next to the counts.
+    if let Some(notice) = output.summary.capped_scan_notice() {
+        out.push_str(&format!("- {notice}\n"));
+    }
     out.push_str(&format!("- Policy mode: `{}`\n\n", output.policy.as_str()));
 
     if output.cards.is_empty() {

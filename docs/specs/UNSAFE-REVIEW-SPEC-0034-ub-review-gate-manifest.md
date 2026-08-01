@@ -53,6 +53,7 @@ movement summary; it recomputes nothing.
   "dialect": "unsafe-review",
   "status": "advisory",
   "summary": { "new_gaps": 2, "worsened_gaps": 1, "resolved_gaps": 3, "inherited_gaps": 91 },
+  "scan_capped": false,
   "artifacts": {
     "cards": "cards.json",
     "comment_plan": "comment-plan.json",
@@ -73,6 +74,16 @@ movement summary; it recomputes nothing.
 - `summary` is the four-bucket movement block of UNSAFE-REVIEW-SPEC-0030, copied
   verbatim, not re-derived. `status` is always `advisory` here; the manifest
   carries posture, never a block verdict.
+- `scan_capped` reports whether the `max_cards` cap dropped cards from this run,
+  with `card_cap` carrying the cap value when it did (omitted otherwise). It
+  sits beside `summary` rather than inside it because the movement block is
+  SPEC-0030's counters copied verbatim, and completeness is a property of the
+  run, not a movement counter. When `scan_capped` is `true` every count in
+  `summary` is understated, so a router must not read the manifest as a complete
+  inventory. The value is projected from the same cap decision as the SPEC-0035
+  status sidecar (`stop_reason: "max_cards"`), not re-derived. Both fields are
+  additive within `unsafe-review-gate/v1`: a reader that ignores them sees the
+  v1 envelope unchanged, and `schema_version`/`dialect` routing is untouched.
 - `artifacts` are relative pointers to the structured files the run already
   wrote (UNSAFE-REVIEW-SPEC-0029 projections). Missing optional artifacts are
   omitted, not faked.

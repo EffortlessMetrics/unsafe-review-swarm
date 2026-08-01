@@ -601,6 +601,11 @@ fn render_pr_summary_header_bullets(out: &mut String, output: &AnalyzeOutput) {
         "- Open actionable gaps: {}\n",
         output.summary.open_actionable_gaps
     ));
+    // A capped run understates every count above it, so the disclosure is rendered
+    // adjacent to the counts rather than in a footer a reader can miss.
+    if let Some(notice) = output.summary.capped_scan_notice() {
+        out.push_str(&format!("- {notice}\n"));
+    }
     // Render coverage movement when any movement signal is present.
     let s = &output.summary;
     let has_movement = s.new_gaps > 0

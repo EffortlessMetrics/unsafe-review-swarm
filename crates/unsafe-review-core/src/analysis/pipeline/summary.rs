@@ -42,6 +42,8 @@ pub(super) fn summarize(
     baseline_ids: &BTreeSet<String>,
     policy_state: &PolicyState,
     scanned_files: &[PathBuf],
+    scan_capped: bool,
+    card_cap: Option<usize>,
 ) -> Summary {
     let diff_scoped = matches!(scope, Scope::Diff);
     let current_ids = cards
@@ -55,6 +57,10 @@ pub(super) fn summarize(
         changed_non_rust_files,
         unsafe_sites: scanned_sites,
         cards: cards.len(),
+        scan_capped,
+        // The cap is only meaningful as a disclosure when it actually bound the
+        // output; an uncapped run carries no cap even when `max_cards` was passed.
+        card_cap: if scan_capped { card_cap } else { None },
         ..Summary::default()
     };
     let mut worsened = 0usize;

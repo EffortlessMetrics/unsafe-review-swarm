@@ -173,6 +173,13 @@ struct JsonSummary {
     improved_gaps: usize,
     resolved_gaps: usize,
     inherited_gaps: usize,
+    /// True when `max_cards` dropped cards from this run (SPEC-0035
+    /// `stop_reason=max_cards`).  While true every count above is understated,
+    /// so a consumer must not read this artifact as a complete inventory.
+    scan_capped: bool,
+    /// The cap that bound the run; absent on an uncapped run.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    card_cap: Option<usize>,
 }
 
 impl From<&Summary> for JsonSummary {
@@ -197,6 +204,8 @@ impl From<&Summary> for JsonSummary {
             improved_gaps: summary.improved_gaps,
             resolved_gaps: summary.resolved_gaps,
             inherited_gaps: summary.inherited_gaps,
+            scan_capped: summary.scan_capped,
+            card_cap: summary.card_cap,
         }
     }
 }

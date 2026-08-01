@@ -375,6 +375,11 @@ fn print_first_pr_overview(
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
     );
+    // Without this line a capped run is byte-identical to a complete one that
+    // genuinely found fewer gaps (#2006).
+    if let Some(notice) = output.summary.capped_scan_notice() {
+        println!("- {notice}");
+    }
     // Output bundle disk footprint — diagnostic only; not a coverage claim,
     // proof, UB-free, Miri-clean, site-execution, or performance guarantee.
     println!("- Output bundle: {output_bytes} bytes");
