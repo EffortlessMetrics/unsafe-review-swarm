@@ -4008,6 +4008,111 @@ fn check_base_outside_a_git_repository_names_the_condition() -> Result<(), Box<d
 }
 
 #[test]
+fn explain_reports_an_unknown_card_id_as_not_found() -> Result<(), Box<dyn Error>> {
+    // Regression: an unknown `UR-` id fell through to the manual-candidate
+    // lookup, whose authoring-time validation rejects `UR-` prefixes. The user
+    // was told a ReviewCard id "must be ... non-UR" — the opposite of what they
+    // had correctly passed.
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_failure([
+        os("explain"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("UR-not-a-real-card-id"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains("card `UR-not-a-real-card-id` not found"),
+        "{text}"
+    );
+    assert!(
+        !text.contains("non-UR"),
+        "a ReviewCard id must not be reported as a malformed manual candidate id: {text}"
+    );
+    assert!(
+        text.contains("unsafe-review repo"),
+        "the error must name how to list current card ids: {text}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn card_not_found_quotes_a_root_containing_whitespace() -> Result<(), Box<dyn Error>> {
+    // The message hands the user a command to run, so the root has to survive
+    // being pasted into a shell.
+    let temp = TempDir::new("unsafe-review-quoted-root-e2e")?;
+    let root = temp.path().join("crate with spaces");
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(root.join("src").join("lib.rs"), "pub fn f() {}\n")?;
+
+    let output = run_failure([
+        os("explain"),
+        os("--root"),
+        root.as_os_str().to_os_string(),
+        os("UR-not-a-real-card-id"),
+    ])?;
+
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("--root \"{}\"", root.display())),
+        "the recovery command must quote the root: {text}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn context_reports_an_unknown_card_id_as_not_found() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_failure([
+        os("context"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("UR-not-a-real-card-id"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains("card `UR-not-a-real-card-id` not found"),
+        "{text}"
+    );
+    assert!(!text.contains("non-UR"), "{text}");
+
+    Ok(())
+}
+
+#[test]
+fn candidate_witness_plan_reports_an_unknown_id_as_a_missing_candidate()
+-> Result<(), Box<dyn Error>> {
+    // `candidate witness-plan` genuinely wants a manual candidate, so a miss is
+    // still a miss — but it is a lookup failure, not a malformed request.
+    let fixture = fixture_root("raw_pointer_alignment");
+
+    let output = run_failure([
+        os("candidate"),
+        os("witness-plan"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("UR-not-a-real-card-id"),
+    ])?;
+
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains("manual candidate `UR-not-a-real-card-id` not found"),
+        "{text}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;

@@ -2039,14 +2039,14 @@ fn explain(root: &Path, id: &str, format: Format) -> Result<(), String> {
     let detail = match card_lookup::explain_text(&output, &id) {
         Ok(detail) => detail,
         Err(_) => card_lookup::manual_candidate_explain(root, &id.0)?
-            .ok_or_else(|| format!("card `{id}` not found"))?,
+            .ok_or_else(|| card_lookup::card_not_found(root, &id.0))?,
     };
     match format {
         Format::Json => {
             let packet = match card_lookup::context_packet(&output, &id) {
                 Ok(packet) => packet,
                 Err(_) => card_lookup::manual_candidate_context(root, &id.0)?
-                    .ok_or_else(|| format!("card `{id}` not found"))?,
+                    .ok_or_else(|| card_lookup::card_not_found(root, &id.0))?,
             };
             println!("{packet}");
         }
@@ -2063,7 +2063,7 @@ fn context(root: &Path, query: ContextQuery) -> Result<(), String> {
             let packet = match card_lookup::context_packet(&output, &card_id) {
                 Ok(packet) => packet,
                 Err(_) => card_lookup::manual_candidate_context(root, &id)?
-                    .ok_or_else(|| format!("card `{id}` not found"))?,
+                    .ok_or_else(|| card_lookup::card_not_found(root, &id))?,
             };
             println!("{packet}");
             Ok(())
