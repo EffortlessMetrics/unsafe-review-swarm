@@ -172,6 +172,23 @@ fn print_baseline_health_warning(root: &Path) {
     {
         return;
     }
+    // `baseline_status` runs a full repository scan (`Scope::Repo`, `max_cards: None`),
+    // so this one advisory line costs far more than the diff-scoped review that produced
+    // everything above it. On this repository the release binary takes ~0.15s for
+    // `first-pr` and ~35s for `pr` on the same input; the entire difference is this call.
+    //
+    // The cost is the documented issue #1893 §Integration stance and is not changed here.
+    // What is changed is that the wait is no longer unexplained: without this line the
+    // front door prints most of its report, stops dead partway through the "Brownfield
+    // baseline" block with no cursor movement, and then resumes — which reads as a hang,
+    // not as work. Announce the scan before starting it so the pause is legible.
+    //
+    // Printed before the scan, and via `println!` (Rust's stdout is a `LineWriter`, so the
+    // trailing newline flushes it) — a notice that appeared only after the scan finished
+    // would explain a pause the user had already sat through.
+    println!(
+        "  checking ledger health (full repository scan; slower than the review above on large repos)"
+    );
     let report = match baseline_status(root) {
         Ok(report) => report,
         Err(_) => {

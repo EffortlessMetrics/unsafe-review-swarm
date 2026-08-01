@@ -9339,6 +9339,21 @@ fn pr_warns_about_unhealthy_baseline_but_first_pr_does_not() -> Result<(), Box<d
         pr_stdout.contains("warning: baseline ledger needs attention"),
         "{pr_stdout}"
     );
+    // The health check runs a full repository scan, so `pr` announces it before starting
+    // rather than leaving the front door looking hung partway through its own report.
+    let notice = "  checking ledger health (full repository scan";
+    assert!(pr_stdout.contains(notice), "{pr_stdout}");
+    let notice_at = pr_stdout
+        .find(notice)
+        .ok_or("expected the ledger-health notice in `pr` stdout")?;
+    let warning_at = pr_stdout
+        .find("warning: baseline ledger needs attention")
+        .ok_or("expected the ledger-health warning in `pr` stdout")?;
+    assert!(
+        notice_at < warning_at,
+        "the notice must precede the scan it announces, otherwise it explains a pause the \
+         user already sat through: {pr_stdout}"
+    );
 
     let first_pr_out_dir = TempDir::new("unsafe-review-first-pr-baseline-warning-e2e")?;
     let first_pr_output = run_success([
@@ -9354,6 +9369,11 @@ fn pr_warns_about_unhealthy_baseline_but_first_pr_does_not() -> Result<(), Box<d
     assert!(
         !first_pr_stdout.contains("warning: baseline ledger needs attention"),
         "the bounded warning is `pr`-only (issue #1893 §Integration): {first_pr_stdout}"
+    );
+    // `first-pr` never runs the scan, so it must not announce one either.
+    assert!(
+        !first_pr_stdout.contains("checking ledger health"),
+        "the ledger-health scan and its notice are both `pr`-only: {first_pr_stdout}"
     );
     // The ledger-exists pointer to `baseline status` is shown for both entrypoints —
     // only the bounded warning line is `pr`-specific.
