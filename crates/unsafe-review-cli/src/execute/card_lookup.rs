@@ -19,6 +19,20 @@ pub(super) fn analyze_repo_cards(root: &Path) -> Result<unsafe_review_core::Anal
     })
 }
 
+/// Report an id that names neither a ReviewCard in the current scan nor a saved
+/// manual candidate.
+///
+/// Card ids encode the reviewed site, so they change when that code changes; a
+/// stale id copied from an earlier run is the usual way to land here. Name the
+/// command that lists current ids rather than leaving the user to guess.
+pub(super) fn card_not_found(root: &Path, id: &str) -> String {
+    format!(
+        "card `{id}` not found. Card ids come from a scan and change when the reviewed \
+         code changes; run `unsafe-review repo --root {} --format json` to list current ids.",
+        root.display()
+    )
+}
+
 pub(super) fn explain_text(
     output: &unsafe_review_core::AnalyzeOutput,
     id: &CardId,
