@@ -3521,76 +3521,53 @@ fn print_baseline_help() {
 fn print_help() {
     println!("unsafe-review: cheap unsafe contract review for Rust");
     println!();
-    println!("Commands:");
     println!(
-        "  check   [--root .] [--base origin/main | --diff file|-] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file]"
+        "unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, or witness."
+    );
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review <command> [flags]");
+    println!("  unsafe-review <command> --help    full flags and examples for one command");
+    println!();
+    println!("Start here:");
+    println!(
+        "  unsafe-review doctor                    check this repository is set up for review"
     );
     println!(
-        "  repo    [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review pr                        review the current PR and write the bundle"
     );
+    println!("  unsafe-review check --base origin/main  advisory review of the current diff");
+    println!();
+    println!("Review a change:");
+    println!("  check   advisory review of a diff; the core command");
     println!("  pr      first-run PR review bundle: auto-detects root and base ref");
-    println!("  pr-setup print read-only external GitHub PR checkout and raw-diff commands");
-    println!(
-        "  first-pr [--root .] [--base origin/main|--base-sha SHA [--head-sha SHA]|--diff file|-] [--out-dir target/unsafe-review] [--max-cards N]  (same bundle; compatibility name)"
-    );
+    println!("  first-pr same bundle as `pr`, with inputs passed explicitly (compatibility name)");
     println!("  review  alias for first-pr");
-    println!("  pilot   [--root .] [--base origin/main] [--max-cards 5]");
-    println!("  badges  [--root .] [--out badges]");
-    println!("  explain [--root .] [--json|--format json] <card-id>");
-    println!("  context [--root .] [--json|--format json] <card-id>");
-    println!("  context [--root .] --file <path> --lines Y-Z [--changed-only] --json");
-    println!("  candidate new --class <stable-byte-class> [--id R4R2-S000-TODO] [--out file]");
+    println!("  pilot   quick diff review capped at 5 cards");
+    println!("  repo    advisory review of every Rust file under --root, not a diff");
+    println!("  pr-setup print read-only external GitHub PR checkout and raw-diff commands");
+    println!();
+    println!("Inspect a finding:");
+    println!("  explain show full detail for a single ReviewCard");
+    println!("  context emit an LLM-ready context packet for a card or file range");
+    println!("  badges  generate badge JSON files for the repository");
+    println!("  lsp     start the Language Server Protocol server over stdio for editors");
+    println!();
+    println!("Track and discharge coverage debt:");
+    println!("  baseline record pre-existing debt as the coverage floor (init/add/status/refresh)");
+    println!("  policy  advisory no-new-debt policy simulation report");
+    println!("  outcome compare two cards.json snapshots for movement");
+    println!("  confirm route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`");
     println!(
-        "  candidate import <manual-candidate.json> [--out .unsafe-review/candidates/<id>.json]"
+        "          executes the routed witness command only with --allow-heavy; never default;"
     );
-    println!("  candidate lint <manual-candidate.json>");
-    println!("  candidate list [--root .] [--format json|markdown] [--out file]");
-    println!("  candidate witness-plan [--root .] <candidate-id> [--out file]");
-    println!(
-        "  baseline init [--root .] [--out policy/unsafe-review-baseline.toml] [--review-after YYYY-MM-DD]"
-    );
-    println!(
-        "  baseline add --card-id <UR-...-cN> --owner <name> --reason <text> --evidence <text> [--root .] [--review-after YYYY-MM-DD] [--out policy/unsafe-review-baseline.toml]"
-    );
-    println!(
-        "  baseline status [--root .] [--format human|json]  (read-only ledger health report)"
-    );
-    println!(
-        "  baseline refresh --dry-run [--root .] [--out target/baseline-refresh]  (read-only refresh preview; no apply mode)"
-    );
-    println!(
-        "  confirm <card-id> --dry-run|--allow-heavy [--author <owner>] [--root .] [--base origin/main|--diff file] [--expires-at <date>] [--timeout-seconds 600] [--command <override>] [--out file]  (executes the routed witness command only with --allow-heavy; never default; --dry-run previews without executing)"
-    );
-    println!("  support");
-    println!(
-        "  outcome --before <cards.json> --after <cards.json> [--format json|markdown] [--out file]"
-    );
-    println!(
-        "  policy report [--root .] [--base origin/main|--diff file] [--format json|markdown] [--out file] [--max-cards N]"
-    );
-    println!(
-        "  receipt template <card-id> --tool <lane> --strength configured|ran|test_targeted|site_reached|reviewed --author <owner> --recorded-at <utc> --expires-at <date> [--summary text] [--command text] [--limitation text] [--out file]"
-    );
-    println!(
-        "  receipt import-miri <card-id> --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
-    );
-    println!(
-        "  receipt import-careful <card-id> --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
-    );
-    println!(
-        "  receipt import-sanitizer <card-id> --tool asan|msan|tsan|lsan --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--allow-runtime] [--limitation text] [--out file]"
-    );
-    println!(
-        "  receipt import-concurrency <card-id> --tool loom|shuttle --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
-    );
-    println!(
-        "  receipt import-proof <card-id> --tool kani|crux --log <file> --author <owner> --recorded-at <utc> --expires-at <date> --command <cmd> [--limitation text] [--out file]"
-    );
-    println!("  receipt validate [--root .]");
-    println!(
-        "  receipt audit [--root .] [--base origin/main|--diff file] [--format json|markdown] [--out file] [--max-cards N]"
-    );
-    println!("  doctor  [--root .]");
+    println!("          --dry-run previews without executing");
+    println!("  receipt create, import, validate, and audit witness receipts");
+    println!("  candidate import and project manual advisory candidates");
+    println!();
+    println!("Repository posture:");
+    println!("  doctor  check the repository setup");
+    println!("  support print the current support tiers and advisory posture");
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
@@ -3600,6 +3577,9 @@ fn print_help() {
     println!("  2  tool did not complete a review: usage, input/IO, or internal error");
     println!();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
+    println!(
+        "unsafe-review does not run witnesses, post comments, edit source, or block by default."
+    );
 }
 
 fn print_repo_help() {

@@ -454,6 +454,89 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
 }
 
 #[test]
+fn help_output_routes_to_per_command_help() -> Result<(), Box<dyn Error>> {
+    // The top-level help is an overview, so it must tell the reader where the
+    // full flag list for a single command lives.
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("unsafe-review <command> --help"),
+        "top-level help must point at per-command help: {stdout}"
+    );
+    assert!(
+        stdout.contains("Start here:"),
+        "top-level help must offer a first-run entry point: {stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, or witness."
+        ),
+        "top-level help must state the product sentence: {stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
+fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    for group in [
+        "Review a change:",
+        "Inspect a finding:",
+        "Track and discharge coverage debt:",
+        "Repository posture:",
+    ] {
+        assert!(
+            stdout.contains(group),
+            "top-level help must group commands by task, missing `{group}`: {stdout}"
+        );
+    }
+
+    // Every command the parser routes must be reachable from the overview,
+    // including the editor entrypoint.
+    for command in [
+        "  check ",
+        "  repo ",
+        "  pr ",
+        "  pr-setup ",
+        "  first-pr ",
+        "  review ",
+        "  pilot ",
+        "  badges ",
+        "  explain ",
+        "  context ",
+        "  lsp ",
+        "  candidate ",
+        "  baseline ",
+        "  confirm ",
+        "  support ",
+        "  outcome ",
+        "  policy ",
+        "  receipt ",
+        "  doctor ",
+    ] {
+        assert!(
+            stdout.contains(command),
+            "top-level help must list command `{}`: {stdout}",
+            command.trim()
+        );
+    }
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
