@@ -29,7 +29,7 @@ pub(super) fn card_not_found(root: &Path, id: &str) -> String {
     format!(
         "card `{id}` not found. Card ids come from a scan and change when the reviewed \
          code changes; run `unsafe-review repo --root {} --format json` to list current ids.",
-        root.display()
+        super::shell_path_arg(root)
     )
 }
 

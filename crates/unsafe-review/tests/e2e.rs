@@ -4041,6 +4041,31 @@ fn explain_reports_an_unknown_card_id_as_not_found() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn card_not_found_quotes_a_root_containing_whitespace() -> Result<(), Box<dyn Error>> {
+    // The message hands the user a command to run, so the root has to survive
+    // being pasted into a shell.
+    let temp = TempDir::new("unsafe-review-quoted-root-e2e")?;
+    let root = temp.path().join("crate with spaces");
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(root.join("src").join("lib.rs"), "pub fn f() {}\n")?;
+
+    let output = run_failure([
+        os("explain"),
+        os("--root"),
+        root.as_os_str().to_os_string(),
+        os("UR-not-a-real-card-id"),
+    ])?;
+
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(
+        text.contains(&format!("--root \"{}\"", root.display())),
+        "the recovery command must quote the root: {text}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn context_reports_an_unknown_card_id_as_not_found() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
 
