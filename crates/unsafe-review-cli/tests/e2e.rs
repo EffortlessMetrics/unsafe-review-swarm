@@ -515,6 +515,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
     // from its header to the next blank line; an entry is a line indented by
     // exactly two spaces (continuation lines are indented further).
     let mut listed: Vec<&str> = Vec::new();
+    let mut group_text = String::new();
     let mut in_group = false;
     for line in stdout.lines() {
         if groups.contains(&line) {
@@ -528,6 +529,8 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
         if !in_group {
             continue;
         }
+        group_text.push_str(line);
+        group_text.push('\n');
         let Some(rest) = line.strip_prefix("  ") else {
             continue;
         };
@@ -547,6 +550,13 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
 
     // Every command the parser routes appears in exactly one task group,
     // including the editor entrypoint, and the groups list nothing else.
+    // Compatibility aliases that route into another command's entry are named
+    // in that entry's text rather than taking a line of their own.
+    assert!(
+        group_text.contains("`receipt-template` is a compatibility name"),
+        "the routed `receipt-template` alias must be named in the receipt entry: {stdout}"
+    );
+
     let mut expected = vec![
         "check",
         "repo",
