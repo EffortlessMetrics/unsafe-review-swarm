@@ -228,7 +228,7 @@ The top-level help output includes a one-line hint pointing users at
 `unsafe-review pr`:
 
 ```text
-  pr      first-run PR review bundle: auto-detects root and base ref
+  pr        first-run PR review bundle: auto-detects root and base ref
 ```
 
 `unsafe-review pr --help` routes to the `first-pr` subcommand help page.

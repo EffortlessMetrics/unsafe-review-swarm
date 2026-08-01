@@ -3539,35 +3539,39 @@ fn print_help() {
     println!("  unsafe-review check --base origin/main  advisory review of the current diff");
     println!();
     println!("Review a change:");
-    println!("  check   advisory review of a diff; the core command");
-    println!("  pr      first-run PR review bundle: auto-detects root and base ref");
-    println!("  first-pr same bundle as `pr`, with inputs passed explicitly (compatibility name)");
-    println!("  review  alias for first-pr");
-    println!("  pilot   quick diff review capped at 5 cards");
-    println!("  repo    advisory review of every Rust file under --root, not a diff");
-    println!("  pr-setup print read-only external GitHub PR checkout and raw-diff commands");
+    println!("  check     advisory review of a diff; the core command");
+    println!("  pr        first-run PR review bundle: auto-detects root and base ref");
+    println!("  first-pr  same bundle as `pr`, with inputs passed explicitly (compatibility name)");
+    println!("  review    alias for first-pr");
+    println!("  pilot     quick diff review capped at 5 cards");
+    println!("  repo      advisory review of every Rust file under --root, not a diff");
+    println!("  pr-setup  print read-only external GitHub PR checkout and raw-diff commands");
     println!();
     println!("Inspect a finding:");
-    println!("  explain show full detail for a single ReviewCard");
-    println!("  context emit an LLM-ready context packet for a card or file range");
-    println!("  badges  generate badge JSON files for the repository");
-    println!("  lsp     start the Language Server Protocol server over stdio for editors");
+    println!("  explain   show full detail for a single ReviewCard");
+    println!("  context   emit an LLM-ready context packet for a card or file range");
+    println!("  badges    generate badge JSON files for the repository");
+    println!("  lsp       start the Language Server Protocol server over stdio for editors");
     println!();
     println!("Track and discharge coverage debt:");
-    println!("  baseline record pre-existing debt as the coverage floor (init/add/status/refresh)");
-    println!("  policy  advisory no-new-debt policy simulation report");
-    println!("  outcome compare two cards.json snapshots for movement");
-    println!("  confirm route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`");
     println!(
-        "          executes the routed witness command only with --allow-heavy; never default;"
+        "  baseline  record pre-existing debt as the coverage floor (init/add/status/refresh)"
     );
-    println!("          --dry-run previews without executing");
-    println!("  receipt create, import, validate, and audit witness receipts");
+    println!("  policy    advisory no-new-debt policy simulation report");
+    println!("  outcome   compare two cards.json snapshots for movement");
+    println!(
+        "  confirm   route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`"
+    );
+    println!(
+        "            executes the routed witness command only with --allow-heavy; never default;"
+    );
+    println!("            --dry-run previews without executing");
+    println!("  receipt   create, import, validate, and audit witness receipts");
     println!("  candidate import and project manual advisory candidates");
     println!();
     println!("Repository posture:");
-    println!("  doctor  check the repository setup");
-    println!("  support print the current support tiers and advisory posture");
+    println!("  doctor    check the repository setup");
+    println!("  support   print the current support tiers and advisory posture");
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
