@@ -3,107 +3,187 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "7aad79695d49fb5b07ab847672baa41ad2ecdd44"
-source_base = "209c76fef1da653172a21c3348d6e3a3fb1eedbd"
-candidate_commit = "7649bff733b7f4cf1676b9b4b4fb40226c5744b5"
-audited_at = "2026-07-18"
+swarm_base = "313f3e60270083d70a7f53b08812289dfc26e3d4"
+source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
+candidate_commit = "unset"
+candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
+audited_at = "2026-08-01"
 owner = "repo-infra"
 semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
 dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
 rollback = "Supersede this draft with a dated cutline artifact and retain it as an audit record; do not alter source history, tags, publication state, or public v1."
 
+# `disposition` answers "is this required to qualify the candidate?" and is an
+# owner decision. `integration` answers the separate factual question "is this
+# work present on swarm main today?" and is refreshed from the git log at each
+# audit. The two are independent: deferred work can still be integrated, and
+# required work can still be absent. Conflating them is what made the previous
+# snapshot misleading.
+#
+# integration values:
+#   on_swarm_main         - the issue's PR sequence appears complete on swarm main
+#   partial_on_swarm_main - some slices landed; named slices remain outstanding
+#   not_on_swarm_main     - no matching work found on swarm main
+#   open_pr               - work exists only on an unmerged PR branch
+#
+# Where a commit does not cite its issue number, `integration_evidence` names
+# the commits matched by scope and title and says so explicitly. Those are
+# attributions, not citations.
+
 [[item]]
 id = "PR-1939"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["ed06cb2b governance: replace single-active-goal routing with portfolio semantics (#1939)"]
 reason = "Moves durable governance authority to .allow and keeps GitHub as the operational portfolio."
 proof = ["cargo-allow check --profile spec-system --mode audit", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "PR-1941"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["ddb7b850 spec-system: add issue-linked work-spec contract (#1941)"]
 reason = "Provides the issue-linked work-spec contract used by later release qualification slices."
 proof = ["cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "PR-1913"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["a25d2ddc docs(contract): map canonical editor and agent fields (#1913)"]
 reason = "Canonical editor and agent field ownership is already integrated on swarm main and must remain in the candidate contract."
 proof = ["cargo run --locked -p xtask -- check-spec-coverage", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1889"
 disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "Recovery audit must establish that still-correct local slices are integrated or explicitly rejected before candidate freeze."
 proof = ["git fetch origin", "cargo run --locked -p xtask -- source-divergence"]
 
 [[item]]
 id = "ISSUE-1890"
 disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "Current-main cargo-allow false-actionability evidence is a release qualification input, not a global accuracy claim."
 proof = ["cargo run --locked -p xtask -- check-dogfood", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1907"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = [
+  "576ac8e2 feat(lsp): define canonical editor diagnostic DTO (#1935)",
+  "c1c9b9e4 feat(lsp): serialize saved diagnostics from canonical DTO (#1936)",
+  "43b6fcc1 feat(lsp): project live diagnostics from canonical DTO (#1937)",
+  "7aad7969 feat(vscode): preserve canonical diagnostic fields (#1938)",
+  "attribution by scope and title only; no commit in swarm history cites #1907",
+]
 reason = "Canonical live/saved/editor diagnostic projection is part of the candidate public contract."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1908"
 disposition = "required"
+integration = "partial_on_swarm_main"
+integration_evidence = [
+  "3aefc619 lsp: surface a failed refresh instead of a clean-looking clear (#1908 PR3) (#1949)",
+  "commit body records PR1/PR2 as already landed and PR4 concurrency/coalescing as outstanding",
+]
 reason = "Freshness, version, stale, failure, partial, and capped states are required for honest editor diagnostics."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1909"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = [
+  "06faa5d5 lsp: define structured command-only action contract (#1909 PR1) (#1955)",
+  "8b7745ed lsp: return diagnostic-bound structured code actions (#1909 PR2) (#1956)",
+  "18e33cb9 lsp: align saved actions with canonical contract (#1909 PR3) (#1961)",
+]
 reason = "Structured command-only actions must remain bound to canonical diagnostics and readiness."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1910"
 disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = [
+  "f4c68e4f vscode: bind saved interactions by exact identity (#1986)",
+  "3b37a804 editor: copy the saved bounded agent packet (#1989)",
+  "bab22c44 vscode: report hidden diagnostics from per-file caps (#1990)",
+  "attribution by scope and title only; no commit in swarm history cites #1910",
+]
 reason = "Exact editor identity and bounded packet delivery complete the candidate-facing editor contract."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1887"
 disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "The diagnostic-to-explanation-to-packet-to-receipt loop must be proven on selected scenarios before claiming a coherent editor/agent product."
 proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-1911"
 disposition = "deferred"
-reason = "Typed repair candidates are additive and are not required to establish the current advisory candidate contract."
+integration = "on_swarm_main"
+integration_evidence = [
+  "74ddbb31 agents: add typed repair candidates (#1979)",
+  "a690f296 agents: expose human-only declaration repair candidates (#1993)",
+  "717a39de agents: project repair candidates across consumers (#1994)",
+  "crates/unsafe-review-core/src/output/repair_queue.rs declares repair_candidates",
+  "attribution by scope and title only; no commit in swarm history cites #1911",
+]
+reason = "Typed repair candidates are additive and are not required to establish the current advisory candidate contract. They are nevertheless integrated on swarm main and are part of the candidate surface, so qualification must cover them even though they do not gate the cutline."
 proof = []
 
 [[item]]
 id = "ISSUE-1912"
 disposition = "deferred"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "Pull diagnostics, cancellation, and progress remain post-correctness evaluation work."
 proof = []
 
 [[item]]
 id = "ISSUE-1886"
 disposition = "deferred"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "Prebuilt distribution is a separate release-ergonomics lane and remains owner-gated."
 proof = []
 
 [[item]]
 id = "ISSUE-1894-1895"
 disposition = "deferred"
-reason = "Grouping and badge work must not be promoted without measured evidence that it is necessary for the candidate."
+integration = "on_swarm_main"
+integration_evidence = [
+  "2df73a2b surface: expose target-feature groups to agent packets (#1977), body cites #1894",
+  "21232921 surfacing: add unsafe-declaration volume summary projection (#1895) (#1952), closes #1895",
+]
+reason = "Grouping work was deferred pending measured evidence that it is necessary for the candidate. It has since landed additively with fixture and calibration coverage, so it is part of the candidate surface; the deferral now records only that it does not gate the cutline."
 proof = []
 
 [[item]]
 id = "PR-1620"
 disposition = "deferred"
-reason = "RSS telemetry is not a release blocker for the current candidate and remains a separate advisory lane."
+integration = "open_pr"
+integration_evidence = [
+  "PR #1620 is an open draft with a conflicted merge state",
+  "blocked on the self-unsafe governance decision in #1805",
+]
+reason = "RSS telemetry is not a release blocker for the current candidate and remains a separate advisory lane. It also proposes relaxing the workspace unsafe_code lint from forbid to deny, which is a product-stance change requiring the #1805 decision first."
 proof = []
 
 [[item]]
 id = "PUBLICATION-1879"
 disposition = "deferred"
+integration = "not_on_swarm_main"
+integration_evidence = []
 reason = "Source promotion, publication, tags, GitHub Release, and public v1 remain explicitly owner-gated after qualification."
 proof = []
