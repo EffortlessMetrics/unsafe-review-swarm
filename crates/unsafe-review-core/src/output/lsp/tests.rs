@@ -339,6 +339,90 @@ fn saved_lsp_and_agent_packet_share_analysis_identity() -> Result<(), String> {
 }
 
 #[test]
+fn editor_agent_and_review_surfaces_preserve_card_guidance() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let card = output.cards.first().ok_or("fixture should emit one card")?;
+    let lsp = parse_json(&render(&output))?;
+    let agent = parse_json(&crate::output::agent::render_with_output(&output, card))?;
+    let sarif = parse_json(&crate::api::render_sarif(&output))?;
+    let pr = crate::api::render_pr_summary(&output);
+
+    let diagnostic = &lsp["diagnostics"][0];
+    let sarif_properties = &sarif["runs"][0]["results"][0]["properties"];
+    let verify_command = card
+        .next_action
+        .verify_commands
+        .first()
+        .ok_or("fixture card should expose a verification command")?;
+
+    for surface_card_id in [
+        diagnostic["card_id"].as_str(),
+        agent["card_id"].as_str(),
+        sarif_properties["cardId"].as_str(),
+    ] {
+        assert_eq!(surface_card_id, Some(card.id.0.as_str()));
+    }
+    for surface_class in [
+        diagnostic["code"].as_str(),
+        agent["card"]["class"].as_str(),
+        sarif_properties["class"].as_str(),
+    ] {
+        assert_eq!(surface_class, Some(card.class.as_str()));
+    }
+    for surface_family in [
+        diagnostic["operation_family"].as_str(),
+        agent["context"]["operation_family"].as_str(),
+        sarif_properties["operationFamily"].as_str(),
+    ] {
+        assert_eq!(surface_family, Some(card.operation.family.as_str()));
+    }
+
+    assert_eq!(diagnostic["path"], "src/lib.rs");
+    assert_eq!(
+        diagnostic["range"]["start"]["line"],
+        card.site.location.line - 1
+    );
+    assert_eq!(
+        sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["artifactLocation"]["uri"],
+        "src/lib.rs"
+    );
+    assert_eq!(
+        sarif["runs"][0]["results"][0]["locations"][0]["physicalLocation"]["region"]["startLine"],
+        card.site.location.line
+    );
+
+    assert_eq!(diagnostic["next_action"], card.next_action.summary);
+    assert_eq!(agent["task"], card.next_action.summary);
+    assert_eq!(sarif_properties["nextAction"], card.next_action.summary);
+    assert!(pr.contains(&card.id.0));
+    assert!(pr.contains(card.class.as_str()));
+    assert!(pr.contains(&format!(
+        "- Operation family: `{}`",
+        card.operation.family.as_str()
+    )));
+    assert!(pr.contains(&card.next_action.summary));
+
+    assert!(
+        diagnostic["verify_commands"]
+            .as_array()
+            .is_some_and(|commands| commands.iter().any(|command| command == verify_command))
+    );
+    assert!(agent["confirmation_cue"]["build_this_first"]["command"] == *verify_command);
+    assert!(
+        sarif_properties["verifyCommands"]
+            .as_array()
+            .is_some_and(|commands| commands.iter().any(|command| command == verify_command))
+    );
+
+    let trust_boundary = lsp["trust_boundary"].as_str().unwrap_or("");
+    assert!(!trust_boundary.is_empty());
+    assert_eq!(agent["trust_boundary"], trust_boundary);
+    assert_eq!(sarif_properties["trustBoundary"], trust_boundary);
+    assert!(pr.contains(trust_boundary));
+    Ok(())
+}
+
+#[test]
 fn lsp_projection_empty_output_has_no_editor_items() -> Result<(), String> {
     let output = fixture_output("safe_code_no_cards")?;
     let value = parse_json(&render(&output))?;
