@@ -104,13 +104,13 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.out_dir,
         report.output_bytes,
     );
-    print_comment_plan_summary(report.comment_plan);
     print_top_card_summary(
         report.output,
         report.root,
         report.no_changed_gaps_message,
         report.no_changed_gaps_limitation,
     );
+    print_comment_plan_summary(report.comment_plan, report.root);
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
     print_baseline_onboarding_handoff(report.root);
@@ -119,7 +119,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     print_trust_boundary();
 }
 
-fn print_comment_plan_summary(comment_plan: Option<&str>) {
+fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
     let Some(comment_plan) = comment_plan else {
         println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
         return;
@@ -147,6 +147,15 @@ fn print_comment_plan_summary(comment_plan: Option<&str>) {
         return;
     };
 
+    let Some(comments) = value.get("comments").and_then(serde_json::Value::as_array) else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    if comments.len() as u64 != selected {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    }
+
     let top_reason = value
         .get("not_selected")
         .and_then(serde_json::Value::as_array)
@@ -170,6 +179,53 @@ fn print_comment_plan_summary(comment_plan: Option<&str>) {
         .unwrap_or_default();
 
     println!("- Reviewer comments: {selected} selected, {omitted} omitted{top_reason}");
+    if comments.is_empty() {
+        println!("- Selected reviewer actions: none");
+        return;
+    }
+
+    let shown = comments.len().min(3);
+    println!(
+        "Selected reviewer actions (showing {shown} of {}):",
+        comments.len()
+    );
+    for (index, comment) in comments.iter().take(shown).enumerate() {
+        let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
+            println!("  {}. unavailable (inspect comment-plan.json)", index + 1);
+            continue;
+        };
+        let location = match (
+            comment.get("path").and_then(serde_json::Value::as_str),
+            comment.get("line").and_then(serde_json::Value::as_u64),
+        ) {
+            (Some(path), Some(line)) => format!("{path}:{line}"),
+            _ => "location unavailable".to_string(),
+        };
+        let operation = comment
+            .get("operation_family")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("operation unavailable");
+        let reason = comment
+            .get("selection_reason")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("selection reason unavailable");
+        let next_action = comment
+            .get("next_action")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("next action unavailable");
+        println!("  {}. {location} `{operation}`", index + 1);
+        println!("     Why: {reason}");
+        println!("     Next: {next_action}");
+        println!("     Explain: {}", explain_command(root, &card_id));
+        if let Some(command) = comment
+            .get("verify_commands")
+            .and_then(serde_json::Value::as_array)
+            .and_then(|commands| commands.first())
+            .and_then(serde_json::Value::as_str)
+        {
+            println!("     Verify: {command}");
+        }
+    }
 }
 
 fn print_receipt_audit_handoff(check: &CheckOptions) {
