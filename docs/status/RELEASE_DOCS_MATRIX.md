@@ -1,7 +1,7 @@
 # Release documentation and support matrix
 
 Audited 2026-08-08 against swarm `origin/main` at
-`3a5d83141a5169c84bb4bda80215e6022d447346` and the public source-of-record
+`db289703c00ab9cfc1cc0ff90ff13d03506ee13c` and the public source-of-record
 release `v0.3.8` (`2026-06-18`). This is an inventory and claim-boundary
 receipt, not a candidate qualification or publication decision.
 

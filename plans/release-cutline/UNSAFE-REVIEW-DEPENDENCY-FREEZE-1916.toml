@@ -4,19 +4,22 @@ issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
 status = "draft_not_active"
 activation = "requires_owner_decision_after_targeted_dependency_proof"
 freeze_scope = "candidate_dependency_inputs_only"
+audited_at = "2026-08-08"
+audit_swarm_base = "db289703c00ab9cfc1cc0ff90ff13d03506ee13c"
+audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "d19a87de817c3a1b4ef7dc746f25e7cc0d117eee"
-lockfile_sha256 = "625a362746db12f1735f337ff8bf168afc721213cc139f4d20efc4c7c5b15b5a"
-ra_ap_syntax = "0.0.341"
-ignore = "0.4.27"
+commit = "db289703c00ab9cfc1cc0ff90ff13d03506ee13c"
+lockfile_sha256 = "6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7"
+ra_ap_syntax = "0.0.343"
+ignore = "0.4.31"
 signal_hook = "0.4.4"
 
 [source]
-commit = "4fc6eb806de1460c618d60869b8a1cb885f87eea"
+commit = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 lockfile_sha256 = "aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527"
 ra_ap_syntax = "0.0.341"
 ignore = "0.4.27"
@@ -44,15 +47,33 @@ status = "owner_gated_directly_affected_tests_required"
 reset_receipts = ["workspace tests", "clippy", "check-pr", "signal-handling tests"]
 
 [[candidate_input]]
-id = "SOURCE-545"
+id = "SOURCE-551"
+surface = "ra_ap_syntax"
+version = "0.0.343"
+status = "owner_gated_open_source_pr_551_targeted_proof_required"
+reset_receipts = ["parser/input tests", "detector contracts", "fixture/calibration parity", "surface determinism", "real-PR/evidence-loss corpus where relevant", "full check-pr"]
+
+[[candidate_input]]
+id = "SOURCE-549"
 surface = "github_actions"
 version = "paired pins"
-status = "blocked_until_workflow_allowlist_pair_is_repaired"
+status = "owner_gated_open_source_pr_549_workflow_allowlist_pair_required"
 reset_receipts = ["check-policy", "Unsafe Review Rust Result", "hosted CI"]
+
+[[candidate_input]]
+id = "SOURCE-550"
+surface = "cargo-minor-and-patch"
+version = "live source dependency group"
+status = "owner_gated_open_source_pr_550_targeted_disposition_required"
+reset_receipts = ["affected tests", "clippy", "check-pr", "lockfile refresh"]
 
 [[deferred_input]]
 id = "SWARM-1874-1875"
 reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path."
+
+[[deferred_input]]
+id = "SWARM-2013-2014"
+reason = "Current swarm Dependabot updates remain open and must not be promoted independently of the chosen source history path; #2013 proposes ra_ap_syntax 0.0.344 and #2014 proposes paired Actions updates."
 
 [[deferred_input]]
 id = "SWARM-1620"
