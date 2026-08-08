@@ -1,0 +1,163 @@
+# UNSAFE-REVIEW-QUALIFICATION-1921
+#
+# PR 1 of issue #1921: a deterministic qualification contract. This manifest
+# records what a later candidate run must execute; it is not an execution
+# receipt and contains no candidate or publication claim.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921"
+cutline_issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
+status = "manifest_only"
+candidate_commit = "unset"
+candidate_version = "unset"
+source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
+swarm_base = "a8b8aa2d6b4d54feaf5de2ae7fb2743a6c20dd00"
+baseline_lockfile_sha256 = "6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7"
+baseline_package_versions = ["unsafe-review-core@0.3.8", "unsafe-review@0.3.8", "unsafe-review-cli@0.3.8"]
+install_root = "task-owned temporary prefix; unset until candidate execution"
+target_dir = "task-owned temporary target; unset until candidate execution"
+receipt_root = "task-owned temporary receipt directory; committed receipts are bounded summaries only"
+owner = "release/public-surface"
+created = "2026-08-08"
+human_projection = "docs/status/INSTALLED_QUALIFICATION.md"
+trust_boundary = "A future receipt proves only the listed installed paths on the named candidate and environments. It does not prove memory safety, UB-free status, Miri cleanliness, site execution, calibrated accuracy, broad platform support, or publication authorization."
+non_goals = ["crates.io publication", "source promotion", "tag or GitHub Release", "public Action or v1 movement", "global accuracy or performance claims"]
+
+[receipt]
+schema_version = "1"
+required_identity = ["candidate_commit", "candidate_version", "source_sha", "swarm_sha", "lockfile_sha256", "package_versions"]
+required_execution = ["environment", "toolchain", "install_method", "prefix", "command", "exit_code", "duration_ms", "result", "limitation"]
+allowed_results = ["pass", "fail", "skipped", "not_applicable", "blocked"]
+failure_rule = "A failed or incomplete row remains non-consumable; do not summarize it as a complete qualification."
+invalidation_rule = "Candidate, package, lockfile, docs, source, or owning behavior changes invalidate affected rows and require an explicit rerun or skip reason."
+redaction_rule = "Do not commit secrets, full source snapshots, or unbounded command logs."
+
+[[environment]]
+id = "linux-ci"
+status = "planned"
+required = true
+platform = "Linux hosted/container environment matching normal CI"
+architecture = "record at execution"
+toolchain = "record at execution"
+limitation = "The manifest does not claim this environment has run."
+
+[[environment]]
+id = "maintainer-primary"
+status = "planned"
+required = true
+platform = "primary maintainer platform; record concrete OS and architecture at execution"
+architecture = "record at execution"
+toolchain = "record at execution"
+limitation = "If this is the Linux environment, record the identity once and do not duplicate the receipt."
+
+[[environment]]
+id = "other-supported"
+status = "planned"
+required = false
+platform = "other platform already named by the repository support matrix"
+architecture = "record at execution"
+toolchain = "record at execution"
+limitation = "Skipped platforms remain explicitly untested; no support claim may be inferred."
+
+[[fixture]]
+id = "pr-movement-fixtures"
+source = "existing fixture and real-PR/evidence-loss inputs"
+required_cases = ["quiet", "new_gap", "worsened_gap", "improved_or_resolved", "inherited_only", "human_only"]
+determinism = "pin fixture/input identifiers and record their repository revision in the execution receipt"
+
+[[fixture]]
+id = "failure-fixtures"
+source = "existing CLI/e2e malformed, capped, partial, invalid-flag, and IO-failure cases"
+required_cases = ["complete", "capped", "partial_or_timeout", "malformed_diff", "unknown_flag", "unwritable_output_or_read_failure"]
+determinism = "use controlled fixtures and record the exact command, exit code, and artifact disposition"
+
+[[fixture]]
+id = "editor-agent-loop"
+source = "issue #1887 scripted client/fixture and canonical editor/agent projections"
+required_cases = ["diagnostic", "explanation_or_hover", "bounded_packet_or_human_route", "identity", "verification_command", "refresh", "stale_failed_partial"]
+determinism = "record the scripted fixture revision and named verification command for each row"
+
+[[fixture]]
+id = "consumer-smokes"
+source = "accepted tokmd presets and real unsafe-review to ub-review ingestion path"
+required_cases = ["tokmd_packet_rendering", "ub_review_ingestion", "saved_consumer_unknown_field_behavior"]
+determinism = "record preset, producer/consumer version, and output hash where useful"
+
+[[row]]
+id = "identity-and-help"
+group = "first_use"
+required = true
+environments = ["linux-ci", "maintainer-primary"]
+commands = ["unsafe-review --version", "unsafe-review --help", "unsafe-review doctor --root .", "unsafe-review pr --help", "unsafe-review repo --help", "unsafe-review context --help", "unsafe-review lsp --help", "unsafe-review init --help", "unsafe-review pr-setup --help"]
+fixture = "none"
+result = "not_run"
+assertions = ["installed identity matches candidate package versions", "documented commands exist", "no stale workspace/path binary is used"]
+
+[[row]]
+id = "preview-only-adoption"
+group = "first_use"
+required = "if_shipped"
+environments = ["linux-ci", "maintainer-primary"]
+commands = ["unsafe-review init --dry-run --root <fixture>"]
+fixture = "existing init preview fixtures"
+result = "not_run"
+assertions = ["bounded human output", "parseable deterministic JSON", "--out writes only the proposal", "conflicts are reported without overwrite", "default repository files remain unchanged"]
+
+[[row]]
+id = "pr-front-panel-and-artifacts"
+group = "pr_surface"
+required = true
+environments = ["linux-ci"]
+commands = ["unsafe-review pr ...", "cargo run --locked -p xtask -- check-first-pr-artifacts <bundle-dir>"]
+fixture = "pr-movement-fixtures"
+result = "not_run"
+assertions = ["front panel is bounded and action-first", "every produced bundle passes the artifact verifier", "ReviewCard identity is preserved across projections"]
+
+[[row]]
+id = "repo-failure-truthfulness"
+group = "failure_semantics"
+required = true
+environments = ["linux-ci"]
+commands = ["unsafe-review repo ...", "unsafe-review repo ... --max-cards <n>", "controlled timeout or partial command", "malformed diff input", "unknown flag", "unwritable output or read failure"]
+fixture = "failure-fixtures"
+result = "not_run"
+assertions = ["complete, capped, partial, malformed, and failed states differ", "exit codes are contracted", "sidecars and artifacts match consumability", "diff failure does not silently fall back to a whole-repo scan"]
+
+[[row]]
+id = "editor-agent-loop"
+group = "editor_agent"
+required = true
+environments = ["linux-ci", "maintainer-primary"]
+commands = ["scripted #1887 client/fixture loop"]
+fixture = "editor-agent-loop"
+result = "not_run"
+assertions = ["diagnostic, explanation, bounded packet, identity, verification, refresh, and stale/failed/partial state agree"]
+
+[[row]]
+id = "consumer-interoperability"
+group = "consumers"
+required = true
+environments = ["linux-ci"]
+commands = ["tokmd accepted-preset rendering", "unsafe-review to ub-review ingestion smoke"]
+fixture = "consumer-smokes"
+result = "not_run"
+assertions = ["actual candidate output is consumed", "unknown/additive fields follow documented compatibility rules"]
+
+[[row]]
+id = "repository-proof-floor"
+group = "deterministic_gates"
+required = true
+environments = ["linux-ci"]
+commands = ["cargo fmt --all --check", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --locked", "cargo run --locked -p xtask -- check-pr", "cargo-allow check --profile spec-system --mode audit", "git diff --check"]
+fixture = "none"
+result = "not_run"
+assertions = ["all commands run against the exact candidate checkout", "failure text and command receipts are retained in bounded form"]
+
+[[row]]
+id = "platform-limitations"
+group = "claim_boundary"
+required = true
+environments = ["linux-ci", "maintainer-primary", "other-supported"]
+commands = ["receipt review"]
+fixture = "none"
+result = "not_run"
+assertions = ["every skipped or unavailable row names a reason", "no untested platform is presented as qualified"]
