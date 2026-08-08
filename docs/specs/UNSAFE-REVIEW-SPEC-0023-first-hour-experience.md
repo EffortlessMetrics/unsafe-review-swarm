@@ -102,6 +102,9 @@ may reclassify findings independently or invent a second analyzer truth.
 `pr`:
 
 - writes the standard advisory bundle
+- prints changed-file and actionable-gap counts from the canonical summary
+- places the top-card next action immediately after the card identity so the
+  first screen answers what to do before the detailed confirmation handoff
 - prints the summary path and top-card `explain` command
 - reports no-card states honestly
 

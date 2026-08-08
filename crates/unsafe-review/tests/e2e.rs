@@ -1937,6 +1937,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("unsafe-review wrote an advisory PR bundle."));
     assert!(stdout.contains("- Artifact directory:"));
     assert!(stdout.contains("- Review cards: 1"));
+    assert!(stdout.contains("- Changed files: 1"));
     assert!(stdout.contains("- Open actionable gaps: 1"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
@@ -1979,6 +1980,15 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
     assert!(stdout.contains("Route: `miri`"));
+    let route_offset = stdout
+        .find("Route: `miri`")
+        .ok_or("missing route in first-pr output")?;
+    let next_offset = stdout.find("Next: ").ok_or("missing next action")?;
+    let hypothesis_offset = stdout
+        .find("Hypothesis: ")
+        .ok_or("missing confirmation hypothesis")?;
+    assert!(route_offset < next_offset);
+    assert!(next_offset < hypothesis_offset);
     assert!(stdout.contains("Hypothesis: static `guard_missing` ReviewCard"));
     assert!(
         stdout.contains(
