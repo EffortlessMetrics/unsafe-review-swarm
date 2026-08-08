@@ -3,7 +3,7 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "6871dbe00c96fd30f531c8d6bb1140ea7310b83f"
+swarm_base = "03e98fc27fed85a757be4c35a594b0ac7db40783"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
@@ -121,7 +121,8 @@ disposition = "required"
 integration = "partial_on_swarm_main"
 integration_evidence = [
   "3aefc619 lsp: surface a failed refresh instead of a clean-looking clear (#1908 PR3) (#1949)",
-  "commit body records PR1/PR2 as already landed and PR4 concurrency/coalescing as outstanding",
+  "03e98fc2 feat: coalesce concurrent LSP refreshes (#2028) completes PR4 concurrency/coalescing",
+  "issue remains open for the separate xtask lsp-smoke rail gap and remaining freshness qualification/usability work",
 ]
 reason = "Freshness, version, stale, failure, partial, and capped states are required for honest editor diagnostics."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
