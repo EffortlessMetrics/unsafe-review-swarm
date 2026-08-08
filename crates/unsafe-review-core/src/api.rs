@@ -3,8 +3,8 @@ use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
 use crate::input::workspace;
 use crate::output::{
-    agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
-    policy_report, receipt_audit, repair_queue, sarif, usefulness_telemetry, witness_plan,
+    agent, badges, comment_plan, gate_manifest, human, json, lsp, markdown, outcome, policy_report,
+    receipt_audit, repair_queue, sarif, usefulness_telemetry, witness_plan,
 };
 use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
@@ -312,15 +312,6 @@ pub struct AnalyzeOutput {
     /// from the same slot-level comparison the summary uses (SPEC-0030 §single-truth).
     /// Empty when no snapshot file exists (no worsened/improved projection possible).
     pub coverage_snapshot: BTreeMap<String, SnapshotCoverage>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ReviewCardConfirmationProjection {
-    pub hypothesis_to_confirm: String,
-    pub build_this_first: String,
-    pub minimal_repro_steps: Vec<String>,
-    pub minimal_repro_limitation: String,
-    pub confirmation_step: String,
 }
 
 #[derive(Clone, Debug)]
@@ -642,17 +633,6 @@ pub fn render_usefulness_telemetry_with_cost(
     cost: Option<&ScanCost>,
 ) -> String {
     usefulness_telemetry::render_with_cost(output, cost)
-}
-
-pub fn project_review_card_confirmation(card: &ReviewCard) -> ReviewCardConfirmationProjection {
-    let minimal_repro = confirmation::minimal_repro(card);
-    ReviewCardConfirmationProjection {
-        hypothesis_to_confirm: confirmation::hypothesis_to_confirm(card),
-        build_this_first: confirmation::build_this_first(card).summary,
-        minimal_repro_steps: minimal_repro.steps().to_vec(),
-        minimal_repro_limitation: minimal_repro.limitation().to_string(),
-        confirmation_step: confirmation::confirmation_step(card),
-    }
 }
 
 pub fn render_badge_jsons(output: &AnalyzeOutput) -> (String, String) {
