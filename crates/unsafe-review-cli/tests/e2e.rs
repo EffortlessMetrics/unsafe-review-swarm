@@ -182,20 +182,14 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "Brownfield baseline (optional):");
     assert_contains(
         &stdout,
-        "run only from a clean base/default branch before feature changes",
-    );
-    assert_contains(&stdout, "do not run it from the PR branch being reviewed");
-    assert_contains(
-        &stdout,
-        &format!("unsafe-review baseline init --root {}", fixture.display()),
+        &format!(
+            "New ledger: unsafe-review baseline init --root {}",
+            fixture.display()
+        ),
     );
     assert_contains(
         &stdout,
-        "records current open actionable gaps as pre-existing debt",
-    );
-    assert_contains(
-        &stdout,
-        "not a safety record, not UB-free status, and not a witness result",
+        "clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt",
     );
     assert_contains(&stdout, "Manual candidates:");
     assert_contains(

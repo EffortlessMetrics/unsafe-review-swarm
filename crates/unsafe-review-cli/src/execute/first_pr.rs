@@ -258,29 +258,16 @@ fn print_baseline_onboarding_handoff(root: &Path) {
         .join("unsafe-review-baseline.toml")
         .is_file()
     {
-        // Issue #1893 §Integration: point to `baseline status` before suggesting
-        // `baseline init` again when a ledger already exists.
-        //
-        // This pointer is free — a file-existence check — and it names the exact
-        // command an operator would run either way.  Issue #2004 retired the
-        // `pr`-only health *warning* that used to follow it: deciding whether to
-        // call the ledger "unhealthy" cost a full-repository classification scan
-        // (`Scope::Repo`, `max_cards: None`), which on this repository made `pr`
-        // ~235x slower than `first-pr` on identical input for one conditional
-        // adjective on a command that is printed here regardless.  The scan lives
-        // on in `baseline status`, where paying for it is the user's choice.
-        println!("  a baseline ledger already exists; check its health before re-running init:");
-        println!("  {}", baseline_status_command(root));
-        println!("  preview stale-entry remediation without writing baseline files:");
-        println!("  {}", baseline_refresh_command(root));
+        println!(
+            "  Existing ledger: inspect {}",
+            baseline_status_command(root)
+        );
+        println!("  Stale-entry preview: {}", baseline_refresh_command(root));
     }
-    println!("  run only from a clean base/default branch before feature changes");
-    println!("  do not run it from the PR branch being reviewed");
-    println!("  {}", baseline_init_command(root));
     println!(
-        "  records current open actionable gaps as pre-existing debt; review generated policy files before committing"
+        "  New ledger: {}; clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt, so review generated policy files; not a safety record, not UB-free status, and not a witness result",
+        baseline_init_command(root)
     );
-    println!("  not a safety record, not UB-free status, and not a witness result");
 }
 
 fn print_manual_candidate_handoff(
