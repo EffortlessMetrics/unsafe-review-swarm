@@ -1939,6 +1939,12 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("- Review cards: 1"));
     assert!(stdout.contains("- Changed files: 1"));
     assert!(stdout.contains("- Open actionable gaps: 1"));
+    assert!(
+        stdout.contains(
+            "- Evidence movement: new 1, worsened 0, improved 0, resolved 0, inherited 0"
+        )
+    );
+    assert!(stdout.contains("- Scan status: complete"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("Agent repair queue:"));
@@ -3741,6 +3747,12 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("- Artifact directory:"));
     assert!(stdout.contains("- Review cards: 0"));
     assert!(stdout.contains("- Open actionable gaps: 0"));
+    assert!(
+        stdout.contains(
+            "- Evidence movement: new 0, worsened 0, improved 0, resolved 0, inherited 0"
+        )
+    );
+    assert!(stdout.contains("- Scan status: complete"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("Agent repair queue:"));
