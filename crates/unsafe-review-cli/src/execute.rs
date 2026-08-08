@@ -1604,6 +1604,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         root: &root,
         check: &check,
         manual_candidates: &manual_candidates,
+        comment_plan: comment_plan_artifact.as_deref(),
         no_changed_gaps_message: NO_CHANGED_GAPS_MESSAGE,
         no_changed_gaps_limitation: NO_CHANGED_GAPS_LIMITATION,
         artifacts: &FIRST_PR_ARTIFACTS,

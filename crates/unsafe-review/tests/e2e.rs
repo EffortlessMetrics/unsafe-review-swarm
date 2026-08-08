@@ -1944,6 +1944,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             "- Evidence movement: new 1, worsened 0, improved 0, resolved 0, inherited 0"
         )
     );
+    assert!(stdout.contains("- Reviewer comments: 1 selected, 0 omitted"));
     assert!(stdout.contains("- Scan status: complete"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
@@ -3752,6 +3753,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
             "- Evidence movement: new 0, worsened 0, improved 0, resolved 0, inherited 0"
         )
     );
+    assert!(stdout.contains("- Reviewer comments: 0 selected, 0 omitted"));
     assert!(stdout.contains("- Scan status: complete"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));

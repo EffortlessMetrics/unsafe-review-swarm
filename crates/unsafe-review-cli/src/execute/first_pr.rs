@@ -87,6 +87,7 @@ pub(super) struct FirstPrReport<'a> {
     pub(super) root: &'a Path,
     pub(super) check: &'a CheckOptions,
     pub(super) manual_candidates: &'a [ManualCandidate],
+    pub(super) comment_plan: Option<&'a str>,
     pub(super) no_changed_gaps_message: &'a str,
     pub(super) no_changed_gaps_limitation: &'a str,
     pub(super) artifacts: &'a [&'a str],
@@ -103,6 +104,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.out_dir,
         report.output_bytes,
     );
+    print_comment_plan_summary(report.comment_plan);
     print_top_card_summary(
         report.output,
         report.root,
@@ -115,6 +117,59 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
+}
+
+fn print_comment_plan_summary(comment_plan: Option<&str>) {
+    let Some(comment_plan) = comment_plan else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(comment_plan) else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    let Some(summary) = value.get("summary").and_then(serde_json::Value::as_object) else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    let Some(selected) = summary
+        .get("selected_count")
+        .and_then(serde_json::Value::as_u64)
+    else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    let Some(omitted) = summary
+        .get("not_selected_count")
+        .and_then(serde_json::Value::as_u64)
+    else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+
+    let top_reason = value
+        .get("not_selected")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|card| {
+            card.get("selection_reason_code")
+                .and_then(serde_json::Value::as_str)
+        })
+        .fold(BTreeMap::<&str, usize>::new(), |mut counts, reason| {
+            *counts.entry(reason).or_default() += 1;
+            counts
+        })
+        .into_iter()
+        .max_by(|(left_reason, left_count), (right_reason, right_count)| {
+            left_count
+                .cmp(right_count)
+                .then_with(|| right_reason.cmp(left_reason))
+        })
+        .map(|(reason, count)| format!("; top omission `{reason}` ({count})"))
+        .unwrap_or_default();
+
+    println!("- Reviewer comments: {selected} selected, {omitted} omitted{top_reason}");
 }
 
 fn print_receipt_audit_handoff(check: &CheckOptions) {
