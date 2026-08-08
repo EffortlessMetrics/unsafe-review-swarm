@@ -1945,6 +1945,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
         )
     );
     assert!(stdout.contains("- Reviewer comments: 1 selected, 0 omitted"));
+    assert!(stdout.contains(
+        "1. src/lib.rs:8 `raw_pointer_read` — Why: guard_coverage: missing — actionable high-priority card; Next: Add or expose local guards for these `raw_pointer_read`"
+    ));
     assert!(stdout.contains("- Scan status: complete"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
