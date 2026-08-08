@@ -3,7 +3,7 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c"
+swarm_base = "3980fa9caa0e70e506a0d28ff4ddbbc8d694373f"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
@@ -62,6 +62,10 @@ integration_evidence = [
   "merged #1959 count-parity regression guard",
   "merged #2001/#2005/#2008/#2010/#2012 first-run and count-truth slices",
   "bdcd8232 ux: put first-pr next action in front panel (#2030) adds changed-file scope and earlier canonical next action",
+  "c8ab83f6 ux: surface evidence movement in first-pr panel (#2040)",
+  "302c3571 ux: show comment-plan counts in first-pr panel (#2041)",
+  "dd0c1d94 ux: show selected reviewer actions in first-pr panel",
+  "5ae3d360 ux: add base ref recovery guidance (#2043)",
   "issue remains open for the full one-screen action-first front door",
 ]
 reason = "The candidate must present bounded, action-first PR output without hiding inherited or partial states; the remaining front-panel compression is not yet integrated."
@@ -70,10 +74,11 @@ proof = ["cargo test -p unsafe-review-cli --locked", "cargo test -p unsafe-revie
 [[item]]
 id = "ISSUE-1885"
 disposition = "required"
-integration = "partial_on_swarm_main"
+integration = "on_swarm_main"
 integration_evidence = [
   "merged #1995 baseline init --dry-run preview slice",
-  "issue remains open for the broader preview-only top-level init flow",
+  "3980fa9c ux: add preview-only repository adoption init (#2044)",
+  "fresh-main proof: JSON/human preview, conflict/diff/rollback guidance, no default writes, and release placeholder",
 ]
 reason = "Guided adoption is part of release UX, but the shipped surface must remain preview-only, deterministic, conflict-aware, and non-mutating by default."
 proof = ["cargo test -p unsafe-review-cli --locked", "cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-first-hour", "cargo run --locked -p xtask -- check-pr"]
