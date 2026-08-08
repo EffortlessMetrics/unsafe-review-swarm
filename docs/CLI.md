@@ -24,6 +24,28 @@ external evidence only, policy reports are advisory, witness execution is not
 default, comment posting is not default, source edits are not supported, and
 live LSP remains deferred.
 
+## Preview Repository Adoption
+
+Before adding a workflow, inspect a deterministic, reviewable proposal:
+
+```bash
+unsafe-review init
+unsafe-review init --format json --out target/unsafe-review-init
+```
+
+`init` is preview-only. It does not create or edit repository files. The
+proposal includes workflow content, create/unchanged/conflict status, rollback
+guidance, repository warnings, recommended ignores, explicit baseline guidance,
+an optional badge snippet, the canonical ub-review gate-manifest pointer, and
+the exact `doctor` and `pr` commands. `--out` writes only
+`unsafe-review-init.json` to the explicitly selected proposal directory; with
+`--format json`, stdout remains valid JSON and the write receipt goes to stderr.
+
+The workflow contains a release placeholder rather than assuming the parked
+public Action/publish lane is ready. Replace it only with a separately verified
+release or pinned CLI invocation before applying the proposal. Baseline creation
+remains a separate explicit command and never labels debt as safe.
+
 ## Review A Diff
 
 Review the current branch against `origin/main`:

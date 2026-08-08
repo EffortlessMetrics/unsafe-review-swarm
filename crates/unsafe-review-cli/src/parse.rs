@@ -3,7 +3,7 @@ use crate::command::{
     BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
     ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format,
-    OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    InitOptions, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
 };
 use std::{
     env,
@@ -49,6 +49,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "--version" | "-V" => Ok(Command::Version),
         "support" => parse_support(rest),
         "doctor" => parse_doctor(rest),
+        "init" => parse_init(rest).map(Command::Init),
         "check" => parse_check(rest).map(Command::Check),
         "first-pr" | "review" => parse_first_pr(rest).map(Command::FirstPr),
         "pr-setup" => parse_pr_setup(rest).map(Command::PrSetup),
@@ -300,6 +301,42 @@ fn parse_baseline(args: Vec<String>) -> Result<BaselineCommand, String> {
     }
 }
 
+fn parse_init(args: Vec<String>) -> Result<InitOptions, String> {
+    let mut options = InitOptions::default();
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--out" => {
+                idx += 1;
+                options.out = Some(parse_path_value(&args, idx, "--out")?);
+            }
+            arg if arg.starts_with("--out=") => {
+                options.out = Some(parse_inline_path_value(arg, "--out")?);
+            }
+            "--json" => options.format = Format::Json,
+            "--format" => {
+                idx += 1;
+                options.format =
+                    human_or_json_format(parse_format(value(&args, idx, "--format")?)?, "init")?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format =
+                    human_or_json_format(parse_format(inline_value(arg, "--format")?)?, "init")?;
+            }
+            other => return Err(format!("unknown init argument `{other}`")),
+        }
+        idx += 1;
+    }
+    Ok(options)
+}
+
 fn parse_baseline_status(args: Vec<String>) -> Result<BaselineStatusOptions, String> {
     let mut options = BaselineStatusOptions::default();
     let mut idx = 0usize;
@@ -538,6 +575,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "receipt" | "receipt-template" => SubcommandHelpTarget::Receipt,
         "outcome" => SubcommandHelpTarget::Outcome,
         "policy" => SubcommandHelpTarget::Policy,
+        "init" => SubcommandHelpTarget::Init,
         "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
         "badges" => SubcommandHelpTarget::Badges,

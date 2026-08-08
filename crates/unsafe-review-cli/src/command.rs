@@ -308,6 +308,24 @@ pub(crate) struct BaselineRefreshOptions {
     pub out: Option<PathBuf>,
 }
 
+/// Options for the preview-only repository adoption proposal.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct InitOptions {
+    pub root: PathBuf,
+    pub format: Format,
+    pub out: Option<PathBuf>,
+}
+
+impl Default for InitOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            format: Format::Human,
+            out: None,
+        }
+    }
+}
+
 impl Default for BaselineRefreshOptions {
     fn default() -> Self {
         Self {
@@ -340,6 +358,7 @@ pub(crate) enum SubcommandHelpTarget {
     Receipt,
     Outcome,
     Policy,
+    Init,
     PrSetup,
     Doctor,
     Badges,
@@ -379,6 +398,7 @@ pub(crate) enum Command {
     },
     Candidate(CandidateCommand),
     Baseline(BaselineCommand),
+    Init(InitOptions),
     Confirm(ConfirmOptions),
     ReceiptTemplate(ReceiptTemplateOptions),
     ReceiptValidate {
@@ -433,6 +453,7 @@ impl Command {
                 BaselineCommand::Refresh(options) => Some(&options.root),
                 BaselineCommand::Help => None,
             },
+            Command::Init(options) => Some(&options.root),
             Command::Help
             | Command::RepoHelp
             | Command::CandidateHelp

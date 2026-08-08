@@ -81,6 +81,22 @@ pr -> pr-summary -> explain -> context -> witness-plan -> receipt audit -> outco
 Every first-hour surface must project from `ReviewCard`. No first-hour surface
 may reclassify findings independently or invent a second analyzer truth.
 
+The preview adoption loop is:
+
+```text
+init -> review proposal -> doctor -> pr
+```
+
+`unsafe-review init` is preview-only by default. It may inspect repository
+layout and write a JSON proposal envelope only to an explicitly selected
+proposal directory; it never applies workflow/configuration changes or edits
+source. The proposal carries complete proposed file content, target path,
+create/unchanged/conflict status, reason, rollback guidance, deterministic
+warnings, and exact next commands. Existing user workflows are conflicts, not
+overwrite targets. Any workflow release reference must be verified separately;
+the init proposal must not assume that a parked public Action or publication
+lane is ready.
+
 ## 4. Non-goals
 
 - no default witness execution
