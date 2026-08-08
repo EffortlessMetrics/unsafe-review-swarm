@@ -1966,6 +1966,9 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     );
     assert!(stdout.contains("Manual candidate queue preview: first 2 of 2 manual candidate(s)"));
     assert!(stdout.contains(
+        "Commands: see the first candidate above; remaining candidate details stay in manual-candidates.json"
+    ));
+    assert!(stdout.contains(
         "R4R2-S002 at src/sql_jsc/mysql/MySQLValue.rs:411 (slice_from_raw_parts) evidence refs: 3"
     ));
     assert!(stdout.contains("proof mode: mutation-plus-miri"));
