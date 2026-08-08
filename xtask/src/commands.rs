@@ -43,6 +43,7 @@ pub(crate) enum XtaskCommand {
     CheckCorpusPartitions,
     CheckEvidenceLossChallenges,
     CheckExternalPilots,
+    ExternalPilotRollup,
     LspSmoke,
     CheckLocal(Vec<String>),
     CheckLocalRun(String),
@@ -167,6 +168,9 @@ impl XtaskCommand {
             ),
             Some("check-external-pilots") => {
                 parse_no_extra(args, "check-external-pilots", Self::CheckExternalPilots)
+            }
+            Some("external-pilot-rollup") => {
+                parse_no_extra(args, "external-pilot-rollup", Self::ExternalPilotRollup)
             }
             Some("check-local") => {
                 // Trailing flags are forwarded to the CheckLocal arg parser.
