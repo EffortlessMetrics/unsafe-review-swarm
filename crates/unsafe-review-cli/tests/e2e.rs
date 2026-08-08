@@ -110,7 +110,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "Selected reviewer actions (showing 1 of 1):");
     assert_contains(
         &stdout,
-        "1. src/lib.rs:8 `raw_pointer_read` — Why: guard_coverage: missing — actionable high-priority card; Next: Add or expose local guards for these `raw_pointer_read`",
+        "1. src/lib.rs:8 `raw_pointer_read` — Why: guard_coverage: missing — actionable high-priority card; selected as the top card above",
     );
     let cards: Value = serde_json::from_str(&fs::read_to_string(out_dir.join("cards.json"))?)?;
     let card_id = cards["cards"][0]["id"]
@@ -123,9 +123,12 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     };
     assert_contains(
         &stdout,
-        &format!("Explain: unsafe-review explain --root {rendered_root} {card_id}"),
+        &format!("Explain top card:\n  unsafe-review explain --root {rendered_root} {card_id}"),
     );
-    assert_contains(&stdout, "Verify: cargo +nightly miri test read_header");
+    assert_contains(
+        &stdout,
+        "Confirmation step: build/run `cargo +nightly miri test read_header` first",
+    );
     let selected_actions = stdout
         .lines()
         .skip_while(|line| !line.starts_with("Selected reviewer actions ("))
@@ -134,6 +137,8 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         .collect::<Vec<_>>();
     assert_eq!(selected_actions.len(), 1);
     assert!(!selected_actions[0].contains("\n"));
+    assert!(!selected_actions[0].contains("; Explain:"));
+    assert!(!selected_actions[0].contains("; Verify:"));
     assert_contains(&stdout, "Explain top card:");
     let top_card = stdout
         .lines()

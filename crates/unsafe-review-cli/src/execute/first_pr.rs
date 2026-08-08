@@ -111,7 +111,8 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.no_changed_gaps_message,
         report.no_changed_gaps_limitation,
     );
-    print_comment_plan_summary(report.comment_plan, report.root);
+    let top_card_id = report.output.cards.first().map(|card| card.id.to_string());
+    print_comment_plan_summary(report.comment_plan, report.root, top_card_id.as_deref());
     print_receipt_audit_handoff(report.check);
     print_policy_report_handoff(report.out_dir);
     print_baseline_onboarding_handoff(report.root);
@@ -120,7 +121,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     print_trust_boundary();
 }
 
-fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
+fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_id: Option<&str>) {
     let Some(comment_plan) = comment_plan else {
         println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
         return;
@@ -223,6 +224,13 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
                 || "Verify: unavailable (inspect comment-plan.json)".to_string(),
                 |command| format!("Verify: {command}"),
             );
+        if top_card_id == Some(card_id) {
+            println!(
+                "  {}. {location} `{operation}` — Why: {reason}; selected as the top card above (see its Next, Explain, and Verify cues)",
+                index + 1,
+            );
+            continue;
+        }
         println!(
             "  {}. {location} `{operation}` — Why: {reason}; Next: {next_action}; Explain: {}; {verify}",
             index + 1,
