@@ -170,6 +170,9 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - Analysis and `spawn_blocking` failures must be logged.
 - Refresh failures must not imply clean/safe state.
 - Refresh failures clear stale diagnostics or mark status stale.
+- A configured `maxCards` cap may publish selected diagnostics, but the live
+  server must log the canonical partial-scan notice and identify those
+  diagnostics as partial rather than presenting a complete inventory.
 - Stale generations must not publish diagnostics.
 - Refresh publishing must not hold state locks across `.await`.
 - `AnalyzeOutput`/`ReviewCard` remain canonical facts.

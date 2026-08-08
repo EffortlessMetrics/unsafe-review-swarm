@@ -1247,6 +1247,76 @@ fn refresh_failure_surfaces_a_visible_warning_and_preserves_last_diagnostics()
     })
 }
 
+/// A configured card cap is a successful but partial refresh, not a clean
+/// complete inventory. Keep the live diagnostics useful while disclosing the
+/// canonical cap notice through the LSP log channel.
+#[test]
+fn capped_refresh_discloses_partial_diagnostics() -> Result<(), Box<dyn Error>> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("failed to build test runtime: {err}"))?;
+    runtime.block_on(async {
+        let fixture = "unsafe_declaration_volume_summary";
+        let root = fixture_root_named(fixture)?;
+        let root_uri = uri_from_path(&root).ok_or("expected root uri")?;
+        let (mut service, socket) = LspService::new(Backend::new);
+        initialize_over_the_wire(
+            &mut service,
+            &InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri,
+                    name: fixture.to_string(),
+                }]),
+                initialization_options: Some(json!({
+                    "unsafeReview": { "maxCards": 1 }
+                })),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let backend = service.inner();
+
+        let (_socket, messages) =
+            refresh_via_execute_command_collecting_messages(backend, socket, 2).await?;
+        let publish = messages
+            .iter()
+            .find(|message| message.method() == "textDocument/publishDiagnostics")
+            .ok_or("capped refresh should publish the selected diagnostics")?;
+        let publish_params = publish
+            .params()
+            .cloned()
+            .ok_or("publishDiagnostics should carry params")?;
+        assert_eq!(
+            publish_params["diagnostics"].as_array().map(Vec::len),
+            Some(1),
+            "maxCards=1 should publish one selected diagnostic"
+        );
+
+        let log = messages
+            .iter()
+            .find(|message| message.method() == "window/logMessage")
+            .ok_or("capped refresh should disclose its partial status")?;
+        let log_params = log
+            .params()
+            .cloned()
+            .ok_or("logMessage should carry params")?;
+        assert_eq!(
+            log_params.get("type"),
+            Some(&serde_json::to_value(MessageType::WARNING)?),
+            "partial diagnostics should use warning severity"
+        );
+        let text = log_params["message"]
+            .as_str()
+            .ok_or("logMessage should carry text")?;
+        assert!(text.contains("Partial scan:"), "{text}");
+        assert!(text.contains("--max-cards 1"), "{text}");
+        assert!(text.contains("not a complete inventory"), "{text}");
+        assert!(text.contains("Live diagnostics are partial"), "{text}");
+        Ok(())
+    })
+}
+
 #[test]
 fn did_change_does_not_trigger_analysis_by_default() {
     assert!(!should_refresh_on_change(&LspConfig::default()));
