@@ -253,6 +253,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_contains(&stdout, "Trust boundary:");
     assert_contains(&stdout, "static unsafe contract review only");
+    assert_contains(
+        &stdout,
+        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so; unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy.",
+    );
     assert_contains(&stdout, "not memory-safety proof");
     assert_contains(
         &stdout,

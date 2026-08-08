@@ -2693,12 +2693,8 @@ fn print_artifact_paths(out_dir: &Path, artifacts: &[&str]) {
 }
 
 fn print_trust_boundary() {
-    println!("Trust boundary:");
     println!(
-        "  static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
-    );
-    println!(
-        "  unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
+        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so; unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
     );
 }
 
