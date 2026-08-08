@@ -36,6 +36,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-08-08 cargo-allow current-main reproduction](reports/2026-08-08-cargo-allow-current-main.md)
 - [2026-07-29 simdutf8 holdout](reports/2026-07-29-simdutf8-holdout.md)
 - [2026-07-30 crossbeam holdout](reports/2026-07-30-crossbeam-holdout.md)
 - [2026-07-30 rkyv holdout](reports/2026-07-30-rkyv-holdout.md)
