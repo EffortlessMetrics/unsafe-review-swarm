@@ -13,7 +13,7 @@ Machine-readable source: [`UNSAFE-REVIEW-QUALIFICATION-1921.toml`](../../plans/r
 | Qualification issue | [#1921](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921) |
 | Sequence | PR 1 — manifest only |
 | Candidate commit/version | unset; #1917 must produce the candidate |
-| Current swarm baseline | `a8b8aa2d6b4d54feaf5de2ae7fb2743a6c20dd00` |
+| Current swarm baseline | `94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c` |
 | Current source baseline | `c25d65272c760c3630eb9528b7efaae2234d9e19` |
 | Baseline lockfile SHA-256 | `6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7` |
 | Baseline package versions | `unsafe-review-core`, `unsafe-review`, `unsafe-review-cli` — `0.3.8` |
