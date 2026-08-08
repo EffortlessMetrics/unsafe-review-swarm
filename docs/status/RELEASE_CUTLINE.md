@@ -8,12 +8,12 @@ publication, or `v1` decision. Its machine-readable source is
 
 Audited 2026-08-08.
 
-- Swarm base: `03e98fc27fed85a757be4c35a594b0ac7db40783`
-  (`feat: coalesce concurrent LSP refreshes (#2028)`)
+- Swarm base: `12bdef8c433eab2b4d76b2f2c47dfbabf109f16a`
+  (`docs(release): refresh current candidate posture (#2032)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=207`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=211`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
@@ -44,7 +44,7 @@ Deferred work can still be integrated, and required work can still be absent.
 | Canonical field map (PR #1913) | on swarm main |
 | Canonical editor/agent chain (#1907, #1909, #1910) | on swarm main |
 | Editor freshness and failure states (#1908) | partial — PR1–PR4 landed; the separate `xtask lsp-smoke` rail gap and remaining freshness qualification/usability work remain open |
-| Action-first PR front door (#1884) | partial — correctness/count slices landed; full front-panel compression remains open |
+| Action-first PR front door (#1884) | partial — count and action-first projection slices landed; broader one-screen front-panel compression remains open |
 | Guided preview-only init (#1885) | partial — baseline preview landed; top-level guided flow remains open |
 | Recovery audit (#1889) | on swarm main — #2015 |
 | Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 disposition posted |
