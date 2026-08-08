@@ -228,15 +228,13 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         "Manual candidates:",
     );
     assert_order(&stdout, "Manual candidates:", "Artifacts:");
-    assert_contains(&stdout, "Artifacts: 18 files indexed by:");
-    assert_contains(&stdout, &path_display_fwd(&out_dir.join("review-kit.json")));
     assert_contains(
         &stdout,
-        &path_display_fwd(&out_dir.join("unsafe-review-gate.json")),
-    );
-    assert_contains(
-        &stdout,
-        "inspect review-kit.json for the complete bundle inventory",
+        &format!(
+            "Artifacts: 18 files indexed by {} and {}; inspect review-kit.json for the complete bundle inventory",
+            path_display_fwd(&out_dir.join("review-kit.json")),
+            path_display_fwd(&out_dir.join("unsafe-review-gate.json")),
+        ),
     );
     assert_not_contains(&stdout, &path_display_fwd(&out_dir.join("cards.json")));
     assert_not_contains(

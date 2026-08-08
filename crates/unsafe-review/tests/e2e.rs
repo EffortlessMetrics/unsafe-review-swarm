@@ -2018,7 +2018,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(!top_card.contains("    - Confirm ReviewCard"));
     assert!(stdout.contains("Explain top card:"));
     assert!(stdout.contains("Agent packet:"));
-    assert!(stdout.contains("Artifacts: 18 files indexed by:"));
+    assert!(stdout.contains("Artifacts: 18 files indexed by "));
     assert!(stdout.contains("review-kit.json"));
     assert!(stdout.contains("unsafe-review-gate.json"));
     assert!(stdout.contains("inspect review-kit.json for the complete bundle inventory"));
@@ -3757,7 +3757,7 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("--diff"));
     assert!(stdout.contains("--format markdown"));
     assert!(stdout.contains("saved receipt metadata only; unsafe-review did not run a witness"));
-    assert!(stdout.contains("Artifacts: 18 files indexed by:"));
+    assert!(stdout.contains("Artifacts: 18 files indexed by "));
     assert!(stdout.contains("review-kit.json"));
     assert!(stdout.contains("inspect review-kit.json for the complete bundle inventory"));
     assert!(stdout.contains("No changed unsafe-review gaps were found."));
