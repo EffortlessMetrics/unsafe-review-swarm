@@ -191,10 +191,10 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
         comments.len()
     );
     for (index, comment) in comments.iter().take(shown).enumerate() {
-        let Some(card_id) = comment.get("card_id").and_then(serde_json::Value::as_str) else {
-            println!("  {}. unavailable (inspect comment-plan.json)", index + 1);
-            continue;
-        };
+        let card_id = comment
+            .get("card_id")
+            .and_then(serde_json::Value::as_str)
+            .unwrap_or("card unavailable");
         let location = match (
             comment.get("path").and_then(serde_json::Value::as_str),
             comment.get("line").and_then(serde_json::Value::as_u64),
@@ -214,18 +214,20 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
             .get("next_action")
             .and_then(serde_json::Value::as_str)
             .unwrap_or("next action unavailable");
-        println!("  {}. {location} `{operation}`", index + 1);
-        println!("     Why: {reason}");
-        println!("     Next: {next_action}");
-        println!("     Explain: {}", explain_command(root, &card_id));
-        if let Some(command) = comment
+        let verify = comment
             .get("verify_commands")
             .and_then(serde_json::Value::as_array)
             .and_then(|commands| commands.first())
             .and_then(serde_json::Value::as_str)
-        {
-            println!("     Verify: {command}");
-        }
+            .map_or_else(
+                || "Verify: unavailable (inspect comment-plan.json)".to_string(),
+                |command| format!("Verify: {command}"),
+            );
+        println!(
+            "  {}. {location} `{operation}` — Why: {reason}; Next: {next_action}; Explain: {}; {verify}",
+            index + 1,
+            explain_command(root, &card_id),
+        );
     }
 }
 
