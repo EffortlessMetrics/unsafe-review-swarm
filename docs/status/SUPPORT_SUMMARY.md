@@ -1,6 +1,6 @@
 # Support summary
 
-Date: 2026-05-20
+Date: 2026-08-08
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).
@@ -25,7 +25,7 @@ calibration exists and support tiers are explicitly promoted.
 | Surface | Current posture | Evidence | Not claimed |
 |---|---|---|---|
 | ReviewCard schema, identity, and core card slices | Experimental | Fixture-backed; selected analyzer rules are dogfood-backed | Stable schema compatibility, broad precision/recall, or safety |
-| First-run CLI path: `doctor`, `first-pr` / `review`, `explain`, `context`, and saved artifacts | Experimental | Fixture-backed CLI e2e coverage and release-readiness proof; 0.3.0 target is advisory review cockpit | Proof, policy authority, source edits, witness execution, agent execution, or live editor integration |
+| First-run CLI path: `doctor`, `pr` (with `first-pr` / `review` compatibility aliases), `explain`, `context`, and saved artifacts | Experimental | Fixture-backed CLI e2e coverage and current release-readiness proof; public v0.3.8 is the last published release | Proof, policy authority, source edits, witness execution, agent execution, or live editor integration |
 | PR artifacts: review-kit manifest, bounded ReviewCard queue preview, cards JSON, PR summary, bounded GitHub summary, SARIF, comment-plan, witness-plan, receipt audit, manual-candidates JSON, manual repair queue sidecar, tokmd packet input sidecar, saved LSP JSON, and repair queue | Experimental | Fixture-backed and workflow-verified; advisory artifact loop is dogfoodable | Automatic comments, branch protection, witness execution, source edits, agent execution, repair success, rendered tokmd output, or policy gating |
 | Saved LSP projection and agent packet | Experimental | Fixture-backed and e2e-covered read-only projections from `ReviewCard` | Live editor integration, agent execution, source edits, or repair success |
 | Witness routes and saved-output receipt import | Experimental | Fixture-backed route table plus saved-output receipt adapters | Running Miri/cargo-careful/sanitizers/Loom/Kani, site reach, or witness success beyond imported receipt scope |
@@ -34,14 +34,17 @@ calibration exists and support tiers are explicitly promoted.
 | Real-crate dogfood measurement | Experimental | Seven capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
 | MIR/nightly facts and live LSP/editor integration | Deferred or planned | Requires later ADR/spec and proof | Default dependency, support promise, or v0.x gate behavior |
 
-## Current Release Target
+## Public and candidate posture
 
-0.3.0 is the advisory review cockpit target: install, run `doctor`, run one
-`first-pr` command, open the review kit, inspect the bounded GitHub doorway,
-explain one `ReviewCard`, generate one `context` packet, inspect
-`unsafe-review support`, and take one concrete review action. It is not a
-policy gate, live LSP release, witness runner, agent runner, or proof claim.
-See [`0.3.0 Advisory Review Cockpit Target`](../releases/0.3.0-advisory-review-cockpit.md).
+The last public release is `v0.3.8` (2026-06-18). The next candidate is still
+unfrozen: its version, candidate SHA, dependency freeze, and publication state
+remain unset in the [draft release cutline](RELEASE_CUTLINE.md). Do not read
+Swarm main integration as public availability or qualification.
+
+The current first-use contract is install → `doctor` → `pr` → reviewer front
+panel → `explain`/`context` or human review → named external verification. The
+preview-only baseline slice does not make a completed top-level `init` command
+part of the supported path.
 
 ## Promotion Posture
 
