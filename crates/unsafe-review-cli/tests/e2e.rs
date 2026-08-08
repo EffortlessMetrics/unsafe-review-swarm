@@ -703,6 +703,37 @@ fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
+fn first_pr_artifact_write_failure_prints_recovery() -> Result<(), Box<dyn Error>> {
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-pr-artifact-write-failure")?;
+    let blocked = temp.path().join("blocked-output");
+    fs::write(&blocked, "not a directory\n")?;
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .arg("--root")
+        .arg(&fixture)
+        .arg("--diff")
+        .arg(fixture.join("change.diff"))
+        .arg("--out-dir")
+        .arg(&blocked)
+        .output()?;
+
+    assert!(!output.status.success());
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("create"));
+    assert!(stderr.contains("blocked-output"));
+    assert!(stderr.contains("Recovery:"));
+    assert!(stderr.contains("unsafe-review doctor --root ."));
+    assert!(stderr.contains("choose a writable output directory or parent"));
+    assert!(String::from_utf8(output.stdout)?.is_empty());
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
