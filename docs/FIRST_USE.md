@@ -13,7 +13,7 @@ blocking policy by default.
 ## Install
 
 ```bash
-cargo install unsafe-review --locked
+cargo install unsafe-review --version 0.3.8 --locked
 unsafe-review --help
 ```
 

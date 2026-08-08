@@ -5,16 +5,22 @@ activating a repository-wide or permanent dependency freeze. Its machine-
 readable source is
 [`UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml`](../../plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml).
 
+Audited 2026-08-08 against swarm `main` at
+`db289703c00ab9cfc1cc0ff90ff13d03506ee13c` and source `main` at
+`c25d65272c760c3630eb9528b7efaae2234d9e19`. This remains a draft and is not an
+active dependency freeze.
+
 ## Exact snapshot
 
 | Repository | Commit | `Cargo.lock` SHA-256 | `ra_ap_syntax` | `ignore` | `signal-hook` |
 | --- | --- | --- | --- | --- | --- |
-| swarm | `d19a87de817c3a1b4ef7dc746f25e7cc0d117eee` | `625a362746db12f1735f337ff8bf168afc721213cc139f4d20efc4c7c5b15b5a` | 0.0.341 | 0.4.27 | 0.4.4 |
-| source | `4fc6eb806de1460c618d60869b8a1cb885f87eea` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
+| swarm | `db289703c00ab9cfc1cc0ff90ff13d03506ee13c` | `6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7` | 0.0.343 | 0.4.31 | 0.4.4 |
+| source | `c25d65272c760c3630eb9528b7efaae2234d9e19` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
 
 These are two live repository baselines, not one frozen release candidate.
 The source candidate path remains owner-gated until its dependency PRs have
-the targeted proof named in issue #1916.
+the targeted proof named in issue #1916. The swarm row is the current
+workbench input, not a source-candidate or publication claim.
 
 ## Candidate inputs
 
@@ -26,10 +32,18 @@ the targeted proof named in issue #1916.
   merged `ignore 0.4.27`; directly affected core/workspace tests and the normal
   repository proof passed before the dependency identity was synced into swarm.
 - Source signal-hook PR [#515](https://github.com/EffortlessMetrics/unsafe-review/pull/515)
-  proposes `signal-hook 0.4.4`; directly affected signal-handling tests and
-  the normal workspace proof remain required.
-- Source Actions PR [#545](https://github.com/EffortlessMetrics/unsafe-review/pull/545)
-  remains blocked until its workflow pins and allowlist mirror converge.
+  remains open for `signal-hook 0.4.4`; directly affected signal-handling tests
+  and the normal workspace proof remain required.
+- Source parser PR [#551](https://github.com/EffortlessMetrics/unsafe-review/pull/551)
+  remains open for `ra_ap_syntax 0.0.343`; parser/corpus proof remains required.
+- Source Actions PR [#549](https://github.com/EffortlessMetrics/unsafe-review/pull/549)
+  remains owner-gated; its workflow pins and policy mirrors must move together.
+- Dependency group PR [#550](https://github.com/EffortlessMetrics/unsafe-review/pull/550)
+  remains owner-gated for its own affected-test and lockfile proof.
+
+The current swarm-only queue also contains #2013 (`ra_ap_syntax 0.0.344`) and
+issue #2014 (paired Actions updates). Both remain deferred from source
+promotion until one history path is chosen.
 
 The merged swarm audit [#1943](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1943)
 records why swarm #1874/#1875 are deferred and why #1620 remains parked.
