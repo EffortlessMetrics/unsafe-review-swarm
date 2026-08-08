@@ -9,7 +9,7 @@ use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
     AnalyzeOutput, ManualCandidate, ReviewCard, Scope, manual_candidate_implementer_handoff,
-    render_repair_queue,
+    project_review_card_confirmation, render_repair_queue,
 };
 
 const MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT: usize = 5;
@@ -547,10 +547,17 @@ fn print_top_card_summary(
         println!("  Route: `{}`", route.kind.as_str());
     }
     // Keep the first-screen card summary action-first. Detailed confirmation
-    // and repro guidance remains available through the exact explain command,
-    // while the selected reviewer action below carries the first verification
-    // command without repeating the long confirmation payload here.
+    // and repro guidance is compacted to one line per required cue, while the
+    // exact explain command and canonical artifacts retain the full detail.
     println!("  Next: {}", card.next_action.summary);
+    let confirmation = project_review_card_confirmation(card);
+    println!("  Hypothesis: {}", confirmation.hypothesis_to_confirm);
+    println!("  Build/run this first: {}", confirmation.build_this_first);
+    if let Some(step) = confirmation.minimal_repro_steps.first() {
+        println!("  Minimal repro cue: {step}");
+    }
+    println!("  Confirmation step: {}", confirmation.confirmation_step);
+    println!("  Limitation: {}", confirmation.minimal_repro_limitation);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
     println!("Agent packet:");

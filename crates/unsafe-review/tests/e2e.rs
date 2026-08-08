@@ -1994,12 +1994,22 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let explain_offset = stdout
         .find("Explain top card:")
         .ok_or("missing explain handoff")?;
+    let top_card = stdout
+        .lines()
+        .skip_while(|line| *line != "Top card:")
+        .take_while(|line| !line.starts_with("Selected reviewer actions:"))
+        .collect::<Vec<_>>()
+        .join("\n");
     assert!(route_offset < next_offset);
     assert!(next_offset < explain_offset);
-    assert!(!stdout.contains("Hypothesis: "));
-    assert!(!stdout.contains("Build/run this first: "));
-    assert!(!stdout.contains("Minimal repro cue:"));
-    assert!(!stdout.contains("Confirmation step: "));
+    assert!(top_card.contains("Route: `miri`"));
+    assert!(top_card.contains("Next: "));
+    assert!(top_card.contains("Hypothesis: "));
+    assert!(top_card.contains("Build/run this first: "));
+    assert!(top_card.contains("Minimal repro cue: "));
+    assert!(top_card.contains("Confirmation step: "));
+    assert!(top_card.contains("Limitation: Minimal repro cue only;"));
+    assert!(!top_card.contains("    - Confirm ReviewCard"));
     assert!(stdout.contains("Explain top card:"));
     assert!(stdout.contains("Agent packet:"));
     assert!(stdout.contains("Artifacts:"));
