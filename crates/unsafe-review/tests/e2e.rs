@@ -9774,7 +9774,7 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
     for (entrypoint, stdout) in [("pr", &pr_stdout), ("first-pr", &first_pr_stdout)] {
         // The free pointer survives: a ledger exists, so name the command to inspect it.
         assert!(
-            stdout.contains("a baseline ledger already exists; check its health"),
+            stdout.contains("Existing ledger: inspect"),
             "`{entrypoint}` must still point at the ledger when one exists: {stdout}"
         );
         assert!(
