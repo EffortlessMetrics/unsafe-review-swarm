@@ -260,11 +260,6 @@ fn check_card_inventory(
     let cards = required_table(table, "card_inventory", path)?;
     let total = required_section_integer(cards, "total_cards", path, "card_inventory")?;
     check_nonnegative_integer(total, path, "card_inventory.total_cards")?;
-    if total == 0 {
-        return Err(format!(
-            "{path} card_inventory.total_cards must be positive for a recorded external pilot"
-        ));
-    }
     check_nonnegative_integer(
         required_section_integer(cards, "agent_ready", path, "card_inventory")?,
         path,
@@ -914,6 +909,19 @@ next_step = "Keep the friction visible in the first-use backlog."
     #[test]
     fn valid_receipt_text_passes() -> Result<(), String> {
         check_text("docs/dogfood/pilots/synthetic-pilot.toml", valid_receipt())
+    }
+
+    #[test]
+    fn quiet_receipt_with_zero_cards_passes() -> Result<(), String> {
+        let text = valid_receipt()
+            .replace("total_cards = 1", "total_cards = 0")
+            .replace(
+                "agent_ready = 0\nhuman_only = 1",
+                "agent_ready = 0\nhuman_only = 0",
+            )
+            .replace("selected_count = 1", "selected_count = 0")
+            .replace("new_gaps = 1", "new_gaps = 0");
+        check_text("docs/dogfood/pilots/quiet-synthetic-pilot.toml", &text)
     }
 
     #[test]

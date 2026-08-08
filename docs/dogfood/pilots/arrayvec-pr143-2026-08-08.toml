@@ -1,0 +1,109 @@
+schema_version = "external-pilot/v1"
+id = "arrayvec-pr143-2026-08-08"
+status = "recorded"
+date = "2026-08-08"
+reviewer = "codex"
+repository = "bluss/arrayvec"
+pr = 143
+url = "https://github.com/bluss/arrayvec/pull/143"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone, pinned PR checkout, repo-local cargo run, and full-index git diff"
+tool_version = "0.3.8"
+base_sha = "fc6664c540b5827c797e365b1c1dc7591c347140"
+head_sha = "633c863b0a7a8a06a8aa41fb77970abad3497cc1"
+diff_path = "target/external-pilots/arrayvec-pr143-2026-08-08/arrayvec-pr143-2026-08-08.diff"
+diff_sha256 = "9db452bd35f5a0810d9db68371e029ed37d60a16b1d9e078703c29a7346f1748"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+[card_inventory]
+total_cards = 0
+agent_ready = 0
+human_only = 0
+[comment_plan]
+mode = "plan_only"
+selected_count = 0
+not_selected_count = 0
+selection_reason = "bounded reviewer noise"
+[gate_summary]
+status = "advisory"
+new_gaps = 0
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+[run]
+exit_code = 0
+elapsed_seconds = 1.2
+diff_bytes = 1224
+artifact_count = 11
+artifact_total_bytes = 19874
+rust_files_changed = 2
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/review-kit.json"
+bytes = 9215
+sha256 = "32063a9c13b4dfb488df3e691c642d61437be1d1c607e5af5e5123fa77216876"
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/cards.json"
+bytes = 1248
+sha256 = "46904bca47bc87e46ddeb59b869552744f616b9d1002cefe3e9495f6628247b2"
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/comment-plan.json"
+bytes = 695
+sha256 = "fe7888f1de8d9bcb6aae52804f62194809ed9e46be9964098a2eb4a97f0bed68"
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/unsafe-review-gate.json"
+bytes = 805
+sha256 = "b140de7fa4726dd615aeb1d0bcb818d6fa30cd4e34fa302ce9e5aed2e3934b3e"
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/github-summary.md"
+bytes = 1662
+sha256 = "35c9996a53fbd212d40a74af34ba60c4af95ce33cc662b104c7c75e27fb58204"
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/pr-summary.md"
+bytes = 787
+sha256 = "eb0b20d1450bc812b714e7121051c0a2c83972f26900c499b919f2a022be7074"
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/repair-queue.json"
+bytes = 1050
+sha256 = "192de7e73a83e8f16e2a5da997e72d72596097caf5eacf45075ebade55cdd64a"
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/cards.sarif"
+bytes = 753
+sha256 = "37bf20cbeff18eba1d08cbddbd7df43545ec630e803fd5987c5cd46b3f5632df"
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/lsp.json"
+bytes = 945
+sha256 = "863f86a7bc10dc99799eb9bb42f2e12948e5f2a66dfb268365c1fad9490d1d5b"
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "fff92bee9c192d3356733beff3b888c7d8c92ec4bd7f6d0b88d008a0705db20e"
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/arrayvec-pr143-2026-08-08/first-pr/usefulness-telemetry.json"
+bytes = 1305
+sha256 = "cd33f1782423183eac56a74b1d78e1a12dfbd57c9cc4d21ff83b8fb56020d793"
+[[judgments]]
+surface = "github_summary"
+label = "correct_but_not_worth_surfacing"
+reason = "The focused API addition produced no changed unsafe-review cards or comment-plan entries, so the first-screen result stayed quiet."
+next_step = "Retain quiet-PR behavior as an explicit pilot matrix case; do not infer safety or analyzer completeness."
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "Even a quiet PR required exact base/head checkout and raw diff capture for a reproducible external receipt."
+next_step = "Use this repeated setup signal to shape the separate preview-only init lane."
