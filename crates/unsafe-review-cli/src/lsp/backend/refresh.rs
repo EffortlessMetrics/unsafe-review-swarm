@@ -59,6 +59,7 @@ impl Backend {
                 return;
             }
         };
+        let partial_notice = output.summary.capped_scan_notice();
         let by_uri = diagnostics_by_uri(&root, &output);
         let Some((clear_uris, publish_batches)) = self
             .install_refresh_result(output, by_uri, document_versions, generation)
@@ -72,6 +73,14 @@ impl Backend {
                 .await;
             return;
         };
+        if let Some(notice) = partial_notice {
+            self.client
+                .log_message(
+                    MessageType::WARNING,
+                    format!("unsafe-review: {notice} Live diagnostics are partial."),
+                )
+                .await;
+        }
         for (uri, version) in clear_uris {
             self.client.publish_diagnostics(uri, vec![], version).await;
         }
