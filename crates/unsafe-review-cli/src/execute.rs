@@ -1513,7 +1513,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     let manual_candidates = load_manual_candidates(&root)?;
 
     fs::create_dir_all(&options.out_dir)
-        .map_err(|err| format!("create {} failed: {err}", options.out_dir.display()))?;
+        .map_err(|err| artifact_write_failure("create", &options.out_dir, err))?;
     // Accumulate bytes written across all artifact writes.  The total is
     // the disk footprint of this run's output bundle — diagnostic only,
     // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
@@ -1679,10 +1679,19 @@ fn enforce_policy(output: &unsafe_review_core::AnalyzeOutput) -> Result<(), crat
 /// diagnostic only, not a coverage claim, proof, UB-free, Miri-clean,
 /// site-execution, or performance guarantee.
 fn write_artifact(path: &Path, rendered: String) -> Result<u64, String> {
-    ensure_parent_dir(path)?;
+    ensure_parent_dir(path)
+        .map_err(|err| artifact_write_failure("prepare", path, std::io::Error::other(err)))?;
     let byte_count = rendered.len() as u64;
-    fs::write(path, rendered).map_err(|err| format!("write {} failed: {err}", path.display()))?;
+    fs::write(path, rendered).map_err(|err| artifact_write_failure("write", path, err))?;
     Ok(byte_count)
+}
+
+fn artifact_write_failure(action: &str, path: &Path, err: impl std::fmt::Display) -> String {
+    format!(
+        "{action} {} failed: {err}\nRecovery:\n  unsafe-review doctor --root .\n  choose a writable output directory or parent for {}",
+        path.display(),
+        path.display()
+    )
 }
 
 fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
