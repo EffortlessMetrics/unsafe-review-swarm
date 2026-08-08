@@ -9819,6 +9819,11 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
         "the Brownfield baseline block must be identical across entrypoints once the \
          `pr`-only health warning is retired"
     );
+    assert_eq!(
+        baseline_block(&pr_stdout).lines().count(),
+        1,
+        "the Brownfield baseline handoff should stay on one compact line"
+    );
 
     Ok(())
 }

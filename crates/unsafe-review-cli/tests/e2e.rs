@@ -197,7 +197,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(
         &stdout,
         &format!(
-            "New ledger: unsafe-review baseline init --root {}",
+            "Brownfield baseline (optional): New ledger: unsafe-review baseline init --root {}",
             fixture.display()
         ),
     );
