@@ -278,16 +278,10 @@ fn print_manual_candidate_handoff(
     println!("Manual candidates:");
     if manual_candidates.is_empty() {
         println!(
-            "  {} (0; manual/advisory sidecar, not analyzer ReviewCards)",
-            artifact_path_display(out_dir, "manual-candidates.json")
-        );
-        println!(
-            "  Manual repair queue: {} (empty copy-only sidecar; unsafe-review did not run an agent)",
-            artifact_path_display(out_dir, "manual-repair-queue.json")
-        );
-        println!(
-            "  Tokmd packet export: {} (empty formatting sidecar; tokmd was not run)",
-            artifact_path_display(out_dir, "tokmd-packets.json")
+            "  none (advisory sidecars: {}, {}, {}; not analyzer ReviewCards; no agent or tokmd run)",
+            artifact_path_display(out_dir, "manual-candidates.json"),
+            artifact_path_display(out_dir, "manual-repair-queue.json"),
+            artifact_path_display(out_dir, "tokmd-packets.json"),
         );
         return;
     }
