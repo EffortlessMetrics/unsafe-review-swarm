@@ -1,0 +1,161 @@
+schema_version = "external-pilot/v1"
+id = "arrayvec-pr138-2026-08-08"
+status = "recorded"
+date = "2026-08-08"
+reviewer = "codex"
+repository = "bluss/arrayvec"
+pr = 138
+url = "https://github.com/bluss/arrayvec/pull/138"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone, pinned PR checkout, repo-local cargo run, and full-index git diff"
+tool_version = "0.3.8"
+base_sha = "b7b8cf8777afc11f7b9954638d21f91443101ac5"
+head_sha = "090a5c50cb3a6a6cdb7906ac3b810c2893a6c51c"
+diff_path = "target/external-pilots/arrayvec-pr138-2026-08-08/arrayvec-pr138-2026-08-08.diff"
+diff_sha256 = "a33253c7e0035b0210e33004cd5bd00bda547553529e9c2224cb8c818875cdbd"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 8
+agent_ready = 0
+human_only = 8
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 3
+not_selected_count = 5
+selection_reason = "bounded reviewer noise"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 8
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+
+[run]
+exit_code = 0
+elapsed_seconds = 1.2
+diff_bytes = 5521
+artifact_count = 18
+artifact_total_bytes = 547954
+rust_files_changed = 2
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/cards.json"
+bytes = 46701
+sha256 = "43c12948da02ab7c02ccdef890a7349c854733e4efbf6d99584c3cd5048fbd57"
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/cards.sarif"
+bytes = 22018
+sha256 = "c2e93229783d1b8dacde5b85161a66f8f76e2a2d21c3bba992eba92cac6ab036"
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/comment-plan.json"
+bytes = 24631
+sha256 = "ffa264f102bb69a7bc5831241af708987b25a728987a34f3eda16b69286ae089"
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/github-summary.md"
+bytes = 4219
+sha256 = "5e59c79294f0a135a6b5e0fafa348c0617765ed8edb1f3458e34d92fba86d752"
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/lsp.json"
+bytes = 228308
+sha256 = "6253ae0cd51f80d45744790407b906858fde9d3aae0db18a9df08242807dfb7c"
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/policy-report.json"
+bytes = 7709
+sha256 = "7d9fd80e4bc66eb548bf069d79e8962db8d2fc492cdae7d7524fe820539e53ff"
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/policy-report.md"
+bytes = 6242
+sha256 = "784f3c6efa706707f04ed04e215cce651682ed17baeaec817c5ff80af0f45ee4"
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/pr-summary.md"
+bytes = 17813
+sha256 = "46f22d4fb4dcab460276fbea353529ca0c8267435d044f6486521f0bf485eaa8"
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "fff92bee9c192d3356733beff3b888c7d8c92ec4bd7f6d0b88d008a0705db20e"
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "701470908cfe9954cd8b3874c7bec7b630a1ca70c65999399ab3ce50615f84a7"
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/repair-queue.json"
+bytes = 113539
+sha256 = "cd93bb1fe430ba8df1b12ddfa05df44735f4f8142599ce38204b358ed97555cb"
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/review-kit.json"
+bytes = 38416
+sha256 = "d5d7a6cef4d21b451c829d37159dbbbf4c9e9748431ad2e04ef54c8af3b6b6dd"
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/tokmd-packets.json"
+bytes = 3531
+sha256 = "2c561a546c2f6355f4be361c4edff3f0fb1976f234e3afb267ffe468f03443c5"
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/unsafe-review-gate.json"
+bytes = 805
+sha256 = "9c4613f429fb5f081ebfacb879a56da96ab24f958ce5ce441c42200514047cf6"
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/usefulness-telemetry.json"
+bytes = 1781
+sha256 = "c022302a5cb566a2e8a1a986eba98054da9508073bf90aa38786788e79b044eb"
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/arrayvec-pr138-2026-08-08/first-pr/witness-plan.md"
+bytes = 23577
+sha256 = "2067e81c20da2af9fb3b35150112260b614f1000e00cf433dca3839d3c81a592"
+
+[[judgments]]
+surface = "github_summary"
+label = "actionable"
+reason = "The first screen named the changed scope, the top pointer-arithmetic contract gap, a bounded reviewer route, and the advisory boundary."
+next_step = "Use this as external usefulness evidence; do not promote it to safety or accuracy evidence."
+[[judgments]]
+surface = "comment_plan"
+label = "correct_but_not_worth_surfacing"
+reason = "Three of eight cards were selected and five were omitted under the bounded reviewer-noise plan."
+next_step = "Compare this selection against larger and quieter pilots before changing front-panel terminology."
+[[judgments]]
+surface = "agent_packet"
+label = "human_only"
+reason = "The cards route through Miri-oriented confirmation and are not automatically executable repair tasks."
+next_step = "Keep the human confirmation boundary explicit in the front panel."
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "The exact SHA checkout and raw full-index diff are useful but require several explicit setup commands."
+next_step = "Use repeated pilot evidence to prioritize a guided setup path separately from front-panel compression."
