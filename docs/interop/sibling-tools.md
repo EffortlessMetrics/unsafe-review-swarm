@@ -129,7 +129,7 @@ owns the tracking issue. Keep this table current as items land.
 | No-finding wording-contract verifier | unsafe-review | ripr | ripr-swarm #1040 | open |
 | Diff-first consumer contract alignment | unsafe-review | ripr | ripr-swarm #1041 | open |
 | Coverage-movement vocabulary (new/worsened/resolved/inherited) | unsafe-review | cargo-allow | cargo-allow #1471 | open |
-| tokmd-packets input-schema ownership + `--from-packets` consumer | unsafe-review (producer) ↔ tokmd (consumer) | tokmd | tokmd-swarm #222 | open |
+| tokmd-packets input-schema ownership + `--from-packets` consumer | unsafe-review (producer) ↔ tokmd (consumer) | tokmd | tokmd-swarm #222, unsafe-review-swarm #1857 | partial (consumer and current-main producer acceptance receipt recorded; publication and broader packet-shape coverage remain open) |
 | `check-local-context` / limited-runtime vocabulary — `downstream_consumable` operator field shipped; `has_unix_absolute_machine_path` / `has_session_state_marker` predicates shipped | ripr | unsafe-review | unsafe-review-swarm #1520 | closed |
 | Pre-guard scratch GC for shared CI runners | ripr | unsafe-review | unsafe-review-swarm #1519 | open |
 

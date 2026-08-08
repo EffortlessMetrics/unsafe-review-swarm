@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Issue #1857 tokmd packet acceptance](2026-08-08-tokmd-packets-1857-acceptance.md) | 2026-08-08 | records current-main producer schema identity, exact tokmd-swarm consumer commit, five-preset rendering, packet/output hashes, limitations, and no-publication boundary |
 | [Issue #1889 recovery audit](2026-08-08-issue-1889-recovery-audit.md) | 2026-08-08 | compares reported local-only repo-improvement commits with current swarm main, routes already-landed and still-open slices, and preserves the no-release/no-publication boundary |
 | [Source policy sync](2026-07-29-source-policy-sync.md) | 2026-07-29 | acknowledges source PRs #558/#559 after their effective RTK-guidance removals were already represented by swarm PRs #1971/#1973/#1975; advances the source-sync checkpoint without importing source-only workbench differences or claiming release, publication, proof, UB-free, Miri-clean, site-execution, calibrated, or policy-readiness status |
 | [Source dependency sync](2026-07-19-source-dependency-sync.md) | 2026-07-19 | acknowledges source PRs #547/#548 (`ignore 0.4.27`, `ra_ap_syntax 0.0.341`) after swarm PR #1958 mirrored the dependency identity and refreshed the issue #1916 freeze records; moves the source-sync checkpoint without release, publication, proof, UB-free, Miri-clean, site-execution, calibrated, or policy-readiness claims |
