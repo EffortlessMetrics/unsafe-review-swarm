@@ -148,6 +148,7 @@ pilot receipts:
 - the read-only posture records no source edits, no witness execution, and no
   third-party comments or issues;
 - comment-plan selected and omitted counts reconcile with card inventory;
+- quiet PRs may record `total_cards = 0` with zero selected and omitted comments;
 - gate movement counts are advisory, non-negative values;
 - runtime and artifact-size metrics are present;
 - required first-pr artifacts are listed with byte sizes and sha256 hashes;
