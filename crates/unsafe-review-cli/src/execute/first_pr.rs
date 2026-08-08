@@ -254,22 +254,23 @@ fn print_policy_report_handoff(out_dir: &Path) {
 }
 
 fn print_baseline_onboarding_handoff(root: &Path) {
-    println!("Brownfield baseline (optional):");
-    if root
+    let existing = root
         .join("policy")
         .join("unsafe-review-baseline.toml")
-        .is_file()
-    {
-        println!(
-            "  Existing ledger: inspect {}",
-            baseline_status_command(root)
-        );
-        println!("  Stale-entry preview: {}", baseline_refresh_command(root));
+        .is_file();
+    let mut handoff = String::from("Brownfield baseline (optional):");
+    if existing {
+        handoff.push_str(&format!(
+            " Existing ledger: inspect {}; Stale-entry preview: {};",
+            baseline_status_command(root),
+            baseline_refresh_command(root)
+        ));
     }
-    println!(
-        "  New ledger: {}; clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt, so review generated policy files; not a safety record, not UB-free status, and not a witness result",
+    handoff.push_str(&format!(
+        " New ledger: {}; clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt, so review generated policy files; not a safety record, not UB-free status, and not a witness result",
         baseline_init_command(root)
-    );
+    ));
+    println!("{handoff}");
 }
 
 fn print_manual_candidate_handoff(
