@@ -7,9 +7,11 @@ use serde_json::{Value, json};
 use tower::Service as _;
 use tower_lsp_server::jsonrpc::Request;
 use tower_lsp_server::ls_types::{
-    CodeActionOrCommand, CodeActionProviderCapability, DiagnosticSeverity, ExecuteCommandOptions,
-    ExecuteCommandParams, HoverContents, HoverParams, HoverProviderCapability, InitializeParams,
-    MessageType, Position, TextDocumentIdentifier, TextDocumentPositionParams, WorkspaceFolder,
+    CodeActionOrCommand, CodeActionProviderCapability, DiagnosticSeverity,
+    DidChangeTextDocumentParams, ExecuteCommandOptions, ExecuteCommandParams, HoverContents,
+    HoverParams, HoverProviderCapability, InitializeParams, MessageType, Position,
+    TextDocumentContentChangeEvent, TextDocumentIdentifier, TextDocumentPositionParams,
+    VersionedTextDocumentIdentifier, WorkspaceFolder,
 };
 use tower_lsp_server::{ClientSocket, LanguageServer, LspService};
 use unsafe_review_core::{
@@ -740,6 +742,136 @@ fn document_change_clears_previously_diagnosed_uris() -> Result<(), Box<dyn Erro
     assert_eq!(clear, vec![uri]);
     assert!(previous.is_empty());
     Ok(())
+}
+
+#[test]
+fn did_change_publishes_versioned_clear_and_invalidates_cached_diagnostics()
+-> Result<(), Box<dyn Error>> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("failed to build test runtime: {err}"))?;
+    runtime.block_on(async {
+        let (root, _) = fixture_output("raw_pointer_alignment")?;
+        let root_uri = uri_from_path(&root).ok_or("expected root uri")?;
+        let lib_uri =
+            uri_from_path(root.join("src/lib.rs")).ok_or("expected file uri for src/lib.rs")?;
+        let (mut service, socket) = LspService::new(Backend::new);
+        initialize_over_the_wire(
+            &mut service,
+            &InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri,
+                    name: "fixture".to_string(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let backend = service.inner();
+        let (socket, success_messages) =
+            refresh_via_execute_command_collecting_messages(backend, socket, 1).await?;
+        let publish = success_messages
+            .first()
+            .ok_or("expected initial diagnostics publication")?;
+        assert_eq!(publish.method(), "textDocument/publishDiagnostics");
+        let initial_params = publish
+            .params()
+            .cloned()
+            .ok_or("initial diagnostics should carry params")?;
+        let start = initial_params["diagnostics"][0]["range"]["start"]
+            .as_object()
+            .ok_or("initial diagnostic should carry a range start")?;
+        let position = Position::new(
+            start["line"]
+                .as_u64()
+                .ok_or("initial diagnostic line should be numeric")? as u32,
+            start["character"]
+                .as_u64()
+                .ok_or("initial diagnostic character should be numeric")? as u32,
+        );
+        let before = backend
+            .hover(HoverParams {
+                text_document_position_params: TextDocumentPositionParams {
+                    text_document: TextDocumentIdentifier {
+                        uri: lib_uri.clone(),
+                    },
+                    position,
+                },
+                work_done_progress_params: Default::default(),
+            })
+            .await?;
+        assert!(
+            before.is_some(),
+            "initial refresh should make the card inspectable"
+        );
+
+        let mut drain = tokio::spawn(async move {
+            let mut socket = socket;
+            let mut messages = Vec::new();
+            while messages.len() < 2 {
+                let Some(message) = socket.next().await else {
+                    break;
+                };
+                messages.push(message);
+            }
+            (socket, messages)
+        });
+        backend
+            .did_change(DidChangeTextDocumentParams {
+                text_document: VersionedTextDocumentIdentifier {
+                    uri: lib_uri.clone(),
+                    version: 2,
+                },
+                content_changes: vec![TextDocumentContentChangeEvent {
+                    range: None,
+                    range_length: None,
+                    text: "changed unsafe document".to_string(),
+                }],
+            })
+            .await;
+        let joined =
+            match tokio::time::timeout(std::time::Duration::from_secs(30), &mut drain).await {
+                Ok(joined) => joined,
+                Err(_timeout) => {
+                    drain.abort();
+                    return Err("draining didChange notifications timed out".into());
+                }
+            };
+        let (_, messages) =
+            joined.map_err(|err| format!("drain task panicked or was cancelled: {err}"))?;
+        let clear = messages
+            .iter()
+            .find(|message| message.method() == "textDocument/publishDiagnostics")
+            .ok_or("didChange should publish a diagnostics clear")?;
+        let params = clear
+            .params()
+            .cloned()
+            .ok_or("diagnostics clear should carry params")?;
+        assert_eq!(params["uri"], lib_uri.to_string());
+        assert_eq!(params["version"], 2);
+        assert_eq!(params["diagnostics"].as_array().map(Vec::len), Some(0));
+        assert!(messages.iter().any(|message| {
+            message.method() == "window/logMessage"
+                && message
+                    .params()
+                    .is_some_and(|params| params.to_string().contains("marked stale"))
+        }));
+        assert!(
+            backend
+                .hover(HoverParams {
+                    text_document_position_params: TextDocumentPositionParams {
+                        text_document: TextDocumentIdentifier { uri: lib_uri },
+                        position,
+                    },
+                    work_done_progress_params: Default::default(),
+                })
+                .await?
+                .is_none(),
+            "stale cached diagnostics must not remain inspectable after didChange"
+        );
+        Ok(())
+    })
 }
 
 /// Drives `execute_command(CMD_REFRESH)` while concurrently draining `count`
