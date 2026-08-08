@@ -14,7 +14,9 @@ const CODE_ACTION_ID: u64 = 4;
 const PACKET_ID: u64 = 5;
 const WITNESS_ROUTE_ID: u64 = 6;
 const WITNESS_COMMAND_ID: u64 = 7;
-const MESSAGE_TIMEOUT: Duration = Duration::from_secs(20);
+// `lsp-smoke` starts the CLI through Cargo so it works from a clean checkout;
+// allow the first workspace build to finish before timing out the protocol.
+const MESSAGE_TIMEOUT: Duration = Duration::from_secs(120);
 
 pub(crate) fn run(workspace_root: &Path) -> Result<(), String> {
     let fixture_root = workspace_root.join("fixtures/raw_pointer_alignment");
@@ -155,7 +157,7 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
         }),
     )?;
     let code_actions = wait_for_id(&messages_rx, CODE_ACTION_ID)?;
-    validate_code_actions_response(&code_actions, &card_id)?;
+    let analysis = validate_code_actions_response(&code_actions, &card_id)?;
 
     write_message(
         &mut stdin,
@@ -165,7 +167,7 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
             "method": "workspace/executeCommand",
             "params": {
                 "command": "unsafe-review.collectAgentPacket",
-                "arguments": [{"card_id": card_id}]
+                "arguments": [{"card_id": card_id, "analysis": analysis}]
             }
         }),
     )?;
@@ -180,7 +182,7 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
             "method": "workspace/executeCommand",
             "params": {
                 "command": "unsafe-review.explainWitnessRoute",
-                "arguments": [{"card_id": card_id}]
+                "arguments": [{"card_id": card_id, "analysis": analysis}]
             }
         }),
     )?;
@@ -195,7 +197,7 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
             "method": "workspace/executeCommand",
             "params": {
                 "command": "unsafe-review.collectWitnessCommand",
-                "arguments": [{"card_id": card_id}]
+                "arguments": [{"card_id": card_id, "analysis": analysis}]
             }
         }),
     )?;
@@ -231,9 +233,17 @@ fn validate_initialize_response(response: &Value) -> Result<(), String> {
         .get("result")
         .and_then(|result| result.get("capabilities"))
         .ok_or_else(|| format!("initialize response has no capabilities: {response}"))?;
+    let code_action_provider = capabilities
+        .get("codeActionProvider")
+        .and_then(Value::as_object);
     if capabilities["textDocumentSync"].is_null()
         || capabilities["hoverProvider"] != Value::Bool(true)
-        || capabilities["codeActionProvider"] != Value::Bool(true)
+        || code_action_provider.map_or(true, |provider| {
+            provider
+                .get("codeActionKinds")
+                .and_then(Value::as_array)
+                .map_or(true, Vec::is_empty)
+        })
     {
         return Err(format!(
             "initialize response lacks required read-only capabilities: {capabilities}"
@@ -295,22 +305,28 @@ fn validate_hover_response(response: &Value, card_id: &str) -> Result<(), String
     Ok(())
 }
 
-fn validate_code_actions_response(response: &Value, card_id: &str) -> Result<(), String> {
+fn validate_code_actions_response(response: &Value, card_id: &str) -> Result<Value, String> {
     let actions = response["result"]
         .as_array()
         .ok_or_else(|| format!("code-action response has no action array: {response}"))?;
-    if actions.is_empty()
-        || actions.iter().any(|action| action.get("edit").is_some())
-        || !actions.iter().any(|action| {
-            action["command"] == "unsafe-review.collectAgentPacket"
-                && action["arguments"][0]["card_id"] == card_id
-        })
-    {
+    if actions.is_empty() || actions.iter().any(|action| action.get("edit").is_some()) {
         return Err(format!(
             "code-action response is not command-only or lost card identity: {response}"
         ));
     }
-    Ok(())
+    actions
+        .iter()
+        .find(|action| {
+            action["command"] == "unsafe-review.collectAgentPacket"
+                && action["arguments"][0]["card_id"] == card_id
+        })
+        .and_then(|action| action["arguments"][0]["analysis"].as_object())
+        .map(|analysis| Value::Object(analysis.clone()))
+        .ok_or_else(|| {
+            format!(
+                "code-action response lost packet identity or analysis identity: {response}"
+            )
+        })
 }
 
 fn validate_packet_response(response: &Value, card_id: &str) -> Result<(), String> {
