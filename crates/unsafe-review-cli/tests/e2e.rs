@@ -107,6 +107,18 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "src/lib.rs:8 `raw_pointer_read`");
     assert_contains(&stdout, "Class: `guard_missing`");
     assert_contains(&stdout, "Missing: guard, witness");
+    assert_contains(&stdout, "Selected reviewer actions (showing 1 of 1):");
+    assert_contains(&stdout, "1. src/lib.rs:8 `raw_pointer_read`");
+    assert_contains(
+        &stdout,
+        "Why: guard_coverage: missing — actionable high-priority card",
+    );
+    assert_contains(
+        &stdout,
+        "Next: Add or expose local guards for these `raw_pointer_read`",
+    );
+    assert_contains(&stdout, "Explain: unsafe-review explain --root");
+    assert_contains(&stdout, "Verify: cargo +nightly miri test read_header");
     assert_contains(&stdout, "Explain top card:");
     assert_contains(
         &stdout,
