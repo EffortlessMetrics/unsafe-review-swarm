@@ -2,14 +2,14 @@
 
 This is the live queue audit for the first #1916 release-prep slice. It is a
 swarm workbench record, not a dependency freeze, scheduler, publication
-authorization, or source-repository decision. Snapshot date: 2026-07-18.
+authorization, or source-repository decision. Snapshot date: 2026-08-08.
 
 ## Repository snapshot
 
 | Repository | Base | Source-divergence posture |
 | --- | --- | --- |
-| `EffortlessMetrics/unsafe-review-swarm` | `64f1eb4caa8490de76dc5bea7469794f9ea13b9c` | `new_source_commits=0`; expected unpromoted swarm work remains |
-| `EffortlessMetrics/unsafe-review` | `209c76fef1da653172a21c3348d6e3a3fb1eedbd` | acknowledged publication-sync point |
+| `EffortlessMetrics/unsafe-review-swarm` | `bdcd82328ba6d58f95e994bc0e2468da54d04755` | `new_source_commits=0`; expected unpromoted swarm work remains |
+| `EffortlessMetrics/unsafe-review` | `c25d65272c760c3630eb9528b7efaae2234d9e19` | acknowledged publication-sync point |
 
 ## Chosen history path
 
@@ -20,24 +20,22 @@ owner-gated and are not changed by this swarm PR.
 
 | Surface | Swarm PR | Source PR | Live evidence | Disposition |
 | --- | --- | --- | --- | --- |
-| `ra_ap_syntax` 0.0.341 | [#1875](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1875), head `eed5b73040304c0be905b4e8d224f62b2d3bad08` | [#548](https://github.com/EffortlessMetrics/unsafe-review/pull/548), head `e5f7ca68f5f2c8cd478bbabbc84314ab7408d68e` | Both are open/mergeable with clean current check summaries; parser acceptance still requires the targeted proof listed in issue #1916. | Defer swarm #1875; retain source #548 for the source candidate. |
-| `ignore` 0.4.27 | [#1874](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1874), head `40e646427b36d0ca197e526d974e3526ed985a3a` | [#547](https://github.com/EffortlessMetrics/unsafe-review/pull/547), head `58f4b89a3cbee9ad0b4b6e6ecdb6523bf743c359` | Both are open/mergeable with clean current check summaries. | Defer swarm #1874; retain source #547 for the source candidate. |
-| GitHub Actions pins | [#1906](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1906), head `ce87b0aaed34f5c3c542a0b3ebebcd883df7a932` | [#545](https://github.com/EffortlessMetrics/unsafe-review/pull/545), head `d90071ee485dc9b93869541f06586ebbe1de01df` | Both fail the policy/Rust gate because the workflow pin changes are not paired with the matching allowlist entries; #1906 specifically reports `actions/setup-node@v7` absent from the swarm allowlist, while #545 reports `ub-review@860e15e4...` absent from the source allowlist. | Repair the swarm path in this PR; leave source #545 open and owner-gated for a paired source repair. |
-| `signal-hook` 0.4.4 | — | [#515](https://github.com/EffortlessMetrics/unsafe-review/pull/515), head `c4d890a9ba016399b6fba3ce8225d07e75eb1191` | Source PR is open/mergeable with a clean current check summary. | Retain source #515 for source-owner disposition; no swarm duplicate exists. |
+| `ra_ap_syntax` 0.0.343 → 0.0.344 | [#2013](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2013), head `ad7c0f5d6c24c92bbe04f4843391c76c5fa06f56` | [#551](https://github.com/EffortlessMetrics/unsafe-review/pull/551), head `40a522b57088fc9ba30722bb9632c37f1fd99db5` | Swarm #2013 is green but is a newer duplicate history; source #551 is the owner-gated candidate path for 0.0.341 → 0.0.343. | Defer swarm #2013; retain source #551. Do not merge both histories independently. |
+| `ignore` 0.4.31 | — | [#547](https://github.com/EffortlessMetrics/unsafe-review/pull/547), merge `fb217073fb47f1e2bd18e02a6bce774900120c74` | Source #547 is merged, and swarm main carries 0.4.31 through a later merged dependency batch; old swarm #1874 is closed. | Integrated; no open duplicate disposition remains. |
+| GitHub Actions pins | [#2014](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2014), head `190a9005ff76db32663f2f7ea17dba9985a59cf5` | [#549](https://github.com/EffortlessMetrics/unsafe-review/pull/549), head `3e54792b493199285f34b59101fef88a300f9248` | Both open PRs fail `policy-contracts`; each changes immutable action SHAs without the matching `policy/workflow-allowlist.toml` update. | Defer both until one owner-approved paired repair path updates workflows and allowlist together, then reruns policy and Rust proof. |
+| `signal-hook` 0.4.4 | [#1390](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1390), merge `22c37dd20b6f143fefec1ce3d232865ce0d203db` | [#515](https://github.com/EffortlessMetrics/unsafe-review/pull/515), head `c4d890a9ba016399b6fba3ce8225d07e75eb1191` | Swarm main already carries 0.4.4; source #515 remains the source-owner candidate path. | Retain source #515 for source-owner disposition; do not create a second swarm promotion. |
 | RSS/self-unsafe telemetry | [#1620](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1620), head `59b2ca6176e5b04b3045c3d5edc4c26ade5e52b0` | — | Draft, conflicted, and Rust gate failing; issue #1916 explicitly keeps this outside the cutline absent the separate owner decision. | Keep parked; do not repair or merge for release optics. |
 
-## Repair in this PR
+## Current disposition boundary
 
-The swarm action path updates `actions/setup-node` from `v6` to `v7` in the
-two editor workflows and advances the standalone advisory `ub-review` action to
-commit `7abfb093a32bad67019f94b8d33bf04ec2b0621d`. The same commit updates
-`policy/workflow-allowlist.toml` for all three pins. This preserves the CI
-contract: the deterministic Rust gate remains the only hard blocker, while
-ub-review remains advisory.
+This refresh makes no dependency or workflow change. In particular, it does
+not repair or merge #2014: the live policy failure is the expected paired-pin
+guard, not a reason to weaken the allowlist or bypass the deterministic gate.
+The source Actions PR #549 has the same policy shape and remains owner-gated.
 
 ## Boundaries and next step
 
-This audit does not freeze versions, merge source PRs, close duplicate PRs,
+This audit does not freeze versions, merge source PRs, close useful open PRs,
 promote swarm commits, publish crates or actions, create tags, or move public
 `v1`. The next #1916 slice can refresh the cutline with exact lockfile and
 dependency versions after the chosen candidate path is owner-approved and the
