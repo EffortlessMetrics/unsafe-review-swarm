@@ -240,15 +240,17 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_
 }
 
 fn print_receipt_audit_handoff(check: &CheckOptions) {
-    println!("Audit saved receipts:");
-    println!("  {}", receipt_audit_command(check));
-    println!("  saved receipt metadata only; unsafe-review did not run a witness");
+    println!(
+        "Audit saved receipts: {} (saved receipt metadata only; unsafe-review did not run a witness)",
+        receipt_audit_command(check)
+    );
 }
 
 fn print_policy_report_handoff(out_dir: &Path) {
-    println!("Policy report:");
-    println!("  {}", artifact_path_display(out_dir, "policy-report.md"));
-    println!("  ReviewCard-only policy simulation; manual candidates are not policy inputs");
+    println!(
+        "Policy report: {} (ReviewCard-only policy simulation; manual candidates are not policy inputs)",
+        artifact_path_display(out_dir, "policy-report.md")
+    );
 }
 
 fn print_baseline_onboarding_handoff(root: &Path) {
