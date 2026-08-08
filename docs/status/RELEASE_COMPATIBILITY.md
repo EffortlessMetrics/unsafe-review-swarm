@@ -1,7 +1,7 @@
 # Release compatibility receipt
 
 Audited 2026-08-08 against swarm `origin/main` at
-`d815ee823e333b1c44b384e11edec02dc1df65b5` and the last public release
+`94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c` and the last public release
 `v0.3.8` (2026-06-18). The next candidate has no frozen version or candidate
 SHA. This is a documentation/support receipt, not a compatibility guarantee
 or installed qualification result.

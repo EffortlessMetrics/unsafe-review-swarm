@@ -3,7 +3,7 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "12bdef8c433eab2b4d76b2f2c47dfbabf109f16a"
+swarm_base = "94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
@@ -123,7 +123,9 @@ integration = "partial_on_swarm_main"
 integration_evidence = [
   "3aefc619 lsp: surface a failed refresh instead of a clean-looking clear (#1908 PR3) (#1949)",
   "03e98fc2 feat: coalesce concurrent LSP refreshes (#2028) completes PR4 concurrency/coalescing",
-  "issue remains open for the separate xtask lsp-smoke rail gap and remaining freshness qualification/usability work",
+  "3c06a1a6 test(lsp): add live protocol qualification rail (#2034)",
+  "94b5cd4a test(lsp): allow cold-start smoke builds (#2035)",
+  "issue remains open for installed qualification and the separately scoped usability study",
 ]
 reason = "Freshness, version, stale, failure, partial, and capped states are required for honest editor diagnostics."
 proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
@@ -156,8 +158,16 @@ proof = ["cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p 
 [[item]]
 id = "ISSUE-1887"
 disposition = "required"
-integration = "not_on_swarm_main"
-integration_evidence = []
+integration = "on_swarm_main"
+integration_evidence = [
+  "bdbf3d91 parity acceptance across LSP, agent packet, SARIF, and PR summary (#2024)",
+  "b5ba5bea stale-document LSP acceptance (#2025)",
+  "34f4c036 inherited-only and adjacent-card quietness (#2026)",
+  "4582d15d capped and partial refresh disclosure (#2027)",
+  "03e98fc2 concurrent refresh coalescing (#2028)",
+  "3c06a1a6 live protocol qualification rail (#2034)",
+  "94b5cd4a cold-start smoke repair (#2035)",
+]
 reason = "The diagnostic-to-explanation-to-packet-to-receipt loop must be proven on selected scenarios before claiming a coherent editor/agent product."
 proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
