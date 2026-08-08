@@ -238,11 +238,11 @@ fn validate_initialize_response(response: &Value) -> Result<(), String> {
         .and_then(Value::as_object);
     if capabilities["textDocumentSync"].is_null()
         || capabilities["hoverProvider"] != Value::Bool(true)
-        || code_action_provider.map_or(true, |provider| {
+        || code_action_provider.is_none_or(|provider| {
             provider
                 .get("codeActionKinds")
                 .and_then(Value::as_array)
-                .map_or(true, Vec::is_empty)
+                .is_none_or(Vec::is_empty)
         })
     {
         return Err(format!(
@@ -323,9 +323,7 @@ fn validate_code_actions_response(response: &Value, card_id: &str) -> Result<Val
         .and_then(|action| action["arguments"][0]["analysis"].as_object())
         .map(|analysis| Value::Object(analysis.clone()))
         .ok_or_else(|| {
-            format!(
-                "code-action response lost packet identity or analysis identity: {response}"
-            )
+            format!("code-action response lost packet identity or analysis identity: {response}")
         })
 }
 
