@@ -195,8 +195,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(
         &stdout,
         &format!(
-            "{} (0; manual/advisory sidecar, not analyzer ReviewCards)",
-            path_display_fwd(&out_dir.join("manual-candidates.json"))
+            "none (advisory sidecars: {}, {}, {}; not analyzer ReviewCards; no agent or tokmd run)",
+            path_display_fwd(&out_dir.join("manual-candidates.json")),
+            path_display_fwd(&out_dir.join("manual-repair-queue.json")),
+            path_display_fwd(&out_dir.join("tokmd-packets.json")),
         ),
     );
     assert!(
