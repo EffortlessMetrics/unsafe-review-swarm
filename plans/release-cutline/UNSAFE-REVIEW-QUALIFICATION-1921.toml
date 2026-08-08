@@ -25,11 +25,11 @@ non_goals = ["crates.io publication", "source promotion", "tag or GitHub Release
 [receipt]
 schema_version = "1"
 required_identity = ["candidate_commit", "candidate_version", "source_sha", "swarm_sha", "lockfile_sha256", "package_versions"]
-required_execution = ["environment", "toolchain", "install_method", "prefix", "command", "exit_code", "duration_ms", "result", "limitation"]
+required_execution = ["environment", "toolchain", "install_method", "prefix", "command_class", "exit_code", "duration_ms", "result", "limitation"]
 allowed_results = ["pass", "fail", "skipped", "not_applicable", "blocked"]
 failure_rule = "A failed or incomplete row remains non-consumable; do not summarize it as a complete qualification."
 invalidation_rule = "Candidate, package, lockfile, docs, source, or owning behavior changes invalidate affected rows and require an explicit rerun or skip reason."
-redaction_rule = "Do not commit secrets, full source snapshots, or unbounded command logs."
+redaction_rule = "Committed receipts contain a redacted command class, exit code, duration, bounded failure classification, and safe log reference or hash; full diagnostics remain in protected execution logs. Do not commit secrets, full source snapshots, or unbounded command logs."
 
 [[environment]]
 id = "linux-ci"
@@ -61,33 +61,42 @@ limitation = "Skipped platforms remain explicitly untested; no support claim may
 [[fixture]]
 id = "pr-movement-fixtures"
 source = "existing fixture and real-PR/evidence-loss inputs"
-required_cases = ["quiet", "new_gap", "worsened_gap", "improved_or_resolved", "inherited_only", "human_only"]
-determinism = "pin fixture/input identifiers and record their repository revision in the execution receipt"
+required_cases = ["raw_pointer_deref_brownfield_inherited", "raw_pointer_deref_coverage_improved", "raw_pointer_deref_coverage_worsened", "raw_pointer_deref_resolved", "inline_asm_human_review", "adjacent_unchanged_unsafe_fn_no_card"]
+paths = ["fixtures/raw_pointer_deref_brownfield_inherited", "fixtures/raw_pointer_deref_coverage_improved", "fixtures/raw_pointer_deref_coverage_worsened", "fixtures/raw_pointer_deref_resolved", "fixtures/inline_asm_human_review", "fixtures/adjacent_unchanged_unsafe_fn_no_card"]
+revision = "candidate checkout tree; record candidate_commit plus sha256 of each fixture input in the execution receipt"
+determinism = "The listed paths and change.diff files are immutable identifiers within the candidate checkout; do not substitute an untracked or generated fixture."
 
 [[fixture]]
 id = "failure-fixtures"
 source = "existing CLI/e2e malformed, capped, partial, invalid-flag, and IO-failure cases"
 required_cases = ["complete", "capped", "partial_or_timeout", "malformed_diff", "unknown_flag", "unwritable_output_or_read_failure"]
-determinism = "use controlled fixtures and record the exact command, exit code, and artifact disposition"
+paths = ["fixtures/raw_pointer_deref_brownfield_inherited/change.diff", "fixtures/raw_pointer_deref_coverage_improved/change.diff", "fixtures/raw_pointer_deref_coverage_worsened/change.diff"]
+revision = "candidate checkout tree; controlled timeout, invalid flag, and IO inputs are generated only under target/qualification-1921"
+determinism = "Use the named fixture paths, a fixed max_cards value of 1, a fixed timeout value of 1 second, and task-owned target/qualification-1921 outputs; record hashes and artifact disposition."
 
 [[fixture]]
 id = "editor-agent-loop"
 source = "issue #1887 scripted client/fixture and canonical editor/agent projections"
 required_cases = ["diagnostic", "explanation_or_hover", "bounded_packet_or_human_route", "identity", "verification_command", "refresh", "stale_failed_partial"]
-determinism = "record the scripted fixture revision and named verification command for each row"
+paths = ["crates/unsafe-review-cli/src/lsp/tests.rs", "crates/unsafe-review-cli/src/lsp/backend.rs", "docs/status/RELEASE_CUTLINE.md"]
+revision = "candidate checkout tree plus the scripted #1887 client fixture revision"
+determinism = "Record the scripted fixture revision and named verification command for each row."
 
 [[fixture]]
 id = "consumer-smokes"
 source = "accepted tokmd presets and real unsafe-review to ub-review ingestion path"
 required_cases = ["tokmd_packet_rendering", "ub_review_ingestion", "saved_consumer_unknown_field_behavior"]
-determinism = "record preset, producer/consumer version, and output hash where useful"
+paths = ["policy/tokmd-presets.toml", "crates/unsafe-review-cli/tests/e2e.rs", "crates/unsafe-review-core/src/output"]
+revision = "candidate checkout tree plus the accepted preset and consumer fixture revisions"
+compatibility_policy = "owner_decision_required_before_pr2"
+determinism = "Do not choose ignore, preserve, reject, or report behavior in this manifest. #1918 and its linked compatibility contract must record the owner decision before execution."
 
 [[row]]
 id = "identity-and-help"
 group = "first_use"
 required = true
 environments = ["linux-ci", "maintainer-primary"]
-commands = ["unsafe-review --version", "unsafe-review --help", "unsafe-review doctor --root .", "unsafe-review pr --help", "unsafe-review repo --help", "unsafe-review context --help", "unsafe-review lsp --help", "unsafe-review init --help", "unsafe-review pr-setup --help"]
+commands = ["target/qualification-1921/bin/unsafe-review --version", "target/qualification-1921/bin/unsafe-review --help", "target/qualification-1921/bin/unsafe-review doctor --root .", "target/qualification-1921/bin/unsafe-review pr --help", "target/qualification-1921/bin/unsafe-review repo --help", "target/qualification-1921/bin/unsafe-review context --help", "target/qualification-1921/bin/unsafe-review lsp --help", "target/qualification-1921/bin/unsafe-review baseline --help", "target/qualification-1921/bin/unsafe-review pr-setup --help"]
 fixture = "none"
 result = "not_run"
 assertions = ["installed identity matches candidate package versions", "documented commands exist", "no stale workspace/path binary is used"]
@@ -95,9 +104,11 @@ assertions = ["installed identity matches candidate package versions", "document
 [[row]]
 id = "preview-only-adoption"
 group = "first_use"
-required = "if_shipped"
 environments = ["linux-ci", "maintainer-primary"]
-commands = ["unsafe-review init --dry-run --root <fixture>"]
+required = false
+requirement = "conditional"
+condition_spec = "Run only when the frozen candidate exposes the top-level init flow defined by issue #1885; otherwise qualify baseline init separately and record not_applicable."
+commands = ["target/qualification-1921/bin/unsafe-review baseline init --help", "target/qualification-1921/bin/unsafe-review baseline init --root fixtures/raw_pointer_deref_brownfield_inherited --dry-run --format json --out target/qualification-1921/init-plan.json"]
 fixture = "existing init preview fixtures"
 result = "not_run"
 assertions = ["bounded human output", "parseable deterministic JSON", "--out writes only the proposal", "conflicts are reported without overwrite", "default repository files remain unchanged"]
@@ -107,7 +118,7 @@ id = "pr-front-panel-and-artifacts"
 group = "pr_surface"
 required = true
 environments = ["linux-ci"]
-commands = ["unsafe-review pr ...", "cargo run --locked -p xtask -- check-first-pr-artifacts <bundle-dir>"]
+commands = ["target/qualification-1921/bin/unsafe-review check --root fixtures/raw_pointer_deref_brownfield_inherited --diff fixtures/raw_pointer_deref_brownfield_inherited/change.diff --format json --out target/qualification-1921/pr/inherited.json", "target/qualification-1921/bin/unsafe-review pr --root fixtures/raw_pointer_deref_coverage_improved --diff fixtures/raw_pointer_deref_coverage_improved/change.diff --out-dir target/qualification-1921/pr/improved", "cargo run --locked -p xtask -- check-first-pr-artifacts target/qualification-1921/pr/improved"]
 fixture = "pr-movement-fixtures"
 result = "not_run"
 assertions = ["front panel is bounded and action-first", "every produced bundle passes the artifact verifier", "ReviewCard identity is preserved across projections"]
@@ -117,10 +128,10 @@ id = "repo-failure-truthfulness"
 group = "failure_semantics"
 required = true
 environments = ["linux-ci"]
-commands = ["unsafe-review repo ...", "unsafe-review repo ... --max-cards <n>", "controlled timeout or partial command", "malformed diff input", "unknown flag", "unwritable output or read failure"]
+commands = ["target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --out target/qualification-1921/failure/complete.json", "target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --max-cards 1 --out target/qualification-1921/failure/capped.json", "target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --timeout-seconds 1 --out target/qualification-1921/failure/partial.json", "target/qualification-1921/bin/unsafe-review check --root fixtures/raw_pointer_deref_brownfield_inherited --diff target/qualification-1921/failure/malformed.diff --format json --out target/qualification-1921/failure/malformed.json", "target/qualification-1921/bin/unsafe-review repo --unknown-qualification-flag", "target/qualification-1921/bin/unsafe-review repo --root target/qualification-1921/missing-root --format json --out target/qualification-1921/failure/io.json"]
 fixture = "failure-fixtures"
 result = "not_run"
-assertions = ["complete, capped, partial, malformed, and failed states differ", "exit codes are contracted", "sidecars and artifacts match consumability", "diff failure does not silently fall back to a whole-repo scan"]
+assertions = ["complete, capped, partial, malformed, and failed states differ", "exit codes are contracted", "sidecars and artifacts match consumability", "diff failure does not silently fall back to a whole-repo scan", "committed receipt records only a redacted command class and bounded failure classification"]
 
 [[row]]
 id = "editor-agent-loop"
@@ -140,7 +151,7 @@ environments = ["linux-ci"]
 commands = ["tokmd accepted-preset rendering", "unsafe-review to ub-review ingestion smoke"]
 fixture = "consumer-smokes"
 result = "not_run"
-assertions = ["actual candidate output is consumed", "unknown/additive fields follow documented compatibility rules"]
+assertions = ["actual candidate output is consumed", "unknown/additive fields are checked only after the owner decision is recorded in #1918 and its linked compatibility contract"]
 
 [[row]]
 id = "repository-proof-floor"

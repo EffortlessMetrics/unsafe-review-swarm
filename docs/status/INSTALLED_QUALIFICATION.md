@@ -27,8 +27,8 @@ them as parent-baseline fields alongside the exact candidate values.
 
 | Lane | Required evidence | Status |
 | --- | --- | --- |
-| First use | Installed version, help, doctor, and shipped command discovery | not run |
-| Preview adoption | Deterministic JSON/human preview, conflict reporting, non-mutation | not run; only if shipped |
+| First use | Installed version, help, doctor, and shipped command discovery, including `baseline init` | not run |
+| Preview adoption | Deterministic JSON/human preview, conflict reporting, non-mutation | not run; only if top-level init is shipped |
 | PR/front panel | Quiet, new, worsened, improved, inherited-only, and human-only fixture bundles | not run |
 | Failure semantics | Complete, capped, partial, malformed, invalid-flag, and IO-failure distinctions | not run |
 | Editor/agent | #1887 diagnostic → explanation → packet/route → identity → verification → refresh loop | not run |
@@ -48,9 +48,12 @@ Every execution row records:
   lockfile SHA-256;
 - OS, architecture, toolchain, install/package method, task-owned prefix and
   target directory;
-- exact command, exit code, duration, bounded output or artifact hashes, and
-  result (`pass`, `fail`, `skipped`, `not_applicable`, or `blocked`);
-- exact failure text when a row fails, plus the reason for every skip;
+- a redacted command class, exit code, duration, bounded failure
+  classification, safe execution-log reference or hash, and result (`pass`,
+  `fail`, `skipped`, `not_applicable`, or `blocked`);
+- full diagnostics stay in protected execution logs; committed receipts must
+  not contain raw failure text, secrets, or unbounded output;
+- the reason for every skip;
 - the fixture/input revision and named verification command where applicable;
 - trust boundary and known limitations.
 
@@ -64,9 +67,12 @@ rows; the next execution PR must rerun them or record an explicit skip reason.
    identity.
 2. Install/package that candidate into clean task-owned locations; prove the
    installed binary does not resolve workspace path leakage.
-3. Run the matrix and write bounded machine/human receipts.
-4. Fix candidate defects in their owning issue/PR, never inside the receipt PR.
-5. Rerun invalidated rows after final docs/candidate changes before #1925.
+3. Confirm the owner decision for additive/unknown consumer fields in #1918
+   and its linked compatibility contract; do not infer a policy in the
+   qualification run.
+4. Run the matrix and write bounded machine/human receipts.
+5. Fix candidate defects in their owning issue/PR, never inside the receipt PR.
+6. Rerun invalidated rows after final docs/candidate changes before #1925.
 
 No crates.io publication, source merge, tag, GitHub Release, public Action, or
 `v1` movement is part of this matrix.
