@@ -16,7 +16,7 @@ const WITNESS_ROUTE_ID: u64 = 6;
 const WITNESS_COMMAND_ID: u64 = 7;
 // `lsp-smoke` starts the CLI through Cargo so it works from a clean checkout;
 // allow the first workspace build to finish before timing out the protocol.
-const MESSAGE_TIMEOUT: Duration = Duration::from_secs(120);
+const MESSAGE_TIMEOUT: Duration = Duration::from_secs(300);
 
 pub(crate) fn run(workspace_root: &Path) -> Result<(), String> {
     let fixture_root = workspace_root.join("fixtures/raw_pointer_alignment");
