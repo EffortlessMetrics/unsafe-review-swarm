@@ -102,6 +102,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.terminal_command,
         report.output,
         report.out_dir,
+        report.check,
         report.output_bytes,
     );
     print_top_card_summary(
@@ -430,6 +431,7 @@ fn print_first_pr_overview(
     terminal_command: &str,
     output: &AnalyzeOutput,
     out_dir: &Path,
+    check: &CheckOptions,
     output_bytes: u64,
 ) {
     println!("unsafe-review {terminal_command}");
@@ -458,6 +460,10 @@ fn print_first_pr_overview(
     // genuinely found fewer gaps (#2006).
     if let Some(notice) = output.summary.capped_scan_notice() {
         println!("- {notice}");
+        println!(
+            "- Retry without cap: {}",
+            rerun_without_cap_command(terminal_command, check, out_dir)
+        );
     }
     // Output bundle disk footprint — diagnostic only; not a coverage claim,
     // proof, UB-free, Miri-clean, site-execution, or performance guarantee.
@@ -469,6 +475,30 @@ fn print_first_pr_overview(
         "  {} (copy-only; unsafe-review did not run an agent)",
         artifact_path_display(out_dir, "repair-queue.json")
     );
+}
+
+fn rerun_without_cap_command(
+    terminal_command: &str,
+    check: &CheckOptions,
+    out_dir: &Path,
+) -> String {
+    let mut parts = vec!["unsafe-review".to_string(), terminal_command.to_string()];
+    parts.push("--root".to_string());
+    parts.push(shell_arg(&check.root.display().to_string()));
+    if let Some(base) = &check.base {
+        parts.push("--base".to_string());
+        parts.push(shell_arg(base));
+    }
+    if let Some(diff) = &check.diff {
+        parts.push("--diff".to_string());
+        match diff {
+            DiffInput::File(path) => parts.push(shell_arg(&path.display().to_string())),
+            DiffInput::Stdin => parts.push("-".to_string()),
+        }
+    }
+    parts.push("--out-dir".to_string());
+    parts.push(shell_arg(&out_dir.display().to_string()));
+    parts.join(" ")
 }
 
 fn print_top_card_summary(

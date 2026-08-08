@@ -1213,6 +1213,13 @@ fn capped_first_pr_run_discloses_the_cap_on_the_terminal() -> Result<(), Box<dyn
         "the disclosure must name the cap that bound the run, got:\n{capped}"
     );
     assert!(
+        capped.contains("Retry without cap: unsafe-review first-pr")
+            && capped.contains("--root")
+            && capped.contains("--diff")
+            && capped.contains("--out-dir"),
+        "a capped run must provide an exact retry command, got:\n{capped}"
+    );
+    assert!(
         !complete.contains("Partial scan:"),
         "a complete run must not claim to be partial, got:\n{complete}"
     );
