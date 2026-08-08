@@ -1,6 +1,6 @@
 # Editor extension surface status
 
-This project ships a VS Code / Open VSX extension surface that consumes
+This repository contains a VS Code / Open VSX extension surface that consumes
 `unsafe-review` saved artifacts (specifically `target/unsafe-review/lsp.json`)
 without changing source files.
 

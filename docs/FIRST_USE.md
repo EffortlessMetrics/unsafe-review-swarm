@@ -1,7 +1,9 @@
 # First-use guide
 
-This guide is for a maintainer trying the published `unsafe-review` CLI for the
-first time.
+This guide is for a maintainer trying the public `v0.3.8` `unsafe-review` CLI
+for the first time. Swarm main may contain newer unpublished candidate work;
+run `unsafe-review --version` and keep any local candidate checkout separate
+from the published install path.
 
 `unsafe-review` is static unsafe contract review. It finds unsafe Rust changes
 missing a safety contract, guard, test, or witness. It does not prove memory
@@ -14,6 +16,10 @@ blocking policy by default.
 cargo install unsafe-review --locked
 unsafe-review --help
 ```
+
+The command above installs the last public release from crates.io. It does not
+install the unfrozen Swarm main candidate, and no `v1`, GitHub Release, or
+marketplace publication is implied by the current workbench docs.
 
 If you are working from a local checkout, keep the installed command and the
 workspace command separate. The installed command is the user path; `cargo run`
