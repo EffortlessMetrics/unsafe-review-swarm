@@ -2011,10 +2011,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(top_card.contains("Route: `miri`"));
     assert!(top_card.contains("Next: "));
     assert!(top_card.contains("Hypothesis: "));
-    assert!(top_card.contains("Build/run this first: "));
+    assert!(top_card.contains("Verify: "));
     assert!(top_card.contains("Minimal repro cue: "));
-    assert!(top_card.contains("Confirmation step: "));
     assert!(top_card.contains("Limitation: Minimal repro cue only;"));
+    assert!(!top_card.contains("Confirmation step: "));
     assert!(!top_card.contains("    - Confirm ReviewCard"));
     assert!(stdout.contains("Explain top card:"));
     assert!(stdout.contains("Agent packet:"));
