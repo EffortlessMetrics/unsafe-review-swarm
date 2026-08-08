@@ -1,5 +1,6 @@
 use std::collections::BTreeSet;
 use std::error::Error;
+use std::fs;
 use std::path::{Path, PathBuf};
 
 use futures::StreamExt;
@@ -967,15 +968,85 @@ async fn initialize_over_the_wire(
     Ok(())
 }
 
-fn fixture_root() -> Result<PathBuf, Box<dyn Error>> {
+fn fixture_root_named(name: &str) -> Result<PathBuf, Box<dyn Error>> {
     let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .parent()
         .and_then(Path::parent)
         .ok_or("unsafe-review-cli should live under crates/")?
         .to_path_buf();
-    Ok(workspace_root
-        .join("fixtures")
-        .join("raw_pointer_alignment"))
+    Ok(workspace_root.join("fixtures").join(name))
+}
+
+fn fixture_root() -> Result<PathBuf, Box<dyn Error>> {
+    fixture_root_named("raw_pointer_alignment")
+}
+
+/// Editor quietness acceptance for issue #1887: inherited-only context and an
+/// unchanged unsafe declaration next to a safe change must not leak a live
+/// diagnostic into the refreshed LSP snapshot.
+#[test]
+fn inherited_and_adjacent_unchanged_context_stay_quiet_in_lsp() -> Result<(), Box<dyn Error>> {
+    let adjacent_root = fixture_root_named("adjacent_unchanged_unsafe_fn_no_card")?;
+    let adjacent_output = analyze(AnalyzeInput {
+        root: adjacent_root.clone(),
+        scope: Scope::Diff,
+        diff: DiffSource::Text(fs::read_to_string(adjacent_root.join("change.diff"))?),
+        mode: AnalysisMode::Draft,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?;
+    assert!(
+        diagnostics_by_uri(&adjacent_root, &adjacent_output).is_empty(),
+        "adjacent unchanged unsafe declarations must stay out of the canonical editor projection"
+    );
+
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("failed to build test runtime: {err}"))?;
+    runtime.block_on(async {
+        let fixture = "raw_pointer_deref_brownfield_inherited";
+        let root = fixture_root_named(fixture)?;
+        let root_uri = uri_from_path(&root).ok_or("expected root uri")?;
+        let file_uri =
+            uri_from_path(root.join("src/lib.rs")).ok_or("expected fixture source uri")?;
+        let (mut service, socket) = LspService::new(Backend::new);
+        initialize_over_the_wire(
+            &mut service,
+            &InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri,
+                    name: fixture.to_string(),
+                }]),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let backend = service.inner();
+
+        let (_socket, messages) =
+            refresh_via_execute_command_collecting_messages(backend, socket, 0).await?;
+        assert!(
+            messages.is_empty(),
+            "inherited-only fixture emitted unexpected LSP messages: {messages:?}"
+        );
+        assert_eq!(
+            backend
+                .hover(HoverParams {
+                    text_document_position_params: TextDocumentPositionParams {
+                        text_document: TextDocumentIdentifier { uri: file_uri },
+                        position: Position::new(8, 12),
+                    },
+                    work_done_progress_params: Default::default(),
+                })
+                .await
+                .map_err(|err| format!("hover failed for {fixture}: {err:?}"))?,
+            None,
+            "inherited-only context must not expose a live editor card"
+        );
+        Ok(())
+    })
 }
 
 /// Headline regression test for the refresh-failure bug: a refresh that fails
