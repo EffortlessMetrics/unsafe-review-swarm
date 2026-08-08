@@ -324,7 +324,7 @@ fn print_manual_candidate_handoff(
             candidate_witness_plan_command(root, &candidate.id)
         );
     }
-    print_manual_candidate_queue_preview(root, manual_candidates, &stable_byte_seed_ledger);
+    print_manual_candidate_queue_preview(manual_candidates, &stable_byte_seed_ledger);
     println!(
         "  Review-kit candidate queue: first {} of {} manual candidate(s)",
         manual_candidates
@@ -346,7 +346,6 @@ fn print_manual_candidate_handoff(
 }
 
 fn print_manual_candidate_queue_preview(
-    root: &Path,
     manual_candidates: &[ManualCandidate],
     stable_byte_seed_ledger: &StableByteSeedLedger,
 ) {
@@ -356,6 +355,9 @@ fn print_manual_candidate_queue_preview(
     println!(
         "  Manual candidate queue preview: first {queue_len} of {} manual candidate(s)",
         manual_candidates.len()
+    );
+    println!(
+        "    Commands: see the first candidate above; remaining candidate details stay in manual-candidates.json"
     );
     for candidate in manual_candidates.iter().take(queue_len) {
         println!(
@@ -371,14 +373,6 @@ fn print_manual_candidate_queue_preview(
         if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
             println!("      {}", stable_byte_seed_terminal_summary(seed));
         }
-        println!(
-            "      Agent packet: {}",
-            context_command(root, &candidate.id)
-        );
-        println!(
-            "      Witness plan: {}",
-            candidate_witness_plan_command(root, &candidate.id)
-        );
     }
 }
 
