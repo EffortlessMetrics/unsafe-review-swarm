@@ -2708,10 +2708,11 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
 }
 
 fn print_artifact_paths(out_dir: &Path, artifacts: &[&str]) {
-    println!("Artifacts:");
-    for name in artifacts {
+    println!("Artifacts: {} files indexed by:", artifacts.len());
+    for name in artifacts.iter().take(2) {
         println!("  {}", artifact_path_display(out_dir, name));
     }
+    println!("  inspect review-kit.json for the complete bundle inventory");
 }
 
 fn print_trust_boundary() {
