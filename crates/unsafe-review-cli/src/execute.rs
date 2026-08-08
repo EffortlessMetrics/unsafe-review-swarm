@@ -1704,7 +1704,7 @@ fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
         if !output.status.success() {
             let git_stderr = String::from_utf8_lossy(&output.stderr);
             let git_stderr = git_stderr.trim();
-            return Err(git_ref_error(base, git_stderr));
+            return Err(git_ref_error(&options.root, base, git_stderr));
         }
         return Ok(DiffSource::Text(
             String::from_utf8_lossy(&output.stdout).into_owned(),
@@ -1718,17 +1718,25 @@ fn diff_source(options: &CheckOptions) -> Result<DiffSource, String> {
 /// When git stderr contains well-known "unknown revision" phrases we add a hint
 /// that names the bad ref and suggests valid alternatives.  The original git
 /// message is always preserved so power users retain the full detail.
-fn git_ref_error(base: &str, git_stderr: &str) -> String {
+fn git_ref_error(root: &Path, base: &str, git_stderr: &str) -> String {
     let is_ref_error = git_stderr.contains("unknown revision")
         || git_stderr.contains("ambiguous argument")
         || git_stderr.contains("bad revision")
         || git_stderr.contains("not a tree object")
-        || git_stderr.contains("does not exist");
+        || git_stderr.contains("does not exist")
+        || git_stderr.contains("no merge base")
+        || git_stderr.contains("shallow");
     if is_ref_error {
         return format!(
             "base ref '{base}' could not be resolved by git ({git_stderr}). \
              Pass a branch, tag, or commit SHA that exists in the repository \
-             (e.g. --base origin/main), or supply --diff <file> instead."
+             (e.g. --base origin/main), or supply --diff <file> instead.\n\
+             Recovery:\n  \
+             git fetch --no-tags origin\n  \
+             # For a shallow checkout, use this instead:\n  \
+             git fetch --unshallow origin\n  \
+             unsafe-review pr --root \"{}\" --base {base}",
+            root.display()
         );
     }
     // Outside a work tree git answers with its full `diff --no-index` usage
@@ -3975,6 +3983,7 @@ mod tests {
     #[test]
     fn git_ref_error_names_an_unresolvable_ref() {
         let err = git_ref_error(
+            Path::new("."),
             "origin/nope",
             "fatal: ambiguous argument 'origin/nope...HEAD': unknown revision",
         );
@@ -3991,12 +4000,25 @@ mod tests {
     #[test]
     fn git_ref_error_fallback_keeps_git_text_and_adds_a_way_out() {
         let err = git_ref_error(
+            Path::new("."),
             "origin/main",
             "fatal: detected dubious ownership in repository at '/repo'",
         );
         assert!(err.contains("detected dubious ownership"), "{err}");
         assert!(err.contains("--base 'origin/main'"), "{err}");
         assert!(err.contains("--diff <file>"), "{err}");
+    }
+
+    #[test]
+    fn git_ref_error_adds_recovery_for_shallow_merge_failures() {
+        let err = git_ref_error(
+            Path::new("/workspace/project"),
+            "origin/main",
+            "fatal: no merge base",
+        );
+        assert!(err.contains("no merge base"), "{err}");
+        assert!(err.contains("git fetch --unshallow origin"), "{err}");
+        assert!(err.contains("unsafe-review pr --root"), "{err}");
     }
 
     #[test]
@@ -4038,7 +4060,7 @@ mod tests {
         // Outside a work tree git replies with its whole `diff --no-index`
         // usage block; the user needs the condition, not the manual page.
         let git_stderr = "warning: Not a git repository. Use --no-index to compare two paths outside a working tree\nusage: git diff --no-index [<options>] <path> <path>";
-        let err = git_ref_error("origin/main", git_stderr);
+        let err = git_ref_error(Path::new("."), "origin/main", git_stderr);
         assert!(
             err.contains("--root is not inside a git repository"),
             "{err}"
@@ -4058,7 +4080,11 @@ mod tests {
     /// leaves room for the escape hatches (which are the same whatever git said).
     #[test]
     fn git_ref_error_preserves_unclassified_git_failures() {
-        let err = git_ref_error("origin/main", "fatal: something else entirely");
+        let err = git_ref_error(
+            Path::new("."),
+            "origin/main",
+            "fatal: something else entirely",
+        );
         assert!(
             err.contains("fatal: something else entirely"),
             "git's own text is the only diagnosis for an unclassified failure: {err}"

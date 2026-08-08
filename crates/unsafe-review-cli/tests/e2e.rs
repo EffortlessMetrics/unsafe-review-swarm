@@ -425,6 +425,42 @@ fn pr_alias_rejects_dirty_worktree_with_exact_head_sha() -> Result<(), Box<dyn E
 }
 
 #[test]
+fn pr_alias_missing_base_prints_fetch_remediation() -> Result<(), Box<dyn Error>> {
+    let repo = exact_pr_fixture_repo("unsafe-review-missing-base-remediation-e2e")?;
+    let out_dir = repo.temp.path().join("review-kit");
+    let missing_base = "origin/missing-base";
+
+    let output = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("pr")
+        .arg("--root")
+        .arg(&repo.root)
+        .arg("--base")
+        .arg(missing_base)
+        .arg("--out-dir")
+        .arg(&out_dir)
+        .output()?;
+
+    assert!(
+        !output.status.success(),
+        "missing base must fail before analysis"
+    );
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8(output.stderr)?;
+    assert!(stderr.contains("base ref 'origin/missing-base' could not be resolved"));
+    assert!(stderr.contains("Recovery:"));
+    assert!(stderr.contains("git fetch --no-tags origin"));
+    assert!(stderr.contains("git fetch --unshallow origin"));
+    assert!(stderr.contains(&format!(
+        "unsafe-review pr --root \"{}\" --base {missing_base}",
+        repo.root.display()
+    )));
+    assert!(!out_dir.join("cards.json").exists());
+
+    Ok(())
+}
+
+#[test]
 fn pr_alias_auto_detect_unresolved_base_prints_actionable_error() -> Result<(), Box<dyn Error>> {
     // When `pr` is run without explicit flags from a directory that is not
     // inside a git repository, the error must name the exact command to run
