@@ -117,9 +117,31 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &stdout,
         "Next: Add or expose local guards for these `raw_pointer_read`",
     );
-    assert_contains(&stdout, "Explain: unsafe-review explain --root");
+    let cards: Value = serde_json::from_str(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    let card_id = cards["cards"][0]["id"]
+        .as_str()
+        .ok_or("missing cards[0].id")?;
+    let rendered_root = if cfg!(windows) {
+        rendered_shell_path(&fixture)
+    } else {
+        fixture.display().to_string()
+    };
+    assert_contains(
+        &stdout,
+        &format!("Explain: unsafe-review explain --root {rendered_root} {card_id}"),
+    );
     assert_contains(&stdout, "Verify: cargo +nightly miri test read_header");
     assert_contains(&stdout, "Explain top card:");
+    assert_order(
+        &stdout,
+        "Top card:",
+        "Selected reviewer actions (showing 1 of 1):",
+    );
+    assert_order(
+        &stdout,
+        "Selected reviewer actions (showing 1 of 1):",
+        "Audit saved receipts:",
+    );
     assert_contains(
         &stdout,
         &format!("unsafe-review explain --root {}", fixture.display()),

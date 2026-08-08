@@ -147,6 +147,15 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
         return;
     };
 
+    let Some(comments) = value.get("comments").and_then(serde_json::Value::as_array) else {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    };
+    if comments.len() as u64 != selected {
+        println!("- Reviewer comments: unavailable (inspect comment-plan.json)");
+        return;
+    }
+
     let top_reason = value
         .get("not_selected")
         .and_then(serde_json::Value::as_array)
@@ -170,11 +179,6 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path) {
         .unwrap_or_default();
 
     println!("- Reviewer comments: {selected} selected, {omitted} omitted{top_reason}");
-
-    let Some(comments) = value.get("comments").and_then(serde_json::Value::as_array) else {
-        println!("- Selected reviewer actions: unavailable (inspect comment-plan.json)");
-        return;
-    };
     if comments.is_empty() {
         println!("- Selected reviewer actions: none");
         return;
