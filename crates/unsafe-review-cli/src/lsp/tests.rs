@@ -3,7 +3,7 @@ use std::error::Error;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-use futures::StreamExt;
+use futures::{StreamExt, future::join3};
 use serde_json::{Value, json};
 use tower::Service as _;
 use tower_lsp_server::jsonrpc::Request;
@@ -1313,6 +1313,81 @@ fn capped_refresh_discloses_partial_diagnostics() -> Result<(), Box<dyn Error>> 
         assert!(text.contains("--max-cards 1"), "{text}");
         assert!(text.contains("not a complete inventory"), "{text}");
         assert!(text.contains("Live diagnostics are partial"), "{text}");
+        Ok(())
+    })
+}
+
+/// Queued refresh requests collapse into one follow-up run instead of making
+/// every save complete an obsolete full scan serially. The capped fixture emits
+/// two messages per run, so three simultaneous requests must produce two runs,
+/// not three.
+#[test]
+fn concurrent_refresh_requests_are_coalesced() -> Result<(), Box<dyn Error>> {
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .map_err(|err| format!("failed to build test runtime: {err}"))?;
+    runtime.block_on(async {
+        let fixture = "unsafe_declaration_volume_summary";
+        let root = fixture_root_named(fixture)?;
+        let root_uri = uri_from_path(&root).ok_or("expected root uri")?;
+        let (mut service, socket) = LspService::new(Backend::new);
+        initialize_over_the_wire(
+            &mut service,
+            &InitializeParams {
+                workspace_folders: Some(vec![WorkspaceFolder {
+                    uri: root_uri,
+                    name: fixture.to_string(),
+                }]),
+                initialization_options: Some(json!({
+                    "unsafeReview": { "maxCards": 1 }
+                })),
+                ..Default::default()
+            },
+        )
+        .await?;
+        let backend = service.inner();
+
+        let mut drain = tokio::spawn(async move {
+            let mut socket = socket;
+            let mut messages = Vec::new();
+            while messages.len() < 4 {
+                let Some(message) = socket.next().await else {
+                    break;
+                };
+                messages.push(message);
+            }
+            while let Ok(Some(message)) =
+                tokio::time::timeout(std::time::Duration::from_millis(100), socket.next()).await
+            {
+                messages.push(message);
+            }
+            messages
+        });
+        let refresh_params = || ExecuteCommandParams {
+            command: CMD_REFRESH.to_string(),
+            arguments: Vec::new(),
+            work_done_progress_params: Default::default(),
+        };
+        let (first, second, third) = join3(
+            backend.execute_command(refresh_params()),
+            backend.execute_command(refresh_params()),
+            backend.execute_command(refresh_params()),
+        )
+        .await;
+        for result in [first, second, third] {
+            result.map_err(|err| format!("coalesced refresh failed: {err:?}"))?;
+        }
+        let messages = tokio::time::timeout(std::time::Duration::from_secs(30), &mut drain)
+            .await
+            .map_err(|_timeout| "draining coalesced refresh notifications timed out")?
+            .map_err(|err| format!("coalesced refresh drain failed: {err}"))?;
+        assert_eq!(
+            messages.len(),
+            4,
+            "three queued refreshes should coalesce into two capped runs: {:?}",
+            messages.iter().map(Request::method).collect::<Vec<_>>()
+        );
         Ok(())
     })
 }

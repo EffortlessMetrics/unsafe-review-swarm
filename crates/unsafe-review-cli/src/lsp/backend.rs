@@ -35,6 +35,7 @@ pub(super) struct Backend {
     last_diagnostic_uris: Mutex<BTreeSet<Uri>>,
     refresh_generation: Mutex<u64>,
     refresh_in_flight: Mutex<()>,
+    refresh_pending: Mutex<bool>,
     action_support: Mutex<ActionClientSupport>,
 }
 
@@ -56,6 +57,7 @@ impl Backend {
             last_diagnostic_uris: Mutex::new(BTreeSet::new()),
             refresh_generation: Mutex::new(0),
             refresh_in_flight: Mutex::new(()),
+            refresh_pending: Mutex::new(false),
             action_support: Mutex::new(ActionClientSupport::default()),
         }
     }
