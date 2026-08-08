@@ -325,6 +325,7 @@ fn print_first_pr_overview(
     println!("unsafe-review wrote an advisory PR bundle.");
     println!("- Artifact directory: {}", card_path_display(out_dir));
     println!("- Review cards: {}", output.summary.cards);
+    println!("- Changed files: {}", output.summary.changed_files);
     println!(
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
@@ -382,6 +383,10 @@ fn print_top_card_summary(
     if let Some(route) = card.routes.first() {
         println!("  Route: `{}`", route.kind.as_str());
     }
+    // Keep the canonical action in the first-screen card summary. The
+    // confirmation and repro details below remain available without making a
+    // reviewer read through the full handoff before learning what to do next.
+    println!("  Next: {}", card.next_action.summary);
     let confirmation = project_review_card_confirmation(card);
     println!("  Hypothesis: {}", confirmation.hypothesis_to_confirm);
     println!("  Build/run this first: {}", confirmation.build_this_first);
@@ -394,7 +399,6 @@ fn print_top_card_summary(
         confirmation.minimal_repro_limitation
     );
     println!("  Confirmation step: {}", confirmation.confirmation_step);
-    println!("  Next: {}", card.next_action.summary);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
     println!("Agent packet:");
