@@ -132,6 +132,9 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_contains(&stdout, "Verify: cargo +nightly miri test read_header");
     assert_contains(&stdout, "Explain top card:");
+    assert_not_contains(&stdout, "Hypothesis:");
+    assert_not_contains(&stdout, "Minimal repro cue:");
+    assert_not_contains(&stdout, "Confirmation step:");
     assert_order(
         &stdout,
         "Top card:",
@@ -1553,6 +1556,13 @@ fn assert_contains(haystack: &str, needle: &str) {
     assert!(
         haystack.contains(needle),
         "expected stdout to contain `{needle}`\nstdout:\n{haystack}"
+    );
+}
+
+fn assert_not_contains(haystack: &str, needle: &str) {
+    assert!(
+        !haystack.contains(needle),
+        "expected stdout not to contain `{needle}`\nstdout:\n{haystack}"
     );
 }
 
