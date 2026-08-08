@@ -330,6 +330,19 @@ fn print_first_pr_overview(
         "- Open actionable gaps: {}",
         output.summary.open_actionable_gaps
     );
+    println!(
+        "- Evidence movement: new {}, worsened {}, improved {}, resolved {}, inherited {}",
+        output.summary.new_gaps,
+        output.summary.worsened_gaps,
+        output.summary.improved_gaps,
+        output.summary.resolved_gaps,
+        output.summary.inherited_gaps,
+    );
+    if output.summary.scan_capped {
+        println!("- Scan status: partial (card cap reached)");
+    } else {
+        println!("- Scan status: complete");
+    }
     // Without this line a capped run is byte-identical to a complete one that
     // genuinely found fewer gaps (#2006).
     if let Some(notice) = output.summary.capped_scan_notice() {
