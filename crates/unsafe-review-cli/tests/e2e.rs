@@ -177,7 +177,21 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "Audit saved receipts:");
     assert_contains(
         &stdout,
+        &format!(
+            "Audit saved receipts: unsafe-review receipt audit --root {}",
+            fixture.display()
+        ),
+    );
+    assert_contains(
+        &stdout,
         "saved receipt metadata only; unsafe-review did not run a witness",
+    );
+    assert_contains(
+        &stdout,
+        &format!(
+            "Policy report: {} (ReviewCard-only policy simulation; manual candidates are not policy inputs)",
+            path_display_fwd(&out_dir.join("policy-report.md"))
+        ),
     );
     assert_contains(&stdout, "Brownfield baseline (optional):");
     assert_contains(
