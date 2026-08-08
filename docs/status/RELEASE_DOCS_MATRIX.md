@@ -1,7 +1,7 @@
 # Release documentation and support matrix
 
 Audited 2026-08-08 against swarm `origin/main` at
-`a8b8aa2d6b4d54feaf5de2ae7fb2743a6c20dd00` and the public source-of-record
+`6871dbe00c96fd30f531c8d6bb1140ea7310b83f` and the public source-of-record
 release `v0.3.8` (`2026-06-18`). This is an inventory and claim-boundary
 receipt, not a candidate qualification or publication decision.
 
@@ -29,7 +29,7 @@ candidate, source, or dependency mutation.
 | GitHub Action | [`github-action.md`](../ci/github-action.md) | Advisory integration surface | Candidate/source availability must be checked separately; public `v1` is unavailable | No automatic comments or default blocking; do not imply `@v1` resolves |
 | Tokmd packets | [`tokmd-bun-packet-presets.md`](../dogfood/tokmd-bun-packet-presets.md), [#1857 receipt](../handoffs/2026-08-08-tokmd-packets-1857-acceptance.md) | Experimental producer/consumer contract | Five named presets validated for the current-main consumer only | `cargo test --locked -p tokmd --test render_packets_integration`; no broad published compatibility claim |
 | Ub-review handoff | [`PR_CI.md`](../ci/PR_CI.md), [#1890 receipt](../dogfood/reports/2026-08-08-cargo-allow-current-main.md) | Advisory packet/evidence route | Swarm main; publication and automatic comment posting unavailable | Packet integrity and dogfood checks; no witness, UB-free, or calibrated accuracy claim |
-| Schema / compatibility | [`CHANGELOG.md`](../../CHANGELOG.md), [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md) | Versioned, additive where documented | Current schemas are candidate inputs, not a frozen public compatibility promise | Consumers must route on schema/version and tolerate only documented additive fields |
+| Schema / compatibility | [`RELEASE_COMPATIBILITY.md`](RELEASE_COMPATIBILITY.md), [`CHANGELOG.md`](../../CHANGELOG.md), [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md) | Versioned, additive where explicitly documented; unknown-field policy owner-pending | Current schemas are candidate inputs, not a frozen public compatibility promise | Consumers must route on schema/version; #1921 cannot claim cross-consumer compatibility until the owner decision is recorded |
 | Support tiers | [`SUPPORT_SUMMARY.md`](SUPPORT_SUMMARY.md), [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md) | Experimental; no calibrated surface | Applies to the named evidence only | No current surface is a blocking policy, safety proof, UB-free claim, or calibrated precision/recall result |
 
 ## First-use contract

@@ -4,6 +4,9 @@ Date: 2026-08-08
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).
+The current schema and availability receipt is
+[`RELEASE_COMPATIBILITY.md`](RELEASE_COMPATIBILITY.md); it records owner-pending
+unknown-field policy rather than inferring a compatibility guarantee.
 
 All surfaces describe static unsafe-review evidence. None of them is a
 memory-safety proof, UB-free claim, Miri-clean claim, target-feature availability
