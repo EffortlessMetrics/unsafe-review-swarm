@@ -3,11 +3,11 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "313f3e60270083d70a7f53b08812289dfc26e3d4"
+swarm_base = "e94643fdd0686b73d131431eea90bbe407ba15e7"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
-audited_at = "2026-08-01"
+audited_at = "2026-08-08"
 owner = "repo-infra"
 semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
 dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
@@ -55,20 +55,51 @@ reason = "Canonical editor and agent field ownership is already integrated on sw
 proof = ["cargo run --locked -p xtask -- check-spec-coverage", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
+id = "ISSUE-1884"
+disposition = "required"
+integration = "partial_on_swarm_main"
+integration_evidence = [
+  "merged #1959 count-parity regression guard",
+  "merged #2001/#2005/#2008/#2010/#2012 first-run and count-truth slices",
+  "issue remains open for the full one-screen action-first front door",
+]
+reason = "The candidate must present bounded, action-first PR output without hiding inherited or partial states; the remaining front-panel compression is not yet integrated."
+proof = ["cargo test -p unsafe-review-cli --locked", "cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-first-hour", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1885"
+disposition = "required"
+integration = "partial_on_swarm_main"
+integration_evidence = [
+  "merged #1995 baseline init --dry-run preview slice",
+  "issue remains open for the broader preview-only top-level init flow",
+]
+reason = "Guided adoption is part of release UX, but the shipped surface must remain preview-only, deterministic, conflict-aware, and non-mutating by default."
+proof = ["cargo test -p unsafe-review-cli --locked", "cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-first-hour", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
 id = "ISSUE-1889"
 disposition = "required"
-integration = "not_on_swarm_main"
-integration_evidence = []
+integration = "on_swarm_main"
+integration_evidence = ["488f4155 docs: record issue 1889 recovery audit (#2015)"]
 reason = "Recovery audit must establish that still-correct local slices are integrated or explicitly rejected before candidate freeze."
 proof = ["git fetch origin", "cargo run --locked -p xtask -- source-divergence"]
 
 [[item]]
 id = "ISSUE-1890"
 disposition = "required"
-integration = "not_on_swarm_main"
-integration_evidence = []
+integration = "on_swarm_main"
+integration_evidence = ["e94643fd docs(dogfood): record cargo-allow current-main receipt (#2017)"]
 reason = "Current-main cargo-allow false-actionability evidence is a release qualification input, not a global accuracy claim."
 proof = ["cargo run --locked -p xtask -- check-dogfood", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1857"
+disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["cf74f497 docs: record tokmd packet acceptance (#2016)"]
+reason = "The candidate's named tokmd packet producer/consumer contract must be qualified without claiming broad published compatibility."
+proof = ["cargo run --locked -p xtask -- check-pr", "cargo test --locked -p tokmd --test render_packets_integration"]
 
 [[item]]
 id = "ISSUE-1907"

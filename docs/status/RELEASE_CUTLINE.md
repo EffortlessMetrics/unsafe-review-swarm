@@ -6,14 +6,14 @@ publication, or `v1` decision. Its machine-readable source is
 
 ## Live snapshot
 
-Audited 2026-08-01.
+Audited 2026-08-08.
 
-- Swarm base: `313f3e60270083d70a7f53b08812289dfc26e3d4`
-  (`docs(dogfood): add slab holdout baseline (#2000)`)
+- Swarm base: `e94643fdd0686b73d131431eea90bbe407ba15e7`
+  (`docs(dogfood): record cargo-allow current-main receipt (#2017)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=183`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=196`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
@@ -44,8 +44,11 @@ Deferred work can still be integrated, and required work can still be absent.
 | Canonical field map (PR #1913) | on swarm main |
 | Canonical editor/agent chain (#1907, #1909, #1910) | on swarm main |
 | Editor freshness and failure states (#1908) | partial — PR1–PR3 landed, PR4 concurrency/coalescing outstanding |
-| Recovery audit (#1889) | not on swarm main |
-| Current-main false-actionability evidence (#1890) | not on swarm main |
+| Action-first PR front door (#1884) | partial — correctness/count slices landed; full front-panel compression remains open |
+| Guided preview-only init (#1885) | partial — baseline preview landed; top-level guided flow remains open |
+| Recovery audit (#1889) | on swarm main — #2015 |
+| Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 disposition posted |
+| Tokmd packet acceptance (#1857) | on swarm main — #2016; named current-main consumer only |
 | Thin editor/agent loop proof (#1887) | not on swarm main |
 
 Integration on swarm main is not a qualification result. Each item still needs
@@ -73,6 +76,11 @@ governance decision in #1805 before it can be dispositioned.
 
 Publication and source promotion (#1879) remain outside this draft and require
 an explicit owner decision after qualification.
+
+The #1890 receipt changes the release blocker from an unclassified historical
+count to one explicit production follow-up plus fixture-scope evidence. It does
+not make a global accuracy or safety claim. The #1857 receipt similarly proves
+only the named current-main tokmd producer/consumer path and five presets.
 
 Where a commit does not cite its issue number, the TOML records the matching
 commits under `integration_evidence` and labels them as attribution by scope and
