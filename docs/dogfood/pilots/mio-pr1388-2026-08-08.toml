@@ -1,0 +1,119 @@
+schema_version = "external-pilot/v1"
+id = "mio-pr1388-2026-08-08"
+status = "recorded"
+date = "2026-08-08"
+reviewer = "codex"
+repository = "tokio-rs/mio"
+pr = 1388
+url = "https://github.com/tokio-rs/mio/pull/1388"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone, pinned PR checkout, repo-local cargo run, and full-index git diff"
+tool_version = "0.3.8"
+base_sha = "13e82ced655bbb6e2729226e485a7de9f2c2ccd9"
+head_sha = "8d3ed77d300b07e086b5cd4253dbde4cf5b40780"
+diff_path = "target/external-pilots/mio-pr1388-2026-08-08/mio-pr1388-2026-08-08.diff"
+diff_sha256 = "1a3684e3450ce709566bdec93750dd5a56740999aa98d530e01855cb578db370"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+[card_inventory]
+total_cards = 18
+agent_ready = 0
+human_only = 18
+[comment_plan]
+mode = "plan_only"
+selected_count = 3
+not_selected_count = 15
+selection_reason = "bounded reviewer noise"
+[gate_summary]
+status = "advisory"
+new_gaps = 18
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+[run]
+exit_code = 0
+elapsed_seconds = 1.2
+diff_bytes = 15320
+artifact_count = 11
+artifact_total_bytes = 1205292
+rust_files_changed = 6
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/review-kit.json"
+bytes = 36286
+sha256 = "cd59e151dc20265f46f035ed6958200f747b6542d665bfbcf59c7d2ee8d6445e"
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/cards.json"
+bytes = 116567
+sha256 = "e4b10d018f2d3d34642d1b9dd34a85e3be64f54c18b7a9bf35376ea9be490cd6"
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/comment-plan.json"
+bytes = 41383
+sha256 = "3e639943c3c95b06163cd67d40842908825c27dfcb42db99c67f1cf061c26299"
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/unsafe-review-gate.json"
+bytes = 806
+sha256 = "ad8d0d820f07f89d503e45611a6f5a5dbfefacf49f6026c70b892487325f89d7"
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/github-summary.md"
+bytes = 4324
+sha256 = "1dc824e546db855ab95a38873c41502d44b8eb5f40c742a55773182fa4015e37"
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/pr-summary.md"
+bytes = 41920
+sha256 = "08719dda7a944d0a6718c0ad75859fc841a141c3b7db5c06fc9a2b8a875e5686"
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/repair-queue.json"
+bytes = 315763
+sha256 = "4ddff225488220926e7320f6cac448189a1d5ceae85b56f3cae243d60a817084"
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/cards.sarif"
+bytes = 51087
+sha256 = "4d874c830046b086832b8508af26ed91fe54bc53025a276a34e5bd9a93e4f40a"
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/lsp.json"
+bytes = 593941
+sha256 = "91aad8ecc9276e5ce7705d438fed25f68bc54d430e30f5122a1c8311d96c4963"
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "fff92bee9c192d3356733beff3b888c7d8c92ec4bd7f6d0b88d008a0705db20e"
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/mio-pr1388-2026-08-08/first-pr/usefulness-telemetry.json"
+bytes = 1806
+sha256 = "eb8249b3badb17abe8c9f48df0582263352776635463507101b34c8c3b0fc35b"
+[[judgments]]
+surface = "github_summary"
+label = "actionable"
+reason = "The summary bounded a large six-file change to a small selected set while retaining the human-review route and advisory limitations."
+next_step = "Use large-diff pilots to test whether the top-action panel stays comprehensible."
+[[judgments]]
+surface = "comment_plan"
+label = "correct_but_not_worth_surfacing"
+reason = "Fifteen of eighteen cards were omitted by the bounded plan, keeping a large PR from becoming a comment flood."
+next_step = "Keep inherited and repeated context quiet while preserving full artifacts."
+[[judgments]]
+surface = "agent_packet"
+label = "human_only"
+reason = "The changed socket-layout paths require human deep review and no witness was run by the pilot."
+next_step = "Do not infer runtime or safety conclusions from the static cards."
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "The larger repository made exact checkout and artifact generation materially heavier than the focused pilots."
+next_step = "Use this as evidence for bounded progress reporting and guided setup, not as a detector-quality claim."

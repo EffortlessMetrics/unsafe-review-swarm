@@ -1,0 +1,114 @@
+schema_version = "external-pilot/v1"
+id = "crossbeam-pr1226-2026-08-08"
+status = "recorded"
+date = "2026-08-08"
+reviewer = "codex"
+repository = "crossbeam-rs/crossbeam"
+pr = 1226
+url = "https://github.com/crossbeam-rs/crossbeam/pull/1226"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone, pinned PR checkout, repo-local cargo run, and full-index git diff"
+tool_version = "0.3.8"
+base_sha = "92c1ec7a9513ae35d8c573a2255d9e5acfda9c75"
+head_sha = "20b25e398919e89e63ab241fa2d96a44243056ab"
+diff_path = "target/external-pilots/crossbeam-pr1226-2026-08-08/crossbeam-pr1226-2026-08-08.diff"
+diff_sha256 = "9eca3944307029a2829e2b64a006a8a08c7c8d795e442986ebbfe47d2095f46f"
+trust_boundary = "Static unsafe contract review external pilot receipt; not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+[card_inventory]
+total_cards = 6
+agent_ready = 0
+human_only = 6
+[comment_plan]
+mode = "plan_only"
+selected_count = 1
+not_selected_count = 5
+selection_reason = "bounded reviewer noise"
+[gate_summary]
+status = "advisory"
+new_gaps = 6
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 0
+inherited_gaps = 0
+[run]
+exit_code = 0
+elapsed_seconds = 1.2
+diff_bytes = 5918
+artifact_count = 11
+artifact_total_bytes = 352439
+rust_files_changed = 1
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/review-kit.json"
+bytes = 26617
+sha256 = "594272937ab8bfbe7b061bb9bdeabf376061c0330cf0aa43b5c503f911d9eb1e"
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/cards.json"
+bytes = 39775
+sha256 = "2b99916f674db184e6331406fbb3479fc2baca0fc7fcd34abc94d582d02713cf"
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/comment-plan.json"
+bytes = 14473
+sha256 = "935c5751961469990fbb06cca563b97642a0f12761f74596a5fb6515ee45889a"
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/unsafe-review-gate.json"
+bytes = 805
+sha256 = "6ffd51a3355e4e24b42443c6590edaa4d270ac58c31588388856437871455d8a"
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/github-summary.md"
+bytes = 4376
+sha256 = "29d625e2329ade5217a918c6eae3d8ea91f436e5e1a86928b5bf89249ce31418"
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/pr-summary.md"
+bytes = 17533
+sha256 = "10cb6e51fc49c57980ee70d917a9a462a0b13c5412f99400fab05f5f459747bf"
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/repair-queue.json"
+bytes = 63018
+sha256 = "3eb624fe46d0b1e85f59eaa56b92e2f8ec9a8175dfe74c2271d30a6f48c69135"
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/cards.sarif"
+bytes = 18324
+sha256 = "fb11d974264cf9b03af5face4d771baac1ad9ea97ce64232bf0af5aa08bba53c"
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/lsp.json"
+bytes = 164642
+sha256 = "065d332315aa45aff3b99cd7a38f5a94961ef1d50900094ca8674d329f5ed3a2"
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "fff92bee9c192d3356733beff3b888c7d8c92ec4bd7f6d0b88d008a0705db20e"
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/crossbeam-pr1226-2026-08-08/first-pr/usefulness-telemetry.json"
+bytes = 1467
+sha256 = "065b14f4d0f8b78930b8a6186f42c4bd636c4093a51eba91096d296e86b48d1a"
+[[judgments]]
+surface = "github_summary"
+label = "actionable"
+reason = "The output surfaced a focused atomic-pointer state gap and named the Loom confirmation route without claiming execution."
+next_step = "Retain the route and limitation language in future concurrency pilots."
+[[judgments]]
+surface = "agent_packet"
+label = "human_only"
+reason = "The packet points to a bounded model-checking task but does not execute or authorize it."
+next_step = "Keep model execution as an explicit human-controlled follow-up."
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "A fork PR requires exact base/head pinning and a raw diff capture before review."
+next_step = "Use this repeated setup signal in the guided-init evidence lane."
