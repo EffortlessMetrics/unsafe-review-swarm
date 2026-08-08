@@ -14,7 +14,26 @@ use super::Backend;
 
 impl Backend {
     pub(super) async fn refresh(&self) {
-        let _guard = self.refresh_in_flight.lock().await;
+        let Ok(_guard) = self.refresh_in_flight.try_lock() else {
+            *self.refresh_pending.lock().await = true;
+            return;
+        };
+
+        loop {
+            self.refresh_once().await;
+            let rerun = {
+                let mut pending = self.refresh_pending.lock().await;
+                let rerun = *pending;
+                *pending = false;
+                rerun
+            };
+            if !rerun {
+                break;
+            }
+        }
+    }
+
+    async fn refresh_once(&self) {
         let generation = self.begin_refresh().await;
         let root = self.root.lock().await.clone();
         let cfg = self.config.lock().await.clone();
@@ -219,7 +238,6 @@ impl Backend {
     }
 
     pub(super) async fn mark_diagnostics_stale(&self) {
-        let _guard = self.refresh_in_flight.lock().await;
         self.begin_refresh().await;
         self.clear_stale_diagnostics().await;
         self.client

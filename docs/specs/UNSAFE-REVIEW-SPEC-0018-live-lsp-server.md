@@ -173,6 +173,9 @@ Invalid configuration must log warning, fall back to defaults, and must not enab
 - A configured `maxCards` cap may publish selected diagnostics, but the live
   server must log the canonical partial-scan notice and identify those
   diagnostics as partial rather than presenting a complete inventory.
+- Concurrent refresh requests must coalesce while one scan is in flight; at
+  most one pending follow-up scan may run, and stale generations must not
+  overwrite the newer result.
 - Stale generations must not publish diagnostics.
 - Refresh publishing must not hold state locks across `.await`.
 - `AnalyzeOutput`/`ReviewCard` remain canonical facts.
