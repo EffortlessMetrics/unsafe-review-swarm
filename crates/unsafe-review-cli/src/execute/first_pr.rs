@@ -261,6 +261,8 @@ fn print_baseline_onboarding_handoff(root: &Path) {
         // on in `baseline status`, where paying for it is the user's choice.
         println!("  a baseline ledger already exists; check its health before re-running init:");
         println!("  {}", baseline_status_command(root));
+        println!("  preview stale-entry remediation without writing baseline files:");
+        println!("  {}", baseline_refresh_command(root));
     }
     println!("  run only from a clean base/default branch before feature changes");
     println!("  do not run it from the PR branch being reviewed");
@@ -423,6 +425,13 @@ pub(super) fn baseline_init_command(root: &Path) -> String {
 fn baseline_status_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline status --root {}",
+        shell_arg(&root.display().to_string())
+    )
+}
+
+fn baseline_refresh_command(root: &Path) -> String {
+    format!(
+        "unsafe-review baseline refresh --dry-run --root {}",
         shell_arg(&root.display().to_string())
     )
 }
@@ -2733,6 +2742,10 @@ mod tests {
         assert_eq!(
             baseline_init_command(root),
             "unsafe-review baseline init --root \"C:/Code/Rust With Spaces/unsafe-review\""
+        );
+        assert_eq!(
+            baseline_refresh_command(root),
+            "unsafe-review baseline refresh --dry-run --root \"C:/Code/Rust With Spaces/unsafe-review\""
         );
         assert_eq!(
             explain_command(root, &card_id),
