@@ -5,6 +5,7 @@ Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
 Usefulness notes: [`usefulness-notes.md`](usefulness-notes.md)
+External pilot usefulness: [rollup](reports/external-pilot-usefulness-rollup.md)
 Bun stable-byte seeds: [`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md)
 
 This index is a front panel for the real-crate dogfood corpus. It summarizes

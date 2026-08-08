@@ -33,6 +33,7 @@ mod dogfood_density;
 mod dogfood_exec;
 mod dogfood_usefulness;
 mod evidence_loss_challenges;
+mod external_pilot_rollup;
 mod external_pilots;
 mod first_hour;
 mod fixture_surfaces;
@@ -948,6 +949,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
         commands::XtaskCommand::CheckExternalPilots => external_pilots::check(),
+        commands::XtaskCommand::ExternalPilotRollup => external_pilot_rollup::write(),
         commands::XtaskCommand::CheckLocal(raw_args) => {
             check_local::run(&raw_args, &|id, quiet| run_named_check(id, quiet))
         }

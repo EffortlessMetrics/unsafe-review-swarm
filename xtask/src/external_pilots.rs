@@ -100,8 +100,14 @@ pub(crate) fn check() -> Result<(), String> {
         check_receipt(path)?;
     }
 
+    super::external_pilot_rollup::check()?;
+
     println!("check-external-pilots: ok ({} receipt(s))", paths.len());
     Ok(())
+}
+
+pub(crate) fn receipt_paths_for_rollup() -> Result<Vec<std::path::PathBuf>, String> {
+    pilot_receipt_paths()
 }
 
 fn check_readme() -> Result<(), String> {

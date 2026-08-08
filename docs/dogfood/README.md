@@ -11,7 +11,9 @@ measurement, and not memory-safety proof.
 The manifest is [`corpus.toml`](corpus.toml). The human-facing index is
 [`index.md`](index.md), with a machine-readable companion at
 [`index.json`](index.json). Reviewer usefulness notes live in
-[`usefulness-notes.md`](usefulness-notes.md). Dogfood report labels are defined
+[`usefulness-notes.md`](usefulness-notes.md). The external pilot usefulness
+rollup is [external pilot usefulness](reports/external-pilot-usefulness-rollup.md).
+Dogfood report labels are defined
 in the [`triage taxonomy`](triage-taxonomy.md). Follow-up work seeds are tracked
 in [`follow-up-seeds.md`](follow-up-seeds.md). Bun stable-byte follow-up seeds
 are tracked in [`stable-byte-follow-up-seeds.md`](stable-byte-follow-up-seeds.md)

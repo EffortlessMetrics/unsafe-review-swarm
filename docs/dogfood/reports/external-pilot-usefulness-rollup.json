@@ -1,0 +1,50 @@
+{
+  "coverage": {
+    "inherited_only": false,
+    "new_gap": true,
+    "public_action": false,
+    "quiet": true,
+    "resolved_or_improved": false
+  },
+  "friction": {
+    "artifact": 1,
+    "setup": 9
+  },
+  "judgments": {
+    "actionable": 9,
+    "agent_ready": 2,
+    "artifact_friction": 1,
+    "correct_but_not_worth_surfacing": 5,
+    "human_only": 6,
+    "setup_friction": 9
+  },
+  "movement": {
+    "improved_gaps": 0,
+    "inherited_gaps": 0,
+    "new_gaps": 49,
+    "resolved_gaps": 0,
+    "worsened_gaps": 0
+  },
+  "next_lane": "preview-only pilot setup",
+  "project_count": 7,
+  "projects": {
+    "BurntSushi/memchr": 1,
+    "bluss/arrayvec": 3,
+    "crossbeam-rs/crossbeam": 1,
+    "rust-lang/hashbrown": 1,
+    "rust-random/getrandom": 1,
+    "tokio-rs/bytes": 1,
+    "tokio-rs/mio": 1
+  },
+  "receipt_count": 9,
+  "schema_version": "external-pilot-usefulness-rollup/v1",
+  "sources": {
+    "local-equivalent-artifact-bundle": 9
+  },
+  "totals": {
+    "cards": 49,
+    "omitted_comments": 36,
+    "selected_comments": 13
+  },
+  "trust_boundary": "Diagnostic external-pilot usefulness evidence only; not calibrated precision or recall, not proof, not UB-free, not Miri-clean, not site-execution evidence, not policy readiness, and not a merge verdict."
+}

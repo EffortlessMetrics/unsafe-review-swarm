@@ -8,6 +8,16 @@ External pilot receipts live at:
 docs/dogfood/pilots/<id>.toml
 ```
 
+The committed maintainer-facing aggregation is [the usefulness rollup](../reports/external-pilot-usefulness-rollup.md), with machine-readable data beside it. Regenerate both files with:
+
+```bash
+cargo run --locked -p xtask -- external-pilot-rollup
+```
+
+`check-external-pilots` verifies that the rollup matches the committed
+receipts. It reports missing matrix cases explicitly; absence is not evidence
+that a case passed.
+
 They record read-only runs of the public Action or an equivalent first-pr
 artifact bundle on real external PRs. A receipt is adoption and usefulness
 evidence: setup friction, acquisition method, selected comments, omitted cards,
