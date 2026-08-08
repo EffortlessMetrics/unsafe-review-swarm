@@ -25,6 +25,26 @@ If you are working from a local checkout, keep the installed command and the
 workspace command separate. The installed command is the user path; `cargo run`
 is for development.
 
+## Preview Repository Adoption
+
+Before adding a workflow, inspect a deterministic proposal:
+
+```bash
+unsafe-review init
+unsafe-review init --format json --out target/unsafe-review-init
+```
+
+The default is preview-only: it does not create or edit repository files. The
+proposal includes workflow content, conflict status, rollback guidance,
+repository warnings, recommended ignores, explicit baseline guidance, an
+optional badge snippet, the canonical ub-review gate-manifest pointer, and the
+exact `doctor` and `pr` commands. `--out` writes only
+`unsafe-review-init.json` to the explicitly selected proposal directory.
+
+The generated workflow uses a release placeholder. Do not apply it until the
+placeholder has been replaced with a separately verified public release or
+pinned CLI invocation; no public Action or `v1` publication is implied.
+
 ## Get A First Card
 
 Check local environment signals:

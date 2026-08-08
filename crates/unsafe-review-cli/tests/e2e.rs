@@ -647,6 +647,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
         "policy",
         "receipt",
         "doctor",
+        "init",
     ];
     expected.sort_unstable();
     let mut actual = listed.clone();
@@ -1001,6 +1002,71 @@ fn subcommand_help_is_command_specific() -> Result<(), Box<dyn Error>> {
             subargs
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn init_is_preview_only_deterministic_and_conflict_visible() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-e2e")?;
+    let root = temp.path().join("repo");
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::create_dir_all(workflow.parent().ok_or("workflow path has no parent")?)?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"init-fixture\"\n",
+    )?;
+    fs::write(root.join(".gitignore"), "target/\n")?;
+    fs::write(&workflow, "name: owner-managed-workflow\n")?;
+    let proposal_dir = temp.path().join("proposal");
+
+    let run_init = || {
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("init")
+            .arg("--root")
+            .arg(&root)
+            .arg("--format")
+            .arg("json")
+            .arg("--out")
+            .arg(&proposal_dir)
+            .output()
+    };
+
+    let first = run_init()?;
+    assert!(first.status.success(), "init failed: {:?}", first.status);
+    let first_stdout = String::from_utf8(first.stdout)?;
+    let first_json: Value = serde_json::from_str(&first_stdout)?;
+    assert_eq!(first_json["mode"], "preview_only");
+    assert_eq!(first_json["writes_repository"], false);
+    assert_eq!(first_json["proposed_files"][0]["status"], "conflict");
+    assert!(first_json["proposed_files"][0]["diff"]
+        .as_str()
+        .is_some_and(|diff| diff.contains("--- a/.github/workflows/unsafe-review-first-pr.yml")));
+    assert_eq!(first_json["warnings"][0]["code"], "missing_git");
+    assert!(String::from_utf8(first.stderr)?.contains("Proposal written:"));
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: owner-managed-workflow\n"
+    );
+
+    let second = run_init()?;
+    assert_eq!(first_stdout, String::from_utf8(second.stdout)?);
+    assert!(proposal_dir.join("unsafe-review-init.json").is_file());
+
+    let default_preview = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("init")
+        .arg("--root")
+        .arg(&root)
+        .output()?;
+    assert!(default_preview.status.success());
+    let human = String::from_utf8(default_preview.stdout)?;
+    assert!(human.contains("Recommendations:"));
+    assert!(human.contains("optional_snippet"));
+    assert!(human.contains("target/unsafe-review/unsafe-review-gate.json"));
+    assert!(human.contains("<verified-release-ref>"));
+    assert!(!root.join("unsafe-review-init.json").exists());
 
     Ok(())
 }

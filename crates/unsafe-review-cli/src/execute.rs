@@ -42,6 +42,7 @@ use unsafe_review_core::{
 mod card_lookup;
 mod confirm;
 mod first_pr;
+mod init;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 const NO_CHANGED_GAPS_LIMITATION: &str =
@@ -153,6 +154,7 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
             Ok(())
         }
         Command::Doctor { root } => doctor(&root).map_err(crate::RunFailure::Tool),
+        Command::Init(options) => init::run(options).map_err(crate::RunFailure::Tool),
         Command::Check(options) => run_check(
             options,
             Scope::Diff,
@@ -3168,12 +3170,24 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::Receipt => print_receipt_help(),
         SubcommandHelpTarget::Outcome => print_outcome_help(),
         SubcommandHelpTarget::Policy => print_policy_help(),
+        SubcommandHelpTarget::Init => print_init_help(),
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
         SubcommandHelpTarget::Support => print_support(),
     }
+}
+
+fn print_init_help() {
+    println!("unsafe-review init: preview a guided repository adoption proposal");
+    println!();
+    println!("Usage:");
+    println!("  unsafe-review init [--root .] [--format human|json] [--out <directory>]");
+    println!();
+    println!("Preview-only by default: no repository files are written. The proposal shows");
+    println!("workflow content, conflicts, warnings, rollback guidance, and next commands.");
+    println!("Use `unsafe-review doctor` and `unsafe-review pr` after reviewing the proposal.");
 }
 
 fn print_check_help() {
@@ -3687,6 +3701,9 @@ fn print_help() {
         "  unsafe-review doctor                    check this repository is set up for review"
     );
     println!(
+        "  unsafe-review init                      preview a guided, read-only adoption proposal"
+    );
+    println!(
         "  unsafe-review pr                        review the current PR and write the bundle"
     );
     println!("  unsafe-review check --base origin/main  advisory review of the current diff");
@@ -3725,6 +3742,7 @@ fn print_help() {
     println!();
     println!("Repository posture:");
     println!("  doctor    check the repository setup");
+    println!("  init      preview repository adoption without writing files");
     println!("  support   print the current support tiers and advisory posture");
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
