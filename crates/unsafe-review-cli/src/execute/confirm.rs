@@ -608,6 +608,30 @@ mod tests {
         );
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_kills_and_reaps_the_timed_out_child() -> Result<(), String> {
+        let started = Instant::now();
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "exec sleep 30".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_millis(50),
+        )?;
+
+        assert!(run.timed_out);
+        assert!(run.output.is_empty());
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "timed-out child should be killed and reaped promptly"
+        );
+        Ok(())
+    }
+
     #[test]
     fn confirm_lane_maps_route_kinds_to_receipt_constructors() -> Result<(), String> {
         let card_id = "UR-fixture-c1";
