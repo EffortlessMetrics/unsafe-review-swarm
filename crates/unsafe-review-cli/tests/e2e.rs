@@ -127,7 +127,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_contains(
         &stdout,
-        "Confirmation step: build/run `cargo +nightly miri test read_header` first",
+        "Verify: Build/run `cargo +nightly miri test read_header` first",
     );
     let selected_actions = stdout
         .lines()
@@ -149,10 +149,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&top_card, "Route:");
     assert_contains(&top_card, "Next:");
     assert_contains(&top_card, "Hypothesis:");
-    assert_contains(&top_card, "Build/run this first:");
+    assert_contains(&top_card, "Verify:");
     assert_contains(&top_card, "Minimal repro cue:");
-    assert_contains(&top_card, "Confirmation step:");
     assert_contains(&top_card, "Limitation: Minimal repro cue only;");
+    assert_not_contains(&top_card, "Confirmation step:");
     assert_not_contains(&top_card, "    - Confirm ReviewCard");
     assert_order(
         &stdout,

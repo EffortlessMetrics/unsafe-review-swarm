@@ -539,11 +539,10 @@ fn print_top_card_summary(
     println!("  Next: {}", card.next_action.summary);
     let confirmation = project_review_card_confirmation(card);
     println!("  Hypothesis: {}", confirmation.hypothesis_to_confirm);
-    println!("  Build/run this first: {}", confirmation.build_this_first);
+    println!("  Verify: {}", confirmation.build_this_first);
     if let Some(step) = confirmation.minimal_repro_steps.first() {
         println!("  Minimal repro cue: {step}");
     }
-    println!("  Confirmation step: {}", confirmation.confirmation_step);
     println!("  Limitation: {}", confirmation.minimal_repro_limitation);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
