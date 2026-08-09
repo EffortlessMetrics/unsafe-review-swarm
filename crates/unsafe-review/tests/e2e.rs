@@ -1942,10 +1942,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             "- Evidence movement: new 1, worsened 0, improved 0, resolved 0, inherited 0; scan status: complete"
         )
     );
-    assert!(stdout.contains("- Reviewer comments: 1 selected, 0 omitted"));
     assert!(stdout.contains(
-        "1. src/lib.rs:8 `raw_pointer_read` — Why: guard_coverage: missing — actionable high-priority card; selected as the top card above"
+        "- Reviewer comments: 1 selected, 0 omitted; top card selected because guard_coverage: missing — actionable high-priority card"
     ));
+    assert!(stdout.contains("- Additional reviewer actions: none"));
     assert!(stdout.contains("Open:"));
     assert!(stdout.contains("pr-summary.md"));
     assert!(stdout.contains("Agent repair queue:"));
@@ -2000,7 +2000,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     let top_card = stdout
         .lines()
         .skip_while(|line| *line != "Top card:")
-        .take_while(|line| !line.starts_with("Selected reviewer actions:"))
+        .take_while(|line| !line.starts_with("- Additional reviewer actions:"))
         .collect::<Vec<_>>()
         .join("\n");
     assert!(route_offset < next_offset);
