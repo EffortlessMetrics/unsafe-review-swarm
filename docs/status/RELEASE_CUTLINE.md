@@ -8,12 +8,12 @@ publication, or `v1` decision. Its machine-readable source is
 
 Audited 2026-08-09.
 
-- Swarm base: `cc0b675acdf39e598134ce90f89dc2586a764b48`
-  (`ux: compact manual candidate terminal handoff (#2068)`)
+- Swarm base: `bd9a6874fab9b0bfee2ad7c324e609bafadda498`
+  (`ux: remove duplicate manual queue summary (#2070)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=247`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=249`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
@@ -44,7 +44,7 @@ Deferred work can still be integrated, and required work can still be absent.
 | Canonical field map (PR #1913) | on swarm main |
 | Canonical editor/agent chain (#1907, #1909, #1910) | on swarm main |
 | Editor freshness and failure states (#1908) | partial — PR1–PR4 plus the merged `xtask lsp-smoke` and cold-start repair landed; installed qualification and the separately scoped usability study remain open |
-| Action-first PR front door (#1884) | partial — changed-file scope, movement, comment-plan, selected-action, missing-base recovery, brownfield baseline, compact artifact handoff, minimal-repro cue, compact overview-count, deduplicated top-card action, and compact manual-candidate terminal handoff slices are integrated; broader one-screen front-panel compression remains open |
+| Action-first PR front door (#1884) | partial — changed-file scope, movement, comment-plan, selected-action, missing-base recovery, brownfield baseline, compact artifact handoff, minimal-repro cue, compact overview-count, deduplicated top-card action, compact manual-candidate terminal handoff, and duplicate manual-queue-summary removal slices are integrated; broader one-screen front-panel compression remains open |
 | Guided preview-only init (#1885) | on swarm main — top-level preview-only proposal, conflict/diff/rollback guidance, deterministic JSON, and release-placeholder boundary are integrated; adoption remains non-mutating and unpublished |
 | Recovery audit (#1889) | on swarm main — #2015 |
 | Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 disposition posted |
