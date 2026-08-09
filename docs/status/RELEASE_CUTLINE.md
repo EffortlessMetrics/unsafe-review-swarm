@@ -8,12 +8,12 @@ publication, or `v1` decision. Its machine-readable source is
 
 Audited 2026-08-09.
 
-- Swarm base: `fdfd32fae00b66d762c99562b6fa82d9bf52aec8`
-  (`ux: compact secondary first-pr handoffs (#2074)`)
+- Swarm base: `0154a86fce3bf384475853b20ec9403ebb6914d5`
+  (`build(deps): bump ra_ap_syntax from 0.0.343 to 0.0.344 (#2013)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=253`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=254`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
