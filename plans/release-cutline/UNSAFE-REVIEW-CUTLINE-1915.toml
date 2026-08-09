@@ -3,7 +3,7 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "da2c8b945b3a368ab7a0a701097c7a3f77c5ae1d"
+swarm_base = "13f6071d0c1e7bec0f8c699c1e871556d0464ab3"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
@@ -68,6 +68,8 @@ integration_evidence = [
   "5ae3d360 ux: add base ref recovery guidance (#2043)",
   "2faffbf2 ux: compact brownfield baseline handoff (#2059)",
   "a89568a3 ux: compact artifact inventory handoff (#2060)",
+  "c06c6b48 ux: compact first-pr minimal repro cue (#2063)",
+  "13f6071d ux: compact first-pr overview counts (#2064)",
   "issue remains open for the full one-screen action-first front door",
 ]
 reason = "The candidate must present bounded, action-first PR output without hiding inherited or partial states; the remaining front-panel compression is not yet integrated."
