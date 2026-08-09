@@ -1,11 +1,11 @@
 # UNSAFE-REVIEW-DEPENDENCY-DISPOSITIONS-1916
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
-snapshot_date = "2026-07-18"
-swarm_base = "e7f52c9187e1f5ef81f7325d8dcb8e478c580fad"
-source_base = "4fc6eb806de1460c618d60869b8a1cb885f87eea"
-status = "dependency_updates_absorbed_checkpoint_complete"
-chosen_history = "accept_source_updates; absorb_versions_into_swarm; close_swarm_duplicates_without_merging_duplicate_history"
+snapshot_date = "2026-08-09"
+swarm_base = "d4ed927a06984593ec610bbb79bd19ae902dc7db"
+source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
+status = "live_audit_current"
+chosen_history = "retain_source_owner_gated; record_swarm_workbench_integration_without_promotion"
 freeze = "not_active"
 publication = "owner_gated_out_of_scope"
 source_divergence = "new_source_commits=0"
@@ -13,12 +13,12 @@ rollback = "Supersede this snapshot with a refreshed live audit; do not change s
 
 [[disposition]]
 surface = "ra_ap_syntax"
-swarm_pr = 1875
-source_pr = 548
-decision = "source_merged_swarm_duplicate_closed_and_absorbed"
-swarm_head = "eed5b73040304c0be905b4e8d224f62b2d3bad08"
-source_head = "e5f7ca68f5f2c8cd478bbabbc84314ab7408d68e"
-reason = "Source PR #548 merged as 4fc6eb80 after parser-specific proof; swarm PR #1875 was closed as the duplicate and swarm PR #1958 absorbed the accepted version."
+swarm_pr = 2013
+source_pr = 551
+decision = "swarm_workbench_integrated_source_candidate_retained"
+swarm_head = "0154a86fce3bf384475853b20ec9403ebb6914d5"
+source_head = "40a522b57088fc9ba30722bb9632c37f1fd99db5"
+reason = "Swarm PR #2013 is integrated as workbench dependency evidence; source PR #551 remains the owner-gated source candidate and no source promotion or publication claim follows."
 
 [[disposition]]
 surface = "ignore"
@@ -31,12 +31,12 @@ reason = "Source PR #547 merged as fb217073; swarm PR #1874 was closed as the du
 
 [[disposition]]
 surface = "github_actions"
-swarm_pr = 1906
-source_pr = 545
-decision = "repair_swarm_leave_source_owner_gated"
-swarm_head = "ce87b0aaed34f5c3c542a0b3ebebcd883df7a932"
-source_head = "d90071ee485dc9b93869541f06586ebbe1de01df"
-reason = "Both candidates fail policy because action pin updates lack matching allowlist entries; this PR repairs the swarm pair only."
+swarm_pr = 2014
+source_pr = 549
+decision = "retain_both_owner_gated_paired_pin_repair"
+swarm_head = "190a9005ff76db32663f2f7ea17dba9985a59cf5"
+source_head = "3e54792b493199285f34b59101fef88a300f9248"
+reason = "Both candidates fail policy because immutable action pin updates lack matching allowlist entries; keep both open until one owner-approved paired repair path updates workflows and policy together."
 
 [[disposition]]
 surface = "signal_hook"
