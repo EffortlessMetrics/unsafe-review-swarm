@@ -1281,11 +1281,11 @@ fn capped_first_pr_run_discloses_the_cap_on_the_terminal() -> Result<(), Box<dyn
     // The disclosure is the ONLY thing distinguishing the two headline blocks —
     // that is precisely the bug, so assert the counts really do differ.
     assert!(
-        capped.contains("- Review cards: 1"),
+        capped.contains("- Scope: 1 ReviewCard"),
         "capped run must report the reduced card count, got:\n{capped}"
     );
     assert!(
-        !complete.contains("- Review cards: 1"),
+        !complete.contains("- Scope: 1 ReviewCard"),
         "fixture must yield more than one card uncapped, got:\n{complete}"
     );
 
