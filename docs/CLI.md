@@ -188,27 +188,19 @@ unsafe-review pr-setup \
 ```
 
 `pr-setup` only prints commands; it does not fetch, checkout, run witnesses,
-post comments, or edit source. The direct commands it prints are:
+post comments, or edit source. It prints one copyable checkout route and one
+copyable saved-diff route:
 
 ```bash
-git -C /path/to/bytes fetch origin <base-ref-name> pull/827/head
-git -C /path/to/bytes checkout --detach <head-sha>
-unsafe-review pr \
-  --root /path/to/bytes \
-  --base-sha <base-sha> \
-  --head-sha <head-sha> \
-  --out-dir /absolute/path/to/bytes-pr827/first-pr
-mkdir -p /absolute/path/to
-git -C /path/to/bytes diff --binary --full-index --output=/absolute/path/to/bytes-pr827.diff <base-sha>...<head-sha>
-unsafe-review pr \
-  --root /path/to/bytes \
-  --diff /absolute/path/to/bytes-pr827.diff \
-  --out-dir /absolute/path/to/bytes-pr827/first-pr
+# Checkout-based review route. Copy as one shell block.
+git -C /path/to/bytes fetch origin <base-ref-name> pull/827/head && git -C /path/to/bytes checkout --detach <head-sha> && unsafe-review pr --root /path/to/bytes --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/bytes-pr827/first-pr
+
+# Saved raw-diff route, after checkout. Copy as one shell block.
+mkdir -p /absolute/path/to && git -C /path/to/bytes diff --binary --full-index --output=/absolute/path/to/bytes-pr827.diff <base-sha>...<head-sha> && unsafe-review pr --root /path/to/bytes --diff /absolute/path/to/bytes-pr827.diff --out-dir /absolute/path/to/bytes-pr827/first-pr
 ```
 
-Use the first `unsafe-review pr` command for checkout-based analysis. Use the
-final `--diff` form when you need the saved raw patch route for receipts or
-replay.
+Use the checkout-based route for normal analysis. Use the saved-diff route when
+you need a replayable raw patch for receipts or replay.
 
 Use the `baseRefName` value for `<base-ref-name>`, `baseRefOid` for
 `<base-sha>`, and `headRefOid` for `<head-sha>`. The pull-ref fetch works for

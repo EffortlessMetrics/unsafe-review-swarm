@@ -3121,26 +3121,17 @@ fn pr_setup(options: ExternalPrSetupOptions) {
         options.number, options.repo
     );
     println!();
-    println!("Prepare a local checkout:");
+    println!("Checkout-based review route (copy as one shell block):");
     println!(
-        "  git -C {root} fetch origin {} pull/{}/head",
-        options.base_ref, options.number
-    );
-    println!("  git -C {root} checkout --detach {}", options.head_sha);
-    println!();
-    println!("Run the normal advisory first-pr bundle:");
-    println!(
-        "  unsafe-review pr --root {root} --base-sha {} --head-sha {} --out-dir {out_dir}",
-        options.base_sha, options.head_sha
+        "  git -C {root} fetch origin {} pull/{}/head && git -C {root} checkout --detach {} && unsafe-review pr --root {root} --base-sha {} --head-sha {} --out-dir {out_dir}",
+        options.base_ref, options.number, options.head_sha, options.base_sha, options.head_sha,
     );
     println!();
-    println!("Raw diff capture for pilot receipts or --diff:");
-    println!("  mkdir -p {diff_out_parent}");
+    println!("Saved raw-diff route (copy as one shell block after checkout):");
     println!(
-        "  git -C {root} diff --binary --full-index --output={diff_out} {}...{}",
-        options.base_sha, options.head_sha
+        "  mkdir -p {diff_out_parent} && git -C {root} diff --binary --full-index --output={diff_out} {}...{} && unsafe-review pr --root {root} --diff {diff_out} --out-dir {out_dir}",
+        options.base_sha, options.head_sha,
     );
-    println!("  unsafe-review pr --root {root} --diff {diff_out} --out-dir {out_dir}");
     println!();
     println!("Inputs kept visible:");
     println!("  repo: {}", options.repo);
@@ -3277,17 +3268,13 @@ fn print_first_pr_help() {
     println!(
         "  unsafe-review pr-setup --repo <owner>/<repo> --number <number> --base-ref <base-ref-name> --base-sha <base-sha> --head-sha <head-sha> --root /path/to/repo --out-dir /path/to/review-kit --diff-out /path/to/change.diff"
     );
-    println!("  git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head");
-    println!("  git -C /path/to/repo checkout --detach <head-sha>");
+    println!("Checkout-based review route (copy as one shell block):");
     println!(
-        "  unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /path/to/review-kit"
+        "  git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head && git -C /path/to/repo checkout --detach <head-sha> && unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /path/to/review-kit"
     );
-    println!("Raw diff capture for receipts or --diff:");
+    println!("Saved raw-diff route (copy as one shell block after checkout):");
     println!(
-        "  git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha>"
-    );
-    println!(
-        "  unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit"
+        "  mkdir -p /path/to && git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha> && unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit"
     );
     println!();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");

@@ -49,17 +49,16 @@ unsafe-review pr-setup \
   --diff-out /absolute/path/to/target/external-pilots/<id>/<id>.diff
 ```
 
-`pr-setup` prints the direct checkout, raw diff, and `unsafe-review pr` commands
+`pr-setup` prints one copyable checkout route and one copyable saved-diff route
 without running `gh`, `git`, witnesses, comments, or source edits. The direct
-local-equivalent commands are:
+local-equivalent routes are:
 
 ```bash
-git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head
-git -C /path/to/repo checkout --detach <head-sha>
-unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
-mkdir -p /absolute/path/to/target/external-pilots/<id>
-git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/target/external-pilots/<id>/<id>.diff <base-sha>...<head-sha>
-unsafe-review pr --root /path/to/repo --diff /absolute/path/to/target/external-pilots/<id>/<id>.diff --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
+# Checkout-based review route. Copy as one shell block.
+git -C /path/to/repo fetch origin <base-ref-name> pull/<number>/head && git -C /path/to/repo checkout --detach <head-sha> && unsafe-review pr --root /path/to/repo --base-sha <base-sha> --head-sha <head-sha> --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
+
+# Saved raw-diff route, after checkout. Copy as one shell block.
+mkdir -p /absolute/path/to/target/external-pilots/<id> && git -C /path/to/repo diff --binary --full-index --output=/absolute/path/to/target/external-pilots/<id>/<id>.diff <base-sha>...<head-sha> && unsafe-review pr --root /path/to/repo --diff /absolute/path/to/target/external-pilots/<id>/<id>.diff --out-dir /absolute/path/to/target/external-pilots/<id>/first-pr
 ```
 
 Use the checkout-based `unsafe-review pr --base-sha ... --head-sha ...` command
