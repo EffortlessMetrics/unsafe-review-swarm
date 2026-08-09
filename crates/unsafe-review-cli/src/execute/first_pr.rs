@@ -434,25 +434,33 @@ fn print_first_pr_overview(
     println!("unsafe-review {terminal_command}");
     println!("unsafe-review wrote an advisory PR bundle.");
     println!("- Artifact directory: {}", card_path_display(out_dir));
-    println!("- Review cards: {}", output.summary.cards);
-    println!("- Changed files: {}", output.summary.changed_files);
     println!(
-        "- Open actionable gaps: {}",
-        output.summary.open_actionable_gaps
+        "- Scope: {}, {}, {}",
+        count_label(output.summary.cards, "ReviewCard", "ReviewCards"),
+        count_label(
+            output.summary.changed_files,
+            "changed file",
+            "changed files"
+        ),
+        count_label(
+            output.summary.open_actionable_gaps,
+            "open actionable gap",
+            "open actionable gaps",
+        ),
     );
+    let scan_status = if output.summary.scan_capped {
+        "partial (card cap reached)"
+    } else {
+        "complete"
+    };
     println!(
-        "- Evidence movement: new {}, worsened {}, improved {}, resolved {}, inherited {}",
+        "- Evidence movement: new {}, worsened {}, improved {}, resolved {}, inherited {}; scan status: {scan_status}",
         output.summary.new_gaps,
         output.summary.worsened_gaps,
         output.summary.improved_gaps,
         output.summary.resolved_gaps,
         output.summary.inherited_gaps,
     );
-    if output.summary.scan_capped {
-        println!("- Scan status: partial (card cap reached)");
-    } else {
-        println!("- Scan status: complete");
-    }
     // Without this line a capped run is byte-identical to a complete one that
     // genuinely found fewer gaps (#2006).
     if let Some(notice) = output.summary.capped_scan_notice() {
@@ -472,6 +480,10 @@ fn print_first_pr_overview(
         "  {} (copy-only; unsafe-review did not run an agent)",
         artifact_path_display(out_dir, "repair-queue.json")
     );
+}
+
+fn count_label(count: usize, singular: &str, plural: &str) -> String {
+    format!("{count} {}", if count == 1 { singular } else { plural })
 }
 
 fn rerun_without_cap_command(
