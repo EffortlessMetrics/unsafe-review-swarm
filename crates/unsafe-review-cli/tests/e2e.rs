@@ -169,7 +169,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_order(
         &stdout,
         "Additional reviewer actions: none",
-        "Audit saved receipts:",
+        "Secondary handoffs:",
     );
     assert_contains(
         &stdout,
@@ -181,36 +181,33 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &format!("unsafe-review context --root {}", fixture.display()),
     );
     assert_contains(&stdout, "--json");
-    assert_contains(&stdout, "Audit saved receipts:");
+    assert_contains(&stdout, "receipts:");
     assert_contains(
         &stdout,
         &format!(
-            "Audit saved receipts: unsafe-review receipt audit --root {}",
+            "receipts: unsafe-review receipt audit --root {}",
             fixture.display()
         ),
     );
-    assert_contains(
-        &stdout,
-        "saved receipt metadata only; unsafe-review did not run a witness",
-    );
+    assert_contains(&stdout, "receipts: unsafe-review receipt audit --root");
     assert_contains(
         &stdout,
         &format!(
-            "Policy report: {} (ReviewCard-only policy simulation; manual candidates are not policy inputs)",
+            "policy: {} (ReviewCard-only; manual candidates excluded)",
             path_display_fwd(&out_dir.join("policy-report.md"))
         ),
     );
-    assert_contains(&stdout, "Brownfield baseline (optional):");
+    assert_contains(&stdout, "baseline new:");
     assert_contains(
         &stdout,
         &format!(
-            "Brownfield baseline (optional): New ledger: unsafe-review baseline init --root {}",
+            "baseline new: unsafe-review baseline init --root {} (clean base/default branch only; records pre-existing debt)",
             fixture.display()
         ),
     );
     assert_contains(
         &stdout,
-        "clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt",
+        "clean base/default branch only; records pre-existing debt",
     );
     assert_contains(&stdout, "Manual candidates:");
     assert_contains(
@@ -226,14 +223,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         !stdout.contains("Manual candidate queue preview:"),
         "zero manual candidates should not print a queue preview:\n{stdout}"
     );
-    assert_order(&stdout, "Top card:", "Audit saved receipts:");
-    assert_order(&stdout, "Audit saved receipts:", "Policy report:");
-    assert_order(&stdout, "Policy report:", "Brownfield baseline (optional):");
-    assert_order(
-        &stdout,
-        "Brownfield baseline (optional):",
-        "Manual candidates:",
-    );
+    assert_order(&stdout, "Top card:", "Secondary handoffs:");
+    assert_order(&stdout, "receipts:", "policy:");
+    assert_order(&stdout, "policy:", "baseline new:");
+    assert_order(&stdout, "baseline new:", "Manual candidates:");
     assert_order(&stdout, "Manual candidates:", "Artifacts:");
     assert_contains(
         &stdout,
