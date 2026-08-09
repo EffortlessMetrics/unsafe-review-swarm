@@ -3,7 +3,7 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "0154a86fce3bf384475853b20ec9403ebb6914d5"
+swarm_base = "c596aab90104d6f1676ba0be4908e0196c686172"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
@@ -75,10 +75,11 @@ integration_evidence = [
   "bd9a6874 ux: remove duplicate manual queue summary (#2070)",
   "adec1af3 ux: make pr-setup routes copyable (#2072)",
   "fdfd32fa ux: compact secondary first-pr handoffs (#2074)",
+  "c596aab9 ux: make pr output an action-first front panel (#2078)",
   "0154a86f build(deps): bump ra_ap_syntax from 0.0.343 to 0.0.344 (#2013)",
   "issue remains open for the full one-screen action-first front door",
 ]
-reason = "The candidate must present bounded, action-first PR output without hiding inherited or partial states; the remaining front-panel compression is not yet integrated."
+reason = "The candidate must present bounded, action-first PR output without hiding inherited or partial states; the bounded pr front panel is integrated, while broader one-screen compression remains open."
 proof = ["cargo test -p unsafe-review-cli --locked", "cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-first-hour", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
