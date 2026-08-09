@@ -113,9 +113,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     );
     let top_card_id = report.output.cards.first().map(|card| card.id.to_string());
     print_comment_plan_summary(report.comment_plan, report.root, top_card_id.as_deref());
-    print_receipt_audit_handoff(report.check);
-    print_policy_report_handoff(report.out_dir);
-    print_baseline_onboarding_handoff(report.root);
+    print_secondary_handoffs(report.check, report.out_dir, report.root);
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
@@ -250,38 +248,28 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_
     }
 }
 
-fn print_receipt_audit_handoff(check: &CheckOptions) {
-    println!(
-        "Audit saved receipts: {} (saved receipt metadata only; unsafe-review did not run a witness)",
-        receipt_audit_command(check)
-    );
-}
-
-fn print_policy_report_handoff(out_dir: &Path) {
-    println!(
-        "Policy report: {} (ReviewCard-only policy simulation; manual candidates are not policy inputs)",
-        artifact_path_display(out_dir, "policy-report.md")
-    );
-}
-
-fn print_baseline_onboarding_handoff(root: &Path) {
+fn print_secondary_handoffs(check: &CheckOptions, out_dir: &Path, root: &Path) {
     let existing = root
         .join("policy")
         .join("unsafe-review-baseline.toml")
         .is_file();
-    let mut handoff = String::from("Brownfield baseline (optional):");
+    let mut baseline = String::from("baseline");
     if existing {
-        handoff.push_str(&format!(
-            " Existing ledger: inspect {}; Stale-entry preview: {};",
+        baseline.push_str(&format!(
+            " existing: status {}; refresh: {};",
             baseline_status_command(root),
             baseline_refresh_command(root)
         ));
     }
-    handoff.push_str(&format!(
-        " New ledger: {}; clean base/default branch only, never the PR branch; records current open actionable gaps as pre-existing debt, so review generated policy files; not a safety record, not UB-free status, and not a witness result",
+    baseline.push_str(&format!(
+        " new: {} (clean base/default branch only; records pre-existing debt)",
         baseline_init_command(root)
     ));
-    println!("{handoff}");
+    println!(
+        "Secondary handoffs: receipts: {} (metadata only; no witness); policy: {} (ReviewCard-only; manual candidates excluded); {baseline}",
+        receipt_audit_command(check),
+        artifact_path_display(out_dir, "policy-report.md"),
+    );
 }
 
 fn print_manual_candidate_handoff(

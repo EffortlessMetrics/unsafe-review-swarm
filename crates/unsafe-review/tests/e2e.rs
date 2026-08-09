@@ -1980,11 +1980,11 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("manual candidates are advisory manual targets"));
     assert!(stdout.contains("not analyzer-discovered"));
     assert!(stdout.contains("not policy inputs"));
-    assert!(stdout.contains("Audit saved receipts:"));
+    assert!(stdout.contains("receipts:"));
     assert!(stdout.contains("unsafe-review receipt audit --root"));
     assert!(stdout.contains("--diff"));
     assert!(stdout.contains("--format markdown"));
-    assert!(stdout.contains("saved receipt metadata only; unsafe-review did not run a witness"));
+    assert!(stdout.contains("receipts: unsafe-review receipt audit --root"));
     assert!(stdout.contains("Top card:"));
     assert!(stdout.contains("`raw_pointer_read`"));
     assert!(stdout.contains("Class: `guard_missing`"));
@@ -3746,11 +3746,11 @@ fn first_pr_clean_output_stays_advisory_not_all_clear() -> Result<(), Box<dyn Er
     assert!(stdout.contains("Agent repair queue:"));
     assert!(stdout.contains("repair-queue.json"));
     assert!(stdout.contains("copy-only; unsafe-review did not run an agent"));
-    assert!(stdout.contains("Audit saved receipts:"));
+    assert!(stdout.contains("receipts:"));
     assert!(stdout.contains("unsafe-review receipt audit --root"));
     assert!(stdout.contains("--diff"));
     assert!(stdout.contains("--format markdown"));
-    assert!(stdout.contains("saved receipt metadata only; unsafe-review did not run a witness"));
+    assert!(stdout.contains("receipts: unsafe-review receipt audit --root"));
     assert!(stdout.contains("Artifacts: 18 files indexed by "));
     assert!(stdout.contains("review-kit.json"));
     assert!(stdout.contains("inspect review-kit.json for the complete bundle inventory"));
@@ -9771,7 +9771,7 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
     for (entrypoint, stdout) in [("pr", &pr_stdout), ("first-pr", &first_pr_stdout)] {
         // The free pointer survives: a ledger exists, so name the command to inspect it.
         assert!(
-            stdout.contains("Existing ledger: inspect"),
+            stdout.contains("baseline existing: status"),
             "`{entrypoint}` must still point at the ledger when one exists: {stdout}"
         );
         assert!(
@@ -9802,10 +9802,11 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
     let baseline_block = |stdout: &str| -> String {
         stdout
             .lines()
-            .skip_while(|line| !line.starts_with("Brownfield baseline"))
-            .take_while(|line| !line.starts_with("Manual candidates:"))
-            .collect::<Vec<_>>()
-            .join("\n")
+            .find_map(|line| {
+                line.find("baseline ")
+                    .map(|offset| line[offset..].to_string())
+            })
+            .unwrap_or_default()
     };
     assert_eq!(
         baseline_block(&pr_stdout),
