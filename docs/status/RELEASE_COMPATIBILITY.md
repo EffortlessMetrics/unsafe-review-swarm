@@ -1,7 +1,7 @@
 # Release compatibility receipt
 
-Audited 2026-08-08 against swarm `origin/main` at
-`94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c` and the last public release
+Audited 2026-08-09 against swarm `origin/main` at
+`5a903227b592dae01b01d76d8d3648283b861fd7` and the last public release
 `v0.3.8` (2026-06-18). The next candidate has no frozen version or candidate
 SHA. This is a documentation/support receipt, not a compatibility guarantee
 or installed qualification result.
@@ -37,8 +37,9 @@ turning observed serde behavior into a contract.
 
 ## CLI and distribution posture
 
-- `pr` is the preferred first-use entrypoint; `first-pr` and `review` remain
-  compatibility names for the same advisory bundle.
+- `pr` is the preferred first-use entrypoint and presents the bounded
+  action-first front panel; `first-pr` and `review` remain compatibility names
+  for the same advisory bundle and detailed route.
 - `doctor`, `explain`, `context`, saved artifacts, and `baseline init` are
   present in the current tree. A completed top-level guided `init` is not
   present and must not be documented as shipped.
