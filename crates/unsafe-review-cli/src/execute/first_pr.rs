@@ -542,13 +542,27 @@ fn print_top_card_summary(
     println!("  Hypothesis: {}", confirmation.hypothesis_to_confirm);
     println!("  Verify: {}", confirmation.build_this_first);
     if let Some(step) = confirmation.minimal_repro_steps.first() {
-        println!("  Minimal repro cue: {step}");
+        println!(
+            "  Minimal repro cue: {}",
+            compact_terminal_minimal_repro_step(step, card)
+        );
     }
     println!("  Limitation: {}", confirmation.minimal_repro_limitation);
     println!("Explain top card:");
     println!("  {}", explain_command(root, &card.id));
     println!("Agent packet:");
     println!("  {}", context_command(root, &card.id));
+}
+
+/// Keep the terminal handoff readable without changing the canonical cue in
+/// ReviewCard projections or artifacts. The exact card identity remains
+/// available in the adjacent Explain/Agent packet commands and artifacts.
+fn compact_terminal_minimal_repro_step(step: &str, card: &ReviewCard) -> String {
+    let prefix = format!("Confirm ReviewCard `{}` still maps to", card.id);
+    step.strip_prefix(&prefix).map_or_else(
+        || step.to_string(),
+        |rest| format!("Confirm this card still maps to{rest}"),
+    )
 }
 
 fn explain_command(root: &Path, card_id: &impl fmt::Display) -> String {

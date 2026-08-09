@@ -116,6 +116,18 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     let card_id = cards["cards"][0]["id"]
         .as_str()
         .ok_or("missing cards[0].id")?;
+    let canonical_repro = cards["cards"][0]["confirmation_cue"]["minimal_repro"]["steps"][0]
+        .as_str()
+        .ok_or("missing canonical minimal repro cue")?;
+    assert!(canonical_repro.contains(card_id));
+    assert_contains(
+        &stdout,
+        "Minimal repro cue: Confirm this card still maps to",
+    );
+    assert_not_contains(
+        &stdout,
+        &format!("Minimal repro cue: Confirm ReviewCard `{card_id}`"),
+    );
     let rendered_root = if cfg!(windows) {
         rendered_shell_path(&fixture)
     } else {
