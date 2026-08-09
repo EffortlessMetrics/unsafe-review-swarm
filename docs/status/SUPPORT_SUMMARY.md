@@ -1,6 +1,6 @@
 # Support summary
 
-Date: 2026-08-08
+Date: 2026-08-09
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).
@@ -44,8 +44,9 @@ unfrozen: its version, candidate SHA, dependency freeze, and publication state
 remain unset in the [draft release cutline](RELEASE_CUTLINE.md). Do not read
 Swarm main integration as public availability or qualification.
 
-The current first-use contract is install → `doctor` → `pr` → reviewer front
-panel → `explain`/`context` or human review → named external verification. The
+The current first-use contract is install → `doctor` → `pr` → bounded
+action-first reviewer front panel → `explain`/`context` or human review →
+named external verification. The
 preview-only baseline slice does not make a completed top-level `init` command
 part of the supported path.
 

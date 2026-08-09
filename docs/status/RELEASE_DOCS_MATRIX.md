@@ -1,7 +1,7 @@
 # Release documentation and support matrix
 
-Audited 2026-08-08 against swarm `origin/main` at
-`94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c` and the public source-of-record
+Audited 2026-08-09 against swarm `origin/main` at
+`5a903227b592dae01b01d76d8d3648283b861fd7` and the public source-of-record
 release `v0.3.8` (`2026-06-18`). This is an inventory and claim-boundary
 receipt, not a candidate qualification or publication decision.
 
@@ -22,7 +22,7 @@ candidate, source, or dependency mutation.
 
 | Surface | User-facing source | Current posture | Availability | Proof / limits |
 | --- | --- | --- | --- | --- |
-| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Current `pr`, `doctor`, `explain`, `context`, and saved artifacts are on unpublished Swarm main; public v0.3.8 remains the last released behavior | `check-pr` and CLI e2e; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
+| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Current bounded action-first `pr` front panel, `doctor`, `explain`, `context`, and saved artifacts are on unpublished Swarm main; public v0.3.8 remains the last released behavior | `check-pr` and CLI e2e; `first-pr` remains the detailed compatibility route; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
 | Review bundle | [`FIRST_USE.md`](../FIRST_USE.md), [`PR_CI.md`](../ci/PR_CI.md) | Experimental, fixture/workflow-backed | Current bundle is on unpublished Swarm main; public v0.3.8 remains the last released artifact path | `check-first-pr-artifacts` and surface parity; tokmd rendering is not claimed by the producer alone |
 | Saved LSP / agent packet | [`saved-lsp-json.md`](../editor/saved-lsp-json.md), [`agent-repair-workflow.md`](../explanation/agent-repair-workflow.md) | Experimental, read-only | Swarm main; no live-server or published-editor availability claim | Canonical ReviewCard projection; no source edits, witness execution, or repair success |
 | VS Code / Open VSX | [`editor-extension.md`](../deferred/editor-extension.md), [`extension-mvp.md`](../editor/extension-mvp.md) | Experimental saved-bundle MVP; live client deferred | Swarm main packaging only; marketplace listings unavailable | Packaging and extension smoke lanes; no Marketplace/Open VSX publication |
@@ -40,7 +40,7 @@ The truthful documented path is:
 install the public v0.3.8 CLI (or identify the local candidate explicitly)
 → doctor
 → pr
-→ open the reviewer front panel
+→ open the bounded action-first reviewer front panel
 → explain/context or route to human review
 → run a named verification command externally
 → attach a receipt only when the external evidence matches the ReviewCard
