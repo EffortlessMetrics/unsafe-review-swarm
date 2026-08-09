@@ -158,6 +158,10 @@ fn print_pr_front_panel(report: FirstPrReport<'_>) {
         "Reviewer actions: selected {selected}, omitted {omitted}{}",
         omitted_reason
     );
+    // Keep the baseline pointer ahead of card prose: a card's canonical next
+    // action may itself mention the baseline, but this is the stable handoff
+    // consumed by the existing front-door contract.
+    println!("Baseline: {}", baseline_handoff(report.root));
 
     if let Some(card) = report.output.cards.first() {
         let missing = card
@@ -275,6 +279,26 @@ fn compact_terminal_text(value: &str, max_chars: usize) -> String {
     } else {
         truncated
     }
+}
+
+fn baseline_handoff(root: &Path) -> String {
+    let existing = root
+        .join("policy")
+        .join("unsafe-review-baseline.toml")
+        .is_file();
+    let mut baseline = String::from("baseline");
+    if existing {
+        baseline.push_str(&format!(
+            " existing: status {}; refresh: {};",
+            baseline_status_command(root),
+            baseline_refresh_command(root)
+        ));
+    }
+    baseline.push_str(&format!(
+        " new: {} (clean base/default branch only; records pre-existing debt)",
+        baseline_init_command(root)
+    ));
+    baseline
 }
 
 fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_id: Option<&str>) {
@@ -407,26 +431,11 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_
 }
 
 fn print_secondary_handoffs(check: &CheckOptions, out_dir: &Path, root: &Path) {
-    let existing = root
-        .join("policy")
-        .join("unsafe-review-baseline.toml")
-        .is_file();
-    let mut baseline = String::from("baseline");
-    if existing {
-        baseline.push_str(&format!(
-            " existing: status {}; refresh: {};",
-            baseline_status_command(root),
-            baseline_refresh_command(root)
-        ));
-    }
-    baseline.push_str(&format!(
-        " new: {} (clean base/default branch only; records pre-existing debt)",
-        baseline_init_command(root)
-    ));
     println!(
-        "Secondary handoffs: receipts: {} (metadata only; no witness); policy: {} (ReviewCard-only; manual candidates excluded); {baseline}",
+        "Secondary handoffs: receipts: {} (metadata only; no witness); policy: {} (ReviewCard-only; manual candidates excluded); {}",
         receipt_audit_command(check),
         artifact_path_display(out_dir, "policy-report.md"),
+        baseline_handoff(root),
     );
 }
 
