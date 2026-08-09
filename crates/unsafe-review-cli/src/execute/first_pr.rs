@@ -98,6 +98,11 @@ pub(super) struct FirstPrReport<'a> {
 }
 
 pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
+    if report.terminal_command == "pr" {
+        print_pr_front_panel(report);
+        return;
+    }
+
     print_first_pr_overview(
         report.terminal_command,
         report.output,
@@ -117,6 +122,159 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
     print_manual_candidate_handoff(report.out_dir, report.root, report.manual_candidates);
     print_artifact_paths(report.out_dir, report.artifacts);
     print_trust_boundary();
+}
+
+fn print_pr_front_panel(report: FirstPrReport<'_>) {
+    let summary = &report.output.summary;
+    let scan_status = if summary.scan_capped {
+        "partial (card cap reached)"
+    } else {
+        "complete"
+    };
+    let (selected, omitted, omitted_reason) = comment_plan_selection(report.comment_plan);
+
+    println!("unsafe-review pr");
+    println!("Result: advisory");
+    println!(
+        "Scope: diff; scan status: {scan_status}; changed files: {} ({} Rust)",
+        summary.changed_files, summary.changed_rust_files
+    );
+    println!(
+        "Movement: new {} | worsened {} | improved {} | resolved {} | inherited {}",
+        summary.new_gaps,
+        summary.worsened_gaps,
+        summary.improved_gaps,
+        summary.resolved_gaps,
+        summary.inherited_gaps
+    );
+    if let Some(notice) = summary.capped_scan_notice() {
+        println!("Limitation: {notice}");
+        println!(
+            "Retry without cap: {}",
+            rerun_without_cap_command("pr", report.check, report.out_dir)
+        );
+    }
+    println!(
+        "Reviewer actions: selected {selected}, omitted {omitted}{}",
+        omitted_reason
+    );
+
+    if let Some(card) = report.output.cards.first() {
+        let missing = card
+            .missing
+            .iter()
+            .map(|missing| missing.kind.as_str())
+            .collect::<Vec<_>>()
+            .join(", ");
+        println!(
+            "Top action: {}:{} {} [{}]",
+            card_path_display(&card.site.location.file),
+            card.site.location.line,
+            card.operation.family.as_str(),
+            card.class.as_str()
+        );
+        if !missing.is_empty() {
+            println!("Missing: {missing}");
+        }
+        println!(
+            "Next: {}",
+            compact_terminal_text(&card.next_action.summary, 180)
+        );
+        if let Some(command) = card.next_action.verify_commands.first() {
+            println!("Verify: {command}");
+        }
+        println!("Explain: {}", explain_command(report.root, &card.id));
+        println!("Agent packet: {}", context_command(report.root, &card.id));
+    } else {
+        println!("Top action: none; no changed evidence gaps were found.");
+        println!(
+            "Next: open {}",
+            artifact_path_display(report.out_dir, "pr-summary.md")
+        );
+    }
+
+    if !report.manual_candidates.is_empty() {
+        println!(
+            "Manual candidates: {} (advisory sidecar; not analyzer ReviewCards)",
+            report.manual_candidates.len()
+        );
+    }
+    println!(
+        "Bundle: {} ({} artifacts, {} bytes)",
+        card_path_display(report.out_dir),
+        report.artifacts.len(),
+        report.output_bytes
+    );
+    println!(
+        "Trust: advisory static unsafe contract review only; no witnesses, comments, source edits, or blocking policy."
+    );
+}
+
+fn comment_plan_selection(comment_plan: Option<&str>) -> (usize, usize, String) {
+    let Some(comment_plan) = comment_plan else {
+        return (
+            0,
+            0,
+            " (unavailable; inspect comment-plan.json)".to_string(),
+        );
+    };
+    let Ok(value) = serde_json::from_str::<serde_json::Value>(comment_plan) else {
+        return (
+            0,
+            0,
+            " (unavailable; inspect comment-plan.json)".to_string(),
+        );
+    };
+    let Some(summary) = value.get("summary") else {
+        return (
+            0,
+            0,
+            " (unavailable; inspect comment-plan.json)".to_string(),
+        );
+    };
+    let Some(selected) = summary
+        .get("selected_count")
+        .and_then(serde_json::Value::as_u64)
+    else {
+        return (
+            0,
+            0,
+            " (unavailable; inspect comment-plan.json)".to_string(),
+        );
+    };
+    let Some(omitted) = summary
+        .get("not_selected_count")
+        .and_then(serde_json::Value::as_u64)
+    else {
+        return (
+            0,
+            0,
+            " (unavailable; inspect comment-plan.json)".to_string(),
+        );
+    };
+    let reason = value
+        .get("not_selected")
+        .and_then(serde_json::Value::as_array)
+        .into_iter()
+        .flatten()
+        .filter_map(|card| {
+            card.get("selection_reason_code")
+                .and_then(serde_json::Value::as_str)
+        })
+        .next()
+        .map_or_else(String::new, |code| format!(" (top omission: {code})"));
+    (selected as usize, omitted as usize, reason)
+}
+
+fn compact_terminal_text(value: &str, max_chars: usize) -> String {
+    let compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
+    let mut chars = compact.chars();
+    let truncated = chars.by_ref().take(max_chars).collect::<String>();
+    if chars.next().is_some() {
+        format!("{truncated}…")
+    } else {
+        truncated
+    }
 }
 
 fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_id: Option<&str>) {

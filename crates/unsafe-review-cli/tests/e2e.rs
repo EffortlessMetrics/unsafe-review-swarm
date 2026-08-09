@@ -285,15 +285,36 @@ fn pr_alias_with_explicit_flags_produces_same_bundle_as_first_pr() -> Result<(),
     )?;
     let stdout = String::from_utf8(output.stdout)?;
 
-    // `pr` produces the same advisory bundle while presenting the command the
-    // user typed in the terminal handoff.
+    // `pr` produces the same advisory bundle while presenting a bounded,
+    // action-first front panel for the command the user typed.
     assert!(
         stdout.starts_with("unsafe-review pr\n"),
         "pr stdout must start with the invoked command label: {stdout}"
     );
-    assert_contains(&stdout, "unsafe-review wrote an advisory PR bundle.");
-    assert_contains(&stdout, "Top card:");
-    assert_contains(&stdout, "Class: `guard_missing`");
+    assert_contains(&stdout, "Result: advisory");
+    assert_contains(&stdout, "Scope: diff; scan status: complete;");
+    assert_contains(
+        &stdout,
+        "Movement: new 1 | worsened 0 | improved 0 | resolved 0 | inherited 0",
+    );
+    assert_contains(&stdout, "Reviewer actions: selected 1, omitted 0");
+    assert_contains(
+        &stdout,
+        "Top action: src/lib.rs:8 raw_pointer_read [guard_missing]",
+    );
+    assert_contains(&stdout, "Missing: guard, witness");
+    assert_contains(&stdout, "Explain: unsafe-review explain --root");
+    assert_contains(&stdout, "Agent packet: unsafe-review context --root");
+    assert_contains(&stdout, "Bundle:");
+    assert_contains(
+        &stdout,
+        "Trust: advisory static unsafe contract review only",
+    );
+    assert!(
+        stdout.lines().count() <= 20,
+        "pr front panel should remain bounded; got {} lines:\n{stdout}",
+        stdout.lines().count()
+    );
     // The advisory bundle files must be on disk.
     assert!(
         out_dir.join("pr-summary.md").exists(),
