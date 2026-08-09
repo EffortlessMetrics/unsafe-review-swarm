@@ -209,9 +209,7 @@ fn print_pr_front_panel(report: FirstPrReport<'_>) {
         report.artifacts.len(),
         report.output_bytes
     );
-    println!(
-        "Trust: advisory static unsafe contract review only; no witnesses, comments, source edits, or blocking policy."
-    );
+    println!("Trust: {}", trust_boundary_text());
 }
 
 fn comment_plan_selection(comment_plan: Option<&str>) -> (usize, usize, String) {
@@ -261,10 +259,7 @@ fn comment_plan_selection(comment_plan: Option<&str>) -> (usize, usize, String) 
         .and_then(serde_json::Value::as_array)
         .into_iter()
         .flatten()
-        .filter_map(|card| {
-            card.get("selection_reason_code")
-                .and_then(serde_json::Value::as_str)
-        })
+        .filter_map(|card| card.get("reason_code").and_then(serde_json::Value::as_str))
         .next()
         .map_or_else(String::new, |code| format!(" (top omission: {code})"));
     (selected as usize, omitted as usize, reason)
@@ -272,13 +267,15 @@ fn comment_plan_selection(comment_plan: Option<&str>) -> (usize, usize, String) 
 
 fn compact_terminal_text(value: &str, max_chars: usize) -> String {
     let compact = value.split_whitespace().collect::<Vec<_>>().join(" ");
-    let mut chars = compact.chars();
-    let truncated = chars.by_ref().take(max_chars).collect::<String>();
-    if chars.next().is_some() {
-        format!("{truncated}…")
-    } else {
-        truncated
+    if compact.chars().count() <= max_chars {
+        return compact;
     }
+    if max_chars == 0 {
+        return String::new();
+    }
+    let mut chars = compact.chars();
+    let truncated = chars.by_ref().take(max_chars - 1).collect::<String>();
+    format!("{truncated}…")
 }
 
 fn baseline_handoff(root: &Path) -> String {
@@ -2879,9 +2876,11 @@ fn print_artifact_paths(out_dir: &Path, artifacts: &[&str]) {
 }
 
 fn print_trust_boundary() {
-    println!(
-        "Trust boundary: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so; unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
-    );
+    println!("Trust boundary: {}", trust_boundary_text());
+}
+
+fn trust_boundary_text() -> &'static str {
+    "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so; unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy."
 }
 
 fn card_path_display(path: &Path) -> String {

@@ -308,7 +308,7 @@ fn pr_alias_with_explicit_flags_produces_same_bundle_as_first_pr() -> Result<(),
     assert_contains(&stdout, "Bundle:");
     assert_contains(
         &stdout,
-        "Trust: advisory static unsafe contract review only",
+        "Trust: static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so; unsafe-review did not run witnesses, post comments, edit source, or enforce blocking policy.",
     );
     assert!(
         stdout.lines().count() <= 20,
