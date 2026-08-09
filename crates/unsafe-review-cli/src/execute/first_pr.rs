@@ -332,7 +332,7 @@ fn print_manual_candidate_handoff(
             candidate_witness_plan_command(root, &candidate.id)
         );
     }
-    print_manual_candidate_queue_preview(manual_candidates, &stable_byte_seed_ledger);
+    print_manual_candidate_queue_preview(manual_candidates);
     println!(
         "  Review-kit candidate queue: first {} of {} manual candidate(s)",
         manual_candidates
@@ -353,21 +353,20 @@ fn print_manual_candidate_handoff(
     );
 }
 
-fn print_manual_candidate_queue_preview(
-    manual_candidates: &[ManualCandidate],
-    stable_byte_seed_ledger: &StableByteSeedLedger,
-) {
+fn print_manual_candidate_queue_preview(manual_candidates: &[ManualCandidate]) {
     let queue_len = manual_candidates
         .len()
         .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT);
+    let additional_total = manual_candidates.len().saturating_sub(1);
+    let additional_shown = queue_len.saturating_sub(1);
+    if additional_total == 0 {
+        println!("  Additional manual candidates: none; full details in manual-candidates.json");
+        return;
+    }
     println!(
-        "  Manual candidate queue preview: first {queue_len} of {} manual candidate(s)",
-        manual_candidates.len()
+        "  Additional manual candidates: {additional_shown} of {additional_total} shown; full details in manual-candidates.json"
     );
-    println!(
-        "    Commands: see the first candidate above; remaining candidate details stay in manual-candidates.json"
-    );
-    for candidate in manual_candidates.iter().take(queue_len) {
+    for candidate in manual_candidates.iter().skip(1).take(additional_shown) {
         println!(
             "    - {} at {} ({}) evidence refs: {}",
             candidate.id,
@@ -377,9 +376,6 @@ fn print_manual_candidate_queue_preview(
         );
         if let Some((label, value)) = manual_candidate_first_guidance_cue(candidate) {
             println!("      {label}: {value}");
-        }
-        if let Some(seed) = stable_byte_seed_ledger.by_candidate_id.get(&candidate.id) {
-            println!("      {}", stable_byte_seed_terminal_summary(seed));
         }
     }
 }
