@@ -4,17 +4,17 @@ issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
 status = "draft_not_active"
 activation = "requires_owner_decision_after_targeted_dependency_proof"
 freeze_scope = "candidate_dependency_inputs_only"
-audited_at = "2026-08-08"
-audit_swarm_base = "db289703c00ab9cfc1cc0ff90ff13d03506ee13c"
+audited_at = "2026-08-09"
+audit_swarm_base = "d4ed927a06984593ec610bbb79bd19ae902dc7db"
 audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "db289703c00ab9cfc1cc0ff90ff13d03506ee13c"
-lockfile_sha256 = "6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7"
-ra_ap_syntax = "0.0.343"
+commit = "d4ed927a06984593ec610bbb79bd19ae902dc7db"
+lockfile_sha256 = "5079ce778c690aee8d48200a342ebdec7cd199cae6f9fb86d4d3ba65c73a7a4c"
+ra_ap_syntax = "0.0.344"
 ignore = "0.4.31"
 signal_hook = "0.4.4"
 
@@ -72,8 +72,12 @@ id = "SWARM-1874-1875"
 reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path."
 
 [[deferred_input]]
-id = "SWARM-2013-2014"
-reason = "Current swarm Dependabot updates remain open and must not be promoted independently of the chosen source history path; #2013 proposes ra_ap_syntax 0.0.344 and #2014 proposes paired Actions updates."
+id = "SWARM-2014"
+reason = "The swarm Actions pin update remains open and fails the paired workflow-allowlist contract; retain it as an owner-gated maintenance path until workflows and policy move together."
+
+[[deferred_input]]
+id = "SWARM-2013-SOURCE-PROMOTION"
+reason = "Swarm #2013 is integrated in the workbench at the audited base, but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred."
 
 [[deferred_input]]
 id = "SWARM-1620"

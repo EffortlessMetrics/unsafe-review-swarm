@@ -5,8 +5,8 @@ activating a repository-wide or permanent dependency freeze. Its machine-
 readable source is
 [`UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml`](../../plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml).
 
-Audited 2026-08-08 against swarm `main` at
-`db289703c00ab9cfc1cc0ff90ff13d03506ee13c` and source `main` at
+Audited 2026-08-09 against swarm `main` at
+`d4ed927a06984593ec610bbb79bd19ae902dc7db` and source `main` at
 `c25d65272c760c3630eb9528b7efaae2234d9e19`. This remains a draft and is not an
 active dependency freeze.
 
@@ -14,7 +14,7 @@ active dependency freeze.
 
 | Repository | Commit | `Cargo.lock` SHA-256 | `ra_ap_syntax` | `ignore` | `signal-hook` |
 | --- | --- | --- | --- | --- | --- |
-| swarm | `db289703c00ab9cfc1cc0ff90ff13d03506ee13c` | `6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7` | 0.0.343 | 0.4.31 | 0.4.4 |
+| swarm | `d4ed927a06984593ec610bbb79bd19ae902dc7db` | `5079ce778c690aee8d48200a342ebdec7cd199cae6f9fb86d4d3ba65c73a7a4c` | 0.0.344 | 0.4.31 | 0.4.4 |
 | source | `c25d65272c760c3630eb9528b7efaae2234d9e19` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
 
 These are two live repository baselines, not one frozen release candidate.
@@ -41,9 +41,11 @@ workbench input, not a source-candidate or publication claim.
 - Dependency group PR [#550](https://github.com/EffortlessMetrics/unsafe-review/pull/550)
   remains owner-gated for its own affected-test and lockfile proof.
 
-The current swarm-only queue also contains #2013 (`ra_ap_syntax 0.0.344`) and
-issue #2014 (paired Actions updates). Both remain deferred from source
-promotion until one history path is chosen.
+Swarm #2013 (`ra_ap_syntax 0.0.344`) is now integrated on the workbench base
+above. Source #551 remains the owner-gated publication history for the source
+repository; this does not promote the swarm commit or authorize a release.
+Issue #2014 remains open and deferred because its paired Actions pins still
+lack the matching workflow-allowlist update.
 
 The merged swarm audit [#1943](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1943)
 records why swarm #1874/#1875 are deferred and why #1620 remains parked.
