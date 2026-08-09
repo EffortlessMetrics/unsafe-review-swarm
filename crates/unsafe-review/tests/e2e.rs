@@ -1964,6 +1964,7 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains(
         "Additional manual candidates: 1 of 1 shown; full details in manual-candidates.json"
     ));
+    assert!(!stdout.contains("Review-kit candidate queue:"));
     assert!(stdout.contains(
         "R4R2-S002 at src/sql_jsc/mysql/MySQLValue.rs:411 (slice_from_raw_parts) evidence refs: 3"
     ));
@@ -1971,7 +1972,6 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
     assert!(stdout.contains("unsafe-review explain --root"));
     assert!(stdout.contains("unsafe-review context --root"));
     assert!(stdout.contains("unsafe-review candidate witness-plan --root"));
-    assert!(stdout.contains("Review-kit candidate queue: first 2 of 2 manual candidate(s)"));
     assert!(stdout.contains("Manual repair queue:"));
     assert!(stdout.contains("manual-repair-queue.json"));
     assert!(stdout.contains("Tokmd packet export:"));

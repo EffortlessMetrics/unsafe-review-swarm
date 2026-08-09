@@ -334,13 +334,6 @@ fn print_manual_candidate_handoff(
     }
     print_manual_candidate_queue_preview(manual_candidates);
     println!(
-        "  Review-kit candidate queue: first {} of {} manual candidate(s)",
-        manual_candidates
-            .len()
-            .min(MANUAL_CANDIDATE_REVIEW_KIT_QUEUE_LIMIT),
-        manual_candidates.len()
-    );
-    println!(
         "  Manual repair queue: {} (copy-only; unsafe-review did not run an agent)",
         artifact_path_display(out_dir, "manual-repair-queue.json")
     );
