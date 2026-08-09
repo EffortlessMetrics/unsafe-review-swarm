@@ -180,18 +180,36 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_
         .map(|(reason, count)| format!("; top omission `{reason}` ({count})"))
         .unwrap_or_default();
 
-    println!("- Reviewer comments: {selected} selected, {omitted} omitted{top_reason}");
-    if comments.is_empty() {
-        println!("- Selected reviewer actions: none");
+    let (top_card_reason, additional_comments): (Option<&str>, Vec<&serde_json::Value>) = comments
+        .iter()
+        .fold((None, Vec::new()), |mut result, comment| {
+            let card_id = comment.get("card_id").and_then(serde_json::Value::as_str);
+            if top_card_id == card_id {
+                result.0 = comment
+                    .get("selection_reason")
+                    .and_then(serde_json::Value::as_str);
+            } else {
+                result.1.push(comment);
+            }
+            result
+        });
+    let top_card_selection = top_card_reason
+        .map(|reason| format!("; top card selected because {reason}"))
+        .unwrap_or_default();
+    println!(
+        "- Reviewer comments: {selected} selected, {omitted} omitted{top_reason}{top_card_selection}"
+    );
+    if additional_comments.is_empty() {
+        println!("- Additional reviewer actions: none");
         return;
     }
 
-    let shown = comments.len().min(3);
+    let shown = additional_comments.len().min(3);
     println!(
-        "Selected reviewer actions (showing {shown} of {}):",
-        comments.len()
+        "Additional reviewer actions (showing {shown} of {}):",
+        additional_comments.len()
     );
-    for (index, comment) in comments.iter().take(shown).enumerate() {
+    for (index, comment) in additional_comments.iter().take(shown).enumerate() {
         let card_id = comment
             .get("card_id")
             .and_then(serde_json::Value::as_str)
@@ -224,13 +242,6 @@ fn print_comment_plan_summary(comment_plan: Option<&str>, root: &Path, top_card_
                 || "Verify: unavailable (inspect comment-plan.json)".to_string(),
                 |command| format!("Verify: {command}"),
             );
-        if top_card_id == Some(card_id) {
-            println!(
-                "  {}. {location} `{operation}` — Why: {reason}; selected as the top card above (see its Next, Explain, and Verify cues)",
-                index + 1,
-            );
-            continue;
-        }
         println!(
             "  {}. {location} `{operation}` — Why: {reason}; Next: {next_action}; Explain: {}; {verify}",
             index + 1,

@@ -107,11 +107,11 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&stdout, "src/lib.rs:8 `raw_pointer_read`");
     assert_contains(&stdout, "Class: `guard_missing`");
     assert_contains(&stdout, "Missing: guard, witness");
-    assert_contains(&stdout, "Selected reviewer actions (showing 1 of 1):");
     assert_contains(
         &stdout,
-        "1. src/lib.rs:8 `raw_pointer_read` — Why: guard_coverage: missing — actionable high-priority card; selected as the top card above",
+        "- Reviewer comments: 1 selected, 0 omitted; top card selected because guard_coverage: missing — actionable high-priority card",
     );
+    assert_contains(&stdout, "- Additional reviewer actions: none");
     let cards: Value = serde_json::from_str(&fs::read_to_string(out_dir.join("cards.json"))?)?;
     let card_id = cards["cards"][0]["id"]
         .as_str()
@@ -143,19 +143,18 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     let selected_actions = stdout
         .lines()
-        .skip_while(|line| !line.starts_with("Selected reviewer actions ("))
-        .skip(1)
-        .take_while(|line| !line.starts_with("Audit saved receipts:"))
+        .skip_while(|line| !line.starts_with("- Additional reviewer actions:"))
+        .take(1)
         .collect::<Vec<_>>();
-    assert_eq!(selected_actions.len(), 1);
-    assert!(!selected_actions[0].contains("\n"));
-    assert!(!selected_actions[0].contains("; Explain:"));
-    assert!(!selected_actions[0].contains("; Verify:"));
+    assert_eq!(
+        selected_actions,
+        vec!["- Additional reviewer actions: none"]
+    );
     assert_contains(&stdout, "Explain top card:");
     let top_card = stdout
         .lines()
         .skip_while(|line| *line != "Top card:")
-        .take_while(|line| !line.starts_with("Selected reviewer actions:"))
+        .take_while(|line| !line.starts_with("- Additional reviewer actions:"))
         .collect::<Vec<_>>()
         .join("\n");
     assert_contains(&top_card, "Route:");
@@ -166,14 +165,10 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     assert_contains(&top_card, "Limitation: Minimal repro cue only;");
     assert_not_contains(&top_card, "Confirmation step:");
     assert_not_contains(&top_card, "    - Confirm ReviewCard");
+    assert_order(&stdout, "Top card:", "Additional reviewer actions: none");
     assert_order(
         &stdout,
-        "Top card:",
-        "Selected reviewer actions (showing 1 of 1):",
-    );
-    assert_order(
-        &stdout,
-        "Selected reviewer actions (showing 1 of 1):",
+        "Additional reviewer actions: none",
         "Audit saved receipts:",
     );
     assert_contains(
