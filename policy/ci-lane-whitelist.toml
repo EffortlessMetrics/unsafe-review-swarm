@@ -131,6 +131,16 @@ status = "advisory"
 review_after = "2026-08-12"
 
 [[lane]]
+id = "cache-warming"
+owner = "repo-infra"
+intent = "Keep the shared ci-gate rust-cache entry warm on main so the ci.yml gate's gh-hosted fallback PR runs start from a warm dependency and check-profile target cache (#1515 candidate 3)"
+proof_obligation = ".github/workflows/cache-warm.yml runs on schedule (weekly Monday 04:41 UTC) and workflow_dispatch only, restores and re-saves the shared-key ci-gate rust-cache entry via a bounded cargo fetch --locked + cargo check --workspace --all-targets --locked warm-up with a 30-minute timeout, mirrors the ci.yml workflow-level CARGO env so the rust-cache key hash matches, uses contents: read only, never triggers on pull_request or push, is never a required check, and never gates a merge"
+cost_estimate = "low"
+trigger_policy = "schedule (weekly Monday 04:41 UTC), workflow_dispatch"
+status = "advisory"
+review_after = "2026-10-10"
+
+[[lane]]
 id = "fuzz"
 owner = "repo-infra"
 intent = "Run a bounded advisory fuzz pass over the analyze target on a weekly schedule to catch panics and renderer-parseability regressions under adversarial input"
