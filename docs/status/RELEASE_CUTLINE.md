@@ -6,14 +6,14 @@ publication, or `v1` decision. Its machine-readable source is
 
 ## Live snapshot
 
-Audited 2026-08-09.
+Audited 2026-08-10.
 
-- Swarm base: `c596aab90104d6f1676ba0be4908e0196c686172`
-  (`ux: make pr output an action-first front panel (#2078)`)
+- Swarm base: `8c2688e1d2c800dfcd60e89f61d3b347b2cf7ebd`
+  (`docs(dogfood): record tokmd consumer five-preset receipt for #1857 (#2083)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=258`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=264`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
@@ -47,8 +47,8 @@ Deferred work can still be integrated, and required work can still be absent.
 | Action-first PR front door (#1884) | partial — changed-file scope, movement, comment-plan, selected-action, missing-base recovery, brownfield baseline, compact artifact handoff, minimal-repro cue, compact overview-count, deduplicated top-card action, compact manual-candidate terminal handoff, duplicate manual-queue-summary removal, copyable external-PR setup routes, compact secondary handoffs, and the bounded `pr` front panel are integrated; broader one-screen front-panel compression remains open |
 | Guided preview-only init (#1885) | on swarm main — top-level preview-only proposal, conflict/diff/rollback guidance, deterministic JSON, and release-placeholder boundary are integrated; adoption remains non-mutating and unpublished |
 | Recovery audit (#1889) | on swarm main — #2015 |
-| Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 disposition posted |
-| Tokmd packet acceptance (#1857) | on swarm main — #2016; named current-main consumer only |
+| Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 dispositioned and closed; the 13-card result was re-confirmed on `79e83eef` after the `ra_ap_syntax` 0.0.344 bump |
+| Tokmd packet acceptance (#1857) | on swarm main — #2016 plus the fresh current-main five-preset consumer receipt (#2083, tokmd 1.15.0 from crates.io) |
 | Thin editor/agent loop proof (#1887) | on swarm main — scripted parity, freshness, quietness, partial/failure, coalescing, and live protocol rails; installed qualification and usability study remain open |
 
 Integration on swarm main is not a qualification result. Each item still needs
