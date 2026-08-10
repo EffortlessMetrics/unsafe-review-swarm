@@ -39,6 +39,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 Snapshot reports:
 
 - [2026-08-10 tokmd consumer five-preset receipt](reports/2026-08-10-tokmd-consumer-five-preset-receipt.md)
+- [2026-08-10 typed repair candidate agent evaluation](reports/2026-08-10-repair-candidate-agent-evaluation.md)
 - [2026-08-08 cargo-allow current-main reproduction](reports/2026-08-08-cargo-allow-current-main.md)
 - [2026-08-10 serde holdout](reports/2026-08-10-serde-holdout.md)
 - [2026-07-29 simdutf8 holdout](reports/2026-07-29-simdutf8-holdout.md)
