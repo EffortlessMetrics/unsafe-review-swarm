@@ -1,0 +1,62 @@
+name: cache-warm
+
+# Advisory scheduled rust-cache warmer (#1515 candidate 3).
+# Restores and re-saves the shared `ci-gate` rust-cache entry on main so the
+# ci.yml gate's gh-hosted fallback PR runs start warm. Weekly schedule plus
+# workflow_dispatch only; never triggers on pull_request or push, is never a
+# required check, and never gates a merge.
+
+on:
+  schedule:
+    # weekly, Monday 04:41 UTC (offset from corpus-backstop 04:00, fuzz 04:17)
+    - cron: '41 4 * * 1'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+defaults:
+  run:
+    shell: bash
+
+# Keep in sync with ci.yml: rust-cache folds CARGO*/RUST* env vars into its
+# cache key hash, so this workflow mirrors the gate's workflow-level env for
+# the shared-key entry to match byte-for-byte.
+env:
+  CARGO_INCREMENTAL: "0"
+  CARGO_TERM_COLOR: always
+
+jobs:
+  warm:
+    name: Warm shared rust cache (advisory)
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+
+      - uses: dtolnay/rust-toolchain@1.95.0
+        with:
+          components: rustfmt, clippy
+
+      # Same shared-key as the ci.yml gate, so the entry saved here is
+      # restorable by PR gate runs (exact match while Cargo.lock is unchanged,
+      # restore-key prefix match otherwise).
+      - uses: Swatinem/rust-cache@v2
+        with:
+          shared-key: ci-gate
+
+      # Bounded warm-up: prime the registry and the check-profile target
+      # artifacts. Advisory: a failure here only marks this scheduled run red;
+      # nothing in the PR gate depends on it.
+      - name: Warm dependency and check cache
+        run: |
+          set -uo pipefail
+          cargo fetch --locked
+          cargo check --workspace --all-targets --locked

@@ -17,7 +17,8 @@ name: CI
 #
 #   0. route (advisory, ubuntu-latest): pick self-hosted (idle trusted em-ci
 #      runner) else ubuntu-latest overflow; emit a runs-on value + runner_kind.
-#   1. Shared setup once (checkout fetch-depth 0, toolchain 1.95.0, rust-cache).
+#   1. Shared setup once (checkout fetch-depth 0, toolchain 1.95.0, rust-cache
+#      with the shared ci-gate cache key also used by cache-warm.yml).
 #   2. Fast precontext (~seconds, no full build): a runner-kind-aware disk/scratch
 #      check, then cargo fmt --check plus repo/PR facts written to
 #      target/ci-core/precontext.md, AND the deterministic core gate
@@ -143,7 +144,15 @@ jobs:
       - uses: dtolnay/rust-toolchain@1.95.0
         with:
           components: rustfmt, clippy
+      # shared-key (#1515 candidate 3): one cache entry family shared by the PR
+      # gate lane and the scheduled cache-warm.yml lane, so gh-hosted fallback
+      # PR runs restore the entry the weekly warm run saves on main. The id
+      # exposes the action's cache-hit output for the advisory floor-time
+      # cache_hit_state below.
       - uses: Swatinem/rust-cache@v2
+        id: rust-cache
+        with:
+          shared-key: ci-gate
       # Fast precontext + background launch of the deterministic core gate. The
       # disk/scratch handling is runner-kind aware: on gh-hosted overflow we free
       # the big preinstalled SDKs when headroom is low; on self-hosted we leave the
@@ -159,6 +168,7 @@ jobs:
       - name: Fast precontext and launch core gate
         env:
           RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
+          RUST_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: |
           set +e
           mkdir -p target/ci-core
@@ -205,6 +215,26 @@ jobs:
           # required_floor_wall_seconds. It is purely advisory and never gates the
           # merge; failures here are non-fatal (|| true).
           date +%s > target/ci-core/gate_start || true
+          # Cache observability (#1515 candidate 1): rust-cache exposes only a
+          # boolean exact-match output, so derive a tri-state here, before the
+          # build populates anything: exact hit from the step output; else a
+          # populated registry cache dir means a partial restore-key match,
+          # else a miss. Advisory only; captured for the floor-time emit and
+          # never read by the gate verdict. Failures are non-fatal (|| true).
+          cache_hit_state="unknown"
+          case "${RUST_CACHE_HIT:-}" in
+            true)
+              cache_hit_state="hit"
+              ;;
+            false)
+              if [ -n "$(ls -A "${CARGO_HOME:-$HOME/.cargo}/registry/cache" 2>/dev/null)" ]; then
+                cache_hit_state="partial"
+              else
+                cache_hit_state="miss"
+              fi
+              ;;
+          esac
+          echo "${cache_hit_state}" > target/ci-core/cache_hit_state || true
           # Launch the full deterministic core gate in the background, sharing
           # the workspace target dir (cargo's lock serialises any overlap
           # safely). The && chain short-circuits, so the
@@ -286,11 +316,19 @@ jobs:
             if [ "${RUNNER_KIND:-github}" = "github" ]; then
               fallback_used="true"
             fi
+            # Cache hit/miss/partial captured pre-build by the precontext step
+            # (#1515); fall back to "unknown" if the capture file is missing or
+            # holds an unexpected value.
+            cache_hit_state="$(cat target/ci-core/cache_hit_state 2>/dev/null || echo "")"
+            case "${cache_hit_state}" in
+              hit|partial|miss) ;;
+              *) cache_hit_state="unknown" ;;
+            esac
             {
-              printf '{"required_floor_wall_seconds":%s,"runner_kind":"%s","fallback_used":%s,"cache_hit_state":"unknown"}\n' \
-                "${elapsed}" "${RUNNER_KIND:-github}" "${fallback_used}"
+              printf '{"required_floor_wall_seconds":%s,"runner_kind":"%s","fallback_used":%s,"cache_hit_state":"%s"}\n' \
+                "${elapsed}" "${RUNNER_KIND:-github}" "${fallback_used}" "${cache_hit_state}"
             } > target/ci-core/floor-time.json
-            echo "floor-time: required_floor_wall_seconds=${elapsed} runner_kind=${RUNNER_KIND:-github} fallback_used=${fallback_used} cache_hit_state=unknown" \
+            echo "floor-time: required_floor_wall_seconds=${elapsed} runner_kind=${RUNNER_KIND:-github} fallback_used=${fallback_used} cache_hit_state=${cache_hit_state}" \
               >> "$GITHUB_STEP_SUMMARY"
           ) || true
           test "${core_exit}" = "0"
