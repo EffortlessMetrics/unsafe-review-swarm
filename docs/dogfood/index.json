@@ -1,23 +1,23 @@
 {
   "schema_version": "0.1",
   "status": "experimental",
-  "updated": "2026-07-29",
+  "updated": "2026-08-10",
   "manifest": "docs/dogfood/corpus.toml",
   "trust_boundary": "Dogfood corpus records are static unsafe contract review evidence, not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless an exact witness receipt is attached.",
   "summary": {
-    "repositories": 18,
-    "targets": 46,
-    "repo_snapshots": 21,
+    "repositories": 19,
+    "targets": 47,
+    "repo_snapshots": 22,
     "pr_diffs": 23,
     "fixture_controls": 2,
     "checked_in_scan_outputs": 0,
     "partitions": {
       "conformance": 2,
       "regression": 38,
-      "holdout": 6
+      "holdout": 7
     },
     "artifact_statuses": {
-      "local_untracked": 46
+      "local_untracked": 47
     }
   },
   "repositories": [
@@ -128,6 +128,12 @@
       "snapshot_targets": ["rkyv-holdout"],
       "pr_diff_targets": [],
       "primary_exercise": "Release-readiness holdout for macro-heavy generated code, allocation, raw pointers, and byte-cast contracts; recorded before tuning"
+    },
+    {
+      "repository": "serde-rs/serde",
+      "snapshot_targets": ["serde-holdout"],
+      "pr_diff_targets": [],
+      "primary_exercise": "Release-readiness holdout for a multi-crate workspace with derive macro-generated code and a modest core unsafe surface; recorded before tuning"
     }
   ],
   "recorded_outcomes": [

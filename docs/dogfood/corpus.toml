@@ -639,3 +639,17 @@ purpose = "release-readiness holdout repo snapshot for a comparatively quiet uns
 command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/slab-holdout --format json --max-cards 50 --out target/dogfood-work/slab-holdout.unsafe-review.json"
 artifact_status = "local_untracked"
 artifacts = ["target/dogfood-work/slab-holdout.unsafe-review.json"]
+
+[[targets]]
+id = "serde-holdout"
+crate = "serde"
+repository = "serde-rs/serde"
+kind = "repo-snapshot"
+partition = "holdout"
+status = "active"
+commit = "7fc3b4c30c94f73a96ebd1553f2b090d928fc3a8"
+root = "target/dogfood-work/serde-holdout"
+purpose = "release-readiness holdout repo snapshot for a multi-crate workspace with derive macro-generated code and a modest core unsafe surface; first result is recorded before tuning"
+command = "cargo run --locked -p unsafe-review -- repo --root target/dogfood-work/serde-holdout --format json --max-cards 50 --out target/dogfood-work/serde-holdout.unsafe-review.json"
+artifact_status = "local_untracked"
+artifacts = ["target/dogfood-work/serde-holdout.unsafe-review.json"]
