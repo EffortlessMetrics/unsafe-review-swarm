@@ -1,6 +1,6 @@
 # Dogfood outcome index
 
-Date: 2026-07-29
+Date: 2026-08-10
 Status: experimental selected-corpus evidence
 Source manifest: [`corpus.toml`](corpus.toml)
 Machine-readable index: [`index.json`](index.json)
@@ -30,12 +30,12 @@ external snapshots and diffs are never checked into the swarm repo.
 
 | Measure | Count |
 |---|---:|
-| Repositories | 18 |
-| Total targets | 46 |
-| Capped repo snapshots | 21 |
+| Repositories | 19 |
+| Total targets | 47 |
+| Capped repo snapshots | 22 |
 | PR diff targets | 23 |
 | Fixture control targets | 2 |
-| Holdout targets | 6 |
+| Holdout targets | 7 |
 | Checked-in scan outputs | 0 |
 
 ## Selected Judgment Sample
@@ -94,6 +94,7 @@ Selected real-crate targets:
 | `rusticstuff/simdutf8` | 2 | 0 | SIMD `target_feature` unsafe fn call, intrinsic, and unchecked UTF-8 cards; control-plane validation and release-readiness holdout |
 | `google/zerocopy` | 1 | 0 | Raw pointer dereference, `transmute`, and byte-cast cards; control-plane validation |
 | `rust-random/getrandom` | 1 | 0 | Release-readiness holdout for platform RNG unsafe declarations, FFI-style bindings, and raw pointer cards; recorded before tuning |
+| `serde-rs/serde` | 1 | 0 | Release-readiness holdout for a multi-crate workspace with derive macro-generated code and a modest core unsafe surface; recorded before tuning |
 
 ## Recorded Outcome Movement
 
@@ -126,6 +127,7 @@ Selected real-crate targets:
 - `crossbeam-holdout` (holdout; run only with explicit release-readiness opt-in)
 - `rkyv-holdout` (holdout; run only with explicit release-readiness opt-in)
 - `slab-holdout` (holdout; run only with explicit release-readiness opt-in)
+- `serde-holdout` (holdout; run only with explicit release-readiness opt-in)
 
 ### PR Diffs
 
@@ -188,7 +190,7 @@ them by default; run a holdout target only with an explicit opt-in:
 
 ```bash
 cargo run --locked -p xtask -- dogfood-exec \
-  --target slab-holdout --include-holdout --strict
+  --target serde-holdout --include-holdout --strict
 ```
 
 Update this index only when the corpus manifest or recorded outcome evidence
