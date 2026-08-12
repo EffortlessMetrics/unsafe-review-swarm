@@ -66,6 +66,7 @@ fn cargo_subcommand_alias_writes_pr_summary_artifact() -> Result<(), Box<dyn Err
 #[test]
 fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
+    let diff_path = fixture.join("change.diff");
     let temp = TempDir::new("unsafe-review-first-pr-stdout-e2e")?;
     let out_dir = temp.path().join("review-kit");
 
@@ -76,7 +77,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
             .arg("--root")
             .arg(&fixture)
             .arg("--diff")
-            .arg(fixture.join("change.diff"))
+            .arg(&diff_path)
             .arg("--out-dir")
             .arg(&out_dir),
     )?;
@@ -128,11 +129,8 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &stdout,
         &format!("Minimal repro cue: Confirm ReviewCard `{card_id}`"),
     );
-    let rendered_root = if cfg!(windows) {
-        rendered_shell_path(&fixture)
-    } else {
-        fixture.display().to_string()
-    };
+    let rendered_root = rendered_shell_path(&fixture);
+    let rendered_diff = rendered_shell_path(&diff_path);
     assert_contains(
         &stdout,
         &format!("Explain top card:\n  unsafe-review explain --root {rendered_root} {card_id}"),
@@ -173,20 +171,19 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
     );
     assert_contains(
         &stdout,
-        &format!("unsafe-review explain --root {}", fixture.display()),
+        &format!("unsafe-review explain --root {rendered_root}"),
     );
     assert_contains(&stdout, "Agent packet:");
     assert_contains(
         &stdout,
-        &format!("unsafe-review context --root {}", fixture.display()),
+        &format!("unsafe-review context --root {rendered_root}"),
     );
     assert_contains(&stdout, "--json");
     assert_contains(&stdout, "receipts:");
     assert_contains(
         &stdout,
         &format!(
-            "receipts: unsafe-review receipt audit --root {}",
-            fixture.display()
+            "receipts: unsafe-review receipt audit --root {rendered_root} --diff {rendered_diff} --format markdown"
         ),
     );
     assert_contains(&stdout, "receipts: unsafe-review receipt audit --root");
@@ -202,7 +199,7 @@ fn first_pr_stdout_points_to_top_card_handoff() -> Result<(), Box<dyn Error>> {
         &stdout,
         &format!(
             "baseline new: unsafe-review baseline init --root {} (clean base/default branch only; records pre-existing debt)",
-            fixture.display()
+            rendered_root
         ),
     );
     assert_contains(
@@ -830,9 +827,9 @@ fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>
     let diff_out_parent = diff_out
         .parent()
         .ok_or("expected diff output path to have a parent")?;
-    let diff_out_arg = rendered_shell_path(&diff_out);
-    let out_dir_arg = rendered_shell_path(&out_dir);
-    let diff_out_parent_arg = rendered_shell_path(diff_out_parent);
+    let diff_out_arg = rendered_pr_setup_path(&diff_out);
+    let out_dir_arg = rendered_pr_setup_path(&out_dir);
+    let diff_out_parent_arg = rendered_pr_setup_path(diff_out_parent);
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
             .arg("unsafe-review")
@@ -1620,6 +1617,22 @@ fn assert_not_contains(haystack: &str, needle: &str) {
 }
 
 fn rendered_shell_path(path: &Path) -> String {
+    let raw = if cfg!(windows) {
+        path.display().to_string().replace('\\', "/")
+    } else {
+        path.display().to_string()
+    };
+    if raw
+        .bytes()
+        .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-'))
+    {
+        raw
+    } else {
+        format!("\"{}\"", raw.replace('"', "\\\""))
+    }
+}
+
+fn rendered_pr_setup_path(path: &Path) -> String {
     let raw = path.display().to_string();
     if cfg!(windows) {
         format!("\"{}\"", raw.replace('\\', "/"))

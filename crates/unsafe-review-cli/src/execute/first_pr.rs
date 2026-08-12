@@ -531,7 +531,7 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
         "receipt".to_string(),
         "audit".to_string(),
         "--root".to_string(),
-        shell_arg(&check.root.display().to_string()),
+        handoff_path_arg(&check.root),
     ];
     if let Some(base) = &check.base {
         parts.push("--base".to_string());
@@ -540,7 +540,7 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
     if let Some(diff) = &check.diff {
         parts.push("--diff".to_string());
         match diff {
-            DiffInput::File(path) => parts.push(shell_arg(&path.display().to_string())),
+            DiffInput::File(path) => parts.push(handoff_path_arg(path)),
             DiffInput::Stdin => parts.push("-".to_string()),
         }
     }
@@ -558,26 +558,26 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
 pub(super) fn baseline_init_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline init --root {}",
-        baseline_root_arg(root)
+        handoff_path_arg(root)
     )
 }
 
 fn baseline_status_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline status --root {}",
-        baseline_root_arg(root)
+        handoff_path_arg(root)
     )
 }
 
 fn baseline_refresh_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline refresh --dry-run --root {}",
-        baseline_root_arg(root)
+        handoff_path_arg(root)
     )
 }
 
-fn baseline_root_arg(root: &Path) -> String {
-    shell_arg(&normalize_shell_path(&root.display().to_string()))
+fn handoff_path_arg(path: &Path) -> String {
+    shell_arg(&normalize_shell_path(&path.display().to_string()))
 }
 
 fn print_first_pr_overview(
@@ -736,14 +736,14 @@ fn compact_terminal_minimal_repro_step(step: &str, card: &ReviewCard) -> String 
 fn explain_command(root: &Path, card_id: &impl fmt::Display) -> String {
     format!(
         "unsafe-review explain --root {} {card_id}",
-        shell_arg(&root.display().to_string())
+        handoff_path_arg(root)
     )
 }
 
 fn context_command(root: &Path, card_id: &impl fmt::Display) -> String {
     format!(
         "unsafe-review context --root {} {card_id} --json",
-        shell_arg(&root.display().to_string())
+        handoff_path_arg(root)
     )
 }
 
@@ -2928,12 +2928,19 @@ mod tests {
     }
 
     #[test]
-    fn baseline_commands_normalize_native_windows_roots() {
+    fn first_pr_handoff_commands_normalize_native_windows_paths() {
         let root = Path::new(r"C:\Code\Rust With Spaces\unsafe-review");
+        let diff = Path::new(r"C:\Code\Rust With Spaces\unsafe-review\change set.diff");
+        let card_id = "UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1";
         let expected_root = if cfg!(windows) {
             "C:/Code/Rust With Spaces/unsafe-review"
         } else {
             r"C:\Code\Rust With Spaces\unsafe-review"
+        };
+        let expected_diff = if cfg!(windows) {
+            "C:/Code/Rust With Spaces/unsafe-review/change set.diff"
+        } else {
+            r"C:\Code\Rust With Spaces\unsafe-review\change set.diff"
         };
 
         assert_eq!(
@@ -2947,6 +2954,29 @@ mod tests {
         assert_eq!(
             baseline_refresh_command(root),
             format!("unsafe-review baseline refresh --dry-run --root \"{expected_root}\"")
+        );
+        assert_eq!(
+            explain_command(root, &card_id),
+            format!("unsafe-review explain --root \"{expected_root}\" {card_id}")
+        );
+        assert_eq!(
+            context_command(root, &card_id),
+            format!("unsafe-review context --root \"{expected_root}\" {card_id} --json")
+        );
+        let check = CheckOptions {
+            root: root.to_path_buf(),
+            base: None,
+            diff: Some(DiffInput::File(diff.to_path_buf())),
+            format: crate::command::Format::Human,
+            policy: unsafe_review_core::PolicyMode::Advisory,
+            out: None,
+            max_cards: None,
+        };
+        assert_eq!(
+            receipt_audit_command(&check),
+            format!(
+                "unsafe-review receipt audit --root \"{expected_root}\" --diff \"{expected_diff}\" --format markdown"
+            )
         );
     }
 
