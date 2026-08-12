@@ -4,7 +4,7 @@ use std::fs;
 use std::path::Path;
 use std::process::Command as ProcessCommand;
 
-use super::shell_arg;
+use super::{normalize_shell_path, shell_arg};
 use crate::command::{CheckOptions, DiffInput};
 use serde_json::json;
 use unsafe_review_core::{
@@ -558,22 +558,26 @@ fn receipt_audit_command(check: &CheckOptions) -> String {
 pub(super) fn baseline_init_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline init --root {}",
-        shell_arg(&root.display().to_string())
+        baseline_root_arg(root)
     )
 }
 
 fn baseline_status_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline status --root {}",
-        shell_arg(&root.display().to_string())
+        baseline_root_arg(root)
     )
 }
 
 fn baseline_refresh_command(root: &Path) -> String {
     format!(
         "unsafe-review baseline refresh --dry-run --root {}",
-        shell_arg(&root.display().to_string())
+        baseline_root_arg(root)
     )
+}
+
+fn baseline_root_arg(root: &Path) -> String {
+    shell_arg(&normalize_shell_path(&root.display().to_string()))
 }
 
 fn print_first_pr_overview(
@@ -2919,6 +2923,25 @@ mod tests {
         assert_eq!(
             context_command(root, &card_id),
             "unsafe-review context --root \"C:/Code/Rust With Spaces/unsafe-review\" UR-fixture-src-lib-rs-owner-operation-read-hash-hazard-c1 --json"
+        );
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn baseline_commands_normalize_native_windows_roots() {
+        let root = Path::new(r"C:\Code\Rust With Spaces\unsafe-review");
+
+        assert_eq!(
+            baseline_init_command(root),
+            "unsafe-review baseline init --root \"C:/Code/Rust With Spaces/unsafe-review\""
+        );
+        assert_eq!(
+            baseline_status_command(root),
+            "unsafe-review baseline status --root \"C:/Code/Rust With Spaces/unsafe-review\""
+        );
+        assert_eq!(
+            baseline_refresh_command(root),
+            "unsafe-review baseline refresh --dry-run --root \"C:/Code/Rust With Spaces/unsafe-review\""
         );
     }
 

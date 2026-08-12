@@ -9754,7 +9754,6 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
     let fixture = fixture_temp.path().join("fixture with spaces");
     copy_dir_all(&source_fixture, &fixture)?;
     let shell_root = fixture.display().to_string().replace('\\', "/");
-    let fixture = PathBuf::from(&shell_root);
     let quoted_root = format!("\"{shell_root}\"");
 
     let run_entrypoint = |command: &str, label: &str| -> Result<String, Box<dyn Error>> {
