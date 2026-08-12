@@ -988,6 +988,15 @@ fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthR
     // finding).
     let ledger_path = root.join("policy/unsafe-review-baseline.toml");
     let ledger_entries = load_baseline_entries_lenient(&ledger_path)?;
+    // Capture the strict loader's exact failure before the repo scan. On Windows the
+    // analyzer's file discovery can normalize the root while loading policy, so
+    // comparing a rendered path substring is not reliable (mixed `/` and `\\`
+    // separators can make the same path compare unequal). The lenient read above
+    // already proved the ledger is syntactically usable for per-entry diagnosis; the
+    // same strict-loader error from `pipeline::analyze`, after separator normalization,
+    // therefore identifies precisely the degraded health case this command is allowed
+    // to tolerate. Every other analyzer error remains fatal.
+    let strict_baseline_error = load_ledger_entries(&ledger_path, LedgerKind::Baseline).err();
 
     // `pipeline::analyze` loads `PolicyState` internally, which uses the *strict*
     // ledger loader for the baseline file — the exact per-entry validation
@@ -1011,18 +1020,19 @@ fn baseline_status_with_date(root: &Path, today: &str) -> Result<BaselineHealthR
         max_cards: None,
     });
     //
-    // The degrade branch keys off the strict loader mentioning the baseline ledger
-    // path — the loader formats every per-entry/parse failure with `path.display()`.
-    // This coupling is intentionally test-pinned, not implicit: the else arm re-raises
-    // (`Err(err) => return Err(err)`), so if the loader's error ever stopped naming the
-    // ledger path, this branch would stop firing, `baseline_status` would return `Err`
-    // for a merely-strict-invalid ledger, and the e2e regression
-    // `baseline_status_survives_a_strictly_invalid_baseline_ledger_entry` (which asserts
-    // the command still *succeeds* and surfaces `card_scan_error`) would fail. The drift
-    // therefore cannot land silently.
+    // The degrade branch keys off equality with the strict baseline-loader failure
+    // captured above, normalizing only path separators. This keeps the exception
+    // fail-closed: a source scan, suppression-ledger, or other analyzer error cannot be
+    // mistaken for the diagnosable baseline-entry failure.
     let (current_cards, card_scan_error) = match analyze_result {
         Ok(output) => (output.cards, None),
-        Err(err) if err.contains(&ledger_path.display().to_string()) => (Vec::new(), Some(err)),
+        Err(err)
+            if strict_baseline_error
+                .as_deref()
+                .is_some_and(|expected| expected.replace('\\', "/") == err.replace('\\', "/")) =>
+        {
+            (Vec::new(), Some(err))
+        }
         Err(err) => return Err(err),
     };
 
