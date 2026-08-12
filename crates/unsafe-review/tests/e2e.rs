@@ -4280,8 +4280,9 @@ fn card_not_found_quotes_a_root_containing_whitespace() -> Result<(), Box<dyn Er
     ])?;
 
     let text = String::from_utf8(output.stderr.clone())?;
+    let shell_root = root.display().to_string().replace('\\', "/");
     assert!(
-        text.contains(&format!("--root \"{}\"", root.display())),
+        text.contains(&format!("--root \"{shell_root}\"")),
         "the recovery command must quote the root: {text}"
     );
 
@@ -9748,7 +9749,11 @@ fn baseline_refresh_dry_run_is_required_and_writes_only_to_out() -> Result<(), B
 #[test]
 fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Result<(), Box<dyn Error>>
 {
-    let fixture = fixture_root("raw_pointer_deref_brownfield_inherited");
+    let source_fixture = fixture_root("raw_pointer_deref_brownfield_inherited");
+    let fixture_temp = TempDir::new("unsafe-review-baseline-pointer-root-e2e")?;
+    let fixture = fixture_temp.path().join("fixture with spaces");
+    copy_dir_all(&source_fixture, &fixture)?;
+    let quoted_root = format!("\"{}\"", fixture.display());
 
     let run_entrypoint = |command: &str, label: &str| -> Result<String, Box<dyn Error>> {
         let out_dir = TempDir::new(label)?;
@@ -9776,8 +9781,7 @@ fn neither_entrypoint_scans_the_repository_for_baseline_ledger_health() -> Resul
         );
         assert!(
             stdout.contains(&format!(
-                "unsafe-review baseline status --root {}",
-                fixture.display()
+                "unsafe-review baseline status --root {quoted_root}"
             )),
             "`{entrypoint}` must name the exact `baseline status` command: {stdout}"
         );
