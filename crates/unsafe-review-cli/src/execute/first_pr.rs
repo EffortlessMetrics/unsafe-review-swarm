@@ -2926,22 +2926,26 @@ mod tests {
         );
     }
 
-    #[cfg(windows)]
     #[test]
     fn baseline_commands_normalize_native_windows_roots() {
         let root = Path::new(r"C:\Code\Rust With Spaces\unsafe-review");
+        let expected_root = if cfg!(windows) {
+            "C:/Code/Rust With Spaces/unsafe-review"
+        } else {
+            r"C:\Code\Rust With Spaces\unsafe-review"
+        };
 
         assert_eq!(
             baseline_init_command(root),
-            "unsafe-review baseline init --root \"C:/Code/Rust With Spaces/unsafe-review\""
+            format!("unsafe-review baseline init --root \"{expected_root}\"")
         );
         assert_eq!(
             baseline_status_command(root),
-            "unsafe-review baseline status --root \"C:/Code/Rust With Spaces/unsafe-review\""
+            format!("unsafe-review baseline status --root \"{expected_root}\"")
         );
         assert_eq!(
             baseline_refresh_command(root),
-            "unsafe-review baseline refresh --dry-run --root \"C:/Code/Rust With Spaces/unsafe-review\""
+            format!("unsafe-review baseline refresh --dry-run --root \"{expected_root}\"")
         );
     }
 
