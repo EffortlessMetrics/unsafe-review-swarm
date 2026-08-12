@@ -87,7 +87,7 @@ path = ".github/workflows/droid-pr-review.yml"
 permissions = "contents: read, id-token: write, pull-requests: write"
 actions = [
   "actions/checkout@v7",
-  "Factory-AI/droid-action@4028e0ae3063a9eb5b673271e381bd645102e36f",
+  "Factory-AI/droid-action@f468f229be3132990734b8202850afca6215fefa",
 ]
 reason = "Owner-requested advisory Droid PR review bot. It configures Factory BYOK with MiniMax M3 via the Anthropic-compatible MiniMax endpoint, uses Droid's shallow review preset with low reasoning effort, disables Droid security review blocking, passes the scoped workflow GitHub token to Droid, grants id-token: write for the pinned Factory Droid validator OIDC path, runs only on non-draft pull requests, bounds the Droid action step with a timeout and continue-on-error so review-bot failures stay advisory, cancels superseded PR review runs per PR, clears ambient Anthropic globals, posts advisory review/security comments through Factory, and does not run unsafe-review witnesses, edit source, publish artifacts, or make unsafe-correctness claims."
 created = "2026-06-01"
@@ -137,7 +137,7 @@ path = ".github/workflows/ub-review.yml"
 permissions = "contents: read, pull-requests: write"
 actions = [
   "actions/checkout@v7",
-  "EffortlessMetrics/ub-review@bf15a077dda2532700722bd676969a7ba5370ad3",
+  "EffortlessMetrics/ub-review@9de43c5215c8e4278cce9421b55991ced4f66065",
   "actions/upload-artifact@v7",
 ]
 reason = "Standalone advisory ub-review LLM review lane, replacing the retired in-job ub-review step that previously rode inside the ci.yml gate job (SPEC-0024 section 4.1). Runs on pull_request (opened, reopened, ready_for_review, synchronize) for same-repo non-draft PRs only — fork PRs cannot read the MINIMAX_API_KEY org secret, draft PRs would burn advisory LLM budget early, and the deterministic core gate in ci.yml still runs for forks and drafts. Superseded runs are cancelled per PR (concurrency cancel-in-progress) to bound advisory cost. The action is pinned to an immutable commit SHA (gh-runner profile, posting review) and the lane stays strictly advisory: the job is continue-on-error with a bounded 25-minute timeout, the action runs with fail-on-gate 'false', and no branch-protection rule names this workflow, so LLM availability or opinion can never block the merge — the only required check remains 'Unsafe Review Rust Result' from ci.yml. pull-requests: write is granted at the job level only, solely so ub-review can post its grouped advisory PR review; the run also uploads its artifact bundle via upload-artifact. Pin bumps must update this entry in the same PR (a dependabot pin bump alone cannot pass the deterministic gate). No witness execution, no source edits, no publishing, and no memory-safety, UB-free, or Miri-clean claims."
