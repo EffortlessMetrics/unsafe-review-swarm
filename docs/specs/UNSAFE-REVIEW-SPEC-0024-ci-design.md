@@ -268,7 +268,8 @@ not make a failed core gate pass, and artifact upload must not make a passing
 core gate fail. On success no evidence paths are exposed, so the
 `always()`-guarded upload step is skipped. After a non-zero verdict, staging is removed
 and recreated as a private unpredictable directory under the per-job
-`RUNNER_TEMP`; the upload action receives only the exact `summary.md` and
+`RUNNER_TEMP`: cleanup is followed immediately by `mkdir -m 700` for the
+private parent and then `mktemp -d` for unpredictable staging. The upload action receives only the exact `summary.md` and
 `metadata.json` regular-file paths, never a workspace or staging directory.
 Pre-populated workspace extras and `core.log` symlinks are therefore outside the
 artifact selection. The intermediate closed-vocabulary step-status excerpt is

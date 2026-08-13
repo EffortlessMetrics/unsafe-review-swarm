@@ -35,6 +35,30 @@ fn check_lane_markers(
     Ok(())
 }
 
+/// Require private evidence staging to recreate its owner-only parent directly
+/// after cleanup and before allocating the unpredictable staging directory.
+fn check_private_staging_order(path: &str, text: &str) -> Result<(), String> {
+    let lines: Vec<&str> = text.lines().map(str::trim).collect();
+    let cleanup = "rm -rf \"$failure_root\"";
+    let create = "mkdir -m 700 \"$failure_root\"";
+    let allocate = "failure_dir=\"$(mktemp -d \"${failure_root}/staging-XXXXXX\")\"";
+    let cleanup_index = lines
+        .iter()
+        .position(|line| *line == cleanup)
+        .ok_or_else(|| format!("{path} missing private staging cleanup: {cleanup}"))?;
+    if lines.get(cleanup_index + 1) != Some(&create) {
+        return Err(format!(
+            "{path} must recreate private staging root immediately after cleanup: {create}"
+        ));
+    }
+    if lines.get(cleanup_index + 2) != Some(&allocate) {
+        return Err(format!(
+            "{path} must allocate private staging immediately after owner-only root creation: {allocate}"
+        ));
+    }
+    Ok(())
+}
+
 /// Validate the bounded diagnostic artifact attached to a failed deterministic
 /// core gate. The upload may report evidence, but it must neither retain the
 /// raw log nor replace the final non-zero verdict with an advisory outcome.
@@ -98,7 +122,8 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "cat target/ci-core/core.log",
             "target/ci-core/redacted-excerpt.txt",
         ],
-    )
+    )?;
+    check_private_staging_order(path, text)
 }
 
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
@@ -248,6 +273,7 @@ head -c 16384
 if [ "${core_exit}" != "0" ]; then
   failure_root="${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}"
   rm -rf "$failure_root"
+  mkdir -m 700 "$failure_root"
   failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
   excerpt_path="${failure_dir}/step-status.txt"
   excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
@@ -488,6 +514,35 @@ clippy\t4\t0\tbare-secret-material\n";
         };
         if !error.contains("target/ci-core/redacted-excerpt.txt") {
             return Err(format!("unexpected workspace-excerpt error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_private_staging_without_owner_only_root_creation() -> Result<(), String> {
+        let missing_create =
+            FAILURE_EVIDENCE_FIXTURE.replace("  mkdir -m 700 \"$failure_root\"\n", "");
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &missing_create)
+        else {
+            return Err("missing private staging root creation unexpectedly passed".to_string());
+        };
+        if !error.contains("mkdir -m 700 \"$failure_root\"") {
+            return Err(format!("unexpected private-root error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_private_staging_root_creation_after_mktemp() -> Result<(), String> {
+        let reordered = FAILURE_EVIDENCE_FIXTURE.replace(
+            "  mkdir -m 700 \"$failure_root\"\n  failure_dir=\"$(mktemp -d \"${failure_root}/staging-XXXXXX\")\"",
+            "  failure_dir=\"$(mktemp -d \"${failure_root}/staging-XXXXXX\")\"\n  mkdir -m 700 \"$failure_root\"",
+        );
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &reordered) else {
+            return Err("reordered private staging root creation unexpectedly passed".to_string());
+        };
+        if !error.contains("immediately after cleanup") {
+            return Err(format!("unexpected staging-order error: {error}"));
         }
         Ok(())
     }
