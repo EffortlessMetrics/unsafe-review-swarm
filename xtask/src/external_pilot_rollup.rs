@@ -279,6 +279,29 @@ mod tests {
                 "unexpected all-absent missing-case list: {missing}"
             ));
         }
+
+        let all_present = json!({
+            "receipt_count": 10,
+            "project_count": 7,
+            "coverage": {
+                "quiet": true,
+                "inherited_only": true,
+                "new_gap": true,
+                "resolved_or_improved": true,
+                "public_action": true
+            },
+            "next_lane": "unassigned"
+        });
+        let markdown = render_markdown(&all_present);
+        let expected = "No pilot matrix cases are currently missing. This report does not convert matrix coverage into a product-readiness claim.";
+        if !markdown.contains(expected) {
+            return Err(format!("missing complete-matrix prose: {markdown}"));
+        }
+        if markdown.contains("explicit release work:") {
+            return Err(format!(
+                "complete matrix unexpectedly rendered a missing-case list: {markdown}"
+            ));
+        }
         Ok(())
     }
 
