@@ -252,19 +252,25 @@ Step shape inside the one gate job:
    --check plus repo/PR facts written to target/ci-core/precontext.md as a
    durable run record, and the core gate launched in the background sharing the
    workspace target dir (cargo's target-lock serialises overlap safely)
-3. final assert: wait for the background core gate, surface it in the job
-   summary, and fail the job iff its exit code != 0
+3. final assert: wait for the current run/attempt's background core gate,
+   surface its closed-vocabulary step-status summary, and fail the job iff its
+   exit code != 0; stale `core_exit` files are removed before launch and cannot
+   satisfy the run-keyed wait
 4. failure evidence: when the core exit is non-zero, create only a bounded,
-   redacted summary plus machine-readable command/commit/exit/path metadata;
-   always attempt a non-fatal upload with seven-day retention and never upload
-   the raw core log
+   allowlisted step-status summary plus machine-readable
+   command/commit/exit/path metadata; always attempt a non-fatal upload with
+   seven-day retention and never read or upload the raw core log
 ```
 
 The failure-evidence upload does not create a second lane or verdict. The final
 assert remains the only authority: artifact preparation or upload failure must
 not make a failed core gate pass, and artifact upload must not make a passing
 core gate fail. On success the failure-evidence directory is absent, so the
-always-running upload step has no files to retain.
+always-running upload step has no files to retain. The retained status summary
+accepts only the fixed step ids `fmt`, `clippy`, `test`, and `check-pr`, decimal
+timing/exit fields, and the literal `skipped`; it is capped at 80 lines and 16
+KiB. Arbitrary stdout/stderr, bare tokens, PEM blocks, and other `core.log`
+content have no projection into the artifact.
 
 Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
 

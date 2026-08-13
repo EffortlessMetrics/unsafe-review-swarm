@@ -46,12 +46,23 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
         &[
             // The deterministic verdict remains the required floor.
             "test \"${core_exit}\" = \"0\"",
-            // Only a bounded, redacted failure directory is discoverable.
-            "tail -n 80 target/ci-core/core.log",
+            // This run's verdict cannot be satisfied by stale core_exit state.
+            "CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}",
+            "core_exit-${CORE_RUN_KEY}",
+            "rm -f target/ci-core/core_exit \"$core_exit_path\"",
+            "while [ ! -f \"$core_exit_path\" ]",
+            "mv \"${core_exit_path}.tmp\" \"$core_exit_path\"",
+            // Only closed-vocabulary step status reaches the bounded artifact.
+            "step_id\\telapsed_seconds\\texit_status",
+            "$1 ~ /^(fmt|clippy|test|check-pr)$/",
+            "case \"$core_mode\" in",
+            "head -n 80",
             "head -c 16384",
-            "[redacted: potentially sensitive line]",
             "target/ci-core/failure-evidence/summary.md",
             "target/ci-core/failure-evidence/metadata.json",
+            // Success clears and never creates a failure artifact directory.
+            "rm -rf target/ci-core/failure-evidence",
+            "if [ \"${core_exit}\" != \"0\" ]; then",
             // Artifact retention is always attempted but cannot change the job.
             "name: Upload bounded core-gate failure evidence",
             "if: ${{ always() }}",
@@ -65,6 +76,8 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             // Uploading the runner-local raw log would defeat the bound and the
             // explicit redaction step.
             "path: target/ci-core/core.log",
+            "tail -n 80 target/ci-core/core.log",
+            "cat target/ci-core/core.log",
         ],
     )
 }
@@ -195,12 +208,27 @@ mod tests {
     use super::check_core_failure_evidence_contract;
 
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
+CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
+core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
+rm -f target/ci-core/core_exit "$core_exit_path"
+rm -rf target/ci-core/failure-evidence
+mv "${core_exit_path}.tmp" "$core_exit_path"
+while [ ! -f "$core_exit_path" ]; do
+  sleep 5
+done
 test "${core_exit}" = "0"
-tail -n 80 target/ci-core/core.log
+printf 'step_id\telapsed_seconds\texit_status\n'
+$1 ~ /^(fmt|clippy|test|check-pr)$/
+case "$core_mode" in
+  without-tests|with-tests) ;;
+esac
+head -n 80
 head -c 16384
-[redacted: potentially sensitive line]
 target/ci-core/failure-evidence/summary.md
 target/ci-core/failure-evidence/metadata.json
+if [ "${core_exit}" != "0" ]; then
+  mkdir -p target/ci-core/failure-evidence
+fi
 - name: Upload bounded core-gate failure evidence
   if: ${{ always() }}
   continue-on-error: true
@@ -210,6 +238,49 @@ target/ci-core/failure-evidence/metadata.json
     if-no-files-found: ignore
     retention-days: 7
 "#;
+
+    fn bounded_core_status_summary(input: &str) -> String {
+        const MAX_LINES: usize = 80;
+        const MAX_BYTES: usize = 16_384;
+
+        let mut output = "step_id\telapsed_seconds\texit_status\n".to_string();
+        let mut line_count = 1;
+        for line in input.lines() {
+            let mut fields = line.split('\t');
+            let Some(step_id) = fields.next() else {
+                continue;
+            };
+            let Some(elapsed) = fields.next() else {
+                continue;
+            };
+            let Some(status) = fields.next() else {
+                continue;
+            };
+            if fields.next().is_some()
+                || !matches!(step_id, "fmt" | "clippy" | "test" | "check-pr")
+                || elapsed.is_empty()
+                || elapsed.len() > 10
+                || !elapsed.bytes().all(|byte| byte.is_ascii_digit())
+                || !valid_core_status(status)
+            {
+                continue;
+            }
+            let normalized = format!("{step_id}\t{elapsed}\t{status}\n");
+            if line_count >= MAX_LINES || output.len() + normalized.len() > MAX_BYTES {
+                break;
+            }
+            output.push_str(&normalized);
+            line_count += 1;
+        }
+        output
+    }
+
+    fn valid_core_status(status: &str) -> bool {
+        status == "skipped"
+            || (!status.is_empty()
+                && status.len() <= 3
+                && status.bytes().all(|byte| byte.is_ascii_digit()))
+    }
 
     #[test]
     fn live_ci_workflow_satisfies_failure_evidence_contract() -> Result<(), String> {
@@ -223,6 +294,53 @@ target/ci-core/failure-evidence/metadata.json
     #[test]
     fn accepts_bounded_failure_evidence_with_required_verdict() -> Result<(), String> {
         check_core_failure_evidence_contract("fixture.yml", FAILURE_EVIDENCE_FIXTURE)
+    }
+
+    #[test]
+    fn allowlisted_summary_rejects_bare_tokens_and_pem_material() -> Result<(), String> {
+        let fixture = "fmt\t1\t0\n\
+ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n\
+-----BEGIN PRIVATE KEY-----\n\
+check-pr\t2\t101\n\
+-----END PRIVATE KEY-----\n\
+test\t3\teyJhbGciOiJIUzI1NiJ9.payload.signature\n\
+clippy\t4\t0\tbare-secret-material\n";
+        let summary = bounded_core_status_summary(fixture);
+        let expected = "step_id\telapsed_seconds\texit_status\nfmt\t1\t0\ncheck-pr\t2\t101\n";
+        if summary != expected {
+            return Err(format!("unexpected closed-vocabulary summary: {summary:?}"));
+        }
+        for forbidden in ["ghp_", "PRIVATE KEY", "eyJhbGci", "bare-secret-material"] {
+            if summary.contains(forbidden) {
+                return Err(format!(
+                    "summary retained forbidden secret fixture: {forbidden}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn allowlisted_summary_enforces_line_and_byte_bounds() -> Result<(), String> {
+        let mut fixture = String::new();
+        for _ in 0..200 {
+            fixture.push_str("check-pr\t1234567890\t101\n");
+        }
+        fixture.push_str(&"bare-token".repeat(4_096));
+        let summary = bounded_core_status_summary(&fixture);
+        if summary.lines().count() > 80 {
+            return Err(format!(
+                "summary exceeded 80-line bound: {}",
+                summary.lines().count()
+            ));
+        }
+        if summary.len() > 16_384 {
+            return Err(format!(
+                "summary exceeded 16-KiB bound: {} bytes",
+                summary.len()
+            ));
+        }
+        Ok(())
     }
 
     #[test]
@@ -247,6 +365,33 @@ target/ci-core/failure-evidence/metadata.json
         };
         if !error.contains("target/ci-core/failure-evidence/metadata.json") {
             return Err(format!("unexpected missing-metadata error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_contract_that_can_observe_stale_core_exit() -> Result<(), String> {
+        let stale = FAILURE_EVIDENCE_FIXTURE
+            .replace("rm -f target/ci-core/core_exit \"$core_exit_path\"", "");
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &stale) else {
+            return Err("stale core-exit fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("rm -f target/ci-core/core_exit") {
+            return Err(format!("unexpected stale-exit error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_contract_that_can_upload_failure_evidence_on_success() -> Result<(), String> {
+        let stale_artifact =
+            FAILURE_EVIDENCE_FIXTURE.replace("rm -rf target/ci-core/failure-evidence", "");
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &stale_artifact)
+        else {
+            return Err("success-path stale artifact fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("rm -rf target/ci-core/failure-evidence") {
+            return Err(format!("unexpected stale-artifact error: {error}"));
         }
         Ok(())
     }
