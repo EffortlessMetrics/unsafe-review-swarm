@@ -1,28 +1,29 @@
 {
   "coverage": {
-    "inherited_only": false,
+    "inherited_only": true,
     "new_gap": true,
     "public_action": false,
     "quiet": true,
-    "resolved_or_improved": false
+    "resolved_or_improved": true
   },
   "friction": {
     "artifact": 1,
-    "setup": 9
+    "setup": 10
   },
   "judgments": {
     "actionable": 9,
     "agent_ready": 2,
     "artifact_friction": 1,
-    "correct_but_not_worth_surfacing": 5,
+    "correct_but_not_worth_surfacing": 6,
     "human_only": 6,
-    "setup_friction": 9
+    "setup_friction": 10,
+    "unclear": 1
   },
   "movement": {
     "improved_gaps": 0,
-    "inherited_gaps": 0,
+    "inherited_gaps": 159,
     "new_gaps": 49,
-    "resolved_gaps": 0,
+    "resolved_gaps": 34,
     "worsened_gaps": 0
   },
   "next_lane": "preview-only pilot setup",
@@ -34,12 +35,12 @@
     "rust-lang/hashbrown": 1,
     "rust-random/getrandom": 1,
     "tokio-rs/bytes": 1,
-    "tokio-rs/mio": 1
+    "tokio-rs/mio": 2
   },
-  "receipt_count": 9,
+  "receipt_count": 10,
   "schema_version": "external-pilot-usefulness-rollup/v1",
   "sources": {
-    "local-equivalent-artifact-bundle": 9
+    "local-equivalent-artifact-bundle": 10
   },
   "totals": {
     "cards": 49,
