@@ -8,12 +8,12 @@ This is diagnostic product-usefulness evidence, not calibration or a safety clai
 
 | Measure | Result |
 |---|---:|
-| Exact receipts | 9 |
+| Exact receipts | 10 |
 | Projects | 7 |
 | Quiet case | yes |
-| Inherited-only case | not yet |
+| Inherited-only case | yes |
 | New-gap case | yes |
-| Resolved/improved case | not yet |
+| Resolved/improved case | yes |
 | Public Action case | not yet |
 
 ## Evidence-led next lane

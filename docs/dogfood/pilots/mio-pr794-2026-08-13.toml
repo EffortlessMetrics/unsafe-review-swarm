@@ -1,0 +1,175 @@
+schema_version = "external-pilot/v1"
+id = "mio-pr794-2026-08-13"
+status = "recorded"
+date = "2026-08-13"
+reviewer = "codex"
+repository = "tokio-rs/mio"
+pr = 794
+url = "https://github.com/tokio-rs/mio/pull/794"
+source = "local-equivalent-artifact-bundle"
+acquisition_method = "read-only clone, pinned PR checkout, base-state local debt ledger, repo-local development binary, and full-index git diff"
+tool_version = "0.3.8"
+base_sha = "f4e1e6ec6eda03a4800be005cae1002802567560"
+head_sha = "dd915866c15803052c540f0733a67fea3a94eeb3"
+diff_path = "target/external-pilots/mio-pr794-2026-08-13/mio-pr794-2026-08-13.diff"
+diff_sha256 = "52426d9804e98f990cdac2b2876ecc95b375d5ae302c0770f5ab7d052bb18b91"
+trust_boundary = "Static unsafe contract review external pilot receipt from the development binary; not a public Action or released-binary result, not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, not a merge verdict, and no third-party comments or issues were filed."
+
+[read_only]
+no_source_edits = true
+no_third_party_comments = true
+no_third_party_issues = true
+no_witnesses_run = true
+
+[card_inventory]
+total_cards = 0
+agent_ready = 0
+human_only = 0
+
+[comment_plan]
+mode = "plan_only"
+selected_count = 0
+not_selected_count = 0
+selection_reason = "bounded reviewer noise"
+
+[gate_summary]
+status = "advisory"
+new_gaps = 0
+worsened_gaps = 0
+improved_gaps = 0
+resolved_gaps = 34
+inherited_gaps = 159
+
+[run]
+exit_code = 0
+elapsed_seconds = 0.962
+diff_bytes = 1033
+artifact_count = 18
+artifact_total_bytes = 71859
+rust_files_changed = 1
+
+[[artifacts]]
+kind = "review_kit"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/review-kit.json"
+bytes = 9231
+sha256 = "b9adb2bf3a70cd2d9bba0ae36a6f181fe79258d346b0fbc38c34e85464dda572"
+
+[[artifacts]]
+kind = "cards"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/cards.json"
+bytes = 1374
+sha256 = "86cd64da59fff1beaa2d957c9a03e4ff3a48a9ae1296a010eceb360fcde4f00f"
+
+[[artifacts]]
+kind = "comment_plan"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/comment-plan.json"
+bytes = 695
+sha256 = "fe7888f1de8d9bcb6aae52804f62194809ed9e46be9964098a2eb4a97f0bed68"
+
+[[artifacts]]
+kind = "gate"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/unsafe-review-gate.json"
+bytes = 808
+sha256 = "781fa589663b1d53df9054a9c39f320116c64731d756cab18430830b4b03cd87"
+
+[[artifacts]]
+kind = "github_summary"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/github-summary.md"
+bytes = 1785
+sha256 = "10420d335c07009cd055a224bf4f6c7ab672a84eb555afae154374c270c1b341"
+
+[[artifacts]]
+kind = "pr_summary"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/pr-summary.md"
+bytes = 910
+sha256 = "88d22b8e0d93360e9bca2e5540f6a7758fa709324f469ec79970b598ac8ecb65"
+
+[[artifacts]]
+kind = "repair_queue"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/repair-queue.json"
+bytes = 1050
+sha256 = "8fe06175c274b6694c36a4ca8328781c8ffcaefb19699ec4ff71605200c37612"
+
+[[artifacts]]
+kind = "sarif"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/cards.sarif"
+bytes = 753
+sha256 = "37bf20cbeff18eba1d08cbddbd7df43545ec630e803fd5987c5cd46b3f5632df"
+
+[[artifacts]]
+kind = "lsp"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/lsp.json"
+bytes = 944
+sha256 = "9850c0e1850b52bd492b77c54678bbecb7f241be9412927a3d09cd6caf769eb4"
+
+[[artifacts]]
+kind = "receipt_audit_json"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/receipt-audit.json"
+bytes = 1409
+sha256 = "6a19e6965d58865077b85b058a4104b5131f53685b56c1f651f6af19e4b71c35"
+
+[[artifacts]]
+kind = "usefulness_telemetry"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/usefulness-telemetry.json"
+bytes = 1308
+sha256 = "f55bf0c022434e48c251ced215838b39563980a1c7c80a405c1ac8c95b34a021"
+
+[[artifacts]]
+kind = "manual_candidates"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/manual-candidates.json"
+bytes = 3755
+sha256 = "5e89b5cf4cafe19e0ac87b79ce2990465d39b352e96ccbe9155de271ef4f1cbb"
+
+[[artifacts]]
+kind = "manual_repair_queue"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/manual-repair-queue.json"
+bytes = 1561
+sha256 = "ede7d8fc350f74f10f0d169bc84927408906e2ca94dd7e171ad7c3d3d8f85c6d"
+
+[[artifacts]]
+kind = "policy_report_json"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/policy-report.json"
+bytes = 28633
+sha256 = "3c4cb8e60a4171d102e9e39a013c28484b0233594bad9f7228b7d335742675c2"
+
+[[artifacts]]
+kind = "policy_report_md"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/policy-report.md"
+bytes = 11745
+sha256 = "15fcf79bfa5ce2e4b1736f417df99102a47b6a7c8df143042e78268585052035"
+
+[[artifacts]]
+kind = "receipt_audit_md"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/receipt-audit.md"
+bytes = 1939
+sha256 = "fce9ded0f37cc1902c5edd6498e2f5f4968e0080cc9229fdaff8de4f855b366e"
+
+[[artifacts]]
+kind = "tokmd_packets"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/tokmd-packets.json"
+bytes = 3316
+sha256 = "63d7f847f168fe2786b2bd6707512db56b1b7587a07c3b28c5ac8c21072aa194"
+
+[[artifacts]]
+kind = "witness_plan"
+path = "target/external-pilots/mio-pr794-2026-08-13/first-pr/witness-plan.md"
+bytes = 643
+sha256 = "aa365cb3a5605191755fe2e5018d6d5ed7264fa5ed60c83488a46c92902ff31a"
+
+[[judgments]]
+surface = "artifact_bundle"
+label = "unclear"
+reason = "The base-state ledger makes the first-pr bundle report 34 resolved and 159 inherited gaps, but the PR only adds ten rationale-comment lines near one atomic-pointer store, so the aggregate resolved count is not a trustworthy per-card improvement claim."
+next_step = "Treat this as first-run holdout evidence for movement review; inspect diff-scoped baseline movement before using resolved counts for maintainer conclusions."
+
+[[judgments]]
+surface = "github_summary"
+label = "correct_but_not_worth_surfacing"
+reason = "The comment-only safety-rationale PR produced no changed ReviewCards or planned comments, which is appropriately quiet for the PR author."
+next_step = "Keep the raw movement counters in artifacts while leaving the comment surface quiet."
+
+[[judgments]]
+surface = "setup"
+label = "setup_friction"
+reason = "A resolved or inherited movement pilot required a separate base-state ledger generation step before the pinned head run; setup took 6.438 seconds before the 0.962-second pilot run."
+next_step = "Document baseline-backed external pilot acquisition before treating this route as normal first-run UX."
