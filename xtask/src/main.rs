@@ -8654,8 +8654,11 @@ fn check_pr_disposition_policy_texts(
 }
 
 fn markdown_heading_section<'a>(text: &'a str, heading: &str) -> Option<&'a str> {
-    let marker = format!("{heading}\n");
-    let start = text.find(&marker)? + marker.len();
+    let (marker_start, marker_len) = [format!("{heading}\n"), format!("{heading}\r\n")]
+        .into_iter()
+        .filter_map(|marker| text.find(&marker).map(|start| (start, marker.len())))
+        .min_by_key(|(start, _)| *start)?;
+    let start = marker_start + marker_len;
     let rest = &text[start..];
     let end = rest.find("\n## ").unwrap_or(rest.len());
     Some(&rest[..end])
@@ -13248,6 +13251,19 @@ artifacts = [
         assert!(err.contains("R4R2-S007"), "{err}");
         assert!(err.contains("src/runtime/api/BunObject.rs:2345"), "{err}");
         Ok(())
+    }
+
+    #[test]
+    fn dogfood_bun_manual_smoke_report_accepts_crlf() -> Result<(), String> {
+        let examples = manual_candidate_examples()?;
+        let text = read_to_string(&workspace_path(BUN_MANUAL_CANDIDATE_SMOKE_REPORT))?;
+        let text = text.replace("\r\n", "\n").replace('\n', "\r\n");
+
+        check_dogfood_bun_manual_candidate_smoke_report_text(
+            BUN_MANUAL_CANDIDATE_SMOKE_REPORT,
+            &text,
+            &examples,
+        )
     }
 
     #[test]
