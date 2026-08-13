@@ -254,7 +254,17 @@ Step shape inside the one gate job:
    workspace target dir (cargo's target-lock serialises overlap safely)
 3. final assert: wait for the background core gate, surface it in the job
    summary, and fail the job iff its exit code != 0
+4. failure evidence: when the core exit is non-zero, create only a bounded,
+   redacted summary plus machine-readable command/commit/exit/path metadata;
+   always attempt a non-fatal upload with seven-day retention and never upload
+   the raw core log
 ```
+
+The failure-evidence upload does not create a second lane or verdict. The final
+assert remains the only authority: artifact preparation or upload failure must
+not make a failed core gate pass, and artifact upload must not make a passing
+core gate fail. On success the failure-evidence directory is absent, so the
+always-running upload step has no files to retain.
 
 Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
 
@@ -1268,6 +1278,14 @@ jobs:
         run: |
           # fail iff the background core gate exited non-zero
           ...
+      - name: Upload bounded core-gate failure evidence
+        if: ${{ always() }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          path: target/ci-core/failure-evidence/
+          if-no-files-found: ignore
+          retention-days: 7
 ```
 
 The advisory ub-review lane is the separate standalone workflow of section

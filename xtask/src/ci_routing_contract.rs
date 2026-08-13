@@ -35,6 +35,40 @@ fn check_lane_markers(
     Ok(())
 }
 
+/// Validate the bounded diagnostic artifact attached to a failed deterministic
+/// core gate. The upload may report evidence, but it must neither retain the
+/// raw log nor replace the final non-zero verdict with an advisory outcome.
+fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), String> {
+    check_lane_markers(
+        path,
+        text,
+        "core failure-evidence contract",
+        &[
+            // The deterministic verdict remains the required floor.
+            "test \"${core_exit}\" = \"0\"",
+            // Only a bounded, redacted failure directory is discoverable.
+            "tail -n 80 target/ci-core/core.log",
+            "head -c 16384",
+            "[redacted: potentially sensitive line]",
+            "target/ci-core/failure-evidence/summary.md",
+            "target/ci-core/failure-evidence/metadata.json",
+            // Artifact retention is always attempted but cannot change the job.
+            "name: Upload bounded core-gate failure evidence",
+            "if: ${{ always() }}",
+            "continue-on-error: true",
+            "uses: actions/upload-artifact@v7",
+            "path: target/ci-core/failure-evidence/",
+            "if-no-files-found: ignore",
+            "retention-days: 7",
+        ],
+        &[
+            // Uploading the runner-local raw log would defeat the bound and the
+            // explicit redaction step.
+            "path: target/ci-core/core.log",
+        ],
+    )
+}
+
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
 pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     let path = ".github/workflows/ci.yml";
@@ -105,6 +139,7 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
             "EffortlessMetrics/ub-review@",
         ],
     )?;
+    check_core_failure_evidence_contract(path, &text)?;
     if text.contains("repos/${") && text.contains("/actions/runners") {
         return Err(format!(
             "{path} must not reintroduce repository runner discovery (org-level only)"
@@ -153,4 +188,66 @@ fn check_ub_review_advisory_contract() -> Result<(), String> {
             "issues: write",
         ],
     )
+}
+
+#[cfg(test)]
+mod tests {
+    use super::check_core_failure_evidence_contract;
+
+    const FAILURE_EVIDENCE_FIXTURE: &str = r#"
+test "${core_exit}" = "0"
+tail -n 80 target/ci-core/core.log
+head -c 16384
+[redacted: potentially sensitive line]
+target/ci-core/failure-evidence/summary.md
+target/ci-core/failure-evidence/metadata.json
+- name: Upload bounded core-gate failure evidence
+  if: ${{ always() }}
+  continue-on-error: true
+  uses: actions/upload-artifact@v7
+  with:
+    path: target/ci-core/failure-evidence/
+    if-no-files-found: ignore
+    retention-days: 7
+"#;
+
+    #[test]
+    fn live_ci_workflow_satisfies_failure_evidence_contract() -> Result<(), String> {
+        let path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/ci.yml");
+        let text = std::fs::read_to_string(&path)
+            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
+        check_core_failure_evidence_contract(&path.display().to_string(), &text)
+    }
+
+    #[test]
+    fn accepts_bounded_failure_evidence_with_required_verdict() -> Result<(), String> {
+        check_core_failure_evidence_contract("fixture.yml", FAILURE_EVIDENCE_FIXTURE)
+    }
+
+    #[test]
+    fn rejects_failure_evidence_that_weakens_required_verdict() -> Result<(), String> {
+        let weakened = FAILURE_EVIDENCE_FIXTURE.replace("test \"${core_exit}\" = \"0\"", "");
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &weakened) else {
+            return Err("weakened core verdict fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("test \"${core_exit}\" = \"0\"") {
+            return Err(format!("unexpected weakened-verdict error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_failure_evidence_without_discoverable_metadata() -> Result<(), String> {
+        let missing_metadata =
+            FAILURE_EVIDENCE_FIXTURE.replace("target/ci-core/failure-evidence/metadata.json", "");
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &missing_metadata)
+        else {
+            return Err("missing failure metadata fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("target/ci-core/failure-evidence/metadata.json") {
+            return Err(format!("unexpected missing-metadata error: {error}"));
+        }
+        Ok(())
+    }
 }
