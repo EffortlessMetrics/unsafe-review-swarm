@@ -253,15 +253,9 @@ mod tests {
             "next_lane": "preview-only pilot setup"
         });
         let markdown = render_markdown(&present_and_absent);
-        let expected =
-            "The missing matrix case remains explicit release work: a real public Action run.";
-        if !markdown.contains(expected) {
-            return Err(format!("missing expected current-case prose: {markdown}"));
-        }
-        for present in ["inherited-only,", "resolved/improved,"] {
-            if markdown.contains(present) {
-                return Err(format!("present matrix case was called missing: {present}"));
-            }
+        let missing = missing_release_work(&markdown)?;
+        if missing != "a real public Action run" {
+            return Err(format!("unexpected current missing-case list: {missing}"));
         }
 
         let all_absent = json!({
@@ -277,17 +271,24 @@ mod tests {
             "next_lane": "unassigned"
         });
         let markdown = render_markdown(&all_absent);
-        for absent in [
-            "quiet",
-            "inherited-only",
-            "new-gap",
-            "resolved/improved",
-            "a real public Action run",
-        ] {
-            if !markdown.contains(absent) {
-                return Err(format!("absent matrix case was omitted: {absent}"));
-            }
+        let missing = missing_release_work(&markdown)?;
+        let expected =
+            "quiet, inherited-only, new-gap, resolved/improved, a real public Action run";
+        if missing != expected {
+            return Err(format!(
+                "unexpected all-absent missing-case list: {missing}"
+            ));
         }
         Ok(())
+    }
+
+    fn missing_release_work(markdown: &str) -> Result<&str, String> {
+        let (_, after_prefix) = markdown
+            .split_once("explicit release work: ")
+            .ok_or_else(|| "missing release-work prefix".to_string())?;
+        after_prefix
+            .split_once(". This report")
+            .map(|(missing, _)| missing)
+            .ok_or_else(|| "missing release-work sentence boundary".to_string())
     }
 }
