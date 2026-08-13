@@ -76,6 +76,11 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "rm -f target/ci-core/core_exit \"$core_exit_path\"",
             "while [ ! -f \"$core_exit_path\" ]",
             "mv \"${core_exit_path}.tmp\" \"$core_exit_path\"",
+            // Diff scoping consumes the runner-provided environment value as a
+            // quoted argument and fails closed to the full test path.
+            "base_ref=\"${GITHUB_BASE_REF:-main}\"",
+            "git diff --name-only \"origin/${base_ref}...HEAD\"",
+            "_changed_rs=\"__diff_unavailable__\"",
             // Only closed-vocabulary step status reaches the bounded artifact.
             "step_id\\telapsed_seconds\\texit_status",
             "$1 ~ /^(fmt|clippy|test|check-pr)$/",
@@ -98,8 +103,6 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "[ ! -L \"$failure_metadata_path\" ]",
             "summary_path=$failure_summary_path",
             "metadata_path=$failure_metadata_path",
-            // Success clears and never creates a failure artifact directory.
-            "rm -rf target/ci-core/failure-evidence",
             "if [ \"${core_exit}\" != \"0\" ]; then",
             // Artifact retention is always attempted but cannot change the job.
             "name: Upload bounded core-gate failure evidence",
@@ -121,6 +124,7 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "tail -n 80 target/ci-core/core.log",
             "cat target/ci-core/core.log",
             "target/ci-core/redacted-excerpt.txt",
+            "origin/${{ github.base_ref",
         ],
     )?;
     check_private_staging_order(path, text)
@@ -254,8 +258,10 @@ mod tests {
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
 CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
 core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
+base_ref="${GITHUB_BASE_REF:-main}"
+git diff --name-only "origin/${base_ref}...HEAD"
+_changed_rs="__diff_unavailable__"
 rm -f target/ci-core/core_exit "$core_exit_path"
-rm -rf target/ci-core/failure-evidence
 mv "${core_exit_path}.tmp" "$core_exit_path"
 while [ ! -f "$core_exit_path" ]; do
   sleep 5
@@ -453,20 +459,6 @@ clippy\t4\t0\tbare-secret-material\n";
     }
 
     #[test]
-    fn rejects_contract_that_can_upload_failure_evidence_on_success() -> Result<(), String> {
-        let stale_artifact =
-            FAILURE_EVIDENCE_FIXTURE.replace("rm -rf target/ci-core/failure-evidence", "");
-        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &stale_artifact)
-        else {
-            return Err("success-path stale artifact fixture unexpectedly passed".to_string());
-        };
-        if !error.contains("rm -rf target/ci-core/failure-evidence") {
-            return Err(format!("unexpected stale-artifact error: {error}"));
-        }
-        Ok(())
-    }
-
-    #[test]
     fn explicit_upload_paths_exclude_prepopulated_extra_and_core_log_symlink() -> Result<(), String>
     {
         let hostile_fixture = format!(
@@ -543,6 +535,35 @@ clippy\t4\t0\tbare-secret-material\n";
         };
         if !error.contains("immediately after cleanup") {
             return Err(format!("unexpected staging-order error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_raw_github_base_ref_template_in_shell() -> Result<(), String> {
+        let injected = format!(
+            "_changed_rs=$(git diff --name-only origin/${{{{ github.base_ref || 'main' }}}}...HEAD)\n{FAILURE_EVIDENCE_FIXTURE}"
+        );
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &injected) else {
+            return Err("raw github.base_ref template unexpectedly passed".to_string());
+        };
+        if !error.contains("origin/${{ github.base_ref") {
+            return Err(format!("unexpected base-ref template error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_diff_scope_that_does_not_force_full_tests_on_failure() -> Result<(), String> {
+        let fail_open = FAILURE_EVIDENCE_FIXTURE.replace(
+            "_changed_rs=\"__diff_unavailable__\"\n",
+            "_changed_rs=\"\"\n",
+        );
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &fail_open) else {
+            return Err("fail-open diff scope fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("_changed_rs=\"__diff_unavailable__\"") {
+            return Err(format!("unexpected diff fail-closed error: {error}"));
         }
         Ok(())
     }

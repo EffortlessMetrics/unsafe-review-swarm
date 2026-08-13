@@ -182,12 +182,10 @@ jobs:
           mkdir -p target/ci-core
           core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
           # A self-hosted workspace may retain untracked target files between
-          # runs. Clear the legacy verdict, this exact run's atomic verdict
-          # files, and the generated failure-evidence directory before launch.
-          # A successful run can therefore never observe stale exit evidence or
-          # upload a stale failure artifact.
+          # runs. Clear the legacy verdict and this exact run's atomic verdict
+          # files before launch. A successful run therefore cannot observe stale
+          # exit evidence; failure staging is created later under RUNNER_TEMP.
           rm -f target/ci-core/core_exit "$core_exit_path" "${core_exit_path}.tmp"
-          rm -rf target/ci-core/failure-evidence
           : > target/ci-core/step-status.tsv
           if [ "${RUNNER_KIND}" = "self-hosted" ]; then
             # Self-hosted primary: do NOT run the gh disk-free (android/dotnet/ghc/
@@ -252,7 +250,15 @@ jobs:
               ;;
           esac
           echo "${cache_hit_state}" > target/ci-core/cache_hit_state || true
-          _changed_rs=$(git diff --name-only origin/${{ github.base_ref || 'main' }}...HEAD 2>/dev/null | grep '\.rs$' || true)
+          base_ref="${GITHUB_BASE_REF:-main}"
+          if changed_paths="$(git diff --name-only "origin/${base_ref}...HEAD")"; then
+            _changed_rs="$(printf '%s\n' "$changed_paths" | grep '\.rs$' || true)"
+          else
+            # Base comparison unavailable: force the full test path instead of
+            # silently treating an unresolved diff as docs-only.
+            echo "diff scope unavailable for origin/${base_ref}...HEAD; forcing cargo test --workspace" >&2
+            _changed_rs="__diff_unavailable__"
+          fi
           if [ -z "$_changed_rs" ]; then
             printf 'without-tests\n' > target/ci-core/core_mode
           else

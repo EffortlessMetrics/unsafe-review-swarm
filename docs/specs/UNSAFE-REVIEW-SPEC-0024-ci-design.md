@@ -251,7 +251,9 @@ Step shape inside the one gate job:
 2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
    --check plus repo/PR facts written to target/ci-core/precontext.md as a
    durable run record, and the core gate launched in the background sharing the
-   workspace target dir (cargo's target-lock serialises overlap safely)
+   workspace target dir (cargo's target-lock serialises overlap safely); diff
+   scoping reads the quoted runner-provided `GITHUB_BASE_REF` with a `main`
+   default, and an unavailable base comparison forces the full test path
 3. final assert: wait for the current run/attempt's background core gate,
    surface its closed-vocabulary step-status summary, and fail the job iff its
    exit code != 0; stale `core_exit` files are removed before launch and cannot
