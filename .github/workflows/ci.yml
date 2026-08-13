@@ -309,6 +309,7 @@ jobs:
       # ub-review.yml workflow, so LLM availability or opinion never blocks the
       # merge.
       - name: Assert core gate verdict
+        id: core-verdict
         if: ${{ always() }}
         env:
           RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
@@ -362,10 +363,21 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           echo "core_exit=${core_exit}"
           if [ "${core_exit}" != "0" ]; then
-            failure_dir="target/ci-core/failure-evidence"
-            failure_summary_path="target/ci-core/failure-evidence/summary.md"
-            failure_metadata_path="target/ci-core/failure-evidence/metadata.json"
-            mkdir -p "$failure_dir"
+            # PR-controlled commands have finished. Discard any predictable
+            # staging tree, then create a private unpredictable directory under
+            # this job's RUNNER_TEMP. The upload step receives only the two exact
+            # regular-file paths below, never this directory, so pre-populated
+            # workspace extras and core.log symlinks cannot enter the artifact.
+            umask 077
+            failure_root="${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}"
+            rm -rf "$failure_root"
+            mkdir -m 700 "$failure_root"
+            failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
+            failure_summary_path="${failure_dir}/summary.md"
+            failure_metadata_path="${failure_dir}/metadata.json"
+            failure_summary_source="$(mktemp "${failure_dir}/.summary-source-XXXXXX")"
+            failure_summary_tmp="$(mktemp "${failure_dir}/.summary-XXXXXX")"
+            failure_metadata_tmp="$(mktemp "${failure_dir}/.metadata-XXXXXX")"
             # Treat even the sidecar as untrusted after PR-controlled commands
             # have run: accept only its closed mode vocabulary, then select a
             # fixed command string rather than copying file content.
@@ -398,9 +410,23 @@ jobs:
               sed 's/^/    /' "$excerpt_path"
               echo
               echo "> Closed-vocabulary diagnostic only. The raw core log is not retained."
-            } > "$failure_summary_path"
-            printf '{"schema_version":"1.0","commit":"%s","command":"%s","exit_code":%s,"failed_step":"%s","result_path":"%s","summary_path":"target/ci-core/failure-evidence/summary.md"}\n' \
-              "${GITHUB_SHA}" "${core_command}" "${core_exit}" "${failed_step}" "${core_exit_path}" > "$failure_metadata_path"
+            } > "$failure_summary_source"
+            # Cap the final uploaded summary itself, including headings and
+            # metadata, rather than bounding only its embedded status table.
+            head -n 80 "$failure_summary_source" | head -c 16384 > "$failure_summary_tmp"
+            printf '{"schema_version":"1.0","commit":"%s","command":"%s","exit_code":%s,"failed_step":"%s","result_path":"%s","summary_path":"%s"}\n' \
+              "${GITHUB_SHA}" "${core_command}" "${core_exit}" "${failed_step}" "${core_exit_path}" "$failure_summary_path" > "$failure_metadata_tmp"
+            rm -f "$failure_summary_source"
+            mv "$failure_summary_tmp" "$failure_summary_path"
+            mv "$failure_metadata_tmp" "$failure_metadata_path"
+            if [ -f "$failure_summary_path" ] && [ ! -L "$failure_summary_path" ] \
+              && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
+              echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
+              echo "metadata_path=$failure_metadata_path" >> "$GITHUB_OUTPUT"
+            else
+              echo "core failure evidence staging rejected non-regular output" >&2
+              rm -rf "$failure_root"
+            fi
           fi
           # Advisory floor-time signal: emit wall-time + run context for
           # ub-review's cost receipt (ub-review#336) to compose. This block is
@@ -435,11 +461,16 @@ jobs:
           ) || true
           test "${core_exit}" = "0"
       - name: Upload bounded core-gate failure evidence
-        if: ${{ always() }}
+        if: >-
+          ${{ always() &&
+              steps.core-verdict.outputs.summary_path != '' &&
+              steps.core-verdict.outputs.metadata_path != '' }}
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
           name: core-gate-failure-evidence
-          path: target/ci-core/failure-evidence/
+          path: |
+            ${{ steps.core-verdict.outputs.summary_path }}
+            ${{ steps.core-verdict.outputs.metadata_path }}
           if-no-files-found: ignore
           retention-days: 7

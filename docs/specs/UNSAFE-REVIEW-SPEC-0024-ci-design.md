@@ -265,12 +265,25 @@ Step shape inside the one gate job:
 The failure-evidence upload does not create a second lane or verdict. The final
 assert remains the only authority: artifact preparation or upload failure must
 not make a failed core gate pass, and artifact upload must not make a passing
-core gate fail. On success the failure-evidence directory is absent, so the
-always-running upload step has no files to retain. The retained status summary
+core gate fail. On success no evidence paths are exposed, so the
+`always()`-guarded upload step is skipped. After a non-zero verdict, staging is removed
+and recreated as a private unpredictable directory under the per-job
+`RUNNER_TEMP`; the upload action receives only the exact `summary.md` and
+`metadata.json` regular-file paths, never a workspace or staging directory.
+Pre-populated workspace extras and `core.log` symlinks are therefore outside the
+artifact selection. The retained status summary
 accepts only the fixed step ids `fmt`, `clippy`, `test`, and `check-pr`, decimal
 timing/exit fields, and the literal `skipped`; it is capped at 80 lines and 16
 KiB. Arbitrary stdout/stderr, bare tokens, PEM blocks, and other `core.log`
 content have no projection into the artifact.
+
+This same-job design cannot fully isolate staging from a deliberately persistent
+hostile process running as the runner user after the core command returns. The
+fresh unpredictable runner-temp directory, owner-only permissions, atomic file
+replacement, regular-file/no-symlink checks, and exact two-file upload selection
+bound that residual risk. Strong isolation would require a separately trusted
+job that downloads and validates a prior artifact, which is outside this
+diagnostic-only lane.
 
 Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
 
@@ -1280,16 +1293,22 @@ jobs:
           # background on the shared workspace target dir.
           ...
       - name: Assert core gate verdict
+        id: core-verdict
         if: ${{ always() }}
         run: |
           # fail iff the background core gate exited non-zero
           ...
       - name: Upload bounded core-gate failure evidence
-        if: ${{ always() }}
+        if: >-
+          ${{ always() &&
+              steps.core-verdict.outputs.summary_path != '' &&
+              steps.core-verdict.outputs.metadata_path != '' }}
         continue-on-error: true
         uses: actions/upload-artifact@v7
         with:
-          path: target/ci-core/failure-evidence/
+          path: |
+            ${{ steps.core-verdict.outputs.summary_path }}
+            ${{ steps.core-verdict.outputs.metadata_path }}
           if-no-files-found: ignore
           retention-days: 7
 ```

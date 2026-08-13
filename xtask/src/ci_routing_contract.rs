@@ -58,17 +58,28 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "case \"$core_mode\" in",
             "head -n 80",
             "head -c 16384",
-            "target/ci-core/failure-evidence/summary.md",
-            "target/ci-core/failure-evidence/metadata.json",
+            // Staging is recreated after the core finishes in a private,
+            // unpredictable runner-temp path. Only two exact regular files are
+            // exposed to upload-artifact via step outputs.
+            "id: core-verdict",
+            "${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}",
+            "rm -rf \"$failure_root\"",
+            "mktemp -d \"${failure_root}/staging-XXXXXX\"",
+            "[ ! -L \"$failure_summary_path\" ]",
+            "[ ! -L \"$failure_metadata_path\" ]",
+            "summary_path=$failure_summary_path",
+            "metadata_path=$failure_metadata_path",
             // Success clears and never creates a failure artifact directory.
             "rm -rf target/ci-core/failure-evidence",
             "if [ \"${core_exit}\" != \"0\" ]; then",
             // Artifact retention is always attempted but cannot change the job.
             "name: Upload bounded core-gate failure evidence",
-            "if: ${{ always() }}",
+            "${{ always() &&",
             "continue-on-error: true",
             "uses: actions/upload-artifact@v7",
-            "path: target/ci-core/failure-evidence/",
+            "path: |",
+            "${{ steps.core-verdict.outputs.summary_path }}",
+            "${{ steps.core-verdict.outputs.metadata_path }}",
             "if-no-files-found: ignore",
             "retention-days: 7",
         ],
@@ -76,6 +87,8 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             // Uploading the runner-local raw log would defeat the bound and the
             // explicit redaction step.
             "path: target/ci-core/core.log",
+            "path: target/ci-core/failure-evidence/",
+            "path: $failure_dir",
             "tail -n 80 target/ci-core/core.log",
             "cat target/ci-core/core.log",
         ],
@@ -224,17 +237,31 @@ case "$core_mode" in
 esac
 head -n 80
 head -c 16384
-target/ci-core/failure-evidence/summary.md
-target/ci-core/failure-evidence/metadata.json
+- name: Assert core gate verdict
+  id: core-verdict
 if [ "${core_exit}" != "0" ]; then
-  mkdir -p target/ci-core/failure-evidence
+  failure_root="${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}"
+  rm -rf "$failure_root"
+  failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
+  failure_summary_path="${failure_dir}/summary.md"
+  failure_metadata_path="${failure_dir}/metadata.json"
+  if [ -f "$failure_summary_path" ] && [ ! -L "$failure_summary_path" ] \
+    && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
+    echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
+    echo "metadata_path=$failure_metadata_path" >> "$GITHUB_OUTPUT"
+  fi
 fi
 - name: Upload bounded core-gate failure evidence
-  if: ${{ always() }}
+  if: >-
+    ${{ always() &&
+        steps.core-verdict.outputs.summary_path != '' &&
+        steps.core-verdict.outputs.metadata_path != '' }}
   continue-on-error: true
   uses: actions/upload-artifact@v7
   with:
-    path: target/ci-core/failure-evidence/
+    path: |
+      ${{ steps.core-verdict.outputs.summary_path }}
+      ${{ steps.core-verdict.outputs.metadata_path }}
     if-no-files-found: ignore
     retention-days: 7
 "#;
@@ -358,12 +385,12 @@ clippy\t4\t0\tbare-secret-material\n";
     #[test]
     fn rejects_failure_evidence_without_discoverable_metadata() -> Result<(), String> {
         let missing_metadata =
-            FAILURE_EVIDENCE_FIXTURE.replace("target/ci-core/failure-evidence/metadata.json", "");
+            FAILURE_EVIDENCE_FIXTURE.replace("${{ steps.core-verdict.outputs.metadata_path }}", "");
         let Err(error) = check_core_failure_evidence_contract("fixture.yml", &missing_metadata)
         else {
             return Err("missing failure metadata fixture unexpectedly passed".to_string());
         };
-        if !error.contains("target/ci-core/failure-evidence/metadata.json") {
+        if !error.contains("${{ steps.core-verdict.outputs.metadata_path }}") {
             return Err(format!("unexpected missing-metadata error: {error}"));
         }
         Ok(())
@@ -392,6 +419,40 @@ clippy\t4\t0\tbare-secret-material\n";
         };
         if !error.contains("rm -rf target/ci-core/failure-evidence") {
             return Err(format!("unexpected stale-artifact error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn explicit_upload_paths_exclude_prepopulated_extra_and_core_log_symlink() -> Result<(), String>
+    {
+        let hostile_fixture = format!(
+            "touch target/ci-core/failure-evidence/extra.bin\n\
+             ln -s ../core.log target/ci-core/failure-evidence/core.log\n\
+             {FAILURE_EVIDENCE_FIXTURE}"
+        );
+        check_core_failure_evidence_contract("fixture.yml", &hostile_fixture)?;
+        let Some((_, upload)) = hostile_fixture.split_once("    path: |\n") else {
+            return Err("fixture missing explicit upload path block".to_string());
+        };
+        let selected: Vec<&str> = upload
+            .lines()
+            .take_while(|line| line.starts_with("      "))
+            .map(str::trim)
+            .collect();
+        let expected = vec![
+            "${{ steps.core-verdict.outputs.summary_path }}",
+            "${{ steps.core-verdict.outputs.metadata_path }}",
+        ];
+        if selected != expected {
+            return Err(format!("unexpected upload selection: {selected:?}"));
+        }
+        for excluded in ["extra.bin", "core.log", "failure-evidence/"] {
+            if selected.iter().any(|path| path.contains(excluded)) {
+                return Err(format!(
+                    "upload selection retained hostile path: {excluded}"
+                ));
+            }
         }
         Ok(())
     }
