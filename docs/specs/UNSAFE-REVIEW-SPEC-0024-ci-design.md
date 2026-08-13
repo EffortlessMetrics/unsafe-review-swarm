@@ -251,10 +251,46 @@ Step shape inside the one gate job:
 2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
    --check plus repo/PR facts written to target/ci-core/precontext.md as a
    durable run record, and the core gate launched in the background sharing the
-   workspace target dir (cargo's target-lock serialises overlap safely)
-3. final assert: wait for the background core gate, surface it in the job
-   summary, and fail the job iff its exit code != 0
+   workspace target dir (cargo's target-lock serialises overlap safely); diff
+   scoping reads the quoted runner-provided `GITHUB_BASE_REF` with a `main`
+   default, and an unavailable base comparison forces the full test path
+3. final assert: wait for the current run/attempt's background core gate,
+   surface its closed-vocabulary step-status summary, and fail the job iff its
+   exit code != 0; stale `core_exit` files are removed before launch and cannot
+   satisfy the run-keyed wait
+4. failure evidence: when the core exit is non-zero, create only a bounded,
+   allowlisted step-status summary plus machine-readable
+   command/commit/exit/path metadata; always attempt a non-fatal upload with
+   seven-day retention and never read or upload the raw core log
 ```
+
+The failure-evidence upload does not create a second lane or verdict. The final
+assert remains the only authority: artifact preparation or upload failure must
+not make a failed core gate pass, and artifact upload must not make a passing
+core gate fail. On success no evidence paths are exposed, so the
+`always()`-guarded upload step is skipped. After a non-zero verdict, staging is removed
+and recreated as a private unpredictable directory under the per-job
+`RUNNER_TEMP`: cleanup is followed immediately by `mkdir -m 700` for the
+private parent and then `mktemp -d` for unpredictable staging. The upload action receives only the exact `summary.md` and
+`metadata.json` regular-file paths, never a workspace or staging directory.
+Pre-populated workspace extras and `core.log` symlinks are therefore outside the
+artifact selection. The intermediate closed-vocabulary step-status excerpt is
+also created atomically inside that private staging directory and verified as a
+regular non-symlink before any read; the workflow never uses the predictable
+workspace `target/ci-core/redacted-excerpt.txt` path, and a failed write or move
+suppresses evidence outputs rather than falling through to a stale read. The retained status summary
+accepts only the fixed step ids `fmt`, `clippy`, `test`, and `check-pr`, decimal
+timing/exit fields, and the literal `skipped`; it is capped at 80 lines and 16
+KiB. Arbitrary stdout/stderr, bare tokens, PEM blocks, and other `core.log`
+content have no projection into the artifact.
+
+This same-job design cannot fully isolate staging from a deliberately persistent
+hostile process running as the runner user after the core command returns. The
+fresh unpredictable runner-temp directory, owner-only permissions, atomic file
+replacement, regular-file/no-symlink checks, and exact two-file upload selection
+bound that residual risk. Strong isolation would require a separately trusted
+job that downloads and validates a prior artifact, which is outside this
+diagnostic-only lane.
 
 Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
 
@@ -1264,10 +1300,24 @@ jobs:
           # background on the shared workspace target dir.
           ...
       - name: Assert core gate verdict
+        id: core-verdict
         if: ${{ always() }}
         run: |
           # fail iff the background core gate exited non-zero
           ...
+      - name: Upload bounded core-gate failure evidence
+        if: >-
+          ${{ always() &&
+              steps.core-verdict.outputs.summary_path != '' &&
+              steps.core-verdict.outputs.metadata_path != '' }}
+        continue-on-error: true
+        uses: actions/upload-artifact@v7
+        with:
+          path: |
+            ${{ steps.core-verdict.outputs.summary_path }}
+            ${{ steps.core-verdict.outputs.metadata_path }}
+          if-no-files-found: ignore
+          retention-days: 7
 ```
 
 The advisory ub-review lane is the separate standalone workflow of section
