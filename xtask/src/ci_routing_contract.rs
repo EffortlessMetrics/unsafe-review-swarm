@@ -81,6 +81,10 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "base_ref=\"${GITHUB_BASE_REF:-main}\"",
             "git diff --name-only \"origin/${base_ref}...HEAD\"",
             "_changed_rs=\"__diff_unavailable__\"",
+            // The shipped Bash arithmetic must produce the numeric elapsed TSV
+            // field consumed by the closed-vocabulary evidence filter.
+            "_now=$(date +%s)",
+            "_elapsed=$((_now - _s))",
             // Only closed-vocabulary step status reaches the bounded artifact.
             "step_id\\telapsed_seconds\\texit_status",
             "$1 ~ /^(fmt|clippy|test|check-pr)$/",
@@ -254,6 +258,10 @@ fn check_ub_review_advisory_contract() -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::check_core_failure_evidence_contract;
+    use std::{
+        io::Write,
+        process::{Command, Stdio},
+    };
 
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
 CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -261,6 +269,8 @@ core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
 base_ref="${GITHUB_BASE_REF:-main}"
 git diff --name-only "origin/${base_ref}...HEAD"
 _changed_rs="__diff_unavailable__"
+_now=$(date +%s)
+_elapsed=$((_now - _s))
 rm -f target/ci-core/core_exit "$core_exit_path"
 mv "${core_exit_path}.tmp" "$core_exit_path"
 while [ ! -f "$core_exit_path" ]; do
@@ -414,6 +424,77 @@ clippy\t4\t0\tbare-secret-material\n";
             return Err(format!(
                 "summary exceeded 16-KiB bound: {} bytes",
                 summary.len()
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shipped_elapsed_expression_emits_numeric_retained_tsv_row() -> Result<(), String> {
+        let workflow_path =
+            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/ci.yml");
+        let workflow = std::fs::read_to_string(&workflow_path)
+            .map_err(|error| format!("failed to read {}: {error}", workflow_path.display()))?;
+        let now_expression = workflow
+            .lines()
+            .map(str::trim)
+            .find(|line| line.starts_with("_now="))
+            .ok_or_else(|| "live workflow missing _now expression".to_string())?;
+        let elapsed_expression = workflow
+            .lines()
+            .map(str::trim)
+            .find(|line| line.starts_with("_elapsed="))
+            .ok_or_else(|| "live workflow missing _elapsed expression".to_string())?;
+        if now_expression != "_now=$(date +%s)" {
+            return Err(format!(
+                "unexpected live current-time expression: {now_expression:?}"
+            ));
+        }
+        if elapsed_expression != "_elapsed=$((_now - _s))" {
+            return Err(format!(
+                "unexpected live elapsed expression: {elapsed_expression:?}"
+            ));
+        }
+
+        let script = format!(
+            "_s=$(date +%s)\n{now_expression}\n{elapsed_expression}\nprintf 'check-pr\\t%s\\t0\\n' \"$_elapsed\"\n"
+        );
+        let mut child = Command::new("bash")
+            .arg("-s")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(|error| format!("failed to start live elapsed expression: {error}"))?;
+        child
+            .stdin
+            .take()
+            .ok_or_else(|| "bash stdin was not available".to_string())?
+            .write_all(script.as_bytes())
+            .map_err(|error| format!("failed to send live elapsed expression: {error}"))?;
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("failed to execute live elapsed expression: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "live elapsed expression failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        let row = String::from_utf8(output.stdout)
+            .map_err(|error| format!("elapsed TSV row was not UTF-8: {error}"))?;
+        let elapsed = row
+            .trim_end()
+            .split('\t')
+            .nth(1)
+            .ok_or_else(|| format!("elapsed TSV row missing elapsed field: {row:?}"))?;
+        if elapsed.is_empty() || !elapsed.bytes().all(|byte| byte.is_ascii_digit()) {
+            return Err(format!("elapsed TSV field is not numeric: {elapsed:?}"));
+        }
+        let summary = bounded_core_status_summary(&row);
+        if !summary.contains(&format!("check-pr\t{elapsed}\t0")) {
+            return Err(format!(
+                "numeric elapsed TSV row was not retained: {summary:?}"
             ));
         }
         Ok(())

@@ -285,7 +285,8 @@ jobs:
               _s=$(date +%s)
               "$@"
               _rc=$?
-              _elapsed=$(($((date +%s) - _s)))
+              _now=$(date +%s)
+              _elapsed=$((_now - _s))
               printf '%s\t%s\t%s\n' "$_id" "$_elapsed" "$_rc" >> target/ci-core/step-status.tsv
               echo "[step-timing] ${_elapsed}s: $*"
               return $_rc
