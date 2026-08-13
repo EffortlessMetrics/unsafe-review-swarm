@@ -20,7 +20,7 @@ This is diagnostic product-usefulness evidence, not calibration or a safety clai
 
 The current bounded UX follow-up is **preview-only pilot setup**, selected from recorded friction counts rather than raw card reduction.
 
-The missing matrix cases remain explicit release work: inherited-only, resolved/improved, and a real public Action run. This report does not convert their absence into a positive claim.
+The missing matrix case remains explicit release work: a real public Action run. This report does not convert their absence into a positive claim.
 
 ## Trust boundary
 

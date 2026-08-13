@@ -170,10 +170,33 @@ fn render_markdown(value: &serde_json::Value) -> String {
     }
     out.push_str("\n## Evidence-led next lane\n\n");
     out.push_str(&format!("The current bounded UX follow-up is **{}**, selected from recorded friction counts rather than raw card reduction.\n\n", value["next_lane"].as_str().unwrap_or("unassigned")));
-    out.push_str("The missing matrix cases remain explicit release work: inherited-only, resolved/improved, and a real public Action run. This report does not convert their absence into a positive claim.\n");
+    let missing = missing_matrix_cases(coverage);
+    if missing.is_empty() {
+        out.push_str("No pilot matrix cases are currently missing. This report does not convert matrix coverage into a product-readiness claim.\n");
+    } else {
+        out.push_str(&format!(
+            "The missing matrix {} {} explicit release work: {}. This report does not convert their absence into a positive claim.\n",
+            if missing.len() == 1 { "case" } else { "cases" },
+            if missing.len() == 1 { "remains" } else { "remain" },
+            missing.join(", ")
+        ));
+    }
     out.push_str("\n## Trust boundary\n\n");
     out.push_str("This is diagnostic external-pilot usefulness evidence only: not calibrated precision or recall, not proof, not UB-free, not Miri-clean, not site-execution evidence, not witness adequacy, not policy readiness, and not a merge verdict.\n");
     out
+}
+
+fn missing_matrix_cases(coverage: &serde_json::Value) -> Vec<&'static str> {
+    [
+        ("quiet", "quiet"),
+        ("inherited_only", "inherited-only"),
+        ("new_gap", "new-gap"),
+        ("resolved_or_improved", "resolved/improved"),
+        ("public_action", "a real public Action run"),
+    ]
+    .into_iter()
+    .filter_map(|(key, label)| (!coverage[key].as_bool().unwrap_or(false)).then_some(label))
+    .collect()
 }
 
 fn required_table<'a>(
@@ -208,4 +231,63 @@ fn required_integer(
         .get(key)
         .and_then(toml::Value::as_integer)
         .ok_or_else(|| format!("{path} is missing integer `{key}`"))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::render_markdown;
+    use serde_json::json;
+
+    #[test]
+    fn markdown_lists_only_missing_matrix_cases() -> Result<(), String> {
+        let present_and_absent = json!({
+            "receipt_count": 10,
+            "project_count": 7,
+            "coverage": {
+                "quiet": true,
+                "inherited_only": true,
+                "new_gap": true,
+                "resolved_or_improved": true,
+                "public_action": false
+            },
+            "next_lane": "preview-only pilot setup"
+        });
+        let markdown = render_markdown(&present_and_absent);
+        let expected =
+            "The missing matrix case remains explicit release work: a real public Action run.";
+        if !markdown.contains(expected) {
+            return Err(format!("missing expected current-case prose: {markdown}"));
+        }
+        for present in ["inherited-only,", "resolved/improved,"] {
+            if markdown.contains(present) {
+                return Err(format!("present matrix case was called missing: {present}"));
+            }
+        }
+
+        let all_absent = json!({
+            "receipt_count": 0,
+            "project_count": 0,
+            "coverage": {
+                "quiet": false,
+                "inherited_only": false,
+                "new_gap": false,
+                "resolved_or_improved": false,
+                "public_action": false
+            },
+            "next_lane": "unassigned"
+        });
+        let markdown = render_markdown(&all_absent);
+        for absent in [
+            "quiet",
+            "inherited-only",
+            "new-gap",
+            "resolved/improved",
+            "a real public Action run",
+        ] {
+            if !markdown.contains(absent) {
+                return Err(format!("absent matrix case was omitted: {absent}"));
+            }
+        }
+        Ok(())
+    }
 }
