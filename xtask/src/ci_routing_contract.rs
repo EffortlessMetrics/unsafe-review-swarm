@@ -65,6 +65,11 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}",
             "rm -rf \"$failure_root\"",
             "mktemp -d \"${failure_root}/staging-XXXXXX\"",
+            "excerpt_path=\"${failure_dir}/step-status.txt\"",
+            "excerpt_tmp=\"$(mktemp \"${failure_dir}/.step-status-XXXXXX\")\"",
+            "if ! {",
+            "elif ! mv \"$excerpt_tmp\" \"$excerpt_path\"; then",
+            "|| [ -L \"$excerpt_path\" ]; then",
             "[ ! -L \"$failure_summary_path\" ]",
             "[ ! -L \"$failure_metadata_path\" ]",
             "summary_path=$failure_summary_path",
@@ -91,6 +96,7 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "path: $failure_dir",
             "tail -n 80 target/ci-core/core.log",
             "cat target/ci-core/core.log",
+            "target/ci-core/redacted-excerpt.txt",
         ],
     )
 }
@@ -243,8 +249,19 @@ if [ "${core_exit}" != "0" ]; then
   failure_root="${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}"
   rm -rf "$failure_root"
   failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
+  excerpt_path="${failure_dir}/step-status.txt"
+  excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
   failure_summary_path="${failure_dir}/summary.md"
   failure_metadata_path="${failure_dir}/metadata.json"
+  if ! {
+    printf 'step_id\telapsed_seconds\texit_status\n'
+  } > "$excerpt_tmp"; then
+    staging_ready="false"
+  elif ! mv "$excerpt_tmp" "$excerpt_path"; then
+    staging_ready="false"
+  elif [ ! -f "$excerpt_path" ] || [ -L "$excerpt_path" ]; then
+    staging_ready="false"
+  fi
   if [ -f "$failure_summary_path" ] && [ ! -L "$failure_summary_path" ] \
     && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
     echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
@@ -453,6 +470,24 @@ clippy\t4\t0\tbare-secret-material\n";
                     "upload selection retained hostile path: {excluded}"
                 ));
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_predictable_workspace_excerpt_symlink_path() -> Result<(), String> {
+        let hostile_fixture = format!(
+            "printf 'raw-secret-core-log' > target/ci-core/core.log\n\
+             ln -s core.log target/ci-core/redacted-excerpt.txt\n\
+             excerpt_path=\"target/ci-core/redacted-excerpt.txt\"\n\
+             {FAILURE_EVIDENCE_FIXTURE}"
+        );
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &hostile_fixture)
+        else {
+            return Err("predictable workspace excerpt fixture unexpectedly passed".to_string());
+        };
+        if !error.contains("target/ci-core/redacted-excerpt.txt") {
+            return Err(format!("unexpected workspace-excerpt error: {error}"));
         }
         Ok(())
     }

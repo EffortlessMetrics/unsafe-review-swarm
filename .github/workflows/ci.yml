@@ -327,40 +327,6 @@ jobs:
             sleep 5
           done
           core_exit="$(cat "$core_exit_path")"
-          # Build the retained diagnostic exclusively from the closed-vocabulary
-          # step-status sidecar. Only known step ids plus bounded decimal timing/
-          # status fields survive; arbitrary command output, bare tokens, PEM
-          # blocks, and other core.log contents have no path into this file.
-          # The final head stages independently enforce the 80-line / 16-KiB cap.
-          excerpt_path="target/ci-core/redacted-excerpt.txt"
-          (
-            {
-              printf 'step_id\telapsed_seconds\texit_status\n'
-              LC_ALL=C awk -F '\t' '
-                NF == 3 &&
-                $1 ~ /^(fmt|clippy|test|check-pr)$/ &&
-                $2 ~ /^[0-9]+$/ && length($2) <= 10 &&
-                (($3 ~ /^[0-9]+$/ && length($3) <= 3) || $3 == "skipped") {
-                  print $1 "\t" $2 "\t" $3
-                }
-              ' target/ci-core/step-status.tsv 2>/dev/null
-            } | head -n 80 \
-              | head -c 16384
-          ) > "$excerpt_path" 2>/dev/null || true
-          if [ ! -s "$excerpt_path" ]; then
-            echo "(no core gate log captured)" > "$excerpt_path"
-          fi
-          {
-            echo "## Deterministic core gate"
-            echo
-            if [ "${core_exit}" = "0" ]; then
-              echo "Result: PASS (xtask check-pr exit 0)"
-            else
-              echo "Result: FAIL (xtask check-pr exit ${core_exit})"
-            fi
-            echo
-            sed 's/^/    /' "$excerpt_path"
-          } >> "$GITHUB_STEP_SUMMARY"
           echo "core_exit=${core_exit}"
           if [ "${core_exit}" != "0" ]; then
             # PR-controlled commands have finished. Discard any predictable
@@ -373,11 +339,42 @@ jobs:
             rm -rf "$failure_root"
             mkdir -m 700 "$failure_root"
             failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
+            excerpt_path="${failure_dir}/step-status.txt"
+            excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
             failure_summary_path="${failure_dir}/summary.md"
             failure_metadata_path="${failure_dir}/metadata.json"
             failure_summary_source="$(mktemp "${failure_dir}/.summary-source-XXXXXX")"
             failure_summary_tmp="$(mktemp "${failure_dir}/.summary-XXXXXX")"
             failure_metadata_tmp="$(mktemp "${failure_dir}/.metadata-XXXXXX")"
+            # Build the retained diagnostic exclusively in private staging from
+            # the closed-vocabulary step-status sidecar. The predictable
+            # workspace excerpt path is never read or written. Only known step
+            # ids plus bounded decimal timing/status fields survive; arbitrary
+            # command output, bare tokens, PEM blocks, and core.log content have
+            # no path into the evidence.
+            staging_ready="true"
+            if ! {
+              printf 'step_id\telapsed_seconds\texit_status\n'
+              LC_ALL=C awk -F '\t' '
+                NF == 3 &&
+                $1 ~ /^(fmt|clippy|test|check-pr)$/ &&
+                $2 ~ /^[0-9]+$/ && length($2) <= 10 &&
+                (($3 ~ /^[0-9]+$/ && length($3) <= 3) || $3 == "skipped") {
+                  print $1 "\t" $2 "\t" $3
+                }
+              ' target/ci-core/step-status.tsv 2>/dev/null
+            } | head -n 80 | head -c 16384 > "$excerpt_tmp"; then
+              staging_ready="false"
+            elif ! mv "$excerpt_tmp" "$excerpt_path"; then
+              staging_ready="false"
+            elif [ ! -f "$excerpt_path" ] || [ -L "$excerpt_path" ]; then
+              staging_ready="false"
+            fi
+            if [ "$staging_ready" != "true" ]; then
+              echo "core failure evidence staging rejected step-status output" >&2
+              rm -rf "$failure_root"
+            fi
+            if [ "$staging_ready" = "true" ]; then
             # Treat even the sidecar as untrusted after PR-controlled commands
             # have run: accept only its closed mode vocabulary, then select a
             # fixed command string rather than copying file content.
@@ -427,6 +424,22 @@ jobs:
               echo "core failure evidence staging rejected non-regular output" >&2
               rm -rf "$failure_root"
             fi
+            fi
+            {
+              echo "## Deterministic core gate"
+              echo
+              echo "Result: FAIL (xtask check-pr exit ${core_exit})"
+              if [ "$staging_ready" = "true" ]; then
+                echo
+                sed 's/^/    /' "$excerpt_path"
+              fi
+            } >> "$GITHUB_STEP_SUMMARY"
+          else
+            {
+              echo "## Deterministic core gate"
+              echo
+              echo "Result: PASS (xtask check-pr exit 0)"
+            } >> "$GITHUB_STEP_SUMMARY"
           fi
           # Advisory floor-time signal: emit wall-time + run context for
           # ub-review's cost receipt (ub-review#336) to compose. This block is

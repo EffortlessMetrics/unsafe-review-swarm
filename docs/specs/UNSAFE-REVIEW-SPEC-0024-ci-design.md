@@ -271,7 +271,11 @@ and recreated as a private unpredictable directory under the per-job
 `RUNNER_TEMP`; the upload action receives only the exact `summary.md` and
 `metadata.json` regular-file paths, never a workspace or staging directory.
 Pre-populated workspace extras and `core.log` symlinks are therefore outside the
-artifact selection. The retained status summary
+artifact selection. The intermediate closed-vocabulary step-status excerpt is
+also created atomically inside that private staging directory and verified as a
+regular non-symlink before any read; the workflow never uses the predictable
+workspace `target/ci-core/redacted-excerpt.txt` path, and a failed write or move
+suppresses evidence outputs rather than falling through to a stale read. The retained status summary
 accepts only the fixed step ids `fmt`, `clippy`, `test`, and `check-pr`, decimal
 timing/exit fields, and the literal `skipped`; it is capped at 80 lines and 16
 KiB. Arbitrary stdout/stderr, bare tokens, PEM blocks, and other `core.log`
