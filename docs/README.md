@@ -28,6 +28,7 @@
 | Spec style | durable source-of-truth ownership boundaries and artifact role split | `docs/spec-style.md` |
 | Spec rails guide | contributor workflow for source-of-truth rails and tool-state boundaries | `docs/contributing/spec-rails.md` |
 | Agent orchestration | portable multi-agent build doctrine: spine, model tiers, two orchestration modes, issue routing, hygiene, and adopt-in-your-lane template | `docs/contributing/AGENT-ORCHESTRATION.md` |
+| Repository lifecycle surface map | authority, consumers, overlaps, and migration dispositions for lifecycle docs, runtime role adapters, and proof commands | `docs/contributing/LIFECYCLE_SURFACE_MAP.md` |
 | Implementation plans | PR-sized sequence and proof commands | `plans/` |
 | Active lane | current dogfood-calibrated evidence loop | `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` |
 | Dogfood index | selected real-crate dogfood targets, usefulness notes, and recorded outcome movement | `docs/dogfood/index.md`, `docs/dogfood/index.json`, `docs/dogfood/usefulness-notes.md` |
