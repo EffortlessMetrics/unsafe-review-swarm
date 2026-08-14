@@ -49,7 +49,7 @@ The disposition vocabulary in this map is:
 | Transition | Trigger | Durable artifact owned | Actual authority | Primary consumers | Existing execution surfaces | Disposition |
 |---|---|---|---|---|---|---|
 | Prepare and research an issue | A user-selected issue/PR, or a bounded candidate selected from current GitHub state | Evidence-backed issue context; no repository-wide active-task record | GitHub issue/PR plus the source-of-truth precedence in `AGENTS.md` | Maintainer, planner, builder | `repo-preflight`, `issue-factcheck`, `source-divergence`, read-only Git/GitHub inspection | `RENAME_OR_ALIAS` the runtime roles as `preflight` and `issue-factcheck`; preserve manual inspection |
-| Compile the accepted work contract | The premise is current and the proposed seam is review-forward | Issue-linked work spec, linked spec/ADR/plan where needed, acceptance IDs, proof commands, non-goals, risk, rollback, claim boundary | `.allow` graph and linked repository artifacts; GitHub issue supplies live disposition | Builder, reviewer, PR author | `xtask check-work-specs`, `plan-refuter`, spec/doc gates | `REUSE` the work-spec contract and checker; `RENAME_OR_ALIAS` the refuter as a runtime-neutral plan review |
+| Compile the accepted work contract | The premise is current and the proposed seam is review-forward | Issue-linked work spec, linked spec/ADR/plan where needed, acceptance IDs, proof commands, non-goals, risk, rollback, claim boundary | SPEC-0044 defines the contract, `docs/schemas/issue-work-spec.schema.json` defines its version-one shape, and the issue plus live GitHub disposition supplies current context; `.allow` registers graph visibility but is not a scheduler | Builder, reviewer, PR author | `xtask check-work-specs`, `plan-refuter`, spec/doc gates | `REUSE` the work-spec contract and checker; `RENAME_OR_ALIAS` the refuter as a runtime-neutral plan review |
 | Admit or resume one writer | The contract is verified, prerequisites are satisfied, and no live writer owns the branch | Branch/worktree identity and a bounded handoff; no durable scheduler record | Live branch/worktree/PR state and controller decision within the accepted contract | Writer and coordinator | Git/worktree inspection, runtime implementer adapter | `RENAME_OR_ALIAS` the implementer adapter; do not encode session ownership in `.allow` |
 | Build and prove | A writer receives an accepted contract | Scoped commit, tests, generated artifacts or receipts required by the contract | Code/spec/policy plus deterministic proof commands | Reviewer, CI, maintainers | Targeted tests, `check-local`, artifact validators, `check-pr` | `REUSE`; `check-local` stays partial and `check-pr` stays the comprehensive local gate |
 | Review the exact head | A scoped commit or PR head exists | Review findings tied to exact base/head and artifacts | Actual diff, controlling contract, tests, hosted checks, and repository policy | Writer, maintainer, merge controller | Claim scan, artifact verification, focused review, GitHub checks | `RENAME_OR_ALIAS` runtime reviewer roles; no agent verdict becomes authority |
@@ -73,6 +73,30 @@ and zero admitted writers is valid.
 | `docs/README.md` | Documentation discovery | Contributors and doc gates | Navigation only; it must not become lifecycle authority | `REUSE` as the index linking this map and the detailed orchestration guide |
 | `.github/PULL_REQUEST_TEMPLATE.md` | PR creation; owns the review-forward reporting shape | PR authors and reviewers | Some command/checklist guidance repeats root docs, intentionally close to delivery | `REUSE`: the template remains the delivery checklist and claim-boundary prompt; it does not decide readiness by itself |
 | `docs/handoffs/` and closeout artifacts | A completed, blocked, or transferred lane needs durable evidence | Maintainers and future agents | Historical records can look like current routing if read without live GitHub checks | `REUSE`: retain as evidence/history; always reconcile with current refs, issues, and PRs before action |
+
+### Source routing and history surfaces
+
+These three runbooks are directional. Their different merge models are part of
+their contracts, not interchangeable Git preferences.
+
+| Surface | Trigger | Owner and actual authority | Consumers | Direction and merge model | Relationship to `source-divergence` | Disposition and manual rollback |
+|---|---|---|---|---|---|---|
+| `docs/contributing/SWARM_TO_MAIN.md` | Any routine cross-repository work selection, source PR disposition, or promotion eligibility decision | Repository maintainers; owns the default routing and disposition policy under the `AGENTS.md` repository-role contract | Swarm contributors, source maintainers, PR reviewers | Routine development starts in swarm and curated work moves swarm to source through narrow source PRs; exceptional history repair delegates to `SOURCE_HISTORY_CATCHUP.md`, while the reverse release mirror delegates to `SWARM_MIRROR.md` | Requires the advisory report before routine work and interprets `new_source_commits`; it does not generate or replace the report | `REUSE`. Manual rollback: stop before cross-repo mutation, leave an evidence-backed handoff, and abandon or revert only the lane-owned unmerged branch; never rewrite either `main` |
+| `docs/contributing/SOURCE_HISTORY_CATCHUP.md` | Source is materially behind swarm, is missing product-relevant reviewed state, or must regain swarm ancestry before release | Source maintainers and explicit release/source authority; owns the exceptional history-repair procedure | Source PR author, reviewer, release maintainer | Swarm to source via a real `--no-ff` merge commit, never squash or rebase; routine narrow promotion must not use this runbook | Divergence is preflight evidence only. The runbook additionally requires ancestry, parent, conflict, source-suite, artifact, and remaining-tree-diff proof | `REUSE`. Manual rollback: abort an in-progress merge or close the unmerged catch-up PR and leave source `main` unchanged; after merge, use an explicit corrective PR rather than history rewrite |
+| `docs/contributing/SWARM_MIRROR.md` | A source-owned release is already published and source is ahead of the workbench | Swarm maintainers; owns release-metadata absorption and the `policy/source-sync.toml` checkpoint update, not publication | Swarm sync author, reviewers, later routine developers | Source to swarm via a normal squash PR; it deliberately does not import source ancestry | Uses `source-divergence` / `check-source-sync` as the before/after checkpoint test and expects `new_source_commits=0` after absorption | `REUSE`. Manual rollback: stop or close the unmerged mirror branch; if an incorrect mirror merged, repair metadata/checkpoint through a new reviewed swarm PR rather than resetting history |
+
+None of these runbooks authorizes release publication. Their manual paths use
+ordinary Git and GitHub operations and remain available when a runtime adapter
+or helper is absent.
+
+### Compile-contract surfaces
+
+| Surface | Trigger and owned artifact | Authority and consumers | Overlap or known drift | Disposition |
+|---|---|---|---|---|
+| `docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md` | Creating or changing an issue-linked work contract; owns the contract semantics and authority boundary | `repo-infra` owner; controller, builder, reviewer, verifier, and closeout consumers | Status is `proposed`; its version-one contract is made concrete by the schema and checker. Generic `.allow` registration alone is insufficient because cargo-allow has no first-class `work_spec` kind | `REUSE`; change semantics through the spec and linked governance review, not through an adapter |
+| `docs/schemas/issue-work-spec.schema.json` | Authoring or validating a version-one work spec; owns the machine-readable field shape | SPEC-0044 is the design authority; authoring tools and validators consume the schema | JSON Schema shape and the Rust checker must remain aligned; neither executes proof or consults GitHub | `REUSE` |
+| `plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml` | A contributor needs the canonical minimal version-one example | SPEC-0044 and the schema govern it; planners, adapters, fixtures, and reviewers consume it | Registered as a draft `plan_item` only for cargo-allow compatibility; it is not a default goal or scheduler | `REUSE` as the canonical example; update it with schema/spec changes and keep `check-work-specs` green |
+| `xtask/src/work_specs.rs` / `xtask check-work-specs` | A work-spec/schema/example change enters local or CI proof | Owns offline structural enforcement of the version-one contract; contributors and CI consume its verdict | Mirrors the schema in executable checks, including rejection of scheduling fields; validates structure rather than live issue truth | `REUSE`; schema/checker drift must fail focused tests or the gate |
 
 ### Runtime role adapters
 
@@ -104,7 +128,7 @@ claim boundaries above.
 |---|---|---|---|---|---|
 | `cargo run --locked -p xtask -- source-divergence` | Preflight and post-merge source/swarm reconciliation | Advisory divergence report | Coordinator and source-promotion maintainer | Networked/read-only and not merge proof | `REUSE` |
 | `cargo-allow doctor/check/worklist --profile spec-system` | Durable graph inspection | Structural configuration/audit/worklist output | Planner and coordinator | Availability is environment-specific; worklist is not priority or scheduling | `REUSE` when installed; absence must be reported, not replaced with invented schema |
-| `cargo run --locked -p xtask -- check-work-specs` | Contract compilation or change | Offline validation of issue URL, scope, invariants, acceptance/proof, integration, risk, rollback, and no scheduling fields | Planner, writer, CI | Validates shape, not factual correctness or live issue state | `REUSE` |
+| `cargo run --locked -p xtask -- check-work-specs` | Contract compilation or change | Offline validation of the SPEC-0044/schema contract: issue URL, scope, invariants, acceptance/proof, integration, risk, rollback, and no scheduling fields | Planner, writer, CI | Validates shape, not factual correctness or live issue state; cargo-allow registration supplies graph visibility only | `REUSE` |
 | `cargo run --locked -p xtask -- check-spec-status` | Spec or command-reference change | Spec-status consistency result | Contributors and CI | Does not establish implementation correctness | `REUSE` |
 | `cargo run --locked -p xtask -- check-docs` | Documentation change | Required-doc and wording result | Contributors and CI | Does not validate every external link or runtime claim | `REUSE` |
 | `cargo run --locked -p xtask -- check-doc-artifacts` | Governed doc-artifact change | Doc-artifact ledger consistency result | Contributors and CI | Checks registered surfaces, not live GitHub state | `REUSE` |
@@ -158,9 +182,11 @@ The intended steady state has five layers:
    transition and which overlaps should be thinned.
 3. **Detailed doctrine:** `AGENT-ORCHESTRATION.md` explains orchestration,
    verification, and economics, with runtime-specific examples labeled as such.
-4. **Accepted work packet:** the selected GitHub issue plus `.allow`-linked
-   work spec/spec/plan carries objective, scope, acceptance, proof, non-goals,
-   risk, rollback, and claim boundary for one lane.
+4. **Accepted work packet:** the selected GitHub issue plus a SPEC-0044/schema
+   conforming work spec and its `.allow`-linked spec/plan carries objective,
+   scope, acceptance, proof, non-goals, risk, rollback, and claim boundary for
+   one lane. `UNSAFE-REVIEW-WORK-1900.toml` is the canonical version-one
+   example; `.allow` registration is graph visibility, not contract semantics.
 5. **Runtime adapter:** `CLAUDE.md`, `.claude/agents/*`, a Codex adapter, or a
    manual checklist translates the protocol into available runtime operations.
 
