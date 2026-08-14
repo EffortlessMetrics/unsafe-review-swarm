@@ -3,11 +3,11 @@ schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
 candidate = "TBD_FROM_LIVE_STATE"
 status = "draft"
-swarm_base = "8c2688e1d2c800dfcd60e89f61d3b347b2cf7ebd"
+swarm_base = "aae31001431a69f4a4fc318423d1566257eebde1"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 candidate_commit = "unset"
 candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
-audited_at = "2026-08-10"
+audited_at = "2026-08-14"
 owner = "repo-infra"
 semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
 dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
@@ -188,6 +188,18 @@ reason = "The diagnostic-to-explanation-to-packet-to-receipt loop must be proven
 proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-review-cli lsp --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
+id = "PR-2095"
+disposition = "required"
+integration = "open_pr"
+integration_evidence = [
+  "draft PR #2095 at a2cf91e45a3e3f974d993efebbd02cbf0142b1f6 is blocked by the required Linux Rust result",
+  "the retained CI evidence reports only test=101; failing-test identities remain unproven",
+  "issue #2100 stopped before implementation because stable libtest output is spoofable; a structured runner or explicitly untrusted hint requires a separate owner decision",
+]
+reason = "Shell-safe first-pr handoff roots are part of the required action-first front door, but the open patch cannot be integrated or treated as qualified while its Linux failure is not diagnosable under the current bounded artifact contract."
+proof = ["cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
 id = "ISSUE-1911"
 disposition = "deferred"
 integration = "on_swarm_main"
@@ -233,10 +245,33 @@ id = "PR-1620"
 disposition = "deferred"
 integration = "open_pr"
 integration_evidence = [
-  "PR #1620 is an open draft with a conflicted merge state",
-  "blocked on the self-unsafe governance decision in #1805",
+  "PR #1620 remains an open draft at 59b2ca6176e5b04b3045c3d5edc4c26ade5e52b0 with a conflicted merge state and failing required Rust result",
+  "the self-unsafe product posture remains owner-gated",
 ]
-reason = "RSS telemetry is not a release blocker for the current candidate and remains a separate advisory lane. It also proposes relaxing the workspace unsafe_code lint from forbid to deny, which is a product-stance change requiring the #1805 decision first."
+reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this draft cutline does not make."
+proof = []
+
+[[item]]
+id = "ISSUE-1881"
+disposition = "deferred"
+integration = "partial_on_swarm_main"
+integration_evidence = [
+  "aae31001 docs(dogfood): record mio movement pilot evidence (#2101) brings the external-pilot set to ten exact development-binary receipts",
+  "the rollup records quiet, inherited-only, new-gap, and resolved/improved cases",
+  "public_action=false; the required real public Action pilot remains absent",
+]
+reason = "The current receipts are bounded development-binary usefulness evidence only. Exercising a public Action remains owner-gated publication work and cannot be inferred from the merged pilot rollup."
+proof = ["cargo run --locked -p xtask -- check-external-pilots", "cargo run --locked -p xtask -- check-corpus-partitions"]
+
+[[item]]
+id = "ISSUE-1883"
+disposition = "deferred"
+integration = "partial_on_swarm_main"
+integration_evidence = [
+  "deterministic hostile-input and fail-closed slices are integrated through merged PR #2061",
+  "unreadable-file coverage and the broader process-control/resource matrix remain open",
+]
+reason = "The remaining platform-sensitive robustness rows require an owner decision on a reliable test strategy; this refresh neither invents that strategy nor converts the completed slices into a broad robustness claim."
 proof = []
 
 [[item]]

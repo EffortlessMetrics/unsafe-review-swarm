@@ -6,14 +6,14 @@ publication, or `v1` decision. Its machine-readable source is
 
 ## Live snapshot
 
-Audited 2026-08-10.
+Audited 2026-08-14.
 
-- Swarm base: `8c2688e1d2c800dfcd60e89f61d3b347b2cf7ebd`
-  (`docs(dogfood): record tokmd consumer five-preset receipt for #1857 (#2083)`)
+- Swarm base: `aae31001431a69f4a4fc318423d1566257eebde1`
+  (`docs(dogfood): record mio movement pilot evidence (#2101)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
 - Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=264`; the swarm
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=276`; the swarm
   contains expected unpromoted workbench commits.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
@@ -50,6 +50,7 @@ Deferred work can still be integrated, and required work can still be absent.
 | Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 dispositioned and closed; the 13-card result was re-confirmed on `79e83eef` after the `ra_ap_syntax` 0.0.344 bump |
 | Tokmd packet acceptance (#1857) | on swarm main — #2016 plus the fresh current-main five-preset consumer receipt (#2083, tokmd 1.15.0 from crates.io) |
 | Thin editor/agent loop proof (#1887) | on swarm main — scripted parity, freshness, quietness, partial/failure, coalescing, and live protocol rails; installed qualification and usability study remain open |
+| Shell-safe first-pr roots (PR #2095) | open draft — required Linux Rust result is failing; retained evidence reports only `test=101`, so failing-test identity is not proven; #2100 stopped before implementation because stable libtest output is spoofable and the alternative substrate is owner-gated |
 
 Integration on swarm main is not a qualification result. Each item still needs
 its own implementation proof and hosted CI before freeze.
@@ -62,7 +63,9 @@ its own implementation proof and hosted CI before freeze.
 | Grouping work (#1894, #1895) | on swarm main |
 | Pull diagnostics and progress (#1912) | not on swarm main |
 | Prebuilt binaries (#1886) | not on swarm main |
-| RSS telemetry (PR #1620) | open draft PR, conflicted |
+| RSS telemetry (PR #1620) | parked open draft at `59b2ca61`, conflicted with a failing required Rust result; the self-unsafe product posture remains owner-gated |
+| External-pilot usefulness (#1881) | partial on swarm main — ten exact development-binary receipts cover quiet, inherited-only, new-gap, and resolved/improved cases, but the rollup records `public_action=false`; no public Action or released-binary claim |
+| Hostile-input and fail-closed matrix (#1883) | partial on swarm main — deterministic slices through #2061 are integrated; unreadable-file coverage and the broader process-control/resource matrix await an owner-approved test strategy |
 
 Typed repair candidates and grouping work were deferred as not required to
 establish the candidate contract, and both have since landed additively on
@@ -70,9 +73,16 @@ swarm main. They therefore form part of the candidate surface that qualification
 must cover, even though they do not gate the cutline. Deferral records only that
 an item does not gate the cutline — never that it is absent from the candidate.
 
-PR #1620 additionally proposes relaxing the workspace `unsafe_code` lint from
-`forbid` to `deny`. That is a product-stance change and needs the self-unsafe
-governance decision in #1805 before it can be dispositioned.
+PR #1620 remains parked because its self-unsafe posture is an owner-gated
+product decision. #1883's platform-sensitive remainder likewise needs an owner
+decision on a reliable test strategy. Neither is promoted to release work by
+this refresh.
+
+The ten #1881 receipts are development-binary usefulness evidence. They do not
+satisfy the issue's public-Action criterion: the rollup remains
+`public_action=false`. Public Action execution and released-binary evidence are
+not inferred, and aggregate movement remains a judgment input rather than an
+accuracy or improvement claim.
 
 Publication and source promotion (#1879) remain outside this draft and require
 an explicit owner decision after qualification.
