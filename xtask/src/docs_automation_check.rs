@@ -209,9 +209,9 @@ fn repo_path_is_under_scope_root(path: &str, root: &str) -> bool {
 fn normalize_repo_scope_path(value: &str) -> String {
     value
         .trim()
+        .replace('\\', "/")
         .trim_start_matches("./")
         .trim_end_matches('/')
-        .replace('\\', "/")
         .to_ascii_lowercase()
 }
 
@@ -315,6 +315,14 @@ mod tests {
         assert!(repo_path_is_under_scope_root(
             ".jules\\goals\\README.md",
             ".jules"
+        ));
+        assert!(repo_path_is_under_scope_root(
+            ".\\.codex\\AGENTS.md",
+            ".codex"
+        ));
+        assert!(repo_path_is_under_scope_root(
+            ".codex/agent-state.md",
+            ".codex\\"
         ));
         assert!(!repo_path_is_under_scope_root(
             "docs/contributing/spec-rails.md",
