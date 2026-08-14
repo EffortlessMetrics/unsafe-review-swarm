@@ -38,6 +38,7 @@ lives in [`REAL_WORLD_FINDINGS.md`](REAL_WORLD_FINDINGS.md).
 
 Snapshot reports:
 
+- [2026-08-14 holdout rotation closeout](reports/2026-08-14-holdout-rotation-closeout.md)
 - [2026-08-10 tokmd consumer five-preset receipt](reports/2026-08-10-tokmd-consumer-five-preset-receipt.md)
 - [2026-08-10 typed repair candidate agent evaluation](reports/2026-08-10-repair-candidate-agent-evaluation.md)
 - [2026-08-10 cargo-allow #541 reproduction (#1890)](reports/2026-08-10-cargo-allow-541-reproduction.md)
