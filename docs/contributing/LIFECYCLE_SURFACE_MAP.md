@@ -139,7 +139,7 @@ claim boundaries above.
 | `cargo fmt --all --check`, workspace Clippy, and workspace tests | Build and hosted core gate | Formatting, lint, and test results | Writer and CI | Each is one rung, not a merge verdict alone | `REUSE` |
 | Hosted required checks and exact-head review | PR convergence | GitHub check/review state tied to the PR head | Merge controller | Local green cannot substitute; skipped advisory lanes are not passes | `REUSE` |
 | `cargo run --locked -p xtask -- cleanup-audit` | Reconciliation and cleanup | Advisory disk/worktree report | Coordinator | Reports only; does not know complete provenance and never deletes | `REUSE` |
-| `cargo run --locked -p xtask -- check-goals` and editable `.rails` routing | Parity window only | Legacy compatibility result | Migration maintainers | `.rails` is not current scheduling or durable authority | `DEPRECATE`; remove only after the `.allow` replacement and parity retirement are proven by the governing migration issue |
+| `cargo run --locked -p xtask -- check-goals` and read-only `.rails` parity archive | Parity window only | Legacy compatibility result | Migration maintainers | `.rails` is not current scheduling or durable authority; do not route new work there | `DEPRECATE`; remove only after the `.allow` replacement and parity retirement are proven by the governing migration issue |
 
 Raw Git, GitHub, Cargo, and shell commands remain valid manual paths. Runtime
 wrappers may standardize invocation, but wrappers do not change which artifact
