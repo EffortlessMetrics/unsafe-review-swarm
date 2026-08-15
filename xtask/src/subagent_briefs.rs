@@ -28,6 +28,8 @@ const INVALID_FIXTURES: &[&str] = &[
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
     "invalid-github-character.toml",
+    "invalid-github-dot-repo.toml",
+    "invalid-github-dotdot-repo.toml",
     "invalid-github-leading-zero.toml",
     "invalid-github-signed-number.toml",
     "invalid-github-whitespace.toml",
@@ -42,6 +44,10 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-mutation-proof.toml",
     "read-only-mutation-stop-when.toml",
     "read-only-camelcase-tool.toml",
+    "read-only-copied-objective.toml",
+    "read-only-copies-objective.toml",
+    "read-only-copy-objective.toml",
+    "read-only-copying-objective.toml",
     "read-only-generate-objective.toml",
     "read-only-overwrite-objective.toml",
     "read-only-synonym-objective.toml",
@@ -165,6 +171,8 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("invalid-external-authority.toml") => Ok("must name a non-empty HTTPS resource"),
         Some("invalid-github-character.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-dot-repo.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-dotdot-repo.toml") => Ok("must be a GitHub pull URL"),
         Some("invalid-github-leading-zero.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-signed-number.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-whitespace.toml") => Ok("must be a GitHub issues URL"),
@@ -178,6 +186,10 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-mutation-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("read-only-mutation-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
         Some("read-only-camelcase-tool.toml") => Ok("requests mutation in objective"),
+        Some("read-only-copy-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-copied-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-copies-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-copying-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-generate-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
@@ -649,6 +661,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "commits",
         "committed",
         "committing",
+        "copy",
+        "copied",
+        "copies",
+        "copying",
         "create",
         "created",
         "creates",
@@ -865,6 +881,8 @@ fn valid_github_owner(value: &str) -> bool {
 fn valid_github_repo(value: &str) -> bool {
     !value.is_empty()
         && value.len() <= 100
+        && value != "."
+        && value != ".."
         && value.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
         })
@@ -988,6 +1006,23 @@ mod tests {
     }
 
     #[test]
+    fn rejects_github_repository_dot_segments() -> Result<(), String> {
+        for (repository, route) in [(".", "issues"), ("..", "pull")] {
+            if validate_url(
+                &format!("https://github.com/EffortlessMetrics/{repository}/{route}/1"),
+                "test.toml",
+                "authority",
+                route,
+            )
+            .is_ok()
+            {
+                return Err(format!("URI dot segment `{repository}` passed"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn rejects_read_only_mutation_text() -> Result<(), String> {
         rejects(
             &valid().replace("Answer one bounded question.", "Edit one bounded file."),
@@ -1073,6 +1108,20 @@ mod tests {
                 &valid().replace(
                     "Answer one bounded question.",
                     &format!("{term} one bounded artifact."),
+                ),
+                "requests mutation in objective",
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_copy_operation_forms() -> Result<(), String> {
+        for term in ["copy", "copied", "copies", "copying"] {
+            rejects(
+                &valid().replace(
+                    "Answer one bounded question.",
+                    &format!("{term} AGENTS.md to docs/backup.md."),
                 ),
                 "requests mutation in objective",
             )?;

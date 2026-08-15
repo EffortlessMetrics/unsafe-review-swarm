@@ -73,6 +73,7 @@ Spec and ADR identifiers resolve to exactly one canonical tracked document.
 GitHub issue and PR identities use closed owner, repository, route, and
 canonical positive-decimal number grammars: the first digit is `1` through `9`
 and remaining characters are ASCII digits, with no sign or leading zero.
+Repository segments cannot be the URI dot segments `.` or `..`.
 
 Only `build` carries writer admission, an admitted worktree, and a non-empty
 write-scope edit cage. `investigate`, `challenge_plan`, `verify`, `review`,
