@@ -48,8 +48,10 @@ copy or replace that contract. Every brief names a full base SHA, one action,
 read and write scopes, durable authorities, proof obligations, non-goals, stop
 conditions, and the expected `bounded-subagent-result-v1` return identifier.
 The closed `capability` field is `write` only for `build` and `read_only` for
-every other action. For read-only briefs, the checker also rejects mutation
-verbs in `objective`, `proof_obligations`, and `stop_when`; prose in any
+every other action. For read-only briefs, the checker also rejects a closed,
+normalized vocabulary of mutation operations in `objective`,
+`proof_obligations`, and `stop_when`. Normalization splits punctuation,
+underscore, and CamelCase boundaries before matching, so prose in any
 directive-bearing field cannot expand the declared capability.
 
 Every `write_scope` entry is a canonical slash-separated repository-relative
@@ -60,7 +62,8 @@ components, and wildcard patterns are rejected. Authorities use one typed
 form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
 `issue:https://github.com/OWNER/REPO/issues/N`,
 `pr:https://github.com/OWNER/REPO/pull/N`, or
-`external:https://...`. An external authority requires at least one
+`external:https://...`. Path-bearing authority payloads use lowercase canonical
+spelling so JSON Schema uniqueness and the checker agree for case variants. An external authority requires at least one
 non-whitespace resource character after `https://`. Leading/trailing
 whitespace, unknown types, duplicate
 normalized references, and global/runtime authority are rejected.

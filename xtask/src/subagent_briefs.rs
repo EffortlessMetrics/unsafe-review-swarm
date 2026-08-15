@@ -23,6 +23,7 @@ const ACTIONS: &[&str] = &[
 ];
 const INVALID_FIXTURES: &[&str] = &[
     "broad-write-scope.toml",
+    "case-variant-authority.toml",
     "contradictory-authority.toml",
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
@@ -33,6 +34,8 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-mutation-objective.toml",
     "read-only-mutation-proof.toml",
     "read-only-mutation-stop-when.toml",
+    "read-only-camelcase-tool.toml",
+    "read-only-generate-objective.toml",
     "read-only-overwrite-objective.toml",
     "read-only-synonym-objective.toml",
     "read-only-underscored-tool.toml",
@@ -157,11 +160,14 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
+        Some("case-variant-authority.toml") => Ok("lowercase normalized path"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
         Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-mutation-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("read-only-mutation-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
+        Some("read-only-camelcase-tool.toml") => Ok("requests mutation in objective"),
+        Some("read-only-generate-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-underscored-tool.toml") => Ok("requests mutation in objective"),
@@ -494,6 +500,11 @@ fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
         }
         "policy" | "work_spec" | "artifact" => {
             repository_relative_path(value, path, "authority")?;
+            if value != value.to_ascii_lowercase() {
+                return Err(format!(
+                    "{path} authority `{authority}` must use a lowercase normalized path"
+                ));
+            }
         }
         "issue" | "pr" => {
             validate_url(
@@ -554,7 +565,9 @@ fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), St
 }
 
 fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), String> {
-    const MUTATION_WORDS: &[&str] = &[
+    // Closed vocabulary: directive prose may use arbitrary nouns, but only these
+    // normalized operation forms can appoint repository mutation.
+    const MUTATION_OPERATION_FORMS: &[&str] = &[
         "add",
         "added",
         "adding",
@@ -591,6 +604,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "fixed",
         "fixes",
         "fixing",
+        "generate",
+        "generated",
+        "generates",
+        "generating",
         "implement",
         "implemented",
         "implementing",
@@ -700,10 +717,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "writing",
         "wrote",
     ];
-    if let Some(word) = value
-        .split(|character: char| !character.is_ascii_alphanumeric())
-        .map(str::to_ascii_lowercase)
-        .find(|word| MUTATION_WORDS.contains(&word.as_str()))
+    let words = normalized_operation_words(value);
+    if let Some(word) = words
+        .iter()
+        .find(|word| MUTATION_OPERATION_FORMS.contains(&word.as_str()))
     {
         Err(format!(
             "{path} read-only action requests mutation in {field} via `{word}`"
@@ -711,6 +728,25 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
     } else {
         Ok(())
     }
+}
+
+fn normalized_operation_words(value: &str) -> Vec<String> {
+    let mut normalized = String::with_capacity(value.len());
+    let mut previous_is_lower_or_digit = false;
+    for character in value.chars() {
+        if character.is_ascii_uppercase() && previous_is_lower_or_digit {
+            normalized.push(' ');
+        }
+        if character.is_ascii_alphanumeric() {
+            normalized.push(character.to_ascii_lowercase());
+            previous_is_lower_or_digit =
+                character.is_ascii_lowercase() || character.is_ascii_digit();
+        } else {
+            normalized.push(' ');
+            previous_is_lower_or_digit = false;
+        }
+    }
+    normalized.split_whitespace().map(str::to_string).collect()
 }
 
 fn sha(value: &str, path: &str, field: &str) -> Result<(), String> {
@@ -841,6 +877,42 @@ mod tests {
                 "Use apply_patch on AGENTS.md.",
             ),
             "requests mutation in objective",
+        )
+    }
+
+    #[test]
+    fn rejects_camelcase_mutation_tool_name() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "Answer one bounded question.",
+                "Use applyPatch on AGENTS.md.",
+            ),
+            "requests mutation in objective",
+        )
+    }
+
+    #[test]
+    fn rejects_generate_operation_forms() -> Result<(), String> {
+        for term in ["generate", "generated", "generates", "generating"] {
+            rejects(
+                &valid().replace(
+                    "Answer one bounded question.",
+                    &format!("{term} one bounded artifact."),
+                ),
+                "requests mutation in objective",
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_case_variant_path_authorities() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "spec:UNSAFE-REVIEW-SPEC-0044",
+                "artifact:docs/file\", \"artifact:Docs/file",
+            ),
+            "lowercase normalized path",
         )
     }
 
