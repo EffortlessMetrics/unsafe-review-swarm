@@ -28,6 +28,8 @@ const INVALID_FIXTURES: &[&str] = &[
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
     "invalid-github-character.toml",
+    "invalid-github-leading-zero.toml",
+    "invalid-github-signed-number.toml",
     "invalid-github-whitespace.toml",
     "invalid-issue-authority-route.toml",
     "invalid-pr-authority-route.toml",
@@ -163,6 +165,8 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("invalid-external-authority.toml") => Ok("must name a non-empty HTTPS resource"),
         Some("invalid-github-character.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-leading-zero.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-signed-number.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-whitespace.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
@@ -832,17 +836,21 @@ fn validate_url(url: &str, path: &str, field: &str, segment: &str) -> Result<(),
         || !valid_github_owner(parts[3])
         || !valid_github_repo(parts[4])
         || parts[5] != segment
-        || parts[6]
-            .parse::<u64>()
-            .ok()
-            .filter(|number| *number > 0)
-            .is_none()
+        || !canonical_github_route_number(parts[6])
     {
         return Err(format!(
             "{path} field `{field}` must be a GitHub {segment} URL"
         ));
     }
     Ok(())
+}
+
+fn canonical_github_route_number(value: &str) -> bool {
+    let mut characters = value.chars();
+    characters
+        .next()
+        .is_some_and(|character| matches!(character, '1'..='9'))
+        && characters.all(|character| character.is_ascii_digit())
 }
 
 fn valid_github_owner(value: &str) -> bool {
@@ -864,7 +872,7 @@ fn valid_github_repo(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::validate;
+    use super::{validate, validate_url};
 
     #[test]
     fn rejects_global_lane_authority() -> Result<(), String> {
@@ -941,6 +949,40 @@ mod tests {
                 ),
                 "must be a GitHub issues URL",
             )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn accepts_canonical_github_route_numbers() -> Result<(), String> {
+        for number in ["1", "42", "184467440737095516160"] {
+            validate_url(
+                &format!(
+                    "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/{number}"
+                ),
+                "test.toml",
+                "work_item.issue",
+                "issues",
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_noncanonical_github_route_numbers() -> Result<(), String> {
+        for number in ["+1", "01"] {
+            if validate_url(
+                &format!(
+                    "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/{number}"
+                ),
+                "test.toml",
+                "work_item.issue",
+                "issues",
+            )
+            .is_ok()
+            {
+                return Err(format!("noncanonical route number `{number}` passed"));
+            }
         }
         Ok(())
     }
