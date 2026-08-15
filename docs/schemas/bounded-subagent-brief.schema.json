@@ -93,7 +93,10 @@
           "type": "string",
           "pattern": "^https://github\\.com/[^/]+/[^/]+/issues/[1-9][0-9]*$"
         },
-        "work_spec": { "type": "string", "minLength": 1 }
+        "work_spec": {
+          "type": "string",
+          "pattern": "^plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$"
+        }
       }
     },
     "basis": {

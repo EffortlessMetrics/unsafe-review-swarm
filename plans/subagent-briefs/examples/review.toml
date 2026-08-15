@@ -7,7 +7,7 @@ write_scope = []
 authorities = ["issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924", "spec:UNSAFE-REVIEW-SPEC-0044"]
 proof_obligations = ["Report only exact-head findings with file evidence."]
 non_goals = ["Do not mutate the reviewed head."]
-stop_when = ["All changed schema and validator surfaces are reviewed."]
+stop_when = ["All PR schema and validator surfaces are reviewed."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"

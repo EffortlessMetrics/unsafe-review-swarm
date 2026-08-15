@@ -29,6 +29,8 @@ const INVALID_FIXTURES: &[&str] = &[
     "nonexistent-work-spec.toml",
     "read-only-mutation-objective.toml",
     "read-only-mutation-proof.toml",
+    "read-only-mutation-stop-when.toml",
+    "read-only-overwrite-objective.toml",
     "read-only-write-scope.toml",
     "review-missing-exact-head.toml",
     "whitespace-authority.toml",
@@ -151,6 +153,8 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
         Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-mutation-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
+        Some("read-only-mutation-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
+        Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
         Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
@@ -256,7 +260,7 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
     distinct_authorities(array(table, "authorities", path, true)?, path)?;
     let proof_obligations = array(table, "proof_obligations", path, true)?;
     array(table, "non_goals", path, true)?;
-    array(table, "stop_when", path, true)?;
+    let stop_when = array(table, "stop_when", path, true)?;
 
     if action == "build" {
         if capability != "write" {
@@ -291,6 +295,13 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
                 value.as_str().unwrap_or_default(),
                 path,
                 &format!("proof_obligations[{index}]"),
+            )?;
+        }
+        for (index, value) in stop_when.iter().enumerate() {
+            reject_mutation_text(
+                value.as_str().unwrap_or_default(),
+                path,
+                &format!("stop_when[{index}]"),
             )?;
         }
     }
@@ -506,6 +517,7 @@ fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), St
         ));
     }
     let work_spec = parse_toml_file(&work_spec_path)?;
+    crate::work_specs::validate_work_spec(&work_spec, &work_spec_path.display().to_string())?;
     let declared_issue = work_spec
         .get("issue")
         .and_then(toml::Value::as_str)
@@ -529,6 +541,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "added",
         "adding",
         "adds",
+        "append",
+        "appended",
+        "appending",
+        "appends",
         "change",
         "changed",
         "changes",
@@ -569,6 +585,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "moved",
         "moves",
         "moving",
+        "overwrite",
+        "overwrites",
+        "overwriting",
+        "overwrote",
         "modify",
         "modified",
         "modifies",
@@ -719,7 +739,17 @@ mod tests {
 
     #[test]
     fn rejects_common_repository_mutation_terms() -> Result<(), String> {
-        for term in ["add", "stage", "rename", "move", "publish", "deploy", "tag"] {
+        for term in [
+            "add",
+            "append",
+            "stage",
+            "rename",
+            "move",
+            "overwrite",
+            "publish",
+            "deploy",
+            "tag",
+        ] {
             rejects(
                 &valid().replace(
                     "Answer one bounded question.",
@@ -729,6 +759,17 @@ mod tests {
             )?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn rejects_mutation_in_stop_condition() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "The question is answered.",
+                "Stop after committing the patch.",
+            ),
+            "requests mutation in stop_when[0]",
+        )
     }
 
     #[test]

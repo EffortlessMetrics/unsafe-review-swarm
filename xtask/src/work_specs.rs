@@ -129,7 +129,7 @@ fn toml_files(root: &Path) -> Result<Vec<PathBuf>, String> {
     Ok(paths)
 }
 
-fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), String> {
+pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), String> {
     let table = value
         .as_table()
         .ok_or_else(|| format!("{path} must contain a TOML table"))?;
