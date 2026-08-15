@@ -6,7 +6,7 @@
   "type": "object",
   "additionalProperties": false,
   "required": [
-    "schema", "work_item", "basis", "action", "objective", "read_scope",
+    "schema", "work_item", "basis", "action", "capability", "objective", "read_scope",
     "write_scope", "authorities", "proof_obligations", "non_goals",
     "stop_when", "return_schema"
   ],
@@ -17,10 +17,19 @@
     "action": {
       "enum": ["investigate", "challenge_plan", "build", "verify", "review", "triage_ci", "audit_cleanup"]
     },
+    "capability": { "enum": ["read_only", "write"] },
     "objective": { "type": "string", "minLength": 1 },
     "read_scope": { "$ref": "#/$defs/non_empty_strings" },
-    "write_scope": { "$ref": "#/$defs/strings" },
-    "authorities": { "$ref": "#/$defs/non_empty_strings" },
+    "write_scope": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repository_relative_path" }
+    },
+    "authorities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/authority" }
+    },
     "proof_obligations": { "$ref": "#/$defs/non_empty_strings" },
     "non_goals": { "$ref": "#/$defs/non_empty_strings" },
     "stop_when": { "$ref": "#/$defs/non_empty_strings" },
@@ -32,11 +41,17 @@
       "if": { "properties": { "action": { "const": "build" } }, "required": ["action"] },
       "then": {
         "required": ["admission"],
-        "properties": { "write_scope": { "minItems": 1 } }
+        "properties": {
+          "capability": { "const": "write" },
+          "write_scope": { "minItems": 1 }
+        }
       },
       "else": {
         "not": { "required": ["admission"] },
-        "properties": { "write_scope": { "maxItems": 0 } }
+        "properties": {
+          "capability": { "const": "read_only" },
+          "write_scope": { "maxItems": 0 }
+        }
       }
     },
     {
@@ -57,6 +72,18 @@
       "items": { "type": "string", "minLength": 1 }
     },
     "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repository_relative_path": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*/?$"
+    },
+    "authority": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^(spec|adr):[A-Z][A-Z0-9._-]+$" },
+        { "pattern": "^(policy|work_spec|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*/?$" },
+        { "pattern": "^(issue|pr|external):https://\\S+$" }
+      ]
+    },
     "work_item": {
       "type": "object",
       "additionalProperties": false,

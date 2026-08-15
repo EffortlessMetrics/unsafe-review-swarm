@@ -1,13 +1,13 @@
 schema = "bounded-subagent-brief-v1"
 action = "investigate"
 capability = "read_only"
-objective = "Invalid mutation request."
+objective = "Inspect one bounded surface."
 read_scope = ["docs/"]
-write_scope = ["docs/"]
-authorities = ["issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"]
-proof_obligations = ["Reject this brief."]
-non_goals = ["No mutation."]
-stop_when = ["Rejected."]
+write_scope = []
+authorities = [" spec:UNSAFE-REVIEW-SPEC-0044"]
+proof_obligations = ["Return exact paths."]
+non_goals = ["No wider work."]
+stop_when = ["The question is answered."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"

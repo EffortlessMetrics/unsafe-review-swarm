@@ -1,16 +1,17 @@
 schema = "bounded-subagent-brief-v1"
 action = "build"
+capability = "write"
 objective = "Implement the bounded-subagent-brief-v1 validator."
 read_scope = ["docs/schemas/issue-work-spec.schema.json", "xtask/src/work_specs.rs"]
 write_scope = ["docs/schemas/bounded-subagent-brief.schema.json", "xtask/src/subagent_briefs.rs", "plans/subagent-briefs/"]
-authorities = ["UNSAFE-REVIEW-SPEC-0044", "issue #1924"]
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044", "issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"]
 proof_obligations = ["Run focused validator tests and fixtures."]
 non_goals = ["Do not add runtime configuration or the result schema."]
 stop_when = ["The edit cage would need to expand.", "A controlling premise is false."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
-work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
 [basis]
 base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
 [admission]

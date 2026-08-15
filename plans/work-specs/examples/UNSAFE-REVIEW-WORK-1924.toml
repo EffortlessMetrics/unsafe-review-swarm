@@ -1,0 +1,66 @@
+# UNSAFE-REVIEW-WORK-1924
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+kind = "maintenance"
+objective = "Define and validate one versioned bounded-subagent brief contract."
+user_outcome = "A coordinator can delegate one issue-linked action without granting repository-wide authority."
+claim_boundary = "This contract validates bounded delegation inputs; it does not define results, schedule work, configure agents, or change product behavior."
+dependencies = ["UNSAFE-REVIEW-SPEC-0044"]
+blockers = []
+affected_files = ["docs/schemas/bounded-subagent-brief.schema.json", "xtask/src/subagent_briefs.rs", "plans/subagent-briefs/"]
+affected_symbols = ["xtask check-subagent-briefs"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0044"]
+linked_adrs = []
+
+[scope]
+included = [
+    "The bounded-subagent-brief-v1 input contract",
+    "Offline validation with valid and invalid action fixtures",
+    "Issue and accepted-work-spec identity matching",
+]
+excluded = [
+    "Subagent result schemas",
+    "Agent configuration, scheduling, or workflow execution",
+    "Repository-global goal, model, count, or product policy",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Every brief names one action, one issue, and an accepted work spec for that same issue."
+
+[[invariant]]
+id = "INV-2"
+text = "Only an admitted build action may carry repository-relative write scope."
+
+[[acceptance]]
+id = "AC-1"
+text = "All seven actions have one valid fixture and the checker rejects every registered invalid case."
+proof = ["cargo run --locked -p xtask -- check-subagent-briefs"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The validator rejects read-only mutation requests, broad scope, malformed authority, and mismatched work-spec identity."
+proof = ["cargo test --locked -p xtask --bin xtask subagent_briefs"]
+
+[[integration]]
+surface = "work_spec"
+expected = "The brief references this accepted issue-linked contract by repository-relative path."
+
+[[integration]]
+surface = "doc_artifacts"
+expected = "The work spec remains registered as a draft plan_item for cargo-allow compatibility."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Use closed grammars and fixture registration so permissive inputs cannot silently expand authority."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Keep the validator offline and restrict work-spec lookup to the accepted examples directory."
+
+[compatibility]
+posture = "Additive repository governance contract; no runtime, analyzer, ReviewCard, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the #1924 brief schema, checker, fixtures, and this work-spec registration together."
+linked_spec = "UNSAFE-REVIEW-SPEC-0044"

@@ -1,15 +1,16 @@
 schema = "bounded-subagent-brief-v1"
 action = "challenge_plan"
+capability = "read_only"
 objective = "Challenge the brief design for authority leakage."
 read_scope = ["docs/schemas/bounded-subagent-brief.schema.json", "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md"]
 write_scope = []
-authorities = ["UNSAFE-REVIEW-SPEC-0044", "issue #1924"]
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044", "issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"]
 proof_obligations = ["Identify any duplicated work-contract or scheduler field."]
 non_goals = ["Do not redesign the result contract from issue #1926."]
 stop_when = ["Every proposed field has one bounded responsibility."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
-work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
 [basis]
 base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"

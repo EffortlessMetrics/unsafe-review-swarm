@@ -47,10 +47,30 @@ The brief references the controlling issue and accepted work spec; it does not
 copy or replace that contract. Every brief names a full base SHA, one action,
 read and write scopes, durable authorities, proof obligations, non-goals, stop
 conditions, and the expected `bounded-subagent-result-v1` return identifier.
+The closed `capability` field is `write` only for `build` and `read_only` for
+every other action. For read-only briefs, the checker also rejects mutation
+verbs in `objective` and `proof_obligations`; prose cannot expand the declared
+capability.
+
+Every `write_scope` entry is a canonical slash-separated repository-relative
+path. Components use ASCII letters, digits, dot, underscore, or hyphen; the
+first character of each component is not a dot. Repository roots (`.` or `/`),
+absolute or drive-qualified paths, backslashes, `..` traversal, empty
+components, and wildcard patterns are rejected. Authorities use one typed
+form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
+`issue:https://.../issues/N`, `pr:https://.../pull/N`, or
+`external:https://...`. Leading/trailing whitespace, unknown types, duplicate
+normalized references, and global/runtime authority are rejected.
+
 Only `build` carries writer admission, an admitted worktree, and a non-empty
 write-scope edit cage. `investigate`, `challenge_plan`, `verify`, `review`,
 `triage_ci`, and `audit_cleanup` are read-only. `verify` and `review` additionally
 require an exact PR and head SHA.
+
+The checker resolves `work_item.work_spec` as a canonical path beneath
+`plans/work-specs/examples/`, parses it through the accepted work-spec data,
+and requires its `issue` URL to equal `work_item.issue`. Missing and mismatched
+references fail offline.
 
 `xtask check-subagent-briefs` validates the schema, one example for every
 action, and rejected fixtures. Its single-line JSON result is structural

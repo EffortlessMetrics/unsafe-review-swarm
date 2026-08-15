@@ -1,15 +1,16 @@
 schema = "bounded-subagent-brief-v1"
 action = "build"
+capability = "write"
 objective = "Invalid writer."
 read_scope = ["docs/"]
 write_scope = ["docs/"]
-authorities = ["UNSAFE-REVIEW-SPEC-0044"]
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044"]
 proof_obligations = ["Reject this brief."]
 non_goals = ["No expansion."]
 stop_when = ["Rejected."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
-work_spec = "UNSAFE-REVIEW-WORK-1900"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
 [basis]
 base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
 [admission]

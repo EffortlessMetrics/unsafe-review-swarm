@@ -1,15 +1,16 @@
 schema = "bounded-subagent-brief-v1"
 action = "investigate"
+capability = "read_only"
 objective = "Locate the validator surfaces governed by SPEC-0044."
 read_scope = ["docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md", "xtask/src/work_specs.rs"]
 write_scope = []
-authorities = ["UNSAFE-REVIEW-SPEC-0044", "issue #1924"]
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044", "issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"]
 proof_obligations = ["Return exact paths and unresolved contradictions."]
 non_goals = ["Do not edit files or select another issue."]
 stop_when = ["The bounded surface inventory is complete."]
 return_schema = "bounded-subagent-result-v1"
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
-work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
 [basis]
 base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"

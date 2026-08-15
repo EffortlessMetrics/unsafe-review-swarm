@@ -21,11 +21,28 @@ const ACTIONS: &[&str] = &[
     "triage_ci",
     "audit_cleanup",
 ];
+const INVALID_FIXTURES: &[&str] = &[
+    "broad-write-scope.toml",
+    "contradictory-authority.toml",
+    "global-lane-authority.toml",
+    "mismatched-work-spec.toml",
+    "nonexistent-work-spec.toml",
+    "read-only-mutation-objective.toml",
+    "read-only-write-scope.toml",
+    "review-missing-exact-head.toml",
+    "whitespace-authority.toml",
+    "writer-missing-admission.toml",
+    "writer-missing-edit-cage.toml",
+    "writer-missing-issue.toml",
+    "writer-missing-work-spec.toml",
+    "writer-missing-worktree.toml",
+];
 const REQUIRED: &[&str] = &[
     "schema",
     "work_item",
     "basis",
     "action",
+    "capability",
     "objective",
     "read_scope",
     "write_scope",
@@ -70,8 +87,22 @@ pub(crate) fn check() -> Result<(), String> {
     }
 
     let invalid = toml_files(&workspace_path(INVALID_ROOT))?;
-    if invalid.is_empty() {
-        return Err(format!("{INVALID_ROOT} must contain invalid fixtures"));
+    let found: BTreeSet<String> = invalid
+        .iter()
+        .filter_map(|path| path.file_name()?.to_str().map(str::to_string))
+        .collect();
+    let registered: BTreeSet<String> = INVALID_FIXTURES
+        .iter()
+        .map(|name| (*name).to_string())
+        .collect();
+    if found != registered {
+        let missing: Vec<_> = registered.difference(&found).cloned().collect();
+        let unexpected: Vec<_> = found.difference(&registered).cloned().collect();
+        return Err(format!(
+            "{INVALID_ROOT} fixture manifest mismatch; missing [{}], unexpected [{}]",
+            missing.join(", "),
+            unexpected.join(", ")
+        ));
     }
     for path in &invalid {
         let value = parse_toml_file(path)?;
@@ -115,6 +146,11 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("review-missing-exact-head.toml") => Ok("requires basis.pr and basis.head_sha"),
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
+        Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
+        Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
+        Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
+        Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
+        Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
         None => Err(format!("{} has no file name", path.display())),
     }
@@ -172,7 +208,8 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
     }
     string(table, "schema", path, Some("bounded-subagent-brief-v1"))?;
     let action = known_string(table, "action", path, ACTIONS)?;
-    string(table, "objective", path, None)?;
+    let capability = known_string(table, "capability", path, &["read_only", "write"])?;
+    let objective = string(table, "objective", path, None)?;
     string(
         table,
         "return_schema",
@@ -182,13 +219,10 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
 
     let work_item = subtable(table, "work_item", path)?;
     only_fields(work_item, &["issue", "work_spec"], path, "work_item")?;
-    validate_url(
-        string(work_item, "issue", path, None)?,
-        path,
-        "work_item.issue",
-        "issues",
-    )?;
-    string(work_item, "work_spec", path, None)?;
+    let issue = string(work_item, "issue", path, None)?;
+    validate_url(issue, path, "work_item.issue", "issues")?;
+    let work_spec = string(work_item, "work_spec", path, None)?;
+    validate_work_spec(work_spec, issue, path)?;
 
     let basis = subtable(table, "basis", path)?;
     only_fields(basis, &["base_sha", "pr", "head_sha"], path, "basis")?;
@@ -214,12 +248,18 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
 
     array(table, "read_scope", path, true)?;
     let write_scope = array(table, "write_scope", path, false)?;
+    for value in write_scope {
+        repository_relative_path(value.as_str().unwrap_or_default(), path, "write_scope")?;
+    }
     distinct_authorities(array(table, "authorities", path, true)?, path)?;
-    array(table, "proof_obligations", path, true)?;
+    let proof_obligations = array(table, "proof_obligations", path, true)?;
     array(table, "non_goals", path, true)?;
     array(table, "stop_when", path, true)?;
 
     if action == "build" {
+        if capability != "write" {
+            return Err(format!("{path} build capability must equal `write`"));
+        }
         if write_scope.is_empty() {
             return Err(format!("{path} build requires a write_scope edit cage"));
         }
@@ -228,6 +268,11 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
         string(admission, "state", path, Some("admitted"))?;
         string(admission, "worktree", path, None)?;
     } else {
+        if capability != "read_only" {
+            return Err(format!(
+                "{path} read-only action `{action}` capability must equal `read_only`"
+            ));
+        }
         if !write_scope.is_empty() {
             return Err(format!(
                 "{path} read-only action `{action}` must have empty write_scope"
@@ -237,6 +282,14 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
             return Err(format!(
                 "{path} read-only action `{action}` must not carry admission"
             ));
+        }
+        reject_mutation_text(objective, path, "objective")?;
+        for (index, value) in proof_obligations.iter().enumerate() {
+            reject_mutation_text(
+                value.as_str().unwrap_or_default(),
+                path,
+                &format!("proof_obligations[{index}]"),
+            )?;
         }
     }
     Ok(action)
@@ -354,28 +407,205 @@ fn distinct_authorities(values: &[toml::Value], path: &str) -> Result<(), String
         let authority = value
             .as_str()
             .ok_or_else(|| format!("{path} authorities must contain strings"))?;
+        if authority.trim() != authority {
+            return Err(format!(
+                "{path} authority `{authority}` must not contain surrounding whitespace"
+            ));
+        }
         let normalized = authority.to_ascii_lowercase();
-        if [
-            "global:",
-            "active_lane:",
-            "default_goal:",
-            "priority:",
-            "model:",
-            "agent_count:",
-            "private_reasoning:",
-        ]
-        .iter()
-        .any(|prefix| normalized.starts_with(prefix))
-        {
+        if normalized.starts_with("global:") {
             return Err(format!(
                 "{path} authority `{authority}` appoints global or runtime authority"
             ));
         }
+        validate_authority(authority, path)?;
         if !seen.insert(normalized) {
             return Err(format!("{path} duplicates authority `{authority}`"));
         }
     }
     Ok(())
+}
+
+fn repository_relative_path(value: &str, path: &str, field: &str) -> Result<(), String> {
+    let trimmed = value.strip_suffix('/').unwrap_or(value);
+    let valid = !trimmed.is_empty()
+        && trimmed != "."
+        && value.trim() == value
+        && !value.contains(['\\', '*', '?', ':'])
+        && trimmed.split('/').all(|component| {
+            !component.is_empty()
+                && component != "."
+                && component != ".."
+                && !component.starts_with('.')
+                && component
+                    .chars()
+                    .all(|character| character.is_ascii_alphanumeric() || "._-".contains(character))
+        });
+    if valid {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} field `{field}` value `{value}` must be a normalized repository-relative path"
+        ))
+    }
+}
+
+fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
+    let (kind, value) = authority.split_once(':').ok_or_else(|| {
+        format!("{path} authority `{authority}` must use a typed authority grammar")
+    })?;
+    match kind {
+        "spec" | "adr" => {
+            if value.is_empty()
+                || !value.starts_with(|character: char| character.is_ascii_uppercase())
+                || !value.chars().all(|character| {
+                    character.is_ascii_uppercase()
+                        || character.is_ascii_digit()
+                        || "._-".contains(character)
+                })
+            {
+                return Err(format!(
+                    "{path} authority `{authority}` has an invalid identifier"
+                ));
+            }
+        }
+        "policy" | "work_spec" | "artifact" => {
+            repository_relative_path(value, path, "authority")?;
+        }
+        "issue" | "pr" => {
+            validate_url(
+                value,
+                path,
+                "authority",
+                if kind == "issue" { "issues" } else { "pull" },
+            )?;
+        }
+        "external" if value.starts_with("https://") && !value.chars().any(char::is_whitespace) => {}
+        _ => {
+            return Err(format!(
+                "{path} authority `{authority}` must use a typed authority grammar"
+            ));
+        }
+    }
+    Ok(())
+}
+
+fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), String> {
+    repository_relative_path(reference, path, "work_item.work_spec")?;
+    if !reference.starts_with("plans/work-specs/examples/") || !reference.ends_with(".toml") {
+        return Err(format!(
+            "{path} work_item.work_spec must reference an accepted work spec under plans/work-specs/examples"
+        ));
+    }
+    let work_spec_path = workspace_path(reference);
+    if !work_spec_path.is_file() {
+        return Err(format!(
+            "{path} work_item.work_spec `{reference}` does not resolve to an accepted work spec"
+        ));
+    }
+    let work_spec = parse_toml_file(&work_spec_path)?;
+    let declared_issue = work_spec
+        .get("issue")
+        .and_then(toml::Value::as_str)
+        .ok_or_else(|| {
+            format!(
+                "{} field `issue` must be a string",
+                work_spec_path.display()
+            )
+        })?;
+    if declared_issue != issue {
+        return Err(format!(
+            "{path} work_item.work_spec `{reference}` declares issue `{declared_issue}`, not `{issue}`"
+        ));
+    }
+    Ok(())
+}
+
+fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), String> {
+    const MUTATION_WORDS: &[&str] = &[
+        "change",
+        "changed",
+        "changes",
+        "changing",
+        "commit",
+        "commits",
+        "committed",
+        "committing",
+        "create",
+        "created",
+        "creates",
+        "creating",
+        "delete",
+        "deleted",
+        "deletes",
+        "deleting",
+        "edit",
+        "edited",
+        "editing",
+        "edits",
+        "fix",
+        "fixed",
+        "fixes",
+        "fixing",
+        "implement",
+        "implemented",
+        "implementing",
+        "implements",
+        "merge",
+        "merged",
+        "merges",
+        "merging",
+        "modify",
+        "modified",
+        "modifies",
+        "modifying",
+        "patch",
+        "patched",
+        "patches",
+        "patching",
+        "push",
+        "pushed",
+        "pushes",
+        "pushing",
+        "remove",
+        "removed",
+        "removes",
+        "removing",
+        "reply",
+        "replied",
+        "replies",
+        "replying",
+        "resolve",
+        "resolved",
+        "resolves",
+        "resolving",
+        "retry",
+        "retried",
+        "retries",
+        "retrying",
+        "rerun",
+        "rerunning",
+        "reruns",
+        "update",
+        "updated",
+        "updates",
+        "updating",
+        "write",
+        "writes",
+        "writing",
+        "wrote",
+    ];
+    if let Some(word) = value
+        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .map(str::to_ascii_lowercase)
+        .find(|word| MUTATION_WORDS.contains(&word.as_str()))
+    {
+        Err(format!(
+            "{path} read-only action requests mutation in {field} via `{word}`"
+        ))
+    } else {
+        Ok(())
+    }
 }
 
 fn sha(value: &str, path: &str, field: &str) -> Result<(), String> {
@@ -420,7 +650,7 @@ mod tests {
     #[test]
     fn rejects_global_lane_authority() -> Result<(), String> {
         rejects(
-            &valid().replace("UNSAFE-REVIEW-SPEC-0044", "global:active-lane"),
+            &valid().replace("spec:UNSAFE-REVIEW-SPEC-0044", "global:active-lane"),
             "global or runtime authority",
         )
     }
@@ -441,6 +671,43 @@ mod tests {
         )
     }
 
+    #[test]
+    fn rejects_read_only_mutation_text() -> Result<(), String> {
+        rejects(
+            &valid().replace("Answer one bounded question.", "Edit one bounded file."),
+            "requests mutation in objective",
+        )
+    }
+
+    #[test]
+    fn rejects_read_only_mutation_proof() -> Result<(), String> {
+        rejects(
+            &valid().replace("Return exact paths.", "Commit the inspected result."),
+            "requests mutation in proof_obligations[0]",
+        )
+    }
+
+    #[test]
+    fn rejects_broad_write_scope() -> Result<(), String> {
+        let source = valid()
+            .replace("action = \"investigate\"", "action = \"build\"")
+            .replace("capability = \"read_only\"", "capability = \"write\"")
+            .replace("write_scope = []", "write_scope = [\".\"]")
+            + "\n[admission]\nstate = \"admitted\"\nworktree = \"E:/worktree\"\n";
+        rejects(&source, "normalized repository-relative path")
+    }
+
+    #[test]
+    fn rejects_whitespace_obscured_authority() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "spec:UNSAFE-REVIEW-SPEC-0044",
+                " spec:UNSAFE-REVIEW-SPEC-0044",
+            ),
+            "surrounding whitespace",
+        )
+    }
+
     fn rejects(source: &str, expected: &str) -> Result<(), String> {
         let value: toml::Value =
             toml::from_str(source).map_err(|error| format!("test TOML: {error}"))?;
@@ -457,10 +724,11 @@ mod tests {
     fn valid() -> String {
         r#"schema = "bounded-subagent-brief-v1"
 action = "investigate"
+capability = "read_only"
 objective = "Answer one bounded question."
 read_scope = ["docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md"]
 write_scope = []
-authorities = ["UNSAFE-REVIEW-SPEC-0044"]
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044"]
 proof_obligations = ["Return exact paths."]
 non_goals = ["Do not select another issue."]
 stop_when = ["The question is answered."]
@@ -468,7 +736,7 @@ return_schema = "bounded-subagent-result-v1"
 
 [work_item]
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
-work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
 
 [basis]
 base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
