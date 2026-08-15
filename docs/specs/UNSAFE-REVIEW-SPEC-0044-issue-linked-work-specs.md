@@ -62,8 +62,9 @@ components, and wildcard patterns are rejected. Authorities use one typed
 form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
 `issue:https://github.com/OWNER/REPO/issues/N`,
 `pr:https://github.com/OWNER/REPO/pull/N`, or
-`external:https://...`. Path-bearing authority payloads preserve the canonical
-case of tracked repository files. JSON Schema rejects exact duplicates; the
+`external:https://...`. Path-bearing authority payloads name files, never
+directory-shaped trailing-slash paths, and preserve the canonical case of
+tracked repository files. JSON Schema rejects exact duplicates; the
 offline checker additionally compares normalized authority strings so casing
 cannot disguise a duplicate. An external authority requires at least one
 non-whitespace resource character after `https://`. Leading/trailing
@@ -73,7 +74,8 @@ Spec and ADR identifiers resolve to exactly one canonical tracked document.
 GitHub issue and PR identities use closed owner, repository, route, and
 canonical positive-decimal number grammars: the first digit is `1` through `9`
 and remaining characters are ASCII digits, with no sign or leading zero.
-Repository segments cannot be the URI dot segments `.` or `..`.
+Repository segments cannot be the URI dot segments `.` or `..`, and cannot end
+with `.`.
 
 Only `build` carries writer admission, an admitted worktree, and a non-empty
 write-scope edit cage. `investigate`, `challenge_plan`, `verify`, `review`,

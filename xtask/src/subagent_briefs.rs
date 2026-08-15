@@ -32,9 +32,11 @@ const INVALID_FIXTURES: &[&str] = &[
     "invalid-github-dotdot-repo.toml",
     "invalid-github-leading-zero.toml",
     "invalid-github-signed-number.toml",
+    "invalid-github-trailing-dot.toml",
     "invalid-github-whitespace.toml",
     "invalid-issue-authority-route.toml",
     "invalid-pr-authority-route.toml",
+    "invalid-trailing-slash-authority.toml",
     "mismatched-work-spec.toml",
     "nested-work-spec.toml",
     "nonexistent-adr-authority.toml",
@@ -180,9 +182,13 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("invalid-github-dotdot-repo.toml") => Ok("must be a GitHub pull URL"),
         Some("invalid-github-leading-zero.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-signed-number.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-trailing-dot.toml") => Ok("must be a GitHub pull URL"),
         Some("invalid-github-whitespace.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
+        Some("invalid-trailing-slash-authority.toml") => {
+            Ok("must resolve with canonical case to a tracked repository file")
+        }
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
         Some("case-variant-authority.toml") => Ok("duplicates authority"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
@@ -234,6 +240,17 @@ fn check_schema() -> Result<(), String> {
                 "{SCHEMA} `{pointer}` must reject whitespace-only strings with `\\S`"
             ));
         }
+    }
+    if value
+        .pointer("/$defs/authority/anyOf/1/pattern")
+        .and_then(serde_json::Value::as_str)
+        != Some(
+            "^(policy|work_spec|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$",
+        )
+    {
+        return Err(format!(
+            "{SCHEMA} path-bearing authorities must reject trailing-slash directory shapes"
+        ));
     }
     Ok(())
 }
@@ -920,6 +937,7 @@ fn valid_github_repo(value: &str) -> bool {
         && value.len() <= 100
         && value != "."
         && value != ".."
+        && !value.ends_with('.')
         && value.chars().all(|character| {
             character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
         })
@@ -1074,6 +1092,21 @@ mod tests {
             {
                 return Err(format!("URI dot segment `{repository}` passed"));
             }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_github_repository_trailing_dot() -> Result<(), String> {
+        if validate_url(
+            "https://github.com/EffortlessMetrics/unsafe-review-swarm./pull/1",
+            "test.toml",
+            "authority",
+            "pull",
+        )
+        .is_ok()
+        {
+            return Err("GitHub repository with trailing dot passed".to_string());
         }
         Ok(())
     }

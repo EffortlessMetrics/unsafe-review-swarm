@@ -1,0 +1,18 @@
+schema = "bounded-subagent-brief-v1"
+action = "review"
+capability = "read_only"
+objective = "Review one exact head."
+read_scope = ["xtask/src/subagent_briefs.rs"]
+write_scope = []
+authorities = ["pr:https://github.com/EffortlessMetrics/unsafe-review-swarm./pull/1"]
+proof_obligations = ["Return exact findings."]
+non_goals = ["No mutation."]
+stop_when = ["Review is complete."]
+return_schema = "bounded-subagent-result-v1"
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2109"
+head_sha = "c012bbb4febf8c88c84c67e341935c0eed26341d"
