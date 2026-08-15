@@ -33,6 +33,14 @@ Claude-specific helpers under `.claude/agents/` are optional runtime adapters,
 not repository roles or proof. Use manual or single-agent execution when it is
 clearer. Model choice and tool availability are runtime details.
 
+## Fixtures, calibration, and dogfood
+
+The fixture-suite-blindness doctrine lives in
+[`ANALYZER-LEARNINGS.md`](docs/contributing/ANALYZER-LEARNINGS.md#fixture-suite-blindness),
+with the detector negative-control contract in the
+[SPEC-0005 operation-family registry](docs/specs/appendices/UNSAFE-REVIEW-SPEC-0005-appendix-operation-family-registry.md#negative-control-requirement).
+This runtime adapter does not restate either authority.
+
 ## Required boundaries
 
 `unsafe-review-swarm` develops; `unsafe-review` publishes. Before routine swarm
