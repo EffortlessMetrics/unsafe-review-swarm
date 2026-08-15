@@ -59,7 +59,9 @@ absolute or drive-qualified paths, backslashes, `..` traversal, empty
 components, and wildcard patterns are rejected. Authorities use one typed
 form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
 `issue:https://.../issues/N`, `pr:https://.../pull/N`, or
-`external:https://...`. Leading/trailing whitespace, unknown types, duplicate
+`external:https://...`. An external authority requires at least one
+non-whitespace resource character after `https://`. Leading/trailing
+whitespace, unknown types, duplicate
 normalized references, and global/runtime authority are rejected.
 
 Only `build` carries writer admission, an admitted worktree, and a non-empty
