@@ -109,18 +109,21 @@ Ambiguous or user-owned state is preserved.
 ## Build, review, and integration
 
 Proof must match the claim. Run focused tests first and the broader repository
-gates when practical. The deterministic core sequence is:
+gates when practical. The full workspace proof baseline is:
 
 ```bash
-cargo fmt --all --check
+cargo fmt --check
+cargo check --workspace --all-targets --locked
 cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --locked
+cargo test --workspace --all-targets --locked
+RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
 cargo run --locked -p xtask -- check-pr
 ```
 
-`check-pr` does not include formatting or Clippy. Report checks as pass, fail,
-or not run; skipped or unavailable proof is not a pass. Local proof, hosted
-checks, review, signing/publication, and release readiness are distinct states.
+`xtask check-pr` is the deterministic core gate and does not include formatting,
+Clippy, or the rest of the workspace baseline. Report checks as pass, fail, or
+not run; skipped or unavailable proof is not a pass. Local proof, hosted checks,
+review, signing/publication, and release readiness are distinct states.
 
 Review the actual diff and exact head. Relevant mutation makes prior review and
 proof stale. Merge only when the current head is scoped, reviewed, green, and
