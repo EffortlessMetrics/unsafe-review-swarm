@@ -71,6 +71,9 @@ non-whitespace resource character after `https://`. Leading/trailing
 whitespace, unknown types, duplicate
 normalized references, and global/runtime authority are rejected.
 Spec and ADR identifiers resolve to exactly one canonical tracked document.
+`work_spec:` authorities resolve to one direct file under
+`plans/work-specs/examples/*.toml`, compile through the full typed work-spec
+validator, and declare the brief's issue.
 GitHub issue and PR identities use closed owner, repository, route, and
 canonical positive-decimal number grammars: the first digit is `1` through `9`
 and remaining characters are ASCII digits, with no sign or leading zero.

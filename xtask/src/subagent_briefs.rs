@@ -38,6 +38,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "invalid-issue-authority-route.toml",
     "invalid-pr-authority-route.toml",
     "invalid-trailing-slash-authority.toml",
+    "invalid-work-spec-authority.toml",
     "mismatched-work-spec.toml",
     "nested-work-spec.toml",
     "nonexistent-adr-authority.toml",
@@ -191,6 +192,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("invalid-trailing-slash-authority.toml") => {
             Ok("must resolve with canonical case to a tracked repository file")
         }
+        Some("invalid-work-spec-authority.toml") => Ok("must reference one direct work spec"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
         Some("case-variant-authority.toml") => Ok("duplicates authority"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
@@ -246,17 +248,24 @@ fn check_schema() -> Result<(), String> {
     if value
         .pointer("/$defs/authority/anyOf/1/pattern")
         .and_then(serde_json::Value::as_str)
-        != Some(
-            "^(policy|work_spec|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$",
-        )
+        != Some("^(policy|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$")
     {
         return Err(format!(
             "{SCHEMA} path-bearing authorities must reject trailing-slash directory shapes"
         ));
     }
+    if value
+        .pointer("/$defs/authority/anyOf/2/pattern")
+        .and_then(serde_json::Value::as_str)
+        != Some("^work_spec:plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$")
+    {
+        return Err(format!(
+            "{SCHEMA} work_spec authorities must reference one direct typed example"
+        ));
+    }
     for pointer in [
-        "/$defs/authority/anyOf/2/pattern",
         "/$defs/authority/anyOf/3/pattern",
+        "/$defs/authority/anyOf/4/pattern",
         "/$defs/work_item/properties/issue/pattern",
         "/$defs/basis/properties/pr/pattern",
     ] {
@@ -356,7 +365,7 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
     for value in write_scope {
         repository_relative_path(value.as_str().unwrap_or_default(), path, "write_scope")?;
     }
-    distinct_authorities(array(table, "authorities", path, true)?, path)?;
+    distinct_authorities(array(table, "authorities", path, true)?, issue, path)?;
     let proof_obligations = array(table, "proof_obligations", path, true)?;
     array(table, "non_goals", path, true)?;
     let stop_when = array(table, "stop_when", path, true)?;
@@ -513,7 +522,7 @@ fn array<'a>(
     Ok(values)
 }
 
-fn distinct_authorities(values: &[toml::Value], path: &str) -> Result<(), String> {
+fn distinct_authorities(values: &[toml::Value], issue: &str, path: &str) -> Result<(), String> {
     let mut seen = BTreeSet::new();
     for value in values {
         let authority = value
@@ -533,7 +542,7 @@ fn distinct_authorities(values: &[toml::Value], path: &str) -> Result<(), String
         if !seen.insert(normalized) {
             return Err(format!("{path} duplicates authority `{authority}`"));
         }
-        validate_authority(authority, path)?;
+        validate_authority(authority, issue, path)?;
     }
     Ok(())
 }
@@ -562,7 +571,7 @@ fn repository_relative_path(value: &str, path: &str, field: &str) -> Result<(), 
     }
 }
 
-fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
+fn validate_authority(authority: &str, issue: &str, path: &str) -> Result<(), String> {
     let (kind, value) = authority.split_once(':').ok_or_else(|| {
         format!("{path} authority `{authority}` must use a typed authority grammar")
     })?;
@@ -582,10 +591,11 @@ fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
             }
             resolve_document_authority(kind, value, path)?;
         }
-        "policy" | "work_spec" | "artifact" => {
+        "policy" | "artifact" => {
             repository_relative_path(value, path, "authority")?;
             tracked_repository_file(value, path, "authority")?;
         }
+        "work_spec" => validate_work_spec(value, issue, path)?,
         "issue" | "pr" => {
             validate_url(
                 value,

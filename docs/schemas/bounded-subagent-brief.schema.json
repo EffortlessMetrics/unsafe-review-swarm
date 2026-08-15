@@ -80,7 +80,8 @@
       "type": "string",
       "anyOf": [
         { "pattern": "^(spec|adr):[A-Z][A-Z0-9._-]+$" },
-        { "pattern": "^(policy|work_spec|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$" },
+        { "pattern": "^(policy|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$" },
+        { "pattern": "^work_spec:plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$" },
         { "pattern": "^issue:https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/issues/[1-9][0-9]*$" },
         { "pattern": "^pr:https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/pull/[1-9][0-9]*$" },
         { "pattern": "^external:https://\\S+$" }
