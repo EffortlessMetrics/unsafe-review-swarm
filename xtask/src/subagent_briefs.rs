@@ -28,6 +28,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
     "invalid-github-character.toml",
+    "invalid-github-consecutive-hyphens.toml",
     "invalid-github-dot-repo.toml",
     "invalid-github-dotdot-repo.toml",
     "invalid-github-leading-zero.toml",
@@ -178,6 +179,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("invalid-external-authority.toml") => Ok("must name a non-empty HTTPS resource"),
         Some("invalid-github-character.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-consecutive-hyphens.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-dot-repo.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-github-dotdot-repo.toml") => Ok("must be a GitHub pull URL"),
         Some("invalid-github-leading-zero.toml") => Ok("must be a GitHub issues URL"),
@@ -251,6 +253,22 @@ fn check_schema() -> Result<(), String> {
         return Err(format!(
             "{SCHEMA} path-bearing authorities must reject trailing-slash directory shapes"
         ));
+    }
+    for pointer in [
+        "/$defs/authority/anyOf/2/pattern",
+        "/$defs/authority/anyOf/3/pattern",
+        "/$defs/work_item/properties/issue/pattern",
+        "/$defs/basis/properties/pr/pattern",
+    ] {
+        let pattern = value
+            .pointer(pointer)
+            .and_then(serde_json::Value::as_str)
+            .ok_or_else(|| format!("{SCHEMA} `{pointer}` must be a string"))?;
+        if !pattern.contains("github\\.com/(?![A-Za-z0-9-]*--)") {
+            return Err(format!(
+                "{SCHEMA} `{pointer}` must reject adjacent GitHub owner hyphens"
+            ));
+        }
     }
     Ok(())
 }
@@ -927,6 +945,7 @@ fn valid_github_owner(value: &str) -> bool {
     value.len() <= 39
         && value.starts_with(|character: char| character.is_ascii_alphanumeric())
         && value.ends_with(|character: char| character.is_ascii_alphanumeric())
+        && !value.contains("--")
         && value
             .chars()
             .all(|character| character.is_ascii_alphanumeric() || character == '-')
@@ -1043,6 +1062,17 @@ mod tests {
             )?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn rejects_github_owner_adjacent_hyphens() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924",
+                "https://github.com/acme--team/unsafe-review-swarm/issues/1924",
+            ),
+            "must be a GitHub issues URL",
+        )
     }
 
     #[test]
