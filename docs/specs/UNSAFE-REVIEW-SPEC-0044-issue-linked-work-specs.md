@@ -73,7 +73,9 @@ normalized references, and global/runtime authority are rejected.
 Spec and ADR identifiers resolve to exactly one canonical tracked document.
 `work_spec:` authorities resolve to one direct file under
 `plans/work-specs/examples/*.toml`, compile through the full typed work-spec
-validator, and declare the brief's issue.
+validator, declare the brief's issue, and match the tracked Git path's exact
+canonical casing. The same exact-case requirement applies to
+`work_item.work_spec`.
 GitHub issue and PR identities use closed owner, repository, route, and
 canonical positive-decimal number grammars: the first digit is `1` through `9`
 and remaining characters are ASCII digits, with no sign or leading zero.

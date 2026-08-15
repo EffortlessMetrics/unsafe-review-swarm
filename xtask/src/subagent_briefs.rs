@@ -24,6 +24,8 @@ const ACTIONS: &[&str] = &[
 const INVALID_FIXTURES: &[&str] = &[
     "broad-write-scope.toml",
     "case-variant-authority.toml",
+    "case-variant-work-spec-authority.toml",
+    "case-variant-work-spec.toml",
     "contradictory-authority.toml",
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
@@ -195,6 +197,12 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("invalid-work-spec-authority.toml") => Ok("must reference one direct work spec"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
         Some("case-variant-authority.toml") => Ok("duplicates authority"),
+        Some("case-variant-work-spec-authority.toml") => {
+            Ok("must resolve with canonical case to a tracked repository file")
+        }
+        Some("case-variant-work-spec.toml") => {
+            Ok("must resolve with canonical case to a tracked repository file")
+        }
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
         Some("whitespace-objective.toml") => Ok("field `objective` must not be empty"),
@@ -213,7 +221,9 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-touch-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-touch-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
         Some("read-only-underscored-tool.toml") => Ok("requests mutation in objective"),
-        Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
+        Some("nonexistent-work-spec.toml") => {
+            Ok("must resolve with canonical case to a tracked repository file")
+        }
         Some("nested-work-spec.toml") => Ok("must reference one direct work spec"),
         Some("nonexistent-spec-authority.toml") => Ok("does not resolve to one tracked spec"),
         Some("prefix-spec-authority.toml") => Ok("does not declare canonical identifier"),
@@ -336,7 +346,7 @@ fn validate<'a>(value: &'a toml::Value, path: &str) -> Result<&'a str, String> {
     let issue = string(work_item, "issue", path, None)?;
     validate_url(issue, path, "work_item.issue", "issues")?;
     let work_spec = string(work_item, "work_spec", path, None)?;
-    validate_work_spec(work_spec, issue, path)?;
+    validate_work_spec(work_spec, issue, path, "work_item.work_spec")?;
 
     let basis = subtable(table, "basis", path)?;
     only_fields(basis, &["base_sha", "pr", "head_sha"], path, "basis")?;
@@ -595,7 +605,7 @@ fn validate_authority(authority: &str, issue: &str, path: &str) -> Result<(), St
             repository_relative_path(value, path, "authority")?;
             tracked_repository_file(value, path, "authority")?;
         }
-        "work_spec" => validate_work_spec(value, issue, path)?,
+        "work_spec" => validate_work_spec(value, issue, path, "authority")?,
         "issue" | "pr" => {
             validate_url(
                 value,
@@ -686,8 +696,8 @@ fn resolve_document_authority(kind: &str, identifier: &str, path: &str) -> Resul
     }
 }
 
-fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), String> {
-    repository_relative_path(reference, path, "work_item.work_spec")?;
+fn validate_work_spec(reference: &str, issue: &str, path: &str, field: &str) -> Result<(), String> {
+    repository_relative_path(reference, path, field)?;
     let name = reference
         .strip_prefix("plans/work-specs/examples/")
         .and_then(|value| value.strip_suffix(".toml"));
@@ -696,6 +706,7 @@ fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), St
             "{path} work_item.work_spec must reference one direct work spec under plans/work-specs/examples/*.toml"
         ));
     }
+    tracked_repository_file(reference, path, field)?;
     let work_spec_path = workspace_path(reference);
     if !work_spec_path.is_file() {
         return Err(format!(
