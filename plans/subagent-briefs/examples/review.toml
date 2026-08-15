@@ -2,7 +2,13 @@ schema = "bounded-subagent-brief-v1"
 action = "review"
 capability = "read_only"
 objective = "Review the exact head for work-contract duplication."
-read_scope = ["docs/schemas/bounded-subagent-brief.schema.json", "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md"]
+read_scope = [
+    "docs/schemas/bounded-subagent-brief.schema.json",
+    "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md",
+    "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml",
+    "xtask/src/subagent_briefs.rs",
+    "xtask/src/work_specs.rs",
+]
 write_scope = []
 authorities = ["issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924", "spec:UNSAFE-REVIEW-SPEC-0044"]
 proof_obligations = ["Report only exact-head findings with file evidence."]

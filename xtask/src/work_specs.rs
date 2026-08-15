@@ -223,6 +223,11 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
     }
 
     let rollback = require_table(table, "rollback", path)?;
+    for key in rollback.keys() {
+        if key != "strategy" {
+            return Err(format!("{path} rollback contains unknown field `{key}`"));
+        }
+    }
     require_string(rollback, "strategy", path, None)?;
 
     for field in [

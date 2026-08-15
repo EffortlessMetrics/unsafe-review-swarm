@@ -1,0 +1,31 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+kind = "maintenance"
+objective = "Reject unsupported nested rollback fields."
+user_outcome = "The work-spec compiler rejects meaning-free nested metadata."
+claim_boundary = "Structural validation only."
+
+[scope]
+included = ["Nested rollback field validation"]
+excluded = ["Runtime rollback execution"]
+
+[[invariant]]
+id = "INV-1"
+text = "Rollback contains only its declared strategy field."
+
+[[acceptance]]
+id = "AC-1"
+text = "The checker rejects an unsupported rollback key."
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "checker"
+expected = "Nested extra fields fail closed."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep linked specifications in the top-level linked_specs field."
+
+[rollback]
+strategy = "Delete the intentionally invalid fixture."
+linked_spec = "UNSAFE-REVIEW-SPEC-0044"

@@ -63,4 +63,3 @@ posture = "Additive repository governance contract; no runtime, analyzer, Review
 
 [rollback]
 strategy = "Remove the #1924 brief schema, checker, fixtures, and this work-spec registration together."
-linked_spec = "UNSAFE-REVIEW-SPEC-0044"
