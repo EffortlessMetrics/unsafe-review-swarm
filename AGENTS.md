@@ -82,6 +82,7 @@ Use the repo source-of-truth stack:
 
 Do not use `.jules`, `.codex`, `.rails`, or product runtime output as current
 repository state. `.rails` is a read-only parity archive. Do not put durable repo operating state in `.codex`.
+
 Spec rails are meant to make routine progress easier, not ceremonial. Do not reject a useful generated PR just because it references missing but
 well-designed scaffolding; add a small missing rail only when it keeps the
 selected PR coherent, otherwise leave a linked follow-up.
