@@ -81,7 +81,9 @@
       "anyOf": [
         { "pattern": "^(spec|adr):[A-Z][A-Z0-9._-]+$" },
         { "pattern": "^(policy|work_spec|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*/?$" },
-        { "pattern": "^(issue|pr|external):https://\\S+$" }
+        { "pattern": "^issue:https://github\\.com/[^/]+/[^/]+/issues/[1-9][0-9]*$" },
+        { "pattern": "^pr:https://github\\.com/[^/]+/[^/]+/pull/[1-9][0-9]*$" },
+        { "pattern": "^external:https://\\S+$" }
       ]
     },
     "work_item": {

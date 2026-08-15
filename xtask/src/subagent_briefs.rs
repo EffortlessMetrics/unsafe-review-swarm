@@ -26,6 +26,8 @@ const INVALID_FIXTURES: &[&str] = &[
     "contradictory-authority.toml",
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
+    "invalid-issue-authority-route.toml",
+    "invalid-pr-authority-route.toml",
     "mismatched-work-spec.toml",
     "nonexistent-work-spec.toml",
     "read-only-mutation-objective.toml",
@@ -33,6 +35,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-mutation-stop-when.toml",
     "read-only-overwrite-objective.toml",
     "read-only-synonym-objective.toml",
+    "read-only-underscored-tool.toml",
     "read-only-write-scope.toml",
     "review-missing-exact-head.toml",
     "whitespace-authority.toml",
@@ -151,6 +154,8 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("review-missing-exact-head.toml") => Ok("requires basis.pr and basis.head_sha"),
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("invalid-external-authority.toml") => Ok("must name a non-empty HTTPS resource"),
+        Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
@@ -159,6 +164,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-mutation-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-underscored-tool.toml") => Ok("requests mutation in objective"),
         Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
         Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
@@ -695,7 +701,7 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "wrote",
     ];
     if let Some(word) = value
-        .split(|character: char| !character.is_ascii_alphanumeric() && character != '_')
+        .split(|character: char| !character.is_ascii_alphanumeric())
         .map(str::to_ascii_lowercase)
         .find(|word| MUTATION_WORDS.contains(&word.as_str()))
     {
@@ -824,6 +830,17 @@ mod tests {
         rejects(
             &valid().replace("spec:UNSAFE-REVIEW-SPEC-0044", "external:https://"),
             "must name a non-empty HTTPS resource",
+        )
+    }
+
+    #[test]
+    fn rejects_underscored_mutation_tool_name() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "Answer one bounded question.",
+                "Use apply_patch on AGENTS.md.",
+            ),
+            "requests mutation in objective",
         )
     }
 

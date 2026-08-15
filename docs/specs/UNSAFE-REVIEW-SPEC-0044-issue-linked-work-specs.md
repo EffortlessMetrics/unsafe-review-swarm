@@ -58,7 +58,8 @@ first character of each component is not a dot. Repository roots (`.` or `/`),
 absolute or drive-qualified paths, backslashes, `..` traversal, empty
 components, and wildcard patterns are rejected. Authorities use one typed
 form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
-`issue:https://.../issues/N`, `pr:https://.../pull/N`, or
+`issue:https://github.com/OWNER/REPO/issues/N`,
+`pr:https://github.com/OWNER/REPO/pull/N`, or
 `external:https://...`. An external authority requires at least one
 non-whitespace resource character after `https://`. Leading/trailing
 whitespace, unknown types, duplicate
