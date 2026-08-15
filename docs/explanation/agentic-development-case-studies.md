@@ -45,9 +45,9 @@ green gate.
 
 ### Rail / artifact
 
-`AGENT-ORCHESTRATION.md` §11 (reconstruct the reason for broad golden or
-snapshot changes; live source truth outranks stale planning) and the
-diff-vs-issue verification step before merge.
+`AGENT-ORCHESTRATION.md` §§7 and 11 (challenge the exact head, reconstruct the
+reason for broad golden or snapshot changes, and prefer live source truth over
+stale planning) and the diff-vs-issue verification step before merge.
 #1604 merged only after explicit owner confirmation.
 
 ### Reuse this when
