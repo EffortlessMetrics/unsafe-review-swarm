@@ -163,6 +163,7 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
     }
 
     let scope = require_table(table, "scope", path)?;
+    reject_unknown_fields(scope, &["included", "excluded"], path, "scope")?;
     require_string_array(scope, "included", path, "scope")?;
     require_string_array(scope, "excluded", path, "scope")?;
 
@@ -173,6 +174,12 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
             .as_table()
             .ok_or_else(|| format!("{path} invariant[{index}] must be a table"))?;
         let context = format!("{path} invariant[{index}]");
+        reject_unknown_fields(
+            invariant,
+            &["id", "text"],
+            path,
+            &format!("invariant[{index}]"),
+        )?;
         let id = require_string(invariant, "id", &context, None)?;
         require_id(id, "INV", path, "invariant", index)?;
         if !invariant_ids.insert(id) {
@@ -188,6 +195,12 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
             .as_table()
             .ok_or_else(|| format!("{path} acceptance[{index}] must be a table"))?;
         let context = format!("{path} acceptance[{index}]");
+        reject_unknown_fields(
+            acceptance,
+            &["id", "text", "proof"],
+            path,
+            &format!("acceptance[{index}]"),
+        )?;
         let id = require_string(acceptance, "id", &context, None)?;
         require_id(id, "AC", path, "acceptance", index)?;
         if !acceptance_ids.insert(id) {
@@ -203,6 +216,12 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
             .as_table()
             .ok_or_else(|| format!("{path} integration[{index}] must be a table"))?;
         let context = format!("{path} integration[{index}]");
+        reject_unknown_fields(
+            integration,
+            &["surface", "expected"],
+            path,
+            &format!("integration[{index}]"),
+        )?;
         require_string(integration, "surface", &context, None)?;
         require_string(integration, "expected", &context, None)?;
     }
@@ -214,6 +233,7 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
             .as_table()
             .ok_or_else(|| format!("{path} risk[{index}] must be a table"))?;
         let context = format!("{path} risk[{index}]");
+        reject_unknown_fields(risk, &["id", "mitigation"], path, &format!("risk[{index}]"))?;
         let id = require_string(risk, "id", &context, None)?;
         require_id(id, "RISK", path, "risk", index)?;
         if !risk_ids.insert(id) {
@@ -223,11 +243,7 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
     }
 
     let rollback = require_table(table, "rollback", path)?;
-    for key in rollback.keys() {
-        if key != "strategy" {
-            return Err(format!("{path} rollback contains unknown field `{key}`"));
-        }
-    }
+    reject_unknown_fields(rollback, &["strategy"], path, "rollback")?;
     require_string(rollback, "strategy", path, None)?;
 
     for field in [
@@ -246,12 +262,14 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
         let compatibility = compatibility
             .as_table()
             .ok_or_else(|| format!("{path} compatibility must be a table"))?;
+        reject_unknown_fields(compatibility, &["posture"], path, "compatibility")?;
         require_string(compatibility, "posture", path, None)?;
     }
     if let Some(delivery) = table.get("delivery") {
         let delivery = delivery
             .as_table()
             .ok_or_else(|| format!("{path} delivery must be a table"))?;
+        reject_unknown_fields(delivery, &["pr", "closeout"], path, "delivery")?;
         for field in ["pr", "closeout"] {
             if let Some(value) = delivery.get(field) {
                 let link = value.as_str().ok_or_else(|| {
@@ -264,6 +282,20 @@ pub(crate) fn validate_work_spec(value: &toml::Value, path: &str) -> Result<(), 
         }
     }
 
+    Ok(())
+}
+
+fn reject_unknown_fields(
+    table: &toml::value::Table,
+    allowed: &[&str],
+    path: &str,
+    context: &str,
+) -> Result<(), String> {
+    for key in table.keys() {
+        if !allowed.contains(&key.as_str()) {
+            return Err(format!("{path} {context} contains unknown field `{key}`"));
+        }
+    }
     Ok(())
 }
 
@@ -443,6 +475,66 @@ mod tests {
         };
         if !(error.contains("acceptance") && error.contains("AC-1")) {
             return Err(format!("unexpected duplicate-id error: {error}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_unknown_fields_in_every_nested_table() -> Result<(), String> {
+        let cases = [
+            (
+                "excluded = [\"Scheduling the repository portfolio\"]",
+                "excluded = [\"Scheduling the repository portfolio\"]\nunknown = \"x\"",
+                "scope",
+            ),
+            (
+                "text = \"The artifact must not choose the next issue.\"",
+                "text = \"The artifact must not choose the next issue.\"\nunknown = \"x\"",
+                "invariant[0]",
+            ),
+            (
+                "proof = [\"cargo test -p xtask\"]",
+                "proof = [\"cargo test -p xtask\"]\nunknown = \"x\"",
+                "acceptance[0]",
+            ),
+            (
+                "expected = \"The PR can report stable acceptance IDs.\"",
+                "expected = \"The PR can report stable acceptance IDs.\"\nunknown = \"x\"",
+                "integration[0]",
+            ),
+            (
+                "mitigation = \"Keep validation offline and structural.\"",
+                "mitigation = \"Keep validation offline and structural.\"\nunknown = \"x\"",
+                "risk[0]",
+            ),
+            (
+                "strategy = \"Remove the example and supersede the schema through a linked spec change.\"",
+                "strategy = \"Remove the example and supersede the schema through a linked spec change.\"\nunknown = \"x\"",
+                "rollback",
+            ),
+        ];
+        for (needle, replacement, context) in cases {
+            rejects_unknown_nested(&valid_spec().replace(needle, replacement), context)?;
+        }
+        rejects_unknown_nested(
+            &(valid_spec() + "\n[compatibility]\nposture = \"Additive.\"\nunknown = \"x\"\n"),
+            "compatibility",
+        )?;
+        rejects_unknown_nested(
+            &(valid_spec()
+                + "\n[delivery]\npr = \"https://github.com/example/repo/pull/1\"\nunknown = \"x\"\n"),
+            "delivery",
+        )
+    }
+
+    fn rejects_unknown_nested(source: &str, context: &str) -> Result<(), String> {
+        let value: toml::Value =
+            toml::from_str(source).map_err(|error| format!("test TOML: {error}"))?;
+        let error = validate_work_spec(&value, "test.toml")
+            .err()
+            .ok_or_else(|| format!("unknown {context} field unexpectedly passed"))?;
+        if !error.contains(context) || !error.contains("unknown field") {
+            return Err(format!("unexpected {context} error: {error}"));
         }
         Ok(())
     }

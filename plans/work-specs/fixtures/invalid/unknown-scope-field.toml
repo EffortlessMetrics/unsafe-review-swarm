@@ -1,0 +1,31 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+kind = "maintenance"
+objective = "Reject unsupported nested scope fields."
+user_outcome = "The compiler matches the closed nested schema."
+claim_boundary = "Structural validation only."
+
+[scope]
+included = ["Nested scope validation"]
+excluded = ["Runtime behavior"]
+unknown = "not allowed"
+
+[[invariant]]
+id = "INV-1"
+text = "Nested schema tables fail closed."
+
+[[acceptance]]
+id = "AC-1"
+text = "The checker rejects the extra field."
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "checker"
+expected = "Unknown fields are rejected."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the compiler aligned with JSON Schema."
+
+[rollback]
+strategy = "Delete the intentionally invalid fixture."
