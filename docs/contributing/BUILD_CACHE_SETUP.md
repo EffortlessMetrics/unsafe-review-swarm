@@ -13,8 +13,9 @@ disk and cause git operations to fail mid-build.
 ## Policy
 
 Relocate heavy caches to a high-capacity drive before starting agent builder
-work. This is documented in `docs/contributing/AGENT-ORCHESTRATION.md` §9
-("Relocate heavy caches off constrained drives").
+work. The cleanup/cache handoff is documented in
+`docs/contributing/AGENT-ORCHESTRATION.md` §9 ("Reconcile and clean"), which
+links back to this setup guide.
 
 ## Setup
 

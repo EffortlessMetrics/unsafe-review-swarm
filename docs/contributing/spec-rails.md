@@ -95,7 +95,8 @@ A spec is the current best-verified understanding, not an axiom — it can be
 wrong. An agent that faithfully implements a false premise produces a wrong
 result that passes its own re-blessed checks. Verify a spec's premise against
 the code before building on it; when verification falsifies it, update the spec
-rather than shipping to it. See `AGENT-ORCHESTRATION.md` §11–12.
+rather than shipping to it. See `AGENT-ORCHESTRATION.md` §11, especially the
+root-premise and live-state verification bullets.
 
 ### Enforcement
 
