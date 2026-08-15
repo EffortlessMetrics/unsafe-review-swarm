@@ -40,6 +40,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "nonexistent-adr-authority.toml",
     "nonexistent-spec-authority.toml",
     "nonexistent-work-spec.toml",
+    "prefix-spec-authority.toml",
     "read-only-mutation-objective.toml",
     "read-only-mutation-proof.toml",
     "read-only-mutation-stop-when.toml",
@@ -50,7 +51,10 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-copying-objective.toml",
     "read-only-generate-objective.toml",
     "read-only-overwrite-objective.toml",
+    "read-only-rm-proof.toml",
     "read-only-synonym-objective.toml",
+    "read-only-touch-objective.toml",
+    "read-only-touch-stop-when.toml",
     "read-only-underscored-tool.toml",
     "read-only-write-scope.toml",
     "review-missing-exact-head.toml",
@@ -194,11 +198,15 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-copying-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-generate-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-rm-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-touch-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-touch-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
         Some("read-only-underscored-tool.toml") => Ok("requests mutation in objective"),
         Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
         Some("nested-work-spec.toml") => Ok("must reference one direct work spec"),
         Some("nonexistent-spec-authority.toml") => Ok("does not resolve to one tracked spec"),
+        Some("prefix-spec-authority.toml") => Ok("does not declare canonical identifier"),
         Some("nonexistent-adr-authority.toml") => Ok("does not resolve to one tracked adr"),
         Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
@@ -611,12 +619,25 @@ fn resolve_document_authority(kind: &str, identifier: &str, path: &str) -> Resul
                 && !candidate[prefix.len()..].contains('/')
         })
         .collect();
-    if output.status.success() && matches.len() == 1 && workspace_path(matches[0]).is_file() {
-        Ok(())
-    } else {
+    if !output.status.success() || matches.len() != 1 || !workspace_path(matches[0]).is_file() {
         Err(format!(
             "{path} authority `{kind}:{identifier}` does not resolve to one tracked {kind} document"
         ))
+    } else {
+        let document = read_to_string(&workspace_path(matches[0]))?;
+        let declared = document
+            .lines()
+            .next()
+            .and_then(|heading| heading.strip_prefix("# "))
+            .and_then(|heading| heading.split_whitespace().next())
+            .map(|token| token.trim_end_matches(':'));
+        if declared == Some(identifier) {
+            Ok(())
+        } else {
+            Err(format!(
+                "{path} authority `{kind}:{identifier}` resolved document does not declare canonical identifier `{identifier}` in its heading"
+            ))
+        }
     }
 }
 
@@ -803,6 +824,8 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "tagged",
         "tagging",
         "tags",
+        "touch",
+        "rm",
         "update",
         "updated",
         "updates",
@@ -955,6 +978,20 @@ mod tests {
             validate(&value, "test.toml")?;
         }
         Ok(())
+    }
+
+    #[test]
+    fn rejects_spec_index_prefix_but_accepts_canonical_spec_heading() -> Result<(), String> {
+        let canonical: toml::Value =
+            toml::from_str(&valid()).map_err(|error| format!("test TOML: {error}"))?;
+        validate(&canonical, "canonical-spec.toml")?;
+        rejects(
+            &valid().replace(
+                "spec:UNSAFE-REVIEW-SPEC-0044",
+                "spec:UNSAFE-REVIEW-SPEC-START",
+            ),
+            "does not declare canonical identifier",
+        )
     }
 
     #[test]
@@ -1144,6 +1181,30 @@ mod tests {
                 ),
                 "requests mutation in objective",
             )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_shell_mutation_commands_in_each_directive_field() -> Result<(), String> {
+        for (original, replacement, expected) in [
+            (
+                "Answer one bounded question.",
+                "Run touch docs/new.md.",
+                "requests mutation in objective",
+            ),
+            (
+                "Return exact paths.",
+                "Run rm -f docs/old.md.",
+                "requests mutation in proof_obligations[0]",
+            ),
+            (
+                "The question is answered.",
+                "Stop after touch docs/new.md.",
+                "requests mutation in stop_when[0]",
+            ),
+        ] {
+            rejects(&valid().replace(original, replacement), expected)?;
         }
         Ok(())
     }
