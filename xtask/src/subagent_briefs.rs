@@ -55,6 +55,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-write-scope.toml",
     "review-missing-exact-head.toml",
     "whitespace-authority.toml",
+    "whitespace-objective.toml",
     "writer-missing-admission.toml",
     "writer-missing-edit-cage.toml",
     "writer-missing-issue.toml",
@@ -182,6 +183,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("case-variant-authority.toml") => Ok("duplicates authority"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
+        Some("whitespace-objective.toml") => Ok("field `objective` must not be empty"),
         Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-mutation-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("read-only-mutation-stop-when.toml") => Ok("requests mutation in stop_when[0]"),
@@ -212,6 +214,18 @@ fn check_schema() -> Result<(), String> {
         != Some("https://json-schema.org/draft/2020-12/schema")
     {
         return Err(format!("{SCHEMA} must use JSON Schema 2020-12"));
+    }
+    for pointer in [
+        "/properties/objective/pattern",
+        "/$defs/strings/items/pattern",
+        "/$defs/non_empty_strings/items/pattern",
+        "/$defs/admission/properties/worktree/pattern",
+    ] {
+        if value.pointer(pointer).and_then(serde_json::Value::as_str) != Some("\\S") {
+            return Err(format!(
+                "{SCHEMA} `{pointer}` must reject whitespace-only strings with `\\S`"
+            ));
+        }
     }
     Ok(())
 }
@@ -890,7 +904,12 @@ fn valid_github_repo(value: &str) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::{validate, validate_url};
+    use super::{check_schema, validate, validate_url};
+
+    #[test]
+    fn schema_rejects_whitespace_only_generic_strings() -> Result<(), String> {
+        check_schema()
+    }
 
     #[test]
     fn rejects_global_lane_authority() -> Result<(), String> {
