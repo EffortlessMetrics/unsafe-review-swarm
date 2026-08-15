@@ -69,14 +69,17 @@ cannot disguise a duplicate. An external authority requires at least one
 non-whitespace resource character after `https://`. Leading/trailing
 whitespace, unknown types, duplicate
 normalized references, and global/runtime authority are rejected.
+Spec and ADR identifiers resolve to exactly one canonical tracked document.
+GitHub issue and PR identities use closed owner, repository, route, and positive
+number grammars rather than accepting arbitrary non-slash segments.
 
 Only `build` carries writer admission, an admitted worktree, and a non-empty
 write-scope edit cage. `investigate`, `challenge_plan`, `verify`, `review`,
 `triage_ci`, and `audit_cleanup` are read-only. `verify` and `review` additionally
 require an exact PR and head SHA.
 
-The checker resolves `work_item.work_spec` as a canonical path beneath
-`plans/work-specs/examples/`, parses it through the accepted work-spec data,
+The checker resolves `work_item.work_spec` as one direct canonical TOML file
+beneath `plans/work-specs/examples/` (nested paths are rejected), parses it through the accepted work-spec data,
 and requires its `issue` URL to equal `work_item.issue`. Missing and mismatched
 references fail offline.
 

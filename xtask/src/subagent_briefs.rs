@@ -27,9 +27,14 @@ const INVALID_FIXTURES: &[&str] = &[
     "contradictory-authority.toml",
     "global-lane-authority.toml",
     "invalid-external-authority.toml",
+    "invalid-github-character.toml",
+    "invalid-github-whitespace.toml",
     "invalid-issue-authority-route.toml",
     "invalid-pr-authority-route.toml",
     "mismatched-work-spec.toml",
+    "nested-work-spec.toml",
+    "nonexistent-adr-authority.toml",
+    "nonexistent-spec-authority.toml",
     "nonexistent-work-spec.toml",
     "read-only-mutation-objective.toml",
     "read-only-mutation-proof.toml",
@@ -157,6 +162,8 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("review-missing-exact-head.toml") => Ok("requires basis.pr and basis.head_sha"),
         Some("global-lane-authority.toml") => Ok("appoints global or runtime authority"),
         Some("invalid-external-authority.toml") => Ok("must name a non-empty HTTPS resource"),
+        Some("invalid-github-character.toml") => Ok("must be a GitHub issues URL"),
+        Some("invalid-github-whitespace.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
@@ -172,6 +179,9 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-underscored-tool.toml") => Ok("requests mutation in objective"),
         Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
+        Some("nested-work-spec.toml") => Ok("must reference one direct work spec"),
+        Some("nonexistent-spec-authority.toml") => Ok("does not resolve to one tracked spec"),
+        Some("nonexistent-adr-authority.toml") => Ok("does not resolve to one tracked adr"),
         Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
         None => Err(format!("{} has no file name", path.display())),
@@ -497,6 +507,7 @@ fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
                     "{path} authority `{authority}` has an invalid identifier"
                 ));
             }
+            resolve_document_authority(kind, value, path)?;
         }
         "policy" | "work_spec" | "artifact" => {
             repository_relative_path(value, path, "authority")?;
@@ -547,11 +558,46 @@ fn tracked_repository_file(value: &str, path: &str, field: &str) -> Result<(), S
     }
 }
 
+fn resolve_document_authority(kind: &str, identifier: &str, path: &str) -> Result<(), String> {
+    let root = if kind == "spec" {
+        "docs/specs"
+    } else {
+        "docs/adr"
+    };
+    let prefix = format!("{root}/{identifier}-");
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "--", root])
+        .current_dir(workspace_path(""))
+        .output()
+        .map_err(|error| format!("{path} failed to resolve {kind} `{identifier}`: {error}"))?;
+    let stdout = String::from_utf8(output.stdout).map_err(|error| {
+        format!("{path} git output for {kind} `{identifier}` is not UTF-8: {error}")
+    })?;
+    let matches: Vec<&str> = stdout
+        .lines()
+        .filter(|candidate| {
+            candidate.starts_with(&prefix)
+                && candidate.ends_with(".md")
+                && !candidate[prefix.len()..].contains('/')
+        })
+        .collect();
+    if output.status.success() && matches.len() == 1 && workspace_path(matches[0]).is_file() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} authority `{kind}:{identifier}` does not resolve to one tracked {kind} document"
+        ))
+    }
+}
+
 fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), String> {
     repository_relative_path(reference, path, "work_item.work_spec")?;
-    if !reference.starts_with("plans/work-specs/examples/") || !reference.ends_with(".toml") {
+    let name = reference
+        .strip_prefix("plans/work-specs/examples/")
+        .and_then(|value| value.strip_suffix(".toml"));
+    if name.is_none_or(|value| value.is_empty() || value.contains('/')) {
         return Err(format!(
-            "{path} work_item.work_spec must reference an accepted work spec under plans/work-specs/examples"
+            "{path} work_item.work_spec must reference one direct work spec under plans/work-specs/examples/*.toml"
         ));
     }
     let work_spec_path = workspace_path(reference);
@@ -783,8 +829,8 @@ fn validate_url(url: &str, path: &str, field: &str, segment: &str) -> Result<(),
         || parts[0] != "https:"
         || !parts[1].is_empty()
         || parts[2] != "github.com"
-        || parts[3].is_empty()
-        || parts[4].is_empty()
+        || !valid_github_owner(parts[3])
+        || !valid_github_repo(parts[4])
         || parts[5] != segment
         || parts[6]
             .parse::<u64>()
@@ -797,6 +843,23 @@ fn validate_url(url: &str, path: &str, field: &str, segment: &str) -> Result<(),
         ));
     }
     Ok(())
+}
+
+fn valid_github_owner(value: &str) -> bool {
+    value.len() <= 39
+        && value.starts_with(|character: char| character.is_ascii_alphanumeric())
+        && value.ends_with(|character: char| character.is_ascii_alphanumeric())
+        && value
+            .chars()
+            .all(|character| character.is_ascii_alphanumeric() || character == '-')
+}
+
+fn valid_github_repo(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= 100
+        && value.chars().all(|character| {
+            character.is_ascii_alphanumeric() || matches!(character, '.' | '_' | '-')
+        })
 }
 
 #[cfg(test)]
@@ -825,6 +888,61 @@ mod tests {
             &valid().replace("action = \"investigate\"", "action = \"review\""),
             "requires basis.pr and basis.head_sha",
         )
+    }
+
+    #[test]
+    fn rejects_nested_work_spec_reference() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml",
+                "plans/work-specs/examples/nested/UNSAFE-REVIEW-WORK-1924.toml",
+            ),
+            "must reference one direct work spec",
+        )
+    }
+
+    #[test]
+    fn resolves_spec_and_adr_authorities() -> Result<(), String> {
+        for authority in ["spec:UNSAFE-REVIEW-SPEC-0044", "adr:UNSAFE-REVIEW-ADR-0001"] {
+            let source = valid().replace("spec:UNSAFE-REVIEW-SPEC-0044", authority);
+            let value: toml::Value =
+                toml::from_str(&source).map_err(|error| format!("test TOML: {error}"))?;
+            validate(&value, "test.toml")?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_nonexistent_document_authorities() -> Result<(), String> {
+        for (authority, expected) in [
+            ("spec:UNSAFE-REVIEW-SPEC-9999", "tracked spec document"),
+            ("adr:UNSAFE-REVIEW-ADR-9999", "tracked adr document"),
+        ] {
+            rejects(
+                &valid().replace("spec:UNSAFE-REVIEW-SPEC-0044", authority),
+                expected,
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_invalid_github_identity_segments() -> Result<(), String> {
+        for issue in [
+            "https://github.com/Effortless Metrics/unsafe-review-swarm/issues/1924",
+            "https://github.com/Effortless@Metrics/unsafe-review-swarm/issues/1924",
+            "https://github.com/EffortlessMetrics/unsafe review/issues/1924",
+            "https://github.com/EffortlessMetrics/unsafe@review/issues/1924",
+        ] {
+            rejects(
+                &valid().replace(
+                    "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924",
+                    issue,
+                ),
+                "must be a GitHub issues URL",
+            )?;
+        }
+        Ok(())
     }
 
     #[test]
