@@ -28,6 +28,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "mismatched-work-spec.toml",
     "nonexistent-work-spec.toml",
     "read-only-mutation-objective.toml",
+    "read-only-mutation-proof.toml",
     "read-only-write-scope.toml",
     "review-missing-exact-head.toml",
     "whitespace-authority.toml",
@@ -149,6 +150,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
         Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-mutation-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("nonexistent-work-spec.toml") => Ok("does not resolve to an accepted work spec"),
         Some("mismatched-work-spec.toml") => Ok("declares issue"),
         Some(name) => Err(format!("{INVALID_ROOT} has unregistered fixture `{name}`")),
@@ -523,6 +525,10 @@ fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), St
 
 fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), String> {
     const MUTATION_WORDS: &[&str] = &[
+        "add",
+        "added",
+        "adding",
+        "adds",
         "change",
         "changed",
         "changes",
@@ -539,6 +545,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "deleted",
         "deletes",
         "deleting",
+        "deploy",
+        "deployed",
+        "deploying",
+        "deploys",
         "edit",
         "edited",
         "editing",
@@ -555,6 +565,10 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "merged",
         "merges",
         "merging",
+        "move",
+        "moved",
+        "moves",
+        "moving",
         "modify",
         "modified",
         "modifies",
@@ -567,10 +581,18 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "pushed",
         "pushes",
         "pushing",
+        "publish",
+        "published",
+        "publishes",
+        "publishing",
         "remove",
         "removed",
         "removes",
         "removing",
+        "rename",
+        "renamed",
+        "renames",
+        "renaming",
         "reply",
         "replied",
         "replies",
@@ -586,6 +608,14 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "rerun",
         "rerunning",
         "reruns",
+        "stage",
+        "staged",
+        "stages",
+        "staging",
+        "tag",
+        "tagged",
+        "tagging",
+        "tags",
         "update",
         "updated",
         "updates",
@@ -685,6 +715,20 @@ mod tests {
             &valid().replace("Return exact paths.", "Commit the inspected result."),
             "requests mutation in proof_obligations[0]",
         )
+    }
+
+    #[test]
+    fn rejects_common_repository_mutation_terms() -> Result<(), String> {
+        for term in ["add", "stage", "rename", "move", "publish", "deploy", "tag"] {
+            rejects(
+                &valid().replace(
+                    "Answer one bounded question.",
+                    &format!("{term} one bounded artifact."),
+                ),
+                "requests mutation in objective",
+            )?;
+        }
+        Ok(())
     }
 
     #[test]

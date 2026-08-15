@@ -1,0 +1,18 @@
+schema = "bounded-subagent-brief-v1"
+action = "verify"
+capability = "read_only"
+objective = "Verify one exact PR head."
+read_scope = ["xtask/src/subagent_briefs.rs"]
+write_scope = []
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044"]
+proof_obligations = ["Stage and publish the verified artifact."]
+non_goals = ["No wider work."]
+stop_when = ["The exact-head result is known."]
+return_schema = "bounded-subagent-result-v1"
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2109"
+head_sha = "cb1af6aac124ff4d0a3ca8e02db4b0b1f5f9292d"
