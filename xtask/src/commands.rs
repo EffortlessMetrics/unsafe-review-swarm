@@ -8,6 +8,7 @@ pub(crate) enum XtaskCommand {
     CheckPolicy,
     CheckDocArtifacts,
     CheckWorkSpecs,
+    CheckSubagentBriefs,
     CheckDocsAutomation,
     CheckSpecStatus,
     CheckPublicSurfaces,
@@ -63,6 +64,9 @@ impl XtaskCommand {
             }
             Some("check-work-specs") => {
                 parse_no_extra(args, "check-work-specs", Self::CheckWorkSpecs)
+            }
+            Some("check-subagent-briefs") => {
+                parse_no_extra(args, "check-subagent-briefs", Self::CheckSubagentBriefs)
             }
             Some("check-docs-automation") => {
                 parse_no_extra(args, "check-docs-automation", Self::CheckDocsAutomation)

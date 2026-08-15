@@ -1,0 +1,15 @@
+schema = "bounded-subagent-brief-v1"
+action = "audit_cleanup"
+objective = "Audit only lane-owned cleanup candidates."
+read_scope = ["git worktree list", "branch and process ownership evidence"]
+write_scope = []
+authorities = ["merged origin/main", "lane handoff"]
+proof_obligations = ["Classify each candidate as owned, foreign, or uncertain."]
+non_goals = ["Do not delete any worktree, branch, process, or artifact."]
+stop_when = ["Every lane candidate is classified."]
+return_schema = "bounded-subagent-result-v1"
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1900.toml"
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"

@@ -6,10 +6,12 @@ Created: 2026-07-14
 Linked proposal: UNSAFE-REVIEW-PROP-0002-source-of-truth-stack
 Linked issues:
 - https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1900
+- https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924
 Support-tier impact: none
 Policy impact:
 - .allow/artifacts/doc-artifacts.toml
 - docs/schemas/issue-work-spec.schema.json
+- docs/schemas/bounded-subagent-brief.schema.json
 
 ## Problem
 
@@ -34,12 +36,38 @@ linked durable specs/ADRs, compatibility posture, and later PR/closeout links.
 Invariant and acceptance IDs are stable contract identifiers. Verification may
 report evidence against them, but must not rewrite their meaning.
 
+### Bounded delegation reference
+
+`bounded-subagent-brief-v1` is the versioned, offline-validated input for one
+bounded child action. Its JSON Schema shape lives at
+`docs/schemas/bounded-subagent-brief.schema.json`, with TOML examples and
+invalid fixtures under `plans/subagent-briefs/`.
+
+The brief references the controlling issue and accepted work spec; it does not
+copy or replace that contract. Every brief names a full base SHA, one action,
+read and write scopes, durable authorities, proof obligations, non-goals, stop
+conditions, and the expected `bounded-subagent-result-v1` return identifier.
+Only `build` carries writer admission, an admitted worktree, and a non-empty
+write-scope edit cage. `investigate`, `challenge_plan`, `verify`, `review`,
+`triage_ci`, and `audit_cleanup` are read-only. `verify` and `review` additionally
+require an exact PR and head SHA.
+
+`xtask check-subagent-briefs` validates the schema, one example for every
+action, and rejected fixtures. Its single-line JSON result is structural
+evidence only. The referenced result identifier does not implement or validate
+the separate result contract tracked by issue #1926.
+
 ## Authority boundary
 
 The work spec MUST NOT contain repository-wide priority, queue rank, current
 task, default goal, or issue-status scheduling fields. GitHub issues and project
 metadata own the concurrent work portfolio; the Codex controller's current
 issue and phase remain ephemeral.
+
+The bounded brief inherits that boundary and also rejects global-lane,
+model-selection, agent-count, and private-reasoning authority. A brief cannot
+admit a writer by itself: it records an admission decision already made from
+live issue, branch, and worktree evidence.
 
 Validation is offline and structural. It does not query GitHub, execute proof
 commands, run tests, establish hosted-CI status, or make unsafe-code safety,
@@ -55,7 +83,9 @@ must not be mistaken for a scheduler or for first-class cargo-allow support.
 
 ```text
 cargo run --locked -p xtask -- check-work-specs
+cargo run --locked -p xtask -- check-subagent-briefs
 cargo test --locked -p xtask work_specs
+cargo test --locked -p xtask subagent_briefs
 cargo-allow check --profile spec-system --mode audit
 cargo run --locked -p xtask -- check-doc-artifacts
 cargo run --locked -p xtask -- check-pr

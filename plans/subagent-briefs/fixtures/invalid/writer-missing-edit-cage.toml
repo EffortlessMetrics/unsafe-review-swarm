@@ -1,0 +1,18 @@
+schema = "bounded-subagent-brief-v1"
+action = "build"
+objective = "Invalid writer."
+read_scope = ["docs/"]
+write_scope = []
+authorities = ["issue #1924"]
+proof_obligations = ["Reject this brief."]
+non_goals = ["No expansion."]
+stop_when = ["Rejected."]
+return_schema = "bounded-subagent-result-v1"
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "UNSAFE-REVIEW-WORK-1900"
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+[admission]
+state = "admitted"
+worktree = "/worktrees/1924"
