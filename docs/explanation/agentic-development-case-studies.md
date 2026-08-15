@@ -6,11 +6,12 @@ case records the reusable rule, the failure mode, the verification move that
 caught it, and the rail where the rule now lives, so a future agent can apply
 the lesson without rediscovering it.
 
-The role split these cases assume (see `../contributing/AGENT-ORCHESTRATION.md`):
-cheap agents **investigate, refute, verify, and clean**; a mid-tier agent
-**implements**; the deterministic gate **decides pass/fail**; the controller
-(human or main thread) **merges**. No agent grades its own work as the merge
-signal, and no agent proves correctness — the gate and tests do the deciding.
+The responsibility split in these cases follows the runtime-neutral protocol
+in `../contributing/AGENT-ORCHESTRATION.md`: one accountable writer owns the
+mutation surface, review challenges the exact head, deterministic checks and
+live GitHub policy decide integration, and the merge controller reconciles the
+result. A human, one agent, or several helpers may carry those responsibilities;
+no runtime verdict grades its own work into a merge signal.
 
 ---
 
@@ -44,8 +45,9 @@ green gate.
 
 ### Rail / artifact
 
-`AGENT-ORCHESTRATION.md` §12 ("beware the re-blessed gate"; specs and issues are
-directional hypotheses) and the diff-vs-issue verification step before merge.
+`AGENT-ORCHESTRATION.md` §11 (reconstruct the reason for broad golden or
+snapshot changes; live source truth outranks stale planning) and the
+diff-vs-issue verification step before merge.
 #1604 merged only after explicit owner confirmation.
 
 ### Reuse this when

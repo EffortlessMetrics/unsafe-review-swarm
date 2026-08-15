@@ -67,9 +67,9 @@ and zero admitted writers is valid.
 
 | Surface | Trigger and owned artifact | Consumers | Overlap or known drift | Disposition and replacement proof |
 |---|---|---|---|---|
-| `AGENTS.md` | Every repository operation; owns the operating contract, precedence, product boundary, and lane rules | All contributors and runtime adapters | Contains detailed model/provider examples and lifecycle explanation also present in the orchestration guide | `THIN`: retain normative authority and repo-specific boundaries; future thinning may link explanatory economics to this map and `AGENT-ORCHESTRATION.md`. Proof: doc gates plus a review that every removed rule remains reachable from the root router |
+| `AGENTS.md` | Every repository operation; owns the operating contract, precedence, product boundary, and lane rules | All contributors and runtime adapters | Now acts as the thin coordinator/worker router and intentionally repeats only the repository, product, worktree, proof, claim, and cleanup invariants needed at entry | `REUSE`: keep the root router thin and link detailed lifecycle guidance rather than restoring runtime choreography. Proof: doc gates plus review that each invariant remains reachable |
 | `CLAUDE.md` | Claude Code entry; owns no durable repository state | Claude Code sessions | Repeats product, command, architecture, and routing doctrine from `AGENTS.md` and specs | `THIN`: retain runtime startup guidance and links; do not make its commands or capability claims repository authority. Proof: Claude entry still routes to `AGENTS.md`, source truth, build gate, and trust boundary |
-| `docs/contributing/AGENT-ORCHESTRATION.md` | Detailed orchestration explanation and reusable examples | Maintainers and adapter authors | Fixed Haiku/Sonnet/Opus tiers, specific background-agent messaging, and token-cache figures are runtime-specific examples presented beside durable protocol | `REUSE`: keep as the detailed doctrine, but future edits must label model names, cache economics, and messaging APIs as examples. This map owns the disposition inventory, not a second lifecycle |
+| `docs/contributing/AGENT-ORCHESTRATION.md` | Detailed runtime-neutral orchestration protocol and reusable evidence patterns | Maintainers and adapter authors | Now defines repository touchpoints without fixed models, counts, personas, messaging topology, cache figures, or mandatory internal sequence; runtime adapters may still carry host-specific implementation choices | `REUSE`: keep it runtime-neutral and linked to this inventory plus SPEC-0044 rather than duplicating their tables or contract schema |
 | `docs/README.md` | Documentation discovery | Contributors and doc gates | Navigation only; it must not become lifecycle authority | `REUSE` as the index linking this map and the detailed orchestration guide |
 | `.github/PULL_REQUEST_TEMPLATE.md` | PR creation; owns the review-forward reporting shape | PR authors and reviewers | Some command/checklist guidance repeats root docs, intentionally close to delivery | `REUSE`: the template remains the delivery checklist and claim-boundary prompt; it does not decide readiness by itself |
 | `docs/handoffs/` and closeout artifacts | A completed, blocked, or transferred lane needs durable evidence | Maintainers and future agents | Historical records can look like current routing if read without live GitHub checks | `REUSE`: retain as evidence/history; always reconcile with current refs, issues, and PRs before action |
@@ -152,11 +152,11 @@ or check owns the result.
    treats GitHub as the concurrent portfolio and `.allow` as a non-scheduling
    durable graph. A later adapter PR should replace only those routing phrases;
    this inventory does not change the adapter files.
-2. `AGENTS.md` and `AGENT-ORCHESTRATION.md` describe fixed model tiers, while
-   model names, costs, cache behavior, and tool availability are runtime
-   capabilities. The durable rule is capability-based: bounded discovery and
-   verification, an appropriately capable writer, independent review, and a
-   deterministic floor. Provider/model names are examples.
+2. The fixed-tier/cache drift in `AGENTS.md` and `AGENT-ORCHESTRATION.md` is
+   resolved: the root is a thin role router and the detailed guide now defines
+   runtime-neutral repository touchpoints. Provider/model pins and tool lists
+   remain adapter-local implementation details, never repository correctness
+   rules.
 3. `CLAUDE.md` repeats repository doctrine as a convenience summary. Its own
    conflict rule already points back to `AGENTS.md`; future edits should reduce
    duplicated normative prose rather than create another authority.
@@ -164,10 +164,10 @@ or check owns the result.
    different coverage. The command reports deterministic disk/worktree facts;
    the role adds an advisory provenance classification. Neither authorizes
    deletion.
-5. The orchestration guide presents a fixed issue-file/spec/build sequence.
-   Existing accepted contracts may already contain the issue, spec, or plan, so
-   the durable requirement is to verify and reuse the current artifact rather
-   than recreate every stage ceremonially.
+5. The orchestration guide now presents lifecycle touchpoints as evidence
+   dependencies rather than a fixed issue-file/spec/build sequence. Existing
+   accepted contracts are verified and reused instead of recreating every
+   stage ceremonially.
 
 These findings are dispositions, not authorization to edit runtime adapters or
 root instructions in this docs-only slice.
