@@ -49,8 +49,8 @@ read and write scopes, durable authorities, proof obligations, non-goals, stop
 conditions, and the expected `bounded-subagent-result-v1` return identifier.
 The closed `capability` field is `write` only for `build` and `read_only` for
 every other action. For read-only briefs, the checker also rejects mutation
-verbs in `objective` and `proof_obligations`; prose cannot expand the declared
-capability.
+verbs in `objective`, `proof_obligations`, and `stop_when`; prose in any
+directive-bearing field cannot expand the declared capability.
 
 Every `write_scope` entry is a canonical slash-separated repository-relative
 path. Components use ASCII letters, digits, dot, underscore, or hyphen; the

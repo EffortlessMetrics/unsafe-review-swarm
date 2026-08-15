@@ -586,6 +586,7 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "moves",
         "moving",
         "overwrite",
+        "overwritten",
         "overwrites",
         "overwriting",
         "overwrote",
@@ -769,6 +770,17 @@ mod tests {
                 "Stop after committing the patch.",
             ),
             "requests mutation in stop_when[0]",
+        )
+    }
+
+    #[test]
+    fn rejects_overwritten_inflection() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "Return exact paths.",
+                "Confirm the validator is overwritten.",
+            ),
+            "requests mutation in proof_obligations[0]",
         )
     }
 
