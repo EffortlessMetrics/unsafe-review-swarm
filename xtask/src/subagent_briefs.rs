@@ -160,7 +160,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("invalid-issue-authority-route.toml") => Ok("must be a GitHub issues URL"),
         Some("invalid-pr-authority-route.toml") => Ok("must be a GitHub pull URL"),
         Some("contradictory-authority.toml") => Ok("duplicates authority"),
-        Some("case-variant-authority.toml") => Ok("lowercase normalized path"),
+        Some("case-variant-authority.toml") => Ok("duplicates authority"),
         Some("broad-write-scope.toml") => Ok("must be a normalized repository-relative path"),
         Some("whitespace-authority.toml") => Ok("must not contain surrounding whitespace"),
         Some("read-only-mutation-objective.toml") => Ok("requests mutation in objective"),
@@ -447,10 +447,10 @@ fn distinct_authorities(values: &[toml::Value], path: &str) -> Result<(), String
                 "{path} authority `{authority}` appoints global or runtime authority"
             ));
         }
-        validate_authority(authority, path)?;
         if !seen.insert(normalized) {
             return Err(format!("{path} duplicates authority `{authority}`"));
         }
+        validate_authority(authority, path)?;
     }
     Ok(())
 }
@@ -500,11 +500,7 @@ fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
         }
         "policy" | "work_spec" | "artifact" => {
             repository_relative_path(value, path, "authority")?;
-            if value != value.to_ascii_lowercase() {
-                return Err(format!(
-                    "{path} authority `{authority}` must use a lowercase normalized path"
-                ));
-            }
+            tracked_repository_file(value, path, "authority")?;
         }
         "issue" | "pr" => {
             validate_url(
@@ -530,6 +526,25 @@ fn validate_authority(authority: &str, path: &str) -> Result<(), String> {
         }
     }
     Ok(())
+}
+
+fn tracked_repository_file(value: &str, path: &str, field: &str) -> Result<(), String> {
+    let output = std::process::Command::new("git")
+        .args(["ls-files", "--error-unmatch", "--", value])
+        .current_dir(workspace_path(""))
+        .output()
+        .map_err(|error| format!("{path} failed to resolve {field} `{value}` with git: {error}"))?;
+    let stdout = String::from_utf8(output.stdout).map_err(|error| {
+        format!("{path} git output for {field} `{value}` is not UTF-8: {error}")
+    })?;
+    let exact = output.status.success() && stdout.lines().any(|tracked| tracked == value);
+    if exact && workspace_path(value).is_file() {
+        Ok(())
+    } else {
+        Err(format!(
+            "{path} {field} `{value}` must resolve with canonical case to a tracked repository file"
+        ))
+    }
 }
 
 fn validate_work_spec(reference: &str, issue: &str, path: &str) -> Result<(), String> {
@@ -910,9 +925,31 @@ mod tests {
         rejects(
             &valid().replace(
                 "spec:UNSAFE-REVIEW-SPEC-0044",
-                "artifact:docs/file\", \"artifact:Docs/file",
+                "artifact:docs/contributing/AGENT-ORCHESTRATION.md\", \"artifact:docs/contributing/agent-orchestration.md",
             ),
-            "lowercase normalized path",
+            "duplicates authority",
+        )
+    }
+
+    #[test]
+    fn accepts_canonical_tracked_path_authorities() -> Result<(), String> {
+        let source = valid().replace(
+            "spec:UNSAFE-REVIEW-SPEC-0044",
+            "artifact:docs/contributing/AGENT-ORCHESTRATION.md\", \"work_spec:plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml",
+        );
+        let value: toml::Value =
+            toml::from_str(&source).map_err(|error| format!("test TOML: {error}"))?;
+        validate(&value, "test.toml").map(|_| ())
+    }
+
+    #[test]
+    fn rejects_noncanonical_tracked_path_spelling() -> Result<(), String> {
+        rejects(
+            &valid().replace(
+                "spec:UNSAFE-REVIEW-SPEC-0044",
+                "artifact:docs/contributing/agent-orchestration.md",
+            ),
+            "must resolve with canonical case to a tracked repository file",
         )
     }
 

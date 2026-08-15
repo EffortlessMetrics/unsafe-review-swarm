@@ -62,8 +62,10 @@ components, and wildcard patterns are rejected. Authorities use one typed
 form: `spec:ID`, `adr:ID`, `policy:path`, `work_spec:path`, `artifact:path`,
 `issue:https://github.com/OWNER/REPO/issues/N`,
 `pr:https://github.com/OWNER/REPO/pull/N`, or
-`external:https://...`. Path-bearing authority payloads use lowercase canonical
-spelling so JSON Schema uniqueness and the checker agree for case variants. An external authority requires at least one
+`external:https://...`. Path-bearing authority payloads preserve the canonical
+case of tracked repository files. JSON Schema rejects exact duplicates; the
+offline checker additionally compares normalized authority strings so casing
+cannot disguise a duplicate. An external authority requires at least one
 non-whitespace resource character after `https://`. Leading/trailing
 whitespace, unknown types, duplicate
 normalized references, and global/runtime authority are rejected.
