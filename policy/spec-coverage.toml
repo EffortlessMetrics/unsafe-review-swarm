@@ -25,7 +25,7 @@ single_truth = true
 [[field]]
 name = "coverage_movement"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
-surfaces = ["json", "agent", "lsp", "usefulness_telemetry", "gate_manifest"]
+surfaces = ["json", "agent", "lsp", "usefulness_telemetry", "gate_manifest", "github_summary"]
 single_truth = true
 note = "policy_report does not project outcome_movement; it projects baseline_state only via its own derivation (see baseline_state entry)"
 
@@ -201,8 +201,8 @@ note = "Human-readable PR Markdown may group or format cards but does not own cl
 [[consumer]]
 name = "github_summary"
 surface = "github_summary"
-disposition = "mapped"
-note = "GitHub summary projection shares ReviewCard semantics with the PR Markdown surface."
+disposition = "aggregate_projection"
+note = "Bounded GitHub step summary maps aggregate scope/count/movement plus only the ranked top card's identity, location, class/code, operation family, missing evidence, next action, and advisory trust boundary. Every non-top card is omitted/parked here and remains available in cards.json and the full PR summary."
 
 [[consumer]]
 name = "comment_plan_json"
