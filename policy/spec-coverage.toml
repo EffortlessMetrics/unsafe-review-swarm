@@ -100,7 +100,7 @@ note = "ReviewClass owns class-derived severity and actionability. Saved LSP, li
 [[field]]
 name = "surfacing_disposition"
 canonical_source = "output/comment_plan/mod.rs::card_statuses (output/comment_plan/selection.rs)"
-surfaces = ["json", "comment_plan", "agent", "lsp", "pr_summary"]
+surfaces = ["json", "comment_plan", "agent", "lsp"]
 single_truth = true
 note = "Selected, not_selected, and not_eligible are reviewer-routing states. They must remain distinct from analyzer class and from human/agent readiness."
 
@@ -196,7 +196,7 @@ note = "The direct human renderer consumes ReviewCards, but its emitted field su
 name = "markdown_pr_summary"
 surface = "pr_summary"
 disposition = "aggregate_projection"
-note = "Maps aggregate coverage movement and card fields for specific-operation rows, but groups owner-contract cards into one bounded row with at most three representative locations. Grouped identity, class, proof path, operation, missing evidence, route, next action, and confirmation state are omitted/parked; the complete per-card inventory remains in cards.json."
+note = "Maps aggregate coverage movement and card fields for specific-operation rows, but groups owner-contract cards into one bounded row with at most three representative locations. Grouped identity, class, proof path, operation, missing evidence, route, next action, and confirmation state are omitted/parked; comment-plan surfacing disposition is absent/parked; the complete per-card inventory remains in cards.json."
 
 [[consumer]]
 name = "github_summary"
