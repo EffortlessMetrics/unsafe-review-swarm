@@ -121,9 +121,12 @@ and advisory; they are not the orchestrator's input.
 
 The bounded 2026-08-20 smoke in
 [`docs/dogfood/reports/2026-08-20-ub-review-consumer-smoke.md`](../dogfood/reports/2026-08-20-ub-review-consumer-smoke.md)
-ran `unsafe-review` 0.3.8 from exact swarm commit
-`672a4c259dd9ddf8e4fa81d861b57d0d5e1254e1` through `ub-review` 0.1.0 at
-exact commit `9de43c5215c8e4278cce9421b55991ced4f66065`.
+exercised a detached `ub-review run` at exact commit
+`9de43c5215c8e4278cce9421b55991ced4f66065`, with locally built
+`unsafe-review` 0.3.8 from exact swarm commit
+`672a4c259dd9ddf8e4fa81d861b57d0d5e1254e1` first on `PATH`. It did not run
+the composite GitHub Action; that Action's default installer remains pinned to
+unsafe-review 0.3.4, so Action-route compatibility remains unproven.
 
 That pin correctly routes `unsafe-review-gate/v1`, surfaces its advisory
 status, movement, tool provenance, and manifest trust boundary, and retains the
