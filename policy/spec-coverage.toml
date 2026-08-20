@@ -252,10 +252,16 @@ disposition = "routing_manifest"
 note = "Thin artifact-routing manifest; paths, kinds, and schema versions require the compatibility contract tracked by #2115."
 
 [[consumer]]
-name = "tokmd_packets_json"
+name = "reviewcard_agent_packet"
 surface = "agent"
+disposition = "mapped"
+note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it preserves card identity, evidence, readiness, and repair projection."
+
+[[consumer]]
+name = "tokmd_packets_json"
+surface = "manual_candidate"
 disposition = "formatting_sidecar"
-note = "Bounded formatting input derived from checked ReviewCard artifacts; it is not rendered tokmd output or a second classifier."
+note = "ManualCandidate formatting input with analyzer_discovered=0; it is not the ReviewCard agent packet, rendered tokmd output, or a second classifier."
 
 [[consumer]]
 name = "public_action"
