@@ -46,9 +46,9 @@ note = "JSON, agent packets, policy-report rows, and saved/live LSP diagnostics 
 [[field]]
 name = "agent_readiness"
 canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
-surfaces = ["json", "agent", "file_range_scan", "lsp", "usefulness_telemetry", "review_kit", "github_summary"]
+surfaces = ["json", "agent", "file_range_scan", "lsp", "repair_queue", "comment_plan", "pr_summary", "usefulness_telemetry", "review_kit", "github_summary"]
 single_truth = true
-note = "compute_agent_lsp_readiness owns the per-card readiness state projected by JSON coverage, agent packets, nested file-range packets, and saved/live LSP EditorCoverageBlock.agent_lsp_readiness; LSP action contracts also carry the same readiness vocabulary. Usefulness telemetry, review-kit, and GitHub summary consume bounded aggregate or handoff projections of that shared state."
+note = "compute_agent_lsp_readiness owns the per-card readiness state projected by JSON coverage, agent packets, nested file-range packets, saved/live LSP EditorCoverageBlock.agent_lsp_readiness, repair-queue entries, and both comment-plan card shapes; LSP action contracts also carry the same readiness vocabulary. The PR summary presents a bounded agent-handoff view of that same projection, while usefulness telemetry, review-kit, and GitHub summary consume bounded aggregate or handoff projections."
 
 [[field]]
 name = "comment_plan_status"
@@ -121,9 +121,9 @@ note = "The summary and verify commands are card-owned handoff facts. Renderers 
 [[field]]
 name = "repair_applicability"
 canonical_source = "output/agent/queue.rs::repair_queue_projection (AgentQueueProjection)"
-surfaces = ["json", "repair_queue", "lsp", "agent", "file_range_scan", "pr_summary", "github_summary", "review_kit"]
+surfaces = ["json", "repair_queue", "comment_plan", "lsp", "agent", "file_range_scan", "pr_summary", "github_summary", "review_kit"]
 single_truth = true
-note = "Buckets, bounded allowed-repair hints, typed repair candidates, and readiness are derived from the shared repair projection. The repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
+note = "Buckets, bounded allowed-repair hints, typed repair candidates, and readiness are derived from the shared repair projection. CommentPlanRepairMetadata directly projects that vocabulary for both selected and not-selected cards; the repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
 
 [[field]]
 name = "freshness_identity"
