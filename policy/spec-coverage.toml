@@ -25,9 +25,9 @@ single_truth = true
 [[field]]
 name = "coverage_movement"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
-surfaces = ["json", "agent", "lsp", "usefulness_telemetry", "gate_manifest", "github_summary"]
+surfaces = ["json", "agent", "lsp", "pr_summary", "badges", "policy_report", "usefulness_telemetry", "gate_manifest", "github_summary"]
 single_truth = true
-note = "policy_report does not project outcome_movement; it projects baseline_state only via its own derivation (see baseline_state entry)"
+note = "PR Markdown, policy-report, gate, and GitHub aggregates copy the canonical five Summary movement counts. Badges consume the canonical baseline-aware new/worsened counts when a baseline exists; their displayed count remains an aggregate, not a per-card movement projection."
 
 [[field]]
 name = "baseline_state"
@@ -65,7 +65,7 @@ note = "audit-time metadata, not a per-card field"
 [[field]]
 name = "card_identity"
 canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
 
@@ -79,21 +79,21 @@ note = "File, range, owner, visibility, and changed-line state are card facts. S
 [[field]]
 name = "rule_class_code"
 canonical_source = "domain/classification.rs::ReviewClass::as_str"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The stable diagnostic code is the canonical class/rule code. Severity remains a separate ReviewClass projection; adapters must not replace either with priority or operation family."
 
 [[field]]
 name = "operation_family"
 canonical_source = "domain/operation.rs::UnsafeOperation.family.as_str()"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "ub_review", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "ub_review", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "Operation family is card-owned and additive. It is descriptive context, not a replacement for class, severity, readiness, or repair applicability."
 
 [[field]]
 name = "review_class"
 canonical_source = "domain/classification.rs::ReviewClass (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "ReviewClass owns class-derived severity and actionability. Saved LSP, live LSP, VS Code, agent, SARIF, and PR consumers must project it without reclassification."
 
@@ -107,7 +107,7 @@ note = "Selected, not_selected, and not_eligible are reviewer-routing states. Th
 [[field]]
 name = "next_action"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The summary and verify commands are card-owned handoff facts. Renderers may format them, but may not invent repairs or broaden their target."
 
@@ -163,7 +163,7 @@ note = "Presentation-only grouping (issue #1894) of target_feature-family Review
 [[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
+surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
 single_truth = true
 note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
 
@@ -195,8 +195,8 @@ note = "The direct human renderer consumes ReviewCards, but its emitted field su
 [[consumer]]
 name = "markdown_pr_summary"
 surface = "pr_summary"
-disposition = "mapped"
-note = "Human-readable PR Markdown may group or format cards but does not own classification, movement, or readiness."
+disposition = "aggregate_projection"
+note = "Maps aggregate coverage movement and card fields for specific-operation rows, but groups owner-contract cards into one bounded row with at most three representative locations. Grouped identity, class, proof path, operation, missing evidence, route, next action, and confirmation state are omitted/parked; the complete per-card inventory remains in cards.json."
 
 [[consumer]]
 name = "github_summary"
@@ -238,13 +238,13 @@ note = "SARIF rule code and level remain class-derived; PR #1770 is the existing
 name = "badges"
 surface = "badges"
 disposition = "aggregate_projection"
-note = "Badge counts summarize card-derived coverage posture and carry no per-card repair, readiness, or safety claim."
+note = "Badge counts consume canonical baseline-aware coverage movement: with a baseline, the main badge is new plus worsened gaps; without one, it falls back to open actionable gaps. Badges carry no per-card movement, repair, readiness, or safety claim."
 
 [[consumer]]
 name = "policy_report"
 surface = "policy_report"
 disposition = "aggregate_projection"
-note = "Projects baseline/policy posture without owning ReviewCard classification or outcome movement."
+note = "Copies the canonical five Summary movement counts and maps per-card identity, class/code, operation family, baseline state, next action, and the advisory trust boundary. Operation text, proof path, changed-line attribution, missing-evidence count, and policy status/reason are report-specific or lack dedicated canonical field rows here and remain explicitly parked from parity claims."
 
 [[consumer]]
 name = "usefulness_telemetry_json"
