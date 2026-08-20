@@ -39,7 +39,7 @@ note = "All three surfaces (json, agent, policy_report) project CoverageBlock::d
 [[field]]
 name = "agent_readiness"
 canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
-surfaces = ["json", "agent", "lsp", "usefulness_telemetry", "review_kit"]
+surfaces = ["json", "agent", "lsp", "usefulness_telemetry", "review_kit", "github_summary"]
 single_truth = true
 note = "shared fn enforces parity across coverage block + agent packet; lsp does not expose per-card agent_readiness via compute_agent_lsp_readiness"
 
@@ -100,7 +100,7 @@ note = "ReviewClass owns class-derived severity and actionability. Saved LSP, li
 [[field]]
 name = "surfacing_disposition"
 canonical_source = "output/comment_plan/mod.rs::card_statuses (output/comment_plan/selection.rs)"
-surfaces = ["json", "comment_plan", "agent", "lsp", "pr_summary", "github_summary"]
+surfaces = ["json", "comment_plan", "agent", "lsp", "pr_summary"]
 single_truth = true
 note = "Selected, not_selected, and not_eligible are reviewer-routing states. They must remain distinct from analyzer class and from human/agent readiness."
 
@@ -135,7 +135,7 @@ note = "Missing evidence is typed card data. Consumers may format it for humans 
 [[field]]
 name = "witness_receipt_coverage"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> WitnessReceiptCoverage"
-surfaces = ["json", "comment_plan", "repair_queue", "lsp", "agent", "pr_summary", "github_summary", "usefulness_telemetry"]
+surfaces = ["json", "comment_plan", "repair_queue", "lsp", "agent", "pr_summary", "usefulness_telemetry"]
 single_truth = true
 note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness."
 
@@ -202,7 +202,7 @@ note = "Human-readable PR Markdown may group or format cards but does not own cl
 name = "github_summary"
 surface = "github_summary"
 disposition = "aggregate_projection"
-note = "Bounded GitHub step summary maps aggregate scope/count/movement plus only the ranked top card's identity, location, class/code, operation family, missing evidence, next action, and advisory trust boundary. Every non-top card is omitted/parked here and remains available in cards.json and the full PR summary."
+note = "Bounded GitHub step summary maps aggregate scope/count/movement plus only the ranked top card's identity, location, class/code, operation family, missing evidence, next action, agent readiness, repair applicability, and advisory trust boundary. It does not emit comment-plan surfacing disposition or typed witness-receipt coverage. Every non-top card is omitted/parked here and remains available in cards.json and the full PR summary."
 
 [[consumer]]
 name = "comment_plan_json"
