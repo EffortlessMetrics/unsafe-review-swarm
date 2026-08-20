@@ -192,6 +192,20 @@ mod tests {
     }
 
     #[test]
+    fn human_parser_rejects_duplicate_structural_headers_and_header_keys() -> Result<(), String> {
+        let output = fixture_output("safe_code_no_cards")?;
+        let rendered = format!("{}cards: 0\n", render(&output));
+        expect_error_contains(
+            parse_human(&rendered, &[]),
+            "human cards summary row count mismatch",
+        )?;
+        expect_error_contains(
+            parse_header("cards: 1, open gaps: 1, cards: 2"),
+            "human header repeats `cards`",
+        )
+    }
+
+    #[test]
     fn human_cards_project_selected_review_card_fields_structurally() -> Result<(), String> {
         for (fixture, card_id, stable_byte_sub_class) in [
             ("raw_pointer_alignment", RAW_POINTER_ALIGNMENT_CARD_ID, None),
@@ -377,11 +391,16 @@ mod tests {
     ];
 
     fn parse_human(rendered: &str, selected_ids: &[&str]) -> Result<ParsedHuman, String> {
-        let header_line = rendered
+        let header_lines: Vec<_> = rendered
             .lines()
-            .find(|line| line.starts_with("cards: "))
+            .filter(|line| line.starts_with("cards: "))
+            .collect();
+        expect_eq("human cards summary row count", header_lines.len(), 1)?;
+        let header_line = header_lines
+            .first()
+            .copied()
             .ok_or_else(|| "human output is missing its cards summary".to_string())?;
-        let header = parse_header(header_line);
+        let header = parse_header(header_line)?;
         let cards = selected_ids
             .iter()
             .map(|id| parse_selected_card(rendered, id))
@@ -398,13 +417,14 @@ mod tests {
         })
     }
 
-    fn parse_header(line: &str) -> ParsedHeader {
-        let fields = line
-            .split(", ")
-            .filter_map(|field| field.split_once(": "))
-            .map(|(name, value)| (name.to_string(), value.to_string()))
-            .collect();
-        ParsedHeader { fields }
+    fn parse_header(line: &str) -> Result<ParsedHeader, String> {
+        let mut fields = BTreeMap::new();
+        for (name, value) in line.split(", ").filter_map(|field| field.split_once(": ")) {
+            if fields.insert(name.to_string(), value.to_string()).is_some() {
+                return Err(format!("human header repeats `{name}`"));
+            }
+        }
+        Ok(ParsedHeader { fields })
     }
 
     fn parse_selected_card(rendered: &str, id: &str) -> Result<ParsedCard, String> {
@@ -466,10 +486,9 @@ mod tests {
             }
             if let (Some(section), Some(item)) =
                 (active_section.as_ref(), line.strip_prefix("    "))
+                && let Some(items) = sections.get_mut(section)
             {
-                if let Some(items) = sections.get_mut(section) {
-                    items.push(item.strip_prefix("- ").unwrap_or(item).to_string());
-                }
+                items.push(item.strip_prefix("- ").unwrap_or(item).to_string());
             }
         }
         Ok(ParsedCard {
@@ -646,6 +665,16 @@ mod tests {
             Ok(())
         } else {
             Err(message.into())
+        }
+    }
+
+    fn expect_error_contains<T>(result: Result<T, String>, expected: &str) -> Result<(), String> {
+        match result {
+            Err(error) if error.contains(expected) => Ok(()),
+            Err(error) => Err(format!(
+                "error mismatch: actual={error:?}, expected fragment={expected:?}"
+            )),
+            Ok(_) => Err(format!("expected error containing {expected:?}")),
         }
     }
 
