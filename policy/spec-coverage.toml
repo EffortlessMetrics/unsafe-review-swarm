@@ -189,8 +189,9 @@ note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact 
 [[consumer]]
 name = "cards_json"
 surface = "json"
-disposition = "mapped"
-note = "Canonical machine-readable ReviewCard set; other first-PR artifacts project from these card identities."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Canonical machine-readable ReviewCard set that maps every existing `json` field row; other first-PR artifacts project from these card identities. Rich rowless confidence, proof path, operation text, hazards, obligations and obligation evidence, contract/discharge/reach details, witness routes, verify commands, confirmation cues, and the unnamed contract/guard/test-reach/manual-context coverage slots are explicitly parked under shared owner #2124 rather than treated as complete parity."
 
 [[consumer]]
 name = "human_cli"
