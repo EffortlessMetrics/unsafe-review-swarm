@@ -65,35 +65,35 @@ note = "audit-time metadata, not a per-card field"
 [[field]]
 name = "card_identity"
 canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
 
 [[field]]
 name = "site_location"
 canonical_source = "domain/operation.rs::UnsafeSite.location and owner (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "baseline_init", "outcome", "witness_plan", "review_kit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "baseline_init", "outcome", "witness_plan", "review_kit"]
 single_truth = true
 note = "File, range, owner, visibility, and changed-line state are card facts. Saved/live LSP and VS Code adapters project the same range; none may infer binding from nearby lines or hover prose."
 
 [[field]]
 name = "rule_class_code"
 canonical_source = "domain/classification.rs::ReviewClass::as_str"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The stable diagnostic code is the canonical class/rule code. Severity remains a separate ReviewClass projection; adapters must not replace either with priority or operation family."
 
 [[field]]
 name = "operation_family"
 canonical_source = "domain/operation.rs::UnsafeOperation.family.as_str()"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "outcome", "ub_review", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "outcome", "ub_review", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "Operation family is card-owned and additive. It is descriptive context, not a replacement for class, severity, readiness, or repair applicability."
 
 [[field]]
 name = "review_class"
 canonical_source = "domain/classification.rs::ReviewClass (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "ReviewClass owns class-derived severity and actionability. Saved LSP, live LSP, VS Code, agent, SARIF, and PR consumers must project it without reclassification."
 
@@ -107,7 +107,7 @@ note = "Selected, not_selected, and not_eligible are reviewer-routing states. Th
 [[field]]
 name = "next_action"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The summary and verify commands are card-owned handoff facts. Renderers may format them, but may not invent repairs or broaden their target."
 
@@ -128,7 +128,7 @@ note = "Saved LSP and agent packets project the shared per-analysis identity. Li
 [[field]]
 name = "missing_evidence"
 canonical_source = "domain/review_card.rs::ReviewCard.missing"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "witness_plan", "review_kit", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "witness_plan", "review_kit", "outcome"]
 single_truth = true
 note = "Missing evidence is typed card data. Consumers may format it for humans or LLMs, but may not replace it with a prose-derived obligation, severity, or repair bucket."
 
@@ -163,7 +163,7 @@ note = "Presentation-only grouping (issue #1894) of target_feature-family Review
 [[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
 single_truth = true
 note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
 
@@ -204,6 +204,13 @@ surface = "markdown"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2119"
 note = "Direct `--format markdown` output maps identity, class/code, missing evidence, next action, and the advisory trust boundary in both scopes. Repo scope additionally maps location and operation family plus declaration/target-feature aggregates; diff scope emits operation text, proof path, hazard, and route without dedicated field rows and only the first missing-evidence kind. Scope-dependent omissions and all non-listed card fields are explicitly parked."
+
+[[consumer]]
+name = "explain_markdown"
+surface = "explain_markdown"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2120"
+note = "Single-card `explain --format markdown` maps identity, class/code, location, operation family, missing evidence, next action, and the advisory trust boundary. Operation text, proof path, hazards, obligation descriptions, contract/discharge/reach/witness summaries, obligation-evidence states, verify commands, and witness routes are emitted directly from the selected ReviewCard but have no dedicated canonical field rows here and remain explicitly parked pending #2120; priority, movement, readiness, and surfacing disposition are absent."
 
 [[consumer]]
 name = "github_summary"
