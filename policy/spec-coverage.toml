@@ -65,7 +65,7 @@ note = "audit-time metadata, not a per-card field"
 [[field]]
 name = "card_identity"
 canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "baseline_status", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
 
@@ -163,7 +163,7 @@ note = "Presentation-only grouping (issue #1894) of target_feature-family Review
 [[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
-surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_status", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
+surfaces = ["json", "markdown", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
 single_truth = true
 note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
 
@@ -266,6 +266,13 @@ surface = "baseline_status"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
 note = "Human and JSON status renderers share BaselineHealthReport and map current or ledger ReviewCard identity plus a baseline-health advisory trust boundary. Health buckets, details, dates, scan/snapshot errors, and aggregate counts are baseline-ledger diagnostics rather than ReviewClass, canonical baseline_state, or Summary coverage_movement, so they remain explicitly parked from those parity claims."
+
+[[consumer]]
+name = "baseline_refresh"
+surface = "baseline_refresh"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "Human and optional baseline-refresh-plan.json dry-run outputs share BaselineRefreshPlan and map per-entry ReviewCard identity plus a refresh-specific advisory trust boundary. Planned action, health bucket, detail, dates, paths, write flags, and summary counts are plan metadata rather than canonical ReviewCard fields and remain explicitly parked; this preview writes no policy, source, or snapshot files."
 
 [[consumer]]
 name = "usefulness_telemetry_json"
