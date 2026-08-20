@@ -147,6 +147,7 @@ command itself; its caller attests that the captured output came from the exact
 recorded command. The CLI provides the stronger explicit authorization,
 execution, and single-local-run limitation at the `confirm --allow-heavy`
 boundary.
+
 `confirm --allow-heavy` must use this executed-output constructor after it
 resolves the exact current ReviewCard, selects a command-bearing card-owned
 route and supported receipt lane, and applies any explicit command-text
@@ -335,6 +336,13 @@ must include a non-empty `command`.
 - The CLI proof saved-output adapter writes a receipt from a success-looking
   Kani/Crux log, rejects unsupported proof tools, and rejects failure-looking
   output.
+- A `confirm --allow-heavy` run whose executed output classifies successfully
+  records a routed-tool receipt through
+  `WitnessReceipt::from_executed_output`, retains `strength = "ran"`, and states
+  both that unsafe-review ran the selected tool and that the evidence came from
+  a single local run.
+- A `confirm --allow-heavy` run whose executed output does not classify fails
+  and writes no receipt.
 - The CLI receipt-validate command counts importable receipts and rejects the
   same invalid receipt files as normal analysis.
 - The CLI receipt-audit command reports matched, stale, expired,
