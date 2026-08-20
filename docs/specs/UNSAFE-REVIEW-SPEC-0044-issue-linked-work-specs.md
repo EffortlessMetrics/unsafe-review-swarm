@@ -52,7 +52,9 @@ every other action. For read-only briefs, the checker also rejects a closed,
 normalized vocabulary of mutation operations in `objective`,
 `proof_obligations`, and `stop_when`. Normalization splits punctuation,
 underscore, and CamelCase boundaries before matching, so prose in any
-directive-bearing field cannot expand the declared capability.
+directive-bearing field cannot expand the declared capability. Governed
+operation aliases include `cp`; broader structured operation semantics remain
+outside this lexical version-one contract.
 
 Every `write_scope` entry is a canonical slash-separated repository-relative
 path. Components use ASCII letters, digits, dot, underscore, or hyphen; the

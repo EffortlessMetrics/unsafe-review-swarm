@@ -55,6 +55,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-copies-objective.toml",
     "read-only-copy-objective.toml",
     "read-only-copying-objective.toml",
+    "read-only-cp-objective.toml",
     "read-only-generate-objective.toml",
     "read-only-overwrite-objective.toml",
     "read-only-rm-proof.toml",
@@ -214,6 +215,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-copied-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-copies-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-copying-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-cp-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-generate-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-rm-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
@@ -756,6 +758,7 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "copied",
         "copies",
         "copying",
+        "cp",
         "create",
         "created",
         "creates",
@@ -1257,7 +1260,7 @@ mod tests {
 
     #[test]
     fn rejects_copy_operation_forms() -> Result<(), String> {
-        for term in ["copy", "copied", "copies", "copying"] {
+        for term in ["copy", "copied", "copies", "copying", "cp"] {
             rejects(
                 &valid().replace(
                     "Answer one bounded question.",
