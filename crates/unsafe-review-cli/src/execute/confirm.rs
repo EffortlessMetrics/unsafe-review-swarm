@@ -7,8 +7,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
-    MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard, SanitizerReceiptInput, Scope,
-    WitnessKind, WitnessReceipt, WitnessRoute, analyze,
+    ExecutedReceiptInput, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
+    SanitizerReceiptInput, Scope, WitnessKind, WitnessReceipt, WitnessRoute, analyze,
 };
 
 use crate::command::{CheckOptions, ConfirmOptions};
@@ -130,9 +130,8 @@ fn print_dry_run(
     println!("working directory: {}", options.root.display());
     println!("timeout: {}s", options.timeout_seconds);
     println!(
-        "expected evidence: a `{}` witness receipt classified by the existing saved-output `{}` import constructor",
+        "expected evidence: a `{}` witness receipt classified by the explicit executed-output constructor",
         lane.tool_name(),
-        lane.tool_name()
     );
     println!();
     println!(
@@ -245,8 +244,8 @@ struct ReceiptFields {
 
 fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessReceipt, String> {
     let limitations = vec![CONFIRM_LIMITATION.to_string()];
-    match lane {
-        ConfirmLane::Miri => WitnessReceipt::from_miri_output(MiriReceiptInput {
+    let input = match lane {
+        ConfirmLane::Miri => ExecutedReceiptInput::Miri(MiriReceiptInput {
             card_id: fields.card_id,
             output: fields.output,
             author: fields.author,
@@ -255,32 +254,28 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
         }),
-        ConfirmLane::CargoCareful => {
-            WitnessReceipt::from_cargo_careful_output(CargoCarefulReceiptInput {
-                card_id: fields.card_id,
-                output: fields.output,
-                author: fields.author,
-                recorded_at: fields.recorded_at,
-                expires_at: fields.expires_at,
-                command: fields.command,
-                limitations,
-            })
-        }
-        ConfirmLane::Sanitizer(tool) => {
-            WitnessReceipt::from_sanitizer_output(SanitizerReceiptInput {
-                card_id: fields.card_id,
-                tool: tool.to_string(),
-                output: fields.output,
-                author: fields.author,
-                recorded_at: fields.recorded_at,
-                expires_at: fields.expires_at,
-                command: fields.command,
-                limitations,
-                allow_runtime: false,
-            })
-        }
+        ConfirmLane::CargoCareful => ExecutedReceiptInput::CargoCareful(CargoCarefulReceiptInput {
+            card_id: fields.card_id,
+            output: fields.output,
+            author: fields.author,
+            recorded_at: fields.recorded_at,
+            expires_at: fields.expires_at,
+            command: fields.command,
+            limitations,
+        }),
+        ConfirmLane::Sanitizer(tool) => ExecutedReceiptInput::Sanitizer(SanitizerReceiptInput {
+            card_id: fields.card_id,
+            tool: tool.to_string(),
+            output: fields.output,
+            author: fields.author,
+            recorded_at: fields.recorded_at,
+            expires_at: fields.expires_at,
+            command: fields.command,
+            limitations,
+            allow_runtime: false,
+        }),
         ConfirmLane::Concurrency(tool) => {
-            WitnessReceipt::from_concurrency_output(ConcurrencyReceiptInput {
+            ExecutedReceiptInput::Concurrency(ConcurrencyReceiptInput {
                 card_id: fields.card_id,
                 tool: tool.to_string(),
                 output: fields.output,
@@ -291,7 +286,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
                 limitations,
             })
         }
-        ConfirmLane::Proof(tool) => WitnessReceipt::from_proof_output(ProofReceiptInput {
+        ConfirmLane::Proof(tool) => ExecutedReceiptInput::Proof(ProofReceiptInput {
             card_id: fields.card_id,
             tool: tool.to_string(),
             output: fields.output,
@@ -301,7 +296,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
         }),
-    }
+    };
+    WitnessReceipt::from_executed_output(input)
 }
 
 type EnvAssignments = Vec<(String, String)>;
@@ -759,6 +755,12 @@ mod tests {
         assert_eq!(receipt.strength, "ran");
         let limitations = receipt.limitations.unwrap_or_default();
         assert!(limitations.iter().any(|item| item == CONFIRM_LIMITATION));
+        assert!(
+            limitations
+                .iter()
+                .any(|item| item == "executed-output adapter; unsafe-review ran Miri")
+        );
+        assert!(limitations.iter().all(|item| !item.contains("did not run")));
         Ok(())
     }
 

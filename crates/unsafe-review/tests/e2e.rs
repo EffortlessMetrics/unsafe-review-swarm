@@ -7,6 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
+use unsafe_review_core::WitnessReceipt;
 
 #[test]
 fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Box<dyn Error>> {
@@ -4399,100 +4400,270 @@ fn confirm_refuses_without_allow_heavy_and_points_at_dry_run() -> Result<(), Box
 }
 
 #[test]
-fn confirm_dry_run_previews_routed_command_without_executing() -> Result<(), Box<dyn Error>> {
-    let fixture = fixture_root("raw_pointer_alignment");
+fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe review confirm e2e")?;
+    let root = temp.path().join("fixture root");
+    copy_dir_all(&fixture_root("raw_pointer_alignment"), &root)?;
+    let card_id = current_confirm_card_id(&root)?;
+    build_confirm_helper(&root)?;
+    let command_text = confirm_helper_command("success");
+    let receipt_path = temp.path().join("confirm success.json");
 
-    let json = run_success([
-        os("check"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        fixture.join("change.diff").into_os_string(),
-        os("--format"),
-        os("json"),
-    ])?;
-    let value = parse_json(&stdout_text(&json)?)?;
-    let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
-
-    let output = run_success([
-        os("confirm"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--dry-run"),
-        OsString::from(card_id),
-    ])?;
-    let text = stdout_text(&output)?;
-
+    let dry_run = run_success_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--dry-run"),
+            os("--command"),
+            OsString::from(&command_text),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    let text = stdout_text(&dry_run)?;
     assert!(text.contains("unsafe-review confirm (dry run)"));
     assert!(text.contains(&format!("card: {card_id}")));
     assert!(text.contains("operation family: raw_pointer_read"));
     assert!(text.contains("route: miri"));
-    assert!(text.contains("command: cargo +nightly miri test read_header"));
-    assert!(text.contains("command provenance: analyzer-derived route"));
-    assert!(text.contains("timeout: 600s"));
+    assert!(text.contains(&format!("command: {command_text}")));
+    assert!(text.contains("command provenance: --command override (author-controlled)"));
     assert!(text.contains("expected evidence: a `miri` witness receipt"));
     assert!(text.contains("dry run only; nothing was executed"));
-    assert!(text.contains("unsafe-review never executes witnesses by default"));
-    assert!(text.contains("trust boundary: static unsafe contract review only"));
-    assert!(
-        !fixture.join(".unsafe-review").join("receipts").exists(),
-        "dry run must not write a receipt"
-    );
-    assert!(
-        !fixture
-            .join("target")
-            .join("unsafe-review-confirm")
-            .exists(),
-        "dry run must not write an output log"
-    );
+    assert!(!receipt_path.exists(), "dry run must not write a receipt");
+    assert!(!root.join(".unsafe-review/receipts").exists());
+    assert!(!root.join("target/unsafe-review-confirm").exists());
 
+    let execution = run_success_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--expires-at"),
+            os("2026-12-31"),
+            os("--command"),
+            OsString::from(&command_text),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    let text = stdout_text(&execution)?;
+    assert!(text.contains(&format!("card: {card_id}")));
+    assert!(text.contains("route: miri"));
+    assert!(text.contains("tool: miri"));
+    assert!(text.contains("strength recorded: ran"));
+
+    let receipt: WitnessReceipt = serde_json::from_str(&fs::read_to_string(&receipt_path)?)?;
+    assert_eq!(receipt.card_id, card_id);
+    assert_eq!(receipt.tool, "miri");
+    assert_eq!(receipt.strength, "ran");
+    assert_eq!(receipt.author.as_deref(), Some("e2e/confirm"));
+    assert_eq!(receipt.expires_at.as_deref(), Some("2026-12-31"));
+    assert_eq!(receipt.command.as_deref(), Some(command_text.as_str()));
+    assert_eq!(
+        receipt.command_hash,
+        Some(WitnessReceipt::command_hash(&command_text))
+    );
+    assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+    let recorded_at = receipt
+        .recorded_at
+        .as_deref()
+        .ok_or("missing recorded_at")?;
+    assert_eq!(recorded_at.len(), 20);
+    assert!(recorded_at.ends_with('Z'));
+    let limitations = receipt.limitations.ok_or("missing limitations")?;
+    assert!(
+        limitations
+            .iter()
+            .any(|item| item == "executed-output adapter; unsafe-review ran Miri")
+    );
+    assert!(
+        limitations
+            .iter()
+            .any(|item| item.contains("executed via unsafe-review confirm --allow-heavy"))
+    );
+    assert!(
+        limitations
+            .iter()
+            .any(|item| item.contains("single local run"))
+    );
+    assert!(
+        limitations
+            .iter()
+            .any(|item| item.contains("site reach is not claimed"))
+    );
+    assert!(limitations.iter().all(|item| !item.contains("did not run")));
+    assert!(!root.join(".unsafe-review/receipts").exists());
+    assert!(!root.join("target/unsafe-review-confirm").exists());
     Ok(())
 }
 
 #[test]
-fn confirm_allow_heavy_reports_spawn_failure_without_writing_a_receipt()
--> Result<(), Box<dyn Error>> {
-    let fixture = fixture_root("raw_pointer_alignment");
+fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe review confirm negative e2e")?;
+    let root = temp.path().join("fixture root");
+    copy_dir_all(&fixture_root("raw_pointer_alignment"), &root)?;
+    let card_id = current_confirm_card_id(&root)?;
+    build_confirm_helper(&root)?;
+    let receipt_path = temp.path().join("must not exist.json");
+    let log_dir = root.join("target/unsafe-review-confirm");
 
-    let json = run_success([
-        os("check"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        fixture.join("change.diff").into_os_string(),
-        os("--format"),
-        os("json"),
+    let wrong_identity = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--dry-run"),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            os("UR-not-the-current-card-c1"),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(&wrong_identity, "not found");
+    assert_no_confirm_receipt_or_log(&receipt_path, &log_dir);
+
+    let candidate_path = root
+        .join(".unsafe-review/candidates")
+        .join("MANUAL-CONFIRM-E2E.json");
+    run_success(vec![
+        os("candidate"),
+        os("new"),
+        os("--class"),
+        os("stable-byte-source-getter-reentry"),
+        os("--id"),
+        os("MANUAL-CONFIRM-E2E"),
+        os("--out"),
+        candidate_path.into_os_string(),
     ])?;
-    let value = parse_json(&stdout_text(&json)?)?;
-    let card_id = json_str(&value["cards"][0]["id"], "cards[0].id")?;
+    let manual = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--dry-run"),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            os("MANUAL-CONFIRM-E2E"),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(&manual, "manual candidate");
+    assert_failure_contains(&manual, "analyzer ReviewCard witness routes only");
+    assert_no_confirm_receipt_or_log(&receipt_path, &log_dir);
 
-    let output = run_failure([
-        os("confirm"),
-        os("--root"),
-        fixture.as_os_str().to_os_string(),
-        os("--allow-heavy"),
-        os("--author"),
-        os("core/e2e"),
-        os("--command"),
-        os("unsafe-review-e2e-missing-witness-binary miri-test read_header"),
-        OsString::from(card_id),
-    ])?;
+    let human_root = temp.path().join("human fixture root");
+    copy_dir_all(&fixture_root("inline_asm_human_review"), &human_root)?;
+    let human_card_id = current_confirm_card_id(&human_root)?;
+    let human = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--dry-run"),
+            os("--command"),
+            OsString::from(confirm_helper_command("success")),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(human_card_id),
+        ],
+        &human_root,
+    )?;
+    assert_failure_contains(&human, "no routed witness command");
+    assert_failure_contains(&human, "human-deep-review route");
+    assert!(!human_root.join("target/unsafe-review-confirm").exists());
+    assert!(!receipt_path.exists());
 
-    assert_eq!(output.status.code(), Some(2));
-    let stderr = String::from_utf8_lossy(&output.stderr);
-    assert!(
-        stderr.contains("failed to spawn `unsafe-review-e2e-missing-witness-binary`"),
-        "stderr should report the spawn failure honestly: {stderr}"
-    );
-    assert!(
-        stderr.contains("no receipt was written"),
-        "stderr should confirm no receipt was fabricated: {stderr}"
-    );
-    assert!(
-        !fixture.join(".unsafe-review").join("receipts").exists(),
-        "spawn failure must not write a receipt"
-    );
+    let spawn = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--command"),
+            os("miri-helper-that-does-not-exist success"),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(&spawn, "failed to spawn");
+    assert_failure_contains(&spawn, "no receipt was written");
+    assert_no_confirm_receipt_or_log(&receipt_path, &log_dir);
 
+    let timeout = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--timeout-seconds"),
+            os("1"),
+            os("--command"),
+            OsString::from(confirm_helper_command("timeout")),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(&timeout, "timed out after 1s");
+    assert_failure_contains(&timeout, "no receipt was written");
+    assert!(!receipt_path.exists());
+    assert!(single_confirm_log(&log_dir)?.contains("timeout mode started"));
+    fs::remove_dir_all(&log_dir)?;
+
+    let unclassified = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--command"),
+            OsString::from(confirm_helper_command("unclassified")),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(card_id),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(&unclassified, "did not classify as miri evidence");
+    assert_failure_contains(&unclassified, "executed Miri output");
+    assert_failure_contains(&unclassified, "no receipt was written");
+    assert!(!receipt_path.exists());
+    assert!(single_confirm_log(&log_dir)?.contains("unclassified witness output"));
+    assert!(!root.join(".unsafe-review/receipts").exists());
     Ok(())
 }
 
@@ -8161,6 +8332,26 @@ where
     Ok(output)
 }
 
+fn run_failure_in_dir<I, S>(args: I, current_dir: &Path) -> Result<Output, Box<dyn Error>>
+where
+    I: IntoIterator<Item = S>,
+    S: AsRef<OsStr>,
+{
+    let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
+        .current_dir(current_dir)
+        .args(args)
+        .output()?;
+    if output.status.success() {
+        return Err(format!(
+            "expected command to fail\nstdout:\n{}\nstderr:\n{}",
+            String::from_utf8_lossy(&output.stdout),
+            String::from_utf8_lossy(&output.stderr)
+        )
+        .into());
+    }
+    Ok(output)
+}
+
 fn run_success_in_dir<I, S>(args: I, current_dir: &Path) -> Result<Output, Box<dyn Error>>
 where
     I: IntoIterator<Item = S>,
@@ -8740,6 +8931,107 @@ fn manual_candidate_examples_dir() -> PathBuf {
 
 fn os(value: &str) -> OsString {
     OsString::from(value)
+}
+
+fn current_confirm_card_id(root: &Path) -> Result<String, Box<dyn Error>> {
+    let output = run_success_in_dir(
+        [
+            os("check"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--format"),
+            os("json"),
+        ],
+        root,
+    )?;
+    let value = parse_json(&stdout_text(&output)?)?;
+    Ok(json_str(&value["cards"][0]["id"], "cards[0].id")?.to_string())
+}
+
+fn build_confirm_helper(root: &Path) -> Result<(), Box<dyn Error>> {
+    let source = root.join("miri_confirm_helper.rs");
+    let executable = root.join(format!(
+        "miri_confirm_helper{}",
+        std::env::consts::EXE_SUFFIX
+    ));
+    fs::write(
+        &source,
+        r#"use std::io::Write;
+use std::time::Duration;
+
+fn main() {
+    match std::env::args().nth(1).as_deref() {
+        Some("success") => println!("test result: ok. 1 passed; 0 failed; finished in 0.01s"),
+        Some("unclassified") => println!("unclassified witness output"),
+        Some("timeout") => {
+            println!("timeout mode started");
+            let _ = std::io::stdout().flush();
+            std::thread::sleep(Duration::from_secs(30));
+        }
+        _ => println!("unclassified witness output"),
+    }
+}
+"#,
+    )?;
+    checked_output(
+        Command::new("rustc")
+            .arg("--edition=2024")
+            .arg(&source)
+            .arg("-o")
+            .arg(&executable),
+    )?;
+    if !executable.is_file() {
+        return Err(format!("rustc did not create {}", executable.display()).into());
+    }
+    Ok(())
+}
+
+fn confirm_helper_command(mode: &str) -> String {
+    let executable = if cfg!(windows) {
+        ".\\miri_confirm_helper.exe"
+    } else {
+        "./miri_confirm_helper"
+    };
+    format!("{executable} {mode}")
+}
+
+fn assert_failure_contains(output: &Output, expected: &str) {
+    let rendered = format!(
+        "{}{}",
+        String::from_utf8_lossy(&output.stdout),
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert!(
+        rendered.contains(expected),
+        "expected failure output to contain `{expected}`\noutput:\n{rendered}"
+    );
+}
+
+fn assert_no_confirm_receipt_or_log(receipt_path: &Path, log_dir: &Path) {
+    assert!(!receipt_path.exists(), "failure must not write a receipt");
+    assert!(
+        !log_dir.exists(),
+        "pre-execution failure must not write a raw log"
+    );
+}
+
+fn single_confirm_log(log_dir: &Path) -> Result<String, Box<dyn Error>> {
+    let logs = fs::read_dir(log_dir)?
+        .collect::<Result<Vec<_>, _>>()?
+        .into_iter()
+        .filter(|entry| entry.path().is_file())
+        .collect::<Vec<_>>();
+    if logs.len() != 1 {
+        return Err(format!(
+            "expected exactly one raw confirm log in {}, found {}",
+            log_dir.display(),
+            logs.len()
+        )
+        .into());
+    }
+    Ok(fs::read_to_string(logs[0].path())?)
 }
 
 fn copy_dir_all(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
