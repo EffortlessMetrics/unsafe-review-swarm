@@ -24,10 +24,10 @@ single_truth = true
 
 [[field]]
 name = "outcome_movement"
-canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement, then CoverageBlock::apply_snapshot_slots promotion"
 surfaces = ["json", "agent", "file_range_scan", "lsp"]
 single_truth = true
-note = "Per-card OutcomeMovement is derived from each ReviewCard's CoverageBlock baseline state. It does not own aggregate counts or resolved baseline IDs for which no current card exists."
+note = "Per-card OutcomeMovement starts from each ReviewCard's CoverageBlock baseline state, then apply_snapshot_slots promotes current-card worsened/improved states after snapshot comparison. It does not own aggregate counts or resolved baseline IDs for which no current card exists."
 
 [[field]]
 name = "coverage_movement_summary"
