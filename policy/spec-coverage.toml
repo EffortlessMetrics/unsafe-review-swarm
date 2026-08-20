@@ -149,9 +149,9 @@ note = "Receipt coverage is imported metadata for the exact card; it is not evid
 [[field]]
 name = "editor_action_contract"
 canonical_source = "output/lsp/action_contract.rs::actions_for_card"
-surfaces = ["json", "lsp", "agent"]
+surfaces = ["lsp"]
 single_truth = true
-note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints. The pre-existing agent entry tracks the action contract's optional embedded agent payload, not a field emitted by AgentPacket itself, and remains a later #1880 reconciliation."
+note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints. Future optional action payloads for agent/file-range packets remain dependent #2125/#1880 work rather than a field those packets currently emit."
 
 [[field]]
 name = "declaration_summary_group"
