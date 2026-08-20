@@ -237,7 +237,7 @@ name = "comment_plan_json"
 surface = "comment_plan"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
-note = "Maps every existing comment_plan field row, including selection status and selected/not-selected routing that remains distinct from ReviewClass. PlannedComment also emits shared rowless confidence, proof path, confirmation, witness-route, verify-command, and handoff details, while NotSelectedCard intentionally carries a smaller shape; those shared fields and the asymmetric parked disposition remain owned by #2124."
+note = "Maps every existing comment_plan field row, including selection status and selected/not-selected routing that remains distinct from ReviewClass. PlannedComment and NotSelectedCard both emit rowless confidence and proof path; selected comments additionally emit confirmation, witness routes, verify commands, and handoff cues while NotSelectedCard intentionally carries a smaller shape. #2124 owns the shared rows and explicit asymmetric parked disposition; #2118 remains the separate shared actionability-derivation owner."
 
 [[consumer]]
 name = "repair_queue_json"
