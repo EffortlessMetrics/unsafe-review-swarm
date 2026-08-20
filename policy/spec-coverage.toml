@@ -3,9 +3,11 @@ policy = "spec-coverage"
 owner = "core / analysis"
 
 # The ReviewCard is the single truth object; surfaces PROJECT pipeline truth,
-# they do not recompute it. A future `check-spec-coverage` gate (later
-# control-plane PR) will fail if a field's canonical source is missing or a
-# surface recomputes it, locking the single-truth invariant.
+# they do not recompute it. `check-spec-coverage` rejects fields without a
+# canonical source, an emitting surface, or the single-truth invariant. The
+# consumer inventory below records aliases, aggregate/formatting-only surfaces,
+# and deliberately uncovered or parked consumers without pretending that the
+# structural gate proves cross-consumer behavior.
 
 [[field]]
 name = "severity"
@@ -168,3 +170,118 @@ note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact 
 # surface vocabulary. The named consumers are saved lsp.json, live
 # unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
 # and PR artifacts; they are not independent semantic surfaces.
+
+# Canonical consumer inventory from issue #1880. `surface` links a consumer to
+# the field entries above. `aggregate_projection`, `routing_manifest`, and
+# `formatting_sidecar` mean the consumer does not emit a complete per-card
+# projection. `uncovered`, `partial`, and `parked` are not passes; each routes
+# to a builder-ready or existing issue instead of adding unproved surfaces to
+# individual field entries.
+
+[[consumer]]
+name = "cards_json"
+surface = "json"
+disposition = "mapped"
+note = "Canonical machine-readable ReviewCard set; other first-PR artifacts project from these card identities."
+
+[[consumer]]
+name = "human_cli"
+surface = "human"
+disposition = "uncovered"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
+note = "The direct human renderer consumes ReviewCards, but its emitted field subset is not yet locked to this map."
+
+[[consumer]]
+name = "markdown_pr_summary"
+surface = "pr_summary"
+disposition = "mapped"
+note = "Human-readable PR Markdown may group or format cards but does not own classification, movement, or readiness."
+
+[[consumer]]
+name = "github_summary"
+surface = "github_summary"
+disposition = "mapped"
+note = "GitHub summary projection shares ReviewCard semantics with the PR Markdown surface."
+
+[[consumer]]
+name = "comment_plan_json"
+surface = "comment_plan"
+disposition = "mapped"
+note = "Plan-only selection surface; comment eligibility and surfacing disposition remain separate from ReviewClass."
+
+[[consumer]]
+name = "repair_queue_json"
+surface = "repair_queue"
+disposition = "mapped"
+note = "ReviewCard-only queue. manual-repair-queue.json is a separate manual-candidate sidecar and is out of scope for this map."
+
+[[consumer]]
+name = "saved_lsp_json"
+surface = "lsp"
+disposition = "mapped"
+note = "Saved editor projection; shares the lsp semantic surface with live LSP and the VS Code adapter."
+
+[[consumer]]
+name = "live_lsp_and_vscode"
+surface = "lsp"
+disposition = "mapped"
+note = "Live/editor adapters preserve the shared LSP diagnostic and action contract; transport and freshness lifecycle are separate concerns."
+
+[[consumer]]
+name = "cards_sarif"
+surface = "sarif"
+disposition = "mapped"
+note = "SARIF rule code and level remain class-derived; PR #1770 is the existing SARIF/LSP severity drift lock."
+
+[[consumer]]
+name = "badges"
+surface = "badges"
+disposition = "aggregate_projection"
+note = "Badge counts summarize card-derived coverage posture and carry no per-card repair, readiness, or safety claim."
+
+[[consumer]]
+name = "policy_report"
+surface = "policy_report"
+disposition = "aggregate_projection"
+note = "Projects baseline/policy posture without owning ReviewCard classification or outcome movement."
+
+[[consumer]]
+name = "unsafe_review_gate_json"
+surface = "gate_manifest"
+disposition = "routing_manifest"
+note = "Thin artifact-routing manifest; paths, kinds, and schema versions require the compatibility contract tracked by #2115."
+
+[[consumer]]
+name = "tokmd_packets_json"
+surface = "agent"
+disposition = "formatting_sidecar"
+note = "Bounded formatting input derived from checked ReviewCard artifacts; it is not rendered tokmd output or a second classifier."
+
+[[consumer]]
+name = "public_action"
+surface = "action"
+disposition = "parked"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1878"
+note = "No public Action or released-binary consumer claim is active; the current map records only the advisory trust boundary."
+
+[[consumer]]
+name = "ub_review"
+surface = "ub_review"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
+note = "Operation-family and trust-boundary intent are mapped, but a pinned real producer/consumer smoke is not yet proven."
+
+[[gap]]
+name = "human_cli_field_parity"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
+
+[[gap]]
+name = "artifact_schema_identity_and_compatibility"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2115"
+
+[[gap]]
+name = "ub_review_real_consumer_smoke"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
