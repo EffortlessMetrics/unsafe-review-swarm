@@ -163,7 +163,7 @@ note = "Presentation-only grouping (issue #1894) of target_feature-family Review
 [[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
-surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_status", "baseline_refresh", "confirm", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "policy_report", "baseline_init", "baseline_add", "baseline_status", "baseline_refresh", "confirm", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
 single_truth = true
 note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
 
@@ -217,7 +217,7 @@ name = "first_pr_terminal"
 surface = "first_pr_terminal"
 disposition = "aggregate_projection"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2121"
-note = "The pr/first-pr/review terminal report copies the canonical five Summary movement counts and comment-plan selection aggregates, then maps a bounded top card's identity through explain/context commands, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary. Non-top cards, full card fields, verify/context command semantics, bundle/scan metadata, and ManualCandidate sidecars are omitted or report-specific and remain parked pending #2121."
+note = "The pr/first-pr/review terminal report copies the canonical five Summary movement counts and comment-plan selection aggregates. Its front panel maps the top card's identity through explain/context commands, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary; first-pr/review also print up to three additional selected cards with identity, location, operation family, next action, selection reason, and first verify command. Cards beyond that cap, remaining additional-card fields, full verify/context command semantics, bundle/scan metadata, and ManualCandidate sidecars are omitted or report-specific and remain parked pending #2121."
 
 [[consumer]]
 name = "github_summary"
@@ -279,7 +279,7 @@ name = "baseline_add"
 surface = "baseline_add"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2122"
-note = "Baseline add reanalyzes the repository, resolves the requested canonical ReviewCard identity, and persists CoverageBlock-derived contract, guard, test-reach, and witness-receipt snapshot slots for that card. Only identity and the existing witness-receipt-coverage row are mapped here; the other three coverage slots plus owner/reason/evidence/review-date ledger metadata have no dedicated field rows and remain parked pending #2122."
+note = "Baseline add reanalyzes the repository, resolves the requested canonical ReviewCard identity, persists CoverageBlock-derived contract, guard, test-reach, and witness-receipt snapshot slots for that card, and emits its fixed advisory trust boundary. Identity, the existing witness-receipt-coverage row, and the trust boundary are mapped here; the other three coverage slots plus owner/reason/evidence/review-date ledger metadata have no dedicated field rows and remain parked pending #2122."
 
 [[consumer]]
 name = "baseline_status"
