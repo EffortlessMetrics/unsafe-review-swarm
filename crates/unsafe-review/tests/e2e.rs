@@ -2572,10 +2572,10 @@ fn first_pr_writes_standard_advisory_review_bundle() -> Result<(), Box<dyn Error
             assert_eq!(entry["format"], "sarif");
         }
         match expected {
-            "cards.json" => {
+            "cards.json" | "lsp.json" => {
                 assert_eq!(entry["schema_version"], "0.2")
             }
-            "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
+            "review-kit.json" | "comment-plan.json" | "repair-queue.json"
             | "policy-report.json" | "receipt-audit.json" => {
                 assert_eq!(entry["schema_version"], "0.1")
             }

@@ -163,6 +163,59 @@ must include artifact kind, format, and schema_version/null metadata
 must include trust boundary wording
 ```
 
+The first-pr bundle has exactly eighteen artifact identities. An identity is
+the complete `(path, kind, format, schema_version/null)` tuple; no single
+bundle-wide schema version replaces these per-artifact contracts.
+
+| Path | Kind | Format | Manifest schema | Actual discriminator | Compatibility disposition | Canonical producer |
+| --- | --- | --- | --- | --- | --- | --- |
+| `review-kit.json` | `review_kit_manifest` | `json` | `0.1` | `schema_version` | Exact supported identity; other versions rejected | CLI `render_review_kit_manifest` |
+| `unsafe-review-gate.json` | `gate_manifest` | `json` | `unsafe-review-gate/v1` | `schema_version` | Exact supported identity; other versions rejected | core `render_gate_manifest` |
+| `cards.json` | `review_cards` | `json` | `0.2` | `schema_version` | Exact supported identity; other versions rejected | core `render_json_with_provenance` |
+| `pr-summary.md` | `reviewer_summary` | `markdown` | `null` | none | Supported unversioned; manifest must be `null` | core `render_pr_summary` |
+| `github-summary.md` | `github_summary` | `markdown` | `null` | none | Supported unversioned; manifest must be `null` | core `render_github_summary` |
+| `cards.sarif` | `sarif` | `sarif` | `2.1.0` | `version` | Exact supported identity; other versions rejected | core `render_sarif` |
+| `comment-plan.json` | `comment_plan` | `json` | `0.1` | `schema_version` | Exact supported identity; other versions rejected | core `render_comment_plan` |
+| `witness-plan.md` | `witness_plan` | `markdown` | `null` | none | Supported unversioned; manifest must be `null` | core `render_witness_plan` |
+| `receipt-audit.md` | `receipt_audit` | `markdown` | `null` | none | Supported unversioned; manifest must be `null` | core `render_receipt_audit_markdown` |
+| `receipt-audit.json` | `receipt_audit` | `json` | `0.1` | `schema_version` | Exact supported identity; other versions rejected | core `render_receipt_audit_json` |
+| `policy-report.json` | `policy_report_json` | `json` | `0.1` | `schema_version` | Exact supported identity; other versions rejected | core `render_policy_report_json` |
+| `policy-report.md` | `policy_report_markdown` | `markdown` | `null` | none | Supported unversioned; manifest must be `null` | core `render_policy_report_markdown` |
+| `manual-candidates.json` | `manual_candidates` | `json` | `manual-candidates/v1` | `schema_version` | Exact supported identity; other versions rejected | CLI `render_manual_candidates_artifact` |
+| `manual-repair-queue.json` | `manual_repair_queue` | `json` | `manual-repair-queue/v1` | `schema_version` | Exact supported identity; other versions rejected | CLI `render_manual_repair_queue_artifact` |
+| `tokmd-packets.json` | `tokmd_packets` | `json` | `tokmd-packets/v1` | `schema_version` | Exact supported identity; other versions rejected | CLI `render_tokmd_packets_artifact` |
+| `usefulness-telemetry.json` | `usefulness_telemetry` | `json` | `usefulness-telemetry/v1` | `schema_version` | Exact supported identity; other versions rejected | core `render_usefulness_telemetry_with_cost` |
+| `lsp.json` | `saved_lsp` | `json` | `0.2` | `schema_version` | Exact supported identity; saved LSP `0.1` rejected | core `render_lsp` |
+| `repair-queue.json` | `repair_queue` | `json` | `0.1` | `schema_version` | Exact supported identity; other versions rejected | core `render_repair_queue` |
+
+The manifest tuple and the actual payload discriminator must agree. JSON
+artifacts carry `schema_version`, SARIF carries `version`, and Markdown
+artifacts must use `null` in the manifest. Missing, wrongly typed, unsupported,
+or mismatched discriminators fail verification; the verifier must not silently
+downgrade them. Its terminal identity error names `artifact`, `field`,
+`expected`, and `actual`, so human output and the JSON manifest/payload evidence
+describe the same failed join without creating a second result format.
+
+Required fields remain required. Unknown object fields are additive and must be
+accepted unless a field's contract explicitly defines a closed vocabulary.
+`operation_family` is an opaque, non-empty, additive value when propagated
+consistently across the bundle. The literal `unknown` and fields whose contracts
+already define closed vocabularies remain closed; an unknown optional field does
+not grant authority to change those meanings.
+
+`tool_version` is required and must be valid semver with a minimum supported
+producer version of `0.3.8`. This is a secondary compatibility floor: the exact
+artifact tuple and payload discriminator remain authoritative because producer
+semver alone cannot establish payload compatibility.
+
+No artifact field is deprecated by this contract. A future rename or removal
+must document the artifact, old and replacement fields, `deprecated_since`, and
+the earliest removal producer version here. Producer and verifier must co-emit
+or accept the old and replacement fields for at least one published minor
+release after deprecation; removal requires a schema-version change for the
+affected artifact and cannot occur until the minimum producer floor advances
+past the old producer compatibility window.
+
 The manifest is a discovery projection. It must not reclassify ReviewCards or
 create a second source of truth for operation family, obligation, evidence,
 witness route, repair bucket, outcome, or policy posture.
@@ -604,7 +657,7 @@ comments, or blocking policy.
 
 Saved editor/LLM projection.
 
-Must include `schema_version = 0.1`.
+Must include `schema_version = 0.2`.
 
 Must be read-only.
 

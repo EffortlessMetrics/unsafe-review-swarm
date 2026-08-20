@@ -2854,8 +2854,9 @@ fn artifact_schema_version(path: &str) -> Option<&'static str> {
     match path {
         // cards.json was bumped to 0.2 when provenance metadata was added.
         "cards.json" => Some("0.2"),
-        "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
-        | "policy-report.json" | "receipt-audit.json" => Some("0.1"),
+        "review-kit.json" | "comment-plan.json" | "repair-queue.json" | "policy-report.json"
+        | "receipt-audit.json" => Some("0.1"),
+        "lsp.json" => Some("0.2"),
         "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
         "manual-candidates.json" => Some("manual-candidates/v1"),
         "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
@@ -2965,6 +2966,32 @@ mod tests {
             artifact_schema_version("usefulness-telemetry.json"),
             Some("usefulness-telemetry/v1")
         );
+    }
+
+    #[test]
+    fn first_pr_artifact_identities_cover_the_exact_bundle() {
+        assert_eq!(super::super::FIRST_PR_ARTIFACTS.len(), 18);
+        for path in super::super::FIRST_PR_ARTIFACTS {
+            assert_ne!(artifact_kind(path), "unknown", "unknown kind for {path}");
+            assert_ne!(
+                artifact_format(path),
+                "unknown",
+                "unknown format for {path}"
+            );
+            if path.ends_with(".md") {
+                assert_eq!(
+                    artifact_schema_version(path),
+                    None,
+                    "markdown artifact {path} must remain unversioned"
+                );
+            } else {
+                assert!(
+                    artifact_schema_version(path).is_some(),
+                    "versioned artifact {path} must declare a schema"
+                );
+            }
+        }
+        assert_eq!(artifact_schema_version("lsp.json"), Some("0.2"));
     }
 
     #[test]
