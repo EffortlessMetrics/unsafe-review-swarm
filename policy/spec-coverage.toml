@@ -114,7 +114,7 @@ note = "Selected, not_selected, and not_eligible are reviewer-routing states. Th
 [[field]]
 name = "next_action"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The summary and verify commands are card-owned handoff facts. Renderers may format them, but may not invent repairs or broaden their target."
 
@@ -242,8 +242,9 @@ note = "Maps every existing comment_plan field row, including selection status a
 [[consumer]]
 name = "repair_queue_json"
 surface = "repair_queue"
-disposition = "mapped"
-note = "ReviewCard-only queue. manual-repair-queue.json is a separate manual-candidate sidecar and is out of scope for this map."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps the existing repair_queue field rows for priority, identity, location, class/code, operation family, repair applicability, missing evidence, witness-receipt coverage, and trust. It does not emit canonical ReviewCard.next_action; its generated context command is a different queue value. Rowless confidence, proof path, and confirmation fields remain shared #2124 ownership. manual-repair-queue.json is a separate ManualCandidate sidecar and remains out of scope."
 
 [[consumer]]
 name = "saved_lsp_json"
@@ -262,8 +263,9 @@ note = "The live LSP server and saved-artifact VS Code adapter consume every can
 [[consumer]]
 name = "cards_sarif"
 surface = "sarif"
-disposition = "mapped"
-note = "SARIF rule code and level remain class-derived; PR #1770 is the existing SARIF/LSP severity drift lock."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps SARIF priority, identity, location, class/code, operation family, next-action summary, and trust; rule code and level remain class-derived under the existing PR #1770 SARIF/LSP severity drift lock. Rowless confidence, proof path, hazards, witness routes, and verify-command details remain shared #2124 ownership."
 
 [[consumer]]
 name = "badges"
