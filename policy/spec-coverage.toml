@@ -142,9 +142,9 @@ note = "Receipt coverage is imported metadata for the exact card; it is not evid
 [[field]]
 name = "editor_action_contract"
 canonical_source = "output/lsp/action_contract.rs::actions_for_card"
-surfaces = ["json", "lsp", "agent", "file_range_scan"]
+surfaces = ["json", "lsp", "agent"]
 single_truth = true
-note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints."
+note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints. The pre-existing agent entry tracks the action contract's optional embedded agent payload, not a field emitted by AgentPacket itself, and remains a later #1880 reconciliation."
 
 [[field]]
 name = "declaration_summary_group"
@@ -156,9 +156,9 @@ note = "Presentation-only grouping (issue #1895) of unsafe_declaration-family Re
 [[field]]
 name = "target_feature_summary_group"
 canonical_source = "output/target_feature_summary.rs::target_feature_groups (derived from ReviewCard.operation.family, domain/coverage.rs::CoverageBlock::derive class/baseline_state/coverage slots, and a normalized attribute shape)"
-surfaces = ["markdown", "pr_summary", "comment_plan"]
+surfaces = ["markdown", "pr_summary", "comment_plan", "agent", "file_range_scan"]
 single_truth = true
-note = "Presentation-only grouping (issue #1894) of target_feature-family ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals are metadata, not identity). Groups never collapse cards whose obligation, class, movement, baseline state, receipt state, or next action differ. total/representatives/underlying_card_ids are counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier, cards.json remains the complete per-site inventory, and the comment-plan's grouped_repetition selection reads the identical group membership so the two surfaces cannot drift on which card is the representative."
+note = "Presentation-only grouping (issue #1894) of target_feature-family ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals are metadata, not identity). Groups never collapse cards whose obligation, class, movement, baseline state, receipt state, or next action differ. total/representatives/underlying_card_ids are counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier, cards.json remains the complete per-site inventory, and the comment-plan plus output-backed single-card and file-range agent packets read the identical group membership so those surfaces cannot drift on which card is the representative."
 
 [[field]]
 name = "trust_boundary"
@@ -350,7 +350,7 @@ name = "file_range_scan"
 surface = "file_range_scan"
 disposition = "aggregate_projection"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
-note = "The context file-range renderer deterministically filters ReviewCards by normalized file and inclusive line range, optionally restricts them to canonical new/worsened baseline states, and wraps zero or more complete output-backed agent packets. Nested packets map the agent packet's canonical identity, location, class, priority, family, coverage, readiness, comment status, repairs, missing evidence, action contract, next action, and trust boundary; the envelope's query geometry, changed-only filter, empty-result meaning, ordering/dedup semantics, schema metadata, and staleness marker remain aggregate or range-specific rather than separate ReviewCard fields."
+note = "The context file-range renderer deterministically filters ReviewCards by normalized file and inclusive line range, optionally restricts them to canonical new/worsened baseline states, and wraps zero or more complete output-backed agent packets. Nested packets map the agent packet's canonical identity, location, class, priority, family, coverage, readiness, comment status, repairs, missing evidence, target-feature group, next action, and trust boundary; the envelope's query geometry, changed-only filter, empty-result meaning, deterministic ordering with input-card multiplicity and duplicates preserved, schema metadata, and staleness marker remain aggregate or range-specific rather than separate ReviewCard fields."
 
 [[consumer]]
 name = "tokmd_packets_json"
