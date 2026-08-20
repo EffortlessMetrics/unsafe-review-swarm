@@ -346,7 +346,7 @@ name = "reviewcard_agent_packet"
 surface = "agent"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2125"
-note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Packet-only confidence, proof path, confirmation cues, source context, safety/obligation evidence details, verify commands, witness-route details, and other rowless handoff metadata remain explicitly parked pending #2125."
+note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Shared canonical rows and parking for confidence, proof path, obligation/evidence, verify-command, and witness-route details remain owned by #2124; dependent #2125 adds the agent and file-range surfaces plus packet-emitted rowless confirmation cues, source context, safety conditions, repair scope, do-not-do guidance, and stop conditions."
 
 [[consumer]]
 name = "file_range_scan"
