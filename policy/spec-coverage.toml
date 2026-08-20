@@ -240,14 +240,16 @@ note = "ReviewCard-only queue. manual-repair-queue.json is a separate manual-can
 [[consumer]]
 name = "saved_lsp_json"
 surface = "lsp"
-disposition = "mapped"
-note = "Saved editor projection; shares the lsp semantic surface with live LSP and the VS Code adapter."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "The saved editor projection maps canonical card identity, location, operation family, next action, and the advisory trust boundary. Rich hover and code-action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness routes, action payloads, and freshness metadata remain explicitly parked pending #2124."
 
 [[consumer]]
 name = "live_lsp_and_vscode"
 surface = "lsp"
-disposition = "mapped"
-note = "Live/editor adapters preserve the shared LSP diagnostic and action contract; transport and freshness lifecycle are separate concerns."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "The live LSP server and saved-artifact VS Code adapter consume the same canonical identity, location, operation family, next action, and advisory trust boundary without becoming a second analyzer truth. Their distinct hover/action payloads, confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness routes, transport, packaging, and freshness lifecycles remain explicitly parked pending #2124; the extension is still a saved-lsp.json viewer rather than a live-server client."
 
 [[consumer]]
 name = "cards_sarif"
