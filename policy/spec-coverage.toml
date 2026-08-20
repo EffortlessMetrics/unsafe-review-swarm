@@ -34,14 +34,14 @@ name = "baseline_state"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_baseline_state"
 surfaces = ["json", "agent", "file_range_scan", "policy_report", "lsp"]
 single_truth = true
-note = "All three surfaces (json, agent, policy_report) project CoverageBlock::derive with snapshot-slot movement. Policy classification (new_gap/baseline_known/suppressed/non_actionable) is carried by policy_report.policy_status and policy_report.policy_reason."
+note = "JSON, agent packets, policy-report rows, and saved/live LSP diagnostics directly project baseline_state from CoverageBlock::derive after applying the same snapshot-slot movement. file_range_scan forwards that value through each nested output-backed agent packet. Policy classification (new_gap/baseline_known/suppressed/non_actionable) remains a separate policy_report.policy_status and policy_report.policy_reason projection."
 
 [[field]]
 name = "agent_readiness"
 canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
 surfaces = ["json", "agent", "file_range_scan", "lsp", "usefulness_telemetry", "review_kit", "github_summary"]
 single_truth = true
-note = "shared fn enforces parity across coverage block + agent packet; lsp does not expose per-card agent_readiness via compute_agent_lsp_readiness"
+note = "compute_agent_lsp_readiness owns the per-card readiness state projected by JSON coverage, agent packets, nested file-range packets, and saved/live LSP EditorCoverageBlock.agent_lsp_readiness; LSP action contracts also carry the same readiness vocabulary. Usefulness telemetry, review-kit, and GitHub summary consume bounded aggregate or handoff projections of that shared state."
 
 [[field]]
 name = "comment_plan_status"
@@ -344,8 +344,9 @@ note = "Maps a bounded ReviewCard queue with identity, location, class/code, pri
 [[consumer]]
 name = "reviewcard_agent_packet"
 surface = "agent"
-disposition = "mapped"
-note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it preserves card identity, evidence, readiness, and repair projection."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2125"
+note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Packet-only confidence, proof path, confirmation cues, source context, safety/obligation evidence details, verify commands, witness-route details, and other rowless handoff metadata remain explicitly parked pending #2125."
 
 [[consumer]]
 name = "file_range_scan"
