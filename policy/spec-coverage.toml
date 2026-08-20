@@ -3,9 +3,12 @@ policy = "spec-coverage"
 owner = "core / analysis"
 
 # The ReviewCard is the single truth object; surfaces PROJECT pipeline truth,
-# they do not recompute it. A future `check-spec-coverage` gate (later
-# control-plane PR) will fail if a field's canonical source is missing or a
-# surface recomputes it, locking the single-truth invariant.
+# they do not recompute it. `check-spec-coverage` rejects fields without a
+# canonical source or emitting surface and rejects an explicitly false
+# `single_truth` declaration. The consumer inventory below records aliases,
+# aggregate/formatting-only surfaces,
+# and deliberately uncovered or parked consumers without pretending that the
+# structural gate proves cross-consumer behavior.
 
 [[field]]
 name = "severity"
@@ -16,34 +19,41 @@ single_truth = true
 [[field]]
 name = "priority"
 canonical_source = "domain/review_card.rs::ReviewCard.priority (set by analysis/pipeline/card_builder.rs)"
-surfaces = ["sarif", "json", "agent", "comment_plan", "repair_queue", "outcome", "lsp"]
+surfaces = ["sarif", "json", "agent", "file_range_scan", "comment_plan", "repair_queue", "outcome", "lsp", "review_kit"]
 single_truth = true
 
 [[field]]
-name = "coverage_movement"
-canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
-surfaces = ["json", "agent", "lsp"]
+name = "outcome_movement"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement, then CoverageBlock::apply_snapshot_slots promotion"
+surfaces = ["json", "agent", "file_range_scan", "lsp"]
 single_truth = true
-note = "policy_report does not project outcome_movement; it projects baseline_state only via its own derivation (see baseline_state entry)"
+note = "Per-card OutcomeMovement starts from each ReviewCard's CoverageBlock baseline state, then apply_snapshot_slots promotes current-card worsened/improved states after snapshot comparison. It does not own aggregate counts or resolved baseline IDs for which no current card exists."
+
+[[field]]
+name = "coverage_movement_summary"
+canonical_source = "analysis/pipeline/summary.rs::summarize -> api.rs::Summary (new_gaps, worsened_gaps, improved_gaps, resolved_gaps, inherited_gaps)"
+surfaces = ["json", "pr_summary", "first_pr_terminal", "badges", "policy_report", "usefulness_telemetry", "gate_manifest", "github_summary"]
+single_truth = true
+note = "Aggregate renderers copy the five canonical Summary movement buckets. Unlike per-card OutcomeMovement, Summary owns resolved baseline IDs whose cards are absent; badges consume its baseline-aware new/worsened counts without becoming per-card projections."
 
 [[field]]
 name = "baseline_state"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_baseline_state"
-surfaces = ["json", "agent", "policy_report", "lsp"]
+surfaces = ["json", "agent", "file_range_scan", "policy_report", "lsp"]
 single_truth = true
-note = "All three surfaces (json, agent, policy_report) project CoverageBlock::derive with snapshot-slot movement. Policy classification (new_gap/baseline_known/suppressed/non_actionable) is carried by policy_report.policy_status and policy_report.policy_reason."
+note = "JSON, agent packets, policy-report rows, and saved/live LSP diagnostics directly project baseline_state from CoverageBlock::derive after applying the same snapshot-slot movement. file_range_scan forwards that value through each nested output-backed agent packet. Policy classification (new_gap/baseline_known/suppressed/non_actionable) remains a separate policy_report.policy_status and policy_report.policy_reason projection."
 
 [[field]]
 name = "agent_readiness"
 canonical_source = "domain/coverage.rs::compute_agent_lsp_readiness"
-surfaces = ["json", "agent", "lsp"]
+surfaces = ["json", "agent", "file_range_scan", "lsp", "repair_queue", "comment_plan", "pr_summary", "usefulness_telemetry", "review_kit", "github_summary"]
 single_truth = true
-note = "shared fn enforces parity across coverage block + agent packet; lsp does not expose per-card agent_readiness via compute_agent_lsp_readiness"
+note = "compute_agent_lsp_readiness owns the per-card readiness state projected by JSON coverage, agent packets, nested file-range packets, saved/live LSP EditorCoverageBlock.agent_lsp_readiness, repair-queue entries, and both comment-plan card shapes; LSP action contracts also carry the same readiness vocabulary. The PR summary presents a bounded agent-handoff view of that same projection, while usefulness telemetry, review-kit, and GitHub summary consume bounded aggregate or handoff projections."
 
 [[field]]
 name = "comment_plan_status"
 canonical_source = "output/comment_plan/mod.rs::card_statuses"
-surfaces = ["json", "agent", "comment_plan", "lsp"]
+surfaces = ["json", "agent", "file_range_scan", "comment_plan", "lsp", "usefulness_telemetry"]
 single_truth = true
 
 [[field]]
@@ -62,105 +72,105 @@ note = "audit-time metadata, not a per-card field"
 [[field]]
 name = "card_identity"
 canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "baseline_init", "baseline_add", "confirm", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
 
 [[field]]
 name = "site_location"
 canonical_source = "domain/operation.rs::UnsafeSite.location and owner (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "baseline_init", "outcome", "witness_plan", "review_kit"]
 single_truth = true
 note = "File, range, owner, visibility, and changed-line state are card facts. Saved/live LSP and VS Code adapters project the same range; none may infer binding from nearby lines or hover prose."
 
 [[field]]
 name = "rule_class_code"
 canonical_source = "domain/classification.rs::ReviewClass::as_str"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The stable diagnostic code is the canonical class/rule code. Severity remains a separate ReviewClass projection; adapters must not replace either with priority or operation family."
 
 [[field]]
 name = "operation_family"
 canonical_source = "domain/operation.rs::UnsafeOperation.family.as_str()"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome", "ub_review"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "baseline_init", "confirm", "outcome", "ub_review", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "Operation family is card-owned and additive. It is descriptive context, not a replacement for class, severity, readiness, or repair applicability."
 
 [[field]]
 name = "review_class"
 canonical_source = "domain/classification.rs::ReviewClass (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "ReviewClass owns class-derived severity and actionability. Saved LSP, live LSP, VS Code, agent, SARIF, and PR consumers must project it without reclassification."
 
 [[field]]
 name = "surfacing_disposition"
 canonical_source = "output/comment_plan/mod.rs::card_statuses (output/comment_plan/selection.rs)"
-surfaces = ["json", "comment_plan", "agent", "lsp", "pr_summary", "github_summary"]
+surfaces = ["json", "comment_plan", "agent", "file_range_scan", "lsp", "first_pr_terminal"]
 single_truth = true
 note = "Selected, not_selected, and not_eligible are reviewer-routing states. They must remain distinct from analyzer class and from human/agent readiness."
 
 [[field]]
 name = "next_action"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "agent", "outcome"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "The summary and verify commands are card-owned handoff facts. Renderers may format them, but may not invent repairs or broaden their target."
 
 [[field]]
 name = "repair_applicability"
 canonical_source = "output/agent/queue.rs::repair_queue_projection (AgentQueueProjection)"
-surfaces = ["json", "repair_queue", "lsp", "agent", "pr_summary", "github_summary"]
+surfaces = ["json", "repair_queue", "comment_plan", "lsp", "agent", "file_range_scan", "pr_summary", "github_summary", "review_kit"]
 single_truth = true
-note = "Buckets, bounded allowed-repair hints, typed repair candidates, and readiness are derived from the shared repair projection. The repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
+note = "Buckets, bounded allowed-repair hints, typed repair candidates, and readiness are derived from the shared repair projection. CommentPlanRepairMetadata directly projects that vocabulary for both selected and not-selected cards; the repair queue, agent packet, saved/live LSP action data, VS Code adapter, and PR artifacts must not classify applicability independently."
 
 [[field]]
 name = "freshness_identity"
 canonical_source = "api.rs::AnalyzeOutput.analysis_identity / freshness.rs::AnalysisIdentity"
-surfaces = ["json", "lsp", "agent"]
+surfaces = ["json", "lsp", "agent", "file_range_scan"]
 single_truth = true
 note = "Saved LSP and agent packets project the shared per-analysis identity. Live LSP, VS Code freshness presentation, document versions, and stale/failure transitions remain later #1908 slices; the identity is a signal, not a safety or currentness guarantee."
 
 [[field]]
 name = "missing_evidence"
 canonical_source = "domain/review_card.rs::ReviewCard.missing"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "witness_plan", "review_kit", "outcome"]
 single_truth = true
 note = "Missing evidence is typed card data. Consumers may format it for humans or LLMs, but may not replace it with a prose-derived obligation, severity, or repair bucket."
 
 [[field]]
 name = "witness_receipt_coverage"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> WitnessReceiptCoverage"
-surfaces = ["json", "comment_plan", "repair_queue", "lsp", "agent", "pr_summary", "github_summary"]
+surfaces = ["json", "comment_plan", "lsp", "agent", "file_range_scan", "pr_summary", "usefulness_telemetry", "baseline_add"]
 single_truth = true
 note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness."
 
 [[field]]
 name = "editor_action_contract"
 canonical_source = "output/lsp/action_contract.rs::actions_for_card"
-surfaces = ["json", "lsp", "agent"]
+surfaces = ["lsp"]
 single_truth = true
-note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints."
+note = "Stable action ID, kind, diagnostic association, readiness, applicability, and disabled reason belong to one action contract. Saved/live LSP and VS Code must preserve it; command-only and edit-free remain ADR-0006 constraints. Future optional action payloads for agent/file-range packets remain dependent #2125/#1880 work rather than a field those packets currently emit."
 
 [[field]]
 name = "declaration_summary_group"
 canonical_source = "output/declaration_summary.rs::declaration_groups (derived from ReviewCard.operation.family, domain/coverage.rs::CoverageBlock::derive contract_coverage/baseline_state)"
-surfaces = ["pr_summary"]
+surfaces = ["markdown", "pr_summary"]
 single_truth = true
 note = "Presentation-only grouping (issue #1895) of unsafe_declaration-family ReviewCards by source file. total/new_or_worsened/inherited/contract_missing/contract_present/representatives are all counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier and cards.json remains the complete per-declaration inventory."
 
 [[field]]
 name = "target_feature_summary_group"
 canonical_source = "output/target_feature_summary.rs::target_feature_groups (derived from ReviewCard.operation.family, domain/coverage.rs::CoverageBlock::derive class/baseline_state/coverage slots, and a normalized attribute shape)"
-surfaces = ["pr_summary", "comment_plan"]
+surfaces = ["markdown", "pr_summary", "comment_plan", "agent", "file_range_scan"]
 single_truth = true
-note = "Presentation-only grouping (issue #1894) of target_feature-family ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals are metadata, not identity). Groups never collapse cards whose obligation, class, movement, baseline state, receipt state, or next action differ. total/representatives/underlying_card_ids are counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier, cards.json remains the complete per-site inventory, and the comment-plan's grouped_repetition selection reads the identical group membership so the two surfaces cannot drift on which card is the representative."
+note = "Presentation-only grouping (issue #1894) of target_feature-family ReviewCards by source file, review class, and a normalized attribute shape (architecture/feature literals are metadata, not identity). Groups never collapse cards whose obligation, class, movement, baseline state, receipt state, or next action differ. total/representatives/underlying_card_ids are counted from the same CoverageBlock derivation every other baseline-movement surface uses; the group is not a second classifier, cards.json remains the complete per-site inventory, and the comment-plan plus output-backed single-card and file-range agent packets read the identical group membership so those surfaces cannot drift on which card is the representative."
 
 [[field]]
 name = "trust_boundary"
 canonical_source = "output/mod.rs::REVIEWCARD_TRUST_BOUNDARY and surface-specific fixed boundary constants"
-surfaces = ["json", "pr_summary", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "badges", "gate_manifest", "action", "ub_review"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "badges", "policy_report", "baseline_init", "baseline_add", "baseline_status", "baseline_refresh", "confirm", "gate_manifest", "action", "ub_review", "usefulness_telemetry", "witness_plan", "review_kit", "outcome", "receipt_audit"]
 single_truth = true
 note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact surface carries the advisory boundary. A renderer may narrow it, never strengthen it into safety, execution, or automatic-repair proof."
 
@@ -168,3 +178,232 @@ note = "Every saved/live/editor, agent, queue, SARIF, PR, and external artifact 
 # surface vocabulary. The named consumers are saved lsp.json, live
 # unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
 # and PR artifacts; they are not independent semantic surfaces.
+
+# Canonical consumer inventory from issue #1880. `surface` links a consumer to
+# the field entries above. `aggregate_projection`, `routing_manifest`, and
+# `formatting_sidecar` mean the consumer does not emit a complete per-card
+# projection. `uncovered`, `partial`, and `parked` are not passes; each routes
+# to a builder-ready or existing issue instead of adding unproved surfaces to
+# individual field entries.
+
+[[consumer]]
+name = "cards_json"
+surface = "json"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Canonical machine-readable ReviewCard set that maps every existing `json` field row; other first-PR artifacts project from these card identities. Rich rowless confidence, proof path, operation text, hazards, obligations and obligation evidence, contract/discharge/reach details, witness routes, verify commands, confirmation cues, and the unnamed contract/guard/test-reach/manual-context coverage slots are explicitly parked under shared owner #2124 rather than treated as complete parity."
+
+[[consumer]]
+name = "human_cli"
+surface = "human"
+disposition = "uncovered"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
+note = "The direct human renderer consumes ReviewCards, but its emitted field subset is not yet locked to this map."
+
+[[consumer]]
+name = "markdown_pr_summary"
+surface = "pr_summary"
+disposition = "aggregate_projection"
+note = "Maps aggregate coverage movement and card fields for specific-operation rows, but groups owner-contract cards into one bounded row with at most three representative locations. Its agent handoff maps readiness only for the ranked top card rather than a complete per-card inventory. Grouped identity, class, proof path, operation, missing evidence, route, next action, and confirmation state are omitted/parked; comment-plan surfacing disposition is absent/parked; the complete per-card inventory remains in cards.json."
+
+[[consumer]]
+name = "direct_markdown"
+surface = "markdown"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2119"
+note = "Direct `--format markdown` output maps identity, class/code, missing evidence, next action, and the advisory trust boundary in both scopes. Repo scope additionally maps location and operation family plus declaration/target-feature aggregates; diff scope emits operation text, proof path, hazard, and route without dedicated field rows and only the first missing-evidence kind. Scope-dependent omissions and all non-listed card fields are explicitly parked."
+
+[[consumer]]
+name = "explain_markdown"
+surface = "explain_markdown"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2120"
+note = "Single-card `explain --format markdown` maps identity, class/code, location, operation family, missing evidence, next action, and the advisory trust boundary. Operation text, proof path, hazards, obligation descriptions, contract/discharge/reach/witness summaries, obligation-evidence states, verify commands, and witness routes are emitted directly from the selected ReviewCard but have no dedicated canonical field rows here and remain explicitly parked pending #2120; priority, movement, readiness, and surfacing disposition are absent."
+
+[[consumer]]
+name = "first_pr_terminal"
+surface = "first_pr_terminal"
+disposition = "aggregate_projection"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2121"
+note = "The pr/first-pr/review terminal report copies the canonical five Summary movement counts and comment-plan selection aggregates. Its front panel maps the top card's identity through explain/context commands, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary; first-pr/review also print up to three additional selected cards with identity, location, operation family, next action, selection reason, and first verify command. Cards beyond that cap, remaining additional-card fields, full verify/context command semantics, bundle/scan metadata, and ManualCandidate sidecars are omitted or report-specific and remain parked pending #2121."
+
+[[consumer]]
+name = "github_summary"
+surface = "github_summary"
+disposition = "aggregate_projection"
+note = "Bounded GitHub step summary maps aggregate scope/count/movement plus only the ranked top card's identity, location, class/code, operation family, missing evidence, next action, agent readiness, repair applicability, and advisory trust boundary. It does not emit comment-plan surfacing disposition or typed witness-receipt coverage. Every non-top card is omitted/parked here and remains available in cards.json and the full PR summary."
+
+[[consumer]]
+name = "comment_plan_json"
+surface = "comment_plan"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps every existing comment_plan field row, including direct per-card agent readiness plus ordered repair-applicability buckets/reasons for both selected and not-selected shapes; those values remain distinct from selection status and ReviewClass. PlannedComment and NotSelectedCard both emit rowless confidence and proof path; selected comments additionally emit confirmation, witness routes, verify commands, and handoff cues while NotSelectedCard intentionally carries a smaller shape. #2124 owns the shared rows and explicit asymmetric parked disposition; #2118 remains the separate shared actionability-derivation owner."
+
+[[consumer]]
+name = "repair_queue_json"
+surface = "repair_queue"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps the existing repair_queue field rows for priority, identity, location, class/code, operation family, direct per-card agent readiness, repair applicability, missing evidence, and trust. It emits neither canonical ReviewCard.next_action nor WitnessReceiptCoverage; its generated context command, confirmation_state, and requires_witness_receipt classification are distinct queue values. Rowless confidence, proof path, and confirmation fields remain shared #2124 ownership. manual-repair-queue.json is a separate ManualCandidate sidecar and remains out of scope."
+
+[[consumer]]
+name = "saved_lsp_json"
+surface = "lsp"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "The saved editor projection maps every canonical field row linked to the shared lsp surface, including diagnostic classification and coverage, identity/location/family/next action, readiness/repair/surfacing, freshness identity, the editor action contract, and the advisory trust boundary. Hover and code-action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness-route details, payload details beyond the mapped editor action contract, and lifecycle details beyond the mapped freshness identity remain rowless and explicitly parked pending #2124."
+
+[[consumer]]
+name = "live_lsp_and_vscode"
+surface = "lsp"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "The live LSP server and saved-artifact VS Code adapter consume every canonical field row linked to the shared lsp surface without becoming a second analyzer truth. Their rowless hover/action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness-route details, payload details beyond the mapped editor action contract, and transport/packaging/lifecycle details beyond the mapped freshness identity remain explicitly parked pending #2124; #1907, #1908, and #1909 already own the delivered diagnostic, lifecycle, and structured-action parity, and the extension remains a saved-lsp.json viewer rather than a live-server client."
+
+[[consumer]]
+name = "cards_sarif"
+surface = "sarif"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps SARIF priority, identity, location, class/code, operation family, missing evidence, next-action summary, and trust; rule code and level remain class-derived under the existing PR #1770 SARIF/LSP severity drift lock. Rowless confidence, proof path, hazards, witness routes, and verify-command details remain shared #2124 ownership."
+
+[[consumer]]
+name = "badges"
+surface = "badges"
+disposition = "aggregate_projection"
+note = "Badge counts consume canonical baseline-aware coverage movement: with a baseline, the main badge is new plus worsened gaps; without one, it falls back to open actionable gaps. Badges carry no per-card movement, repair, readiness, or safety claim."
+
+[[consumer]]
+name = "policy_report"
+surface = "policy_report"
+disposition = "aggregate_projection"
+note = "Copies the canonical five Summary movement counts and maps per-card identity, class/code, operation family, baseline state, next action, and the advisory trust boundary. Operation text, proof path, changed-line attribution, missing-evidence count, and policy status/reason are report-specific or lack dedicated canonical field rows here and remain explicitly parked from parity claims."
+
+[[consumer]]
+name = "baseline_init"
+surface = "baseline_init"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "Human and JSON baseline-init output map actionable ReviewCard identity, location, operation family, and a baseline-specific advisory trust boundary. Hazard labels plus ledger/snapshot paths and write/preview metadata have no dedicated canonical field rows here and remain parked; this debt capture is not a safety review or baseline-state projection."
+
+[[consumer]]
+name = "baseline_add"
+surface = "baseline_add"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2122"
+note = "Baseline add reanalyzes the repository, resolves the requested canonical ReviewCard identity, persists CoverageBlock-derived contract, guard, test-reach, and witness-receipt snapshot slots for that card, and emits its fixed advisory trust boundary. Identity, the existing witness-receipt-coverage row, and the trust boundary are mapped here; the other three coverage slots plus owner/reason/evidence/review-date ledger metadata have no dedicated field rows and remain parked pending #2122."
+
+[[consumer]]
+name = "baseline_status"
+surface = "baseline_status"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "Human and JSON status renderers share BaselineHealthReport and emit baseline-ledger card_id values plus a baseline-health advisory trust boundary. A ledger ID overlaps canonical ReviewCard identity only when classification matches a current card; resolved, malformed, or duplicate ledger rows remain ledger/health identifiers, not ReviewCard.id projections. Health buckets, details, dates, scan/snapshot errors, and aggregate counts remain parked under #1880."
+
+[[consumer]]
+name = "baseline_refresh"
+surface = "baseline_refresh"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "Human and optional baseline-refresh-plan.json dry-run outputs share BaselineRefreshPlan and emit per-entry baseline-ledger card_id values plus a refresh-specific advisory trust boundary. An ID overlaps canonical ReviewCard identity only for entries matched to a current card; resolved or invalid ledger entries remain plan identifiers rather than ReviewCard.id projections. Planned action, bucket, detail, dates, paths, write flags, and summary counts remain parked under #1880; this preview writes no policy, source, or snapshot files."
+
+[[consumer]]
+name = "usefulness_telemetry_json"
+surface = "usefulness_telemetry"
+disposition = "aggregate_projection"
+note = "Maps only aggregate coverage movement, agent readiness, comment selection status, witness-receipt coverage, and the advisory trust boundary. Actionability duplicates a private ReviewClass match and is parked pending the parity lock in #2118; confidence, coverage-slot, unfulfilled-obligation, and CLI-owned scan-cost aggregates have no dedicated field row and remain parked from per-card parity. Per-card identity, location, priority, operation family, missing-evidence list, next action, repair applicability, freshness identity, and editor action are absent/parked from this diagnostic count artifact."
+
+[[consumer]]
+name = "unsafe_review_gate_json"
+surface = "gate_manifest"
+disposition = "routing_manifest"
+note = "Artifact-routing manifest plus an aggregate projection of the five exact Summary movement counts and the advisory trust boundary. Per-card fields are absent/parked; paths, kinds, and schema versions require the compatibility contract tracked by #2115."
+
+[[consumer]]
+name = "outcome_report"
+surface = "outcome"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2127"
+note = "Maps the bounded before/after ReviewCard-backed identity, class/code, priority, operation family, missing evidence, next action, and advisory trust subset, with location reduced to file and line. Saved snapshot and ManualCandidate states may lack a current ReviewCard; rowless operation text, proof path, witness state, snapshot movement/reasons, receipt deltas, and manual fields remain outcome-specific and parked to #2127 rather than shared #2124 ownership."
+
+[[consumer]]
+name = "receipt_audit"
+surface = "receipt_audit"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "Maps canonical receipt status plus matched ReviewCard identity, class/code, operation family, next action, and the advisory trust boundary. Missing-evidence counts, confirmation state, route tools, saved receipt metadata, and matched ManualCandidate details remain audit-specific/parked rather than a complete per-card projection."
+
+[[consumer]]
+name = "confirm_receipt_generation"
+surface = "confirm"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2123"
+note = "Confirm resolves the exact current ReviewCard, selects a command-bearing card-owned witness route, and writes a typed WitnessReceipt keyed by card identity after explicit execution authorization; dry-run additionally maps operation family and the advisory trust boundary without executing or writing. Route kind/command/provenance, tool/strength, receipt metadata, and execution classification are workflow-specific and remain parked pending #2123; receipt generation is not imported witness-receipt coverage or site-execution proof."
+
+[[consumer]]
+name = "witness_plan_markdown"
+surface = "witness_plan"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2126"
+note = "Maps ReviewCard identity, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary into an advisory witness-routing plan. Shared rowless proof-path, hazard, obligation-evidence, verify-command, and witness-route fields remain owned by #2124; witness-plan-specific operation text, confirmation cues, and rendering/group metadata remain parked to dependent #2126. The plan does not execute witnesses."
+
+[[consumer]]
+name = "review_kit_json"
+surface = "review_kit"
+disposition = "aggregate_projection"
+note = "Maps a bounded ReviewCard queue with identity, location, class/code, priority, operation family, missing evidence, next action, agent readiness, repair applicability, and the advisory trust boundary, plus aggregate counts and copy-only handoff commands. Confidence and witness-route details have no dedicated field row and remain parked from this parity map; omitted cards remain in cards.json."
+
+[[consumer]]
+name = "reviewcard_agent_packet"
+surface = "agent"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2125"
+note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Shared canonical rows and parking for confidence, proof path, obligation/evidence, verify-command, and witness-route details remain owned by #2124; dependent #2125 adds the agent and file-range surfaces plus packet-emitted rowless confirmation cues, source context, safety conditions, repair scope, do-not-do guidance, and stop conditions."
+
+[[consumer]]
+name = "file_range_scan"
+surface = "file_range_scan"
+disposition = "aggregate_projection"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
+note = "The context file-range renderer deterministically filters ReviewCards by normalized file and inclusive line range, optionally restricts them to canonical new/worsened baseline states, and wraps zero or more complete output-backed agent packets. Nested packets map the agent packet's canonical identity, location, class, priority, family, coverage, readiness, comment status, repairs, missing evidence, target-feature group, next action, and trust boundary; the envelope's query geometry, changed-only filter, empty-result meaning, deterministic ordering with input-card multiplicity and duplicates preserved, schema metadata, and staleness marker remain aggregate or range-specific rather than separate ReviewCard fields."
+
+[[consumer]]
+name = "tokmd_packets_json"
+surface = "manual_candidate"
+disposition = "formatting_sidecar"
+note = "ManualCandidate formatting input with analyzer_discovered=0; it is not the ReviewCard agent packet, rendered tokmd output, or a second classifier."
+
+[[consumer]]
+name = "public_action"
+surface = "action"
+disposition = "parked"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1878"
+note = "No public Action or released-binary consumer claim is active; the current map records only the advisory trust boundary."
+
+[[consumer]]
+name = "ub_review"
+surface = "ub_review"
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
+note = "Operation-family and trust-boundary intent are mapped, but a pinned real producer/consumer smoke is not yet proven."
+
+[[gap]]
+name = "human_cli_field_parity"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
+
+[[gap]]
+name = "artifact_schema_identity_and_compatibility"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2115"
+
+[[gap]]
+name = "ub_review_real_consumer_smoke"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
+
+[[gap]]
+name = "usefulness_actionability_projection_parity"
+status = "builder_ready"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2118"
