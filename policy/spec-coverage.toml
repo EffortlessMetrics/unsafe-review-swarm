@@ -72,7 +72,7 @@ note = "audit-time metadata, not a per-card field"
 [[field]]
 name = "card_identity"
 canonical_source = "domain/review_card.rs::ReviewCard.id (analysis/pipeline/card_identity.rs)"
-surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "baseline_init", "baseline_add", "baseline_status", "baseline_refresh", "confirm", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "baseline_init", "baseline_add", "confirm", "outcome", "witness_plan", "review_kit", "receipt_audit"]
 single_truth = true
 note = "All editor, packet, queue, SARIF, and PR projections join by the exact ReviewCard ID; the saved VS Code adapter must preserve this identity rather than infer it from position."
 
@@ -298,14 +298,14 @@ name = "baseline_status"
 surface = "baseline_status"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
-note = "Human and JSON status renderers share BaselineHealthReport and map current or ledger ReviewCard identity plus a baseline-health advisory trust boundary. Health buckets, details, dates, scan/snapshot errors, and aggregate counts are baseline-ledger diagnostics rather than ReviewClass, canonical baseline_state, or Summary coverage_movement, so they remain explicitly parked from those parity claims."
+note = "Human and JSON status renderers share BaselineHealthReport and emit baseline-ledger card_id values plus a baseline-health advisory trust boundary. A ledger ID overlaps canonical ReviewCard identity only when classification matches a current card; resolved, malformed, or duplicate ledger rows remain ledger/health identifiers, not ReviewCard.id projections. Health buckets, details, dates, scan/snapshot errors, and aggregate counts remain parked under #1880."
 
 [[consumer]]
 name = "baseline_refresh"
 surface = "baseline_refresh"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
-note = "Human and optional baseline-refresh-plan.json dry-run outputs share BaselineRefreshPlan and map per-entry ReviewCard identity plus a refresh-specific advisory trust boundary. Planned action, health bucket, detail, dates, paths, write flags, and summary counts are plan metadata rather than canonical ReviewCard fields and remain explicitly parked; this preview writes no policy, source, or snapshot files."
+note = "Human and optional baseline-refresh-plan.json dry-run outputs share BaselineRefreshPlan and emit per-entry baseline-ledger card_id values plus a refresh-specific advisory trust boundary. An ID overlaps canonical ReviewCard identity only for entries matched to a current card; resolved or invalid ledger entries remain plan identifiers rather than ReviewCard.id projections. Planned action, bucket, detail, dates, paths, write flags, and summary counts remain parked under #1880; this preview writes no policy, source, or snapshot files."
 
 [[consumer]]
 name = "usefulness_telemetry_json"
@@ -322,8 +322,9 @@ note = "Artifact-routing manifest plus an aggregate projection of the five exact
 [[consumer]]
 name = "outcome_report"
 surface = "outcome"
-disposition = "mapped"
-note = "Maps before/after ReviewCard identity, location, class/code, priority, operation family, missing evidence, next action, and the advisory trust boundary. Snapshot-comparison movement reasons, receipt deltas, and mixed ManualCandidate fields are report-specific and remain parked from canonical per-card coverage-movement parity."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2127"
+note = "Maps the bounded before/after ReviewCard-backed identity, class/code, priority, operation family, missing evidence, next action, and advisory trust subset, with location reduced to file and line. Saved snapshot and ManualCandidate states may lack a current ReviewCard; rowless operation text, proof path, witness state, snapshot movement/reasons, receipt deltas, and manual fields remain outcome-specific and parked to #2127 rather than shared #2124 ownership."
 
 [[consumer]]
 name = "receipt_audit"
