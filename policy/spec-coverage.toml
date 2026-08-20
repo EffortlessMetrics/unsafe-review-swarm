@@ -242,14 +242,14 @@ name = "saved_lsp_json"
 surface = "lsp"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
-note = "The saved editor projection maps canonical card identity, location, operation family, next action, and the advisory trust boundary. Rich hover and code-action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness routes, action payloads, and freshness metadata remain explicitly parked pending #2124."
+note = "The saved editor projection maps every canonical field row linked to the shared lsp surface, including diagnostic classification and coverage, identity/location/family/next action, readiness/repair/surfacing, freshness identity, the editor action contract, and the advisory trust boundary. Hover and code-action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness-route details, payload details beyond the mapped editor action contract, and lifecycle details beyond the mapped freshness identity remain rowless and explicitly parked pending #2124."
 
 [[consumer]]
 name = "live_lsp_and_vscode"
 surface = "lsp"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
-note = "The live LSP server and saved-artifact VS Code adapter consume the same canonical identity, location, operation family, next action, and advisory trust boundary without becoming a second analyzer truth. Their distinct hover/action payloads, confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness routes, transport, packaging, and freshness lifecycles remain explicitly parked pending #2124; the extension is still a saved-lsp.json viewer rather than a live-server client."
+note = "The live LSP server and saved-artifact VS Code adapter consume every canonical field row linked to the shared lsp surface without becoming a second analyzer truth. Their rowless hover/action confidence, proof path, hazards, obligations, evidence summaries, verify commands, witness-route details, payload details beyond the mapped editor action contract, and transport/packaging/lifecycle details beyond the mapped freshness identity remain explicitly parked pending #2124; #1907, #1908, and #1909 already own the delivered diagnostic, lifecycle, and structured-action parity, and the extension remains a saved-lsp.json viewer rather than a live-server client."
 
 [[consumer]]
 name = "cards_sarif"
