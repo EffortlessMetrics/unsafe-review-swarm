@@ -1,6 +1,6 @@
 use crate::api::AnalyzeOutput;
 use crate::domain::coverage::{Coverage, WitnessReceiptCoverage};
-use crate::domain::{Confidence, Priority, ReviewCard, ReviewClass, UnsafeSiteKind};
+use crate::domain::{Confidence, Priority, ReviewCard, UnsafeSiteKind};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY;
 use crate::output::confirmation::{build_this_first, confirmation_step, hypothesis_to_confirm};
 use crate::output::target_feature_summary;
@@ -454,20 +454,7 @@ pub(super) fn relevance(card: &ReviewCard) -> &'static str {
 }
 
 pub(super) fn actionability(card: &ReviewCard) -> &'static str {
-    match &card.class {
-        ReviewClass::GuardMissing => "specific_guard_missing",
-        ReviewClass::ContractMissing => "specific_contract_missing",
-        ReviewClass::GuardedUnwitnessed
-        | ReviewClass::ReachableUnwitnessed
-        | ReviewClass::RequiresLoom
-        | ReviewClass::RequiresSanitizer
-        | ReviewClass::RequiresKaniOrCrux
-        | ReviewClass::MiriUnsupported => "specific_witness_missing",
-        ReviewClass::WitnessMismatch => "specific_receipt_missing",
-        ReviewClass::UnsafeUnreached => "specific_reach_missing",
-        ReviewClass::StaticUnknown => "human_review_only",
-        _ => "not_actionable",
-    }
+    card.class.actionability_label()
 }
 
 /// Render the inline comment body for a planned comment.

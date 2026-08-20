@@ -5,8 +5,8 @@
 /// This is diagnostic operational usefulness only — not calibrated, not a measurement of
 /// detection accuracy, not a guarantee of any kind, not a gate, not a merge verdict.
 use crate::api::{AnalyzeOutput, ScanCost};
+use crate::domain::Confidence;
 use crate::domain::coverage::{AgentLspReadiness, Coverage, WitnessReceiptCoverage};
-use crate::domain::{Confidence, ReviewClass};
 use crate::output::comment_plan;
 use serde::Serialize;
 use std::collections::BTreeMap;
@@ -342,32 +342,10 @@ fn build_confidence_distribution(output: &AnalyzeOutput) -> ConfidenceDistributi
     }
 }
 
-/// Derive the actionability label for a card.
-///
-/// Mirrors the same logic in `output/comment_plan/selection.rs::actionability()`
-/// without importing that private function. The mapping is a trivial match over
-/// `ReviewClass` (15 lines); inlining avoids a cross-module coupling.
-fn card_actionability(card: &crate::domain::ReviewCard) -> &'static str {
-    match &card.class {
-        ReviewClass::GuardMissing => "specific_guard_missing",
-        ReviewClass::ContractMissing => "specific_contract_missing",
-        ReviewClass::GuardedUnwitnessed
-        | ReviewClass::ReachableUnwitnessed
-        | ReviewClass::RequiresLoom
-        | ReviewClass::RequiresSanitizer
-        | ReviewClass::RequiresKaniOrCrux
-        | ReviewClass::MiriUnsupported => "specific_witness_missing",
-        ReviewClass::WitnessMismatch => "specific_receipt_missing",
-        ReviewClass::UnsafeUnreached => "specific_reach_missing",
-        ReviewClass::StaticUnknown => "human_review_only",
-        _ => "not_actionable",
-    }
-}
-
 fn build_actionability_distribution(output: &AnalyzeOutput) -> BTreeMap<String, usize> {
     let mut distribution: BTreeMap<String, usize> = BTreeMap::new();
     for card in &output.cards {
-        let label = card_actionability(card);
+        let label = card.class.actionability_label();
         *distribution.entry(label.to_string()).or_insert(0) += 1;
     }
     distribution
@@ -475,6 +453,19 @@ mod tests {
             expected_new,
             "new_cards must match summary.new_gaps"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn usefulness_telemetry_actionability_uses_canonical_label() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let value = parse_json(&render(&output))?;
+        let distribution = value["actionability_distribution"]
+            .as_object()
+            .ok_or("actionability_distribution must be an object")?;
+
+        assert_eq!(distribution.len(), 1);
+        assert_eq!(distribution.get("specific_guard_missing"), Some(&1.into()));
         Ok(())
     }
 

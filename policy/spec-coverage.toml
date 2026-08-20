@@ -99,10 +99,10 @@ note = "Operation family is card-owned and additive. It is descriptive context, 
 
 [[field]]
 name = "review_class"
-canonical_source = "domain/classification.rs::ReviewClass (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
+canonical_source = "domain/classification.rs::ReviewClass and ReviewClass::actionability_label (analysis/pipeline/card_builder.rs)"
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit", "usefulness_telemetry"]
 single_truth = true
-note = "ReviewClass owns class-derived severity and actionability. Saved LSP, live LSP, VS Code, agent, SARIF, and PR consumers must project it without reclassification."
+note = "ReviewClass owns class-derived severity and actionability. Comment-plan and usefulness-telemetry actionability labels project the same exhaustive ReviewClass::actionability_label mapping; saved LSP, live LSP, VS Code, agent, SARIF, and other PR consumers must project ReviewClass without reclassification."
 
 [[field]]
 name = "surfacing_disposition"
@@ -312,7 +312,7 @@ note = "Human and optional baseline-refresh-plan.json dry-run outputs share Base
 name = "usefulness_telemetry_json"
 surface = "usefulness_telemetry"
 disposition = "aggregate_projection"
-note = "Maps only aggregate coverage movement, agent readiness, comment selection status, witness-receipt coverage, and the advisory trust boundary. Actionability duplicates a private ReviewClass match and is parked pending the parity lock in #2118; confidence, coverage-slot, unfulfilled-obligation, and CLI-owned scan-cost aggregates have no dedicated field row and remain parked from per-card parity. Per-card identity, location, priority, operation family, missing-evidence list, next action, repair applicability, freshness identity, and editor action are absent/parked from this diagnostic count artifact."
+note = "Maps only aggregate coverage movement, agent readiness, comment selection status, witness-receipt coverage, canonical ReviewClass actionability labels, and the advisory trust boundary. Confidence, coverage-slot, unfulfilled-obligation, and CLI-owned scan-cost aggregates have no dedicated field row and remain parked from per-card parity. Per-card identity, location, priority, operation family, missing-evidence list, next action, repair applicability, freshness identity, and editor action are absent/parked from this diagnostic count artifact."
 
 [[consumer]]
 name = "unsafe_review_gate_json"
@@ -402,8 +402,3 @@ follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/211
 name = "ub_review_real_consumer_smoke"
 status = "builder_ready"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
-
-[[gap]]
-name = "usefulness_actionability_projection_parity"
-status = "builder_ready"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2118"
