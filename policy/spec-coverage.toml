@@ -142,7 +142,7 @@ note = "Missing evidence is typed card data. Consumers may format it for humans 
 [[field]]
 name = "witness_receipt_coverage"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> WitnessReceiptCoverage"
-surfaces = ["json", "comment_plan", "repair_queue", "lsp", "agent", "file_range_scan", "pr_summary", "usefulness_telemetry", "baseline_add"]
+surfaces = ["json", "comment_plan", "lsp", "agent", "file_range_scan", "pr_summary", "usefulness_telemetry", "baseline_add"]
 single_truth = true
 note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness."
 
@@ -244,7 +244,7 @@ name = "repair_queue_json"
 surface = "repair_queue"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
-note = "Maps the existing repair_queue field rows for priority, identity, location, class/code, operation family, repair applicability, missing evidence, witness-receipt coverage, and trust. It does not emit canonical ReviewCard.next_action; its generated context command is a different queue value. Rowless confidence, proof path, and confirmation fields remain shared #2124 ownership. manual-repair-queue.json is a separate ManualCandidate sidecar and remains out of scope."
+note = "Maps the existing repair_queue field rows for priority, identity, location, class/code, operation family, repair applicability, missing evidence, and trust. It emits neither canonical ReviewCard.next_action nor WitnessReceiptCoverage; its generated context command, confirmation_state, and requires_witness_receipt classification are distinct queue values. Rowless confidence, proof path, and confirmation fields remain shared #2124 ownership. manual-repair-queue.json is a separate ManualCandidate sidecar and remains out of scope."
 
 [[consumer]]
 name = "saved_lsp_json"
@@ -265,7 +265,7 @@ name = "cards_sarif"
 surface = "sarif"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
-note = "Maps SARIF priority, identity, location, class/code, operation family, next-action summary, and trust; rule code and level remain class-derived under the existing PR #1770 SARIF/LSP severity drift lock. Rowless confidence, proof path, hazards, witness routes, and verify-command details remain shared #2124 ownership."
+note = "Maps SARIF priority, identity, location, class/code, operation family, missing evidence, next-action summary, and trust; rule code and level remain class-derived under the existing PR #1770 SARIF/LSP severity drift lock. Rowless confidence, proof path, hazards, witness routes, and verify-command details remain shared #2124 ownership."
 
 [[consumer]]
 name = "badges"
