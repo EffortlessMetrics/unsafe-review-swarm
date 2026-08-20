@@ -23,11 +23,18 @@ surfaces = ["sarif", "json", "agent", "file_range_scan", "comment_plan", "repair
 single_truth = true
 
 [[field]]
-name = "coverage_movement"
+name = "outcome_movement"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> derive_outcome_movement"
-surfaces = ["json", "agent", "file_range_scan", "lsp", "pr_summary", "first_pr_terminal", "badges", "policy_report", "usefulness_telemetry", "gate_manifest", "github_summary"]
+surfaces = ["json", "agent", "file_range_scan", "lsp"]
 single_truth = true
-note = "PR Markdown, policy-report, gate, and GitHub aggregates copy the canonical five Summary movement counts. Badges consume the canonical baseline-aware new/worsened counts when a baseline exists; their displayed count remains an aggregate, not a per-card movement projection."
+note = "Per-card OutcomeMovement is derived from each ReviewCard's CoverageBlock baseline state. It does not own aggregate counts or resolved baseline IDs for which no current card exists."
+
+[[field]]
+name = "coverage_movement_summary"
+canonical_source = "analysis/pipeline/summary.rs::summarize -> api.rs::Summary (new_gaps, worsened_gaps, improved_gaps, resolved_gaps, inherited_gaps)"
+surfaces = ["json", "pr_summary", "first_pr_terminal", "badges", "policy_report", "usefulness_telemetry", "gate_manifest", "github_summary"]
+single_truth = true
+note = "Aggregate renderers copy the five canonical Summary movement buckets. Unlike per-card OutcomeMovement, Summary owns resolved baseline IDs whose cards are absent; badges consume its baseline-aware new/worsened counts without becoming per-card projections."
 
 [[field]]
 name = "baseline_state"
@@ -228,8 +235,9 @@ note = "Bounded GitHub step summary maps aggregate scope/count/movement plus onl
 [[consumer]]
 name = "comment_plan_json"
 surface = "comment_plan"
-disposition = "mapped"
-note = "Plan-only selection surface; comment eligibility and surfacing disposition remain separate from ReviewClass."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Maps every existing comment_plan field row, including selection status and selected/not-selected routing that remains distinct from ReviewClass. PlannedComment also emits shared rowless confidence, proof path, confirmation, witness-route, verify-command, and handoff details, while NotSelectedCard intentionally carries a smaller shape; those shared fields and the asymmetric parked disposition remain owned by #2124."
 
 [[consumer]]
 name = "repair_queue_json"
@@ -332,8 +340,9 @@ note = "Confirm resolves the exact current ReviewCard, selects a command-bearing
 [[consumer]]
 name = "witness_plan_markdown"
 surface = "witness_plan"
-disposition = "mapped"
-note = "Maps ReviewCard identity, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary into a complete witness-routing plan. Proof-path, hazard, witness-route, and obligation-evidence details have no dedicated field row and remain parked from this parity map; the plan does not execute witnesses."
+disposition = "partial"
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2126"
+note = "Maps ReviewCard identity, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary into an advisory witness-routing plan. Shared rowless proof-path, hazard, obligation-evidence, verify-command, and witness-route fields remain owned by #2124; witness-plan-specific operation text, confirmation cues, and rendering/group metadata remain parked to dependent #2126. The plan does not execute witnesses."
 
 [[consumer]]
 name = "review_kit_json"
