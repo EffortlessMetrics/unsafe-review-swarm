@@ -6691,7 +6691,7 @@ fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(),
         card["witness"]
             .as_str()
             .unwrap_or("")
-            .contains("expires_at: 2026-08-18")
+            .contains("expires_at: 2099-12-31")
     );
     let missing = card["missing"]
         .as_array()
@@ -6899,7 +6899,7 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert_eq!(receipt["summary"], "focused fixture witness passed");
     assert_eq!(receipt["author"], "core/fixtures");
     assert_eq!(receipt["recorded_at"], "2026-05-18T00:00:00Z");
-    assert_eq!(receipt["expires_at"], "2026-08-18");
+    assert_eq!(receipt["expires_at"], "2099-12-31");
     assert_eq!(receipt["command_hash"], "3e163b0bce29ff2e");
     assert_eq!(receipt["limitations"][0], "fixture only");
     assert!(
@@ -6963,7 +6963,7 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("imports_witness_evidence, matched"));
     assert!(markdown.contains("core/fixtures"));
     assert!(markdown.contains("2026-05-18T00:00:00Z"));
-    assert!(markdown.contains("2026-08-18"));
+    assert!(markdown.contains("2099-12-31"));
     assert!(markdown.contains("3e163b0bce29ff2e"));
     assert!(markdown.contains("fixture only"));
     assert!(markdown.contains("raw_pointer_read"));

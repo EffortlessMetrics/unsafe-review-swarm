@@ -425,7 +425,7 @@ mod tests {
         let rendered = render(&output);
 
         assert!(rendered.contains("Imported miri receipt"));
-        assert!(rendered.contains("expires_at: 2026-08-18"));
+        assert!(rendered.contains("expires_at: 2099-12-31"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("Receipt hint"));
         assert!(rendered.contains("not a site-execution claim"));

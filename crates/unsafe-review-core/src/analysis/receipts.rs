@@ -896,7 +896,7 @@ mod tests {
   "strength": "ran",
   "author": "core/fixtures",
   "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
+  "expires_at": "2099-12-31",
   "summary": "focused witness passed",
   "command": "cargo +nightly miri test read_header",
   "limitations": ["fixture only"]
@@ -914,7 +914,7 @@ mod tests {
         assert!(evidence.summary.contains("miri"));
         assert!(evidence.summary.contains("ran"));
         assert!(evidence.summary.contains("core/fixtures"));
-        assert!(evidence.summary.contains("2026-08-18"));
+        assert!(evidence.summary.contains("2099-12-31"));
         assert!(evidence.summary.contains("fixture only"));
         assert!(evidence.runtime_executed);
         Ok(())
@@ -2271,7 +2271,7 @@ mod tests {
   "strength": "ran",
   "author": "core/fixtures",
   "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
+  "expires_at": "2099-12-31",
   "verdict": "confirmed",
   "summary": "miri run: UB hypothesis reproduced"
 }}"#
@@ -2347,7 +2347,7 @@ mod tests {
   "strength": "ran",
   "author": "core/fixtures",
   "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
+  "expires_at": "2099-12-31",
   "verdict": "not_reproduced",
   "summary": "miri run: no UB observed in this run — not a safety claim"
 }}"#

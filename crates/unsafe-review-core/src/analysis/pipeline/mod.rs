@@ -6164,7 +6164,7 @@ evidence = "test fixture"
   "strength": "{strength}",
   "author": "core/fixtures",
   "recorded_at": "2026-05-18T00:00:00Z",
-  "expires_at": "2026-08-18",
+  "expires_at": "2099-12-31",
   "summary": "focused fixture witness passed",
   "command": "{command}",
   "limitations": ["fixture only"]
