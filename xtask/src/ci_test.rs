@@ -978,7 +978,7 @@ fn validate_root_opening(text: &str) -> Result<(), ()> {
 
 fn validate_testcase_body(body: &str) -> Result<(), ()> {
     let mut rest = body;
-    let mut open: Option<&str> = None;
+    let mut open = Vec::new();
     while let Some(start) = rest.find('<') {
         rest = &rest[start..];
         let end = rest.find('>').ok_or(())?;
@@ -995,12 +995,26 @@ fn validate_testcase_body(body: &str) -> Result<(), ()> {
             .ok_or(())?;
         let name = name.trim();
         let allowed_attributes = match name {
-            "failure" | "error" | "skipped" | "rerunFailure" | "flakyFailure" | "flakyError" => {
-                &["message", "type"][..]
+            "failure" | "error" | "skipped" => &["message", "type"][..],
+            "rerunFailure" | "flakyFailure" | "flakyError" => {
+                &["message", "type", "time", "timestamp"][..]
             }
             "system-out" | "system-err" => &[][..],
             _ => return Err(()),
         };
+        if !closing
+            && open.last().is_some_and(|parent| {
+                !matches!(
+                    (*parent, name),
+                    (
+                        "rerunFailure" | "flakyFailure" | "flakyError",
+                        "system-out" | "system-err"
+                    )
+                )
+            })
+        {
+            return Err(());
+        }
         if !closing && parse_attributes(tag, name, allowed_attributes).is_err() {
             return Err(());
         }
@@ -1008,19 +1022,27 @@ fn validate_testcase_body(body: &str) -> Result<(), ()> {
             return Err(());
         }
         if closing {
-            if open.take() != Some(name) {
+            if open.pop() != Some(name) {
                 return Err(());
             }
         } else if self_closing {
-            if open.is_some() {
+            if open.last().is_some_and(|parent| {
+                !matches!(
+                    (*parent, name),
+                    (
+                        "rerunFailure" | "flakyFailure" | "flakyError",
+                        "system-out" | "system-err"
+                    )
+                )
+            }) {
                 return Err(());
             }
-        } else if open.replace(name).is_some() {
-            return Err(());
+        } else {
+            open.push(name);
         }
         rest = &rest[end + 1..];
     }
-    if open.is_some() {
+    if !open.is_empty() {
         return Err(());
     }
     Ok(())
@@ -1491,7 +1513,7 @@ exit 101
         // cargo-nextest may emit retry/flaky failure elements plus diagnostic
         // streams under one testcase. Accept their bounded attributes and
         // structure, but project only the failed identity, never their body.
-        let nextest_nested_failures = br#"<testsuite name="demo"><testcase classname="demo::tests" name="rerun-fails"><rerunFailure message="retry" type="panic">raw retry output</rerunFailure><flakyFailure message="flaky" type="panic">raw flaky output</flakyFailure><flakyError message="error" type="panic">raw flaky error</flakyError><system-out>raw stdout</system-out><system-err>raw stderr</system-err></testcase></testsuite>"#;
+        let nextest_nested_failures = br#"<testsuite name="demo"><testcase classname="demo::tests" name="rerun-fails"><rerunFailure message="retry" type="panic" timestamp="2026-08-22T03:00:00Z" time="0.01"><system-out>nested retry output</system-out>raw retry output</rerunFailure><flakyFailure message="flaky" type="panic"><system-err>nested flaky output</system-err>raw flaky output</flakyFailure><flakyError message="error" type="panic">raw flaky error</flakyError><system-out>raw stdout</system-out><system-err>raw stderr</system-err></testcase></testsuite>"#;
         records.clear();
         if parse_junit(nextest_nested_failures, &mut records) != "ok" || records.len() != 1 {
             return Err("nextest nested failure fixture was rejected".to_string());
