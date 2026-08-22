@@ -401,7 +401,7 @@ jobs:
             # file and keep the upload bounded; no runner stream or arbitrary
             # path is copied into the artifact.
             if [ -f "$diagnostics_source" ] && [ ! -L "$diagnostics_source" ] \
-              && [ "$(wc -c < "$diagnostics_source" 2>/dev/null || echo 999999)" -le 16384 ]; then
+              && [ "$(wc -c < "$diagnostics_source" 2>/dev/null || echo 999999)" -le 16385 ]; then
               cp --no-dereference "$diagnostics_source" "$diagnostics_path"
             fi
             if [ ! -f "$diagnostics_path" ] || [ -L "$diagnostics_path" ]; then
