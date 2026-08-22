@@ -1191,7 +1191,7 @@ fn write_diagnostics(
         );
         let bytes = serde_json::to_vec(&serde_json::Value::Object(output.clone()))
             .map_err(|error| format!("serialize test diagnostics: {error}"))?;
-        if bytes.len() <= MAX_OUTPUT_BYTES {
+        if bytes.len() < MAX_OUTPUT_BYTES {
             break bytes;
         }
         if record_values.pop().is_none() {
@@ -1581,7 +1581,7 @@ exit 101
         write_diagnostics(&path, 101, 0, 101, "ok", None, &records)?;
         reject_symlink(&path)?;
         let bytes = fs::read(&path).map_err(|error| format!("read fixture: {error}"))?;
-        if bytes.len() > MAX_OUTPUT_BYTES + 1 {
+        if bytes.len() > MAX_OUTPUT_BYTES {
             return Err(format!("diagnostics exceeded bound: {}", bytes.len()));
         }
         let _ = fs::remove_dir_all(&dir);
