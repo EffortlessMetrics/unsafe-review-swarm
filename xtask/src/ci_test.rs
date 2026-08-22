@@ -233,7 +233,11 @@ pub(crate) fn validate_diagnostics(path: &Path) -> Result<(), String> {
         serde_json::Value::String(reason) if PARSE_REASONS.contains(&reason.as_str()) => {
             Some(reason.as_str())
         }
-        _ => return Err("test diagnostics parse_reason is outside the closed vocabulary".to_string()),
+        _ => {
+            return Err(
+                "test diagnostics parse_reason is outside the closed vocabulary".to_string(),
+            );
+        }
     };
     let requires_reason = !matches!(stream_status, "ok" | "missing_report");
     if requires_reason != parse_reason.is_some() {
@@ -952,8 +956,9 @@ fn validate_testcase_body(body: &str) -> Result<(), ()> {
             .ok_or(())?;
         let name = name.trim();
         let allowed_attributes = match name {
-            "failure" | "error" | "skipped" | "rerunFailure" | "flakyFailure" | "flakyError" =>
-                &["message", "type"][..],
+            "failure" | "error" | "skipped" | "rerunFailure" | "flakyFailure" | "flakyError" => {
+                &["message", "type"][..]
+            }
             "system-out" | "system-err" => &[][..],
             _ => return Err(()),
         };
