@@ -59,6 +59,27 @@ fn check_private_staging_order(path: &str, text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Require the structured test invocation to be part of the launched core
+/// gate, rather than accepting the `ci-test` prefix from the validator command.
+fn check_core_gate_launch_order(path: &str, text: &str) -> Result<(), String> {
+    let launch = r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#;
+    let launch_index = text
+        .find(launch)
+        .ok_or_else(|| format!("{path} missing exact launched ci-test invocation: {launch}"))?;
+    let background = text
+        .find(") > target/ci-core/core.log 2>&1 &")
+        .ok_or_else(|| format!("{path} missing background core-gate launch"))?;
+    let verdict = text
+        .find("- name: Assert core gate verdict")
+        .ok_or_else(|| format!("{path} missing core-gate verdict step"))?;
+    if !(launch_index < background && background < verdict) {
+        return Err(format!(
+            "{path} must launch the exact ci-test invocation before asserting the core verdict"
+        ));
+    }
+    Ok(())
+}
+
 /// Validate the bounded diagnostic artifact attached to a failed deterministic
 /// core gate. The upload may report evidence, but it must neither retain the
 /// raw log nor replace the final non-zero verdict with an advisory outcome.
@@ -94,7 +115,7 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             // Staging is recreated after the core finishes in a private,
             // unpredictable runner-temp path. Only the baseline two files plus
             // the optional sanitized structured diagnostic are exposed.
-            "cargo run --locked -p xtask -- ci-test",
+            r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#,
             "UNSAFE_REVIEW_CI_HANDOFF_DIR=\"${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}\"",
             "id: core-verdict",
             "${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}",
@@ -138,7 +159,8 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "origin/${{ github.base_ref",
         ],
     )?;
-    check_private_staging_order(path, text)
+    check_private_staging_order(path, text)?;
+    check_core_gate_launch_order(path, text)
 }
 
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
@@ -293,6 +315,8 @@ case "$core_mode" in
 esac
 head -n 80
 head -c 16384
+_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test \
+  ) > target/ci-core/core.log 2>&1 &
 - name: Assert core gate verdict
   id: core-verdict
 if [ "${core_exit}" != "0" ]; then
