@@ -231,6 +231,17 @@ The producer-control and consumer commands use different option forms, so only
 byte-equal artifacts are claimed equal. Cards legitimately carry different
 run-input provenance.
 
+## Trust boundary
+
+This receipt is producer/consumer compatibility evidence only: the gate
+envelope was retained and its schema version routed, and the typed
+unsupported-schema degradation path was exercised. It does not run witnesses,
+execute Miri, execute the pinned composite Action, edit source, or post
+comments. It does not claim UB presence or absence: not memory-safety proof,
+not UB-free status, not Miri-clean status, not site-execution proof, not
+calibrated precision or recall, merge readiness, policy readiness or a
+blocking policy, or any publication or release readiness for either repository.
+
 ## Disposition
 
 The gate envelope and typed unsupported-schema degradation are compatible. The
