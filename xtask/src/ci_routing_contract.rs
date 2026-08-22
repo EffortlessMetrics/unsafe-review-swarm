@@ -398,6 +398,27 @@ fi
     }
 
     #[test]
+    fn diagnostics_are_validated_before_output_exposure() -> Result<(), String> {
+        let text = FAILURE_EVIDENCE_FIXTURE;
+        let copy = text
+            .find("cp --no-dereference \"$diagnostics_source\" \"$diagnostics_path\"")
+            .ok_or_else(|| "diagnostics copy step is missing".to_string())?;
+        let validate = text
+            .find("cargo run --locked -p xtask -- ci-test-validate \"$diagnostics_path\"")
+            .ok_or_else(|| "diagnostics validator step is missing".to_string())?;
+        let expose = text
+            .find("echo \"diagnostics_path=$diagnostics_path\" >> \"$GITHUB_OUTPUT\"")
+            .ok_or_else(|| "diagnostics output exposure is missing".to_string())?;
+        if !(copy < validate && validate < expose) {
+            return Err("diagnostics were exposed before validation completed".to_string());
+        }
+        if !text.contains("${{ steps.core-verdict.outputs.diagnostics_path }}") {
+            return Err("diagnostics_path is missing from the upload vector".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
     fn allowlisted_summary_rejects_bare_tokens_and_pem_material() -> Result<(), String> {
         let fixture = "fmt\t1\t0\n\
 ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n\
@@ -574,6 +595,7 @@ clippy\t4\t0\tbare-secret-material\n";
         let expected = vec![
             "${{ steps.core-verdict.outputs.summary_path }}",
             "${{ steps.core-verdict.outputs.metadata_path }}",
+            "${{ steps.core-verdict.outputs.diagnostics_path }}",
         ];
         if selected != expected {
             return Err(format!("unexpected upload selection: {selected:?}"));

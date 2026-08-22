@@ -202,6 +202,11 @@ x86_64-pc-windows-msvc archive sha256:
 c42a1dbde532da06dc9b4a43d44fd0ce668b836c2ab7388410f10ff9834476a2
 ```
 
+For local reproduction, run `cargo run --locked -p xtask -- ci-test`; the
+wrapper emits the bounded `test-diagnostics.json` handoff. Validate that file
+with `cargo run --locked -p xtask -- ci-test-validate <path>` before treating
+it as an upload-ready diagnostic.
+
 The wrapper resolves the binary under `target/ci-tools`, verifies the archive
 before extraction, rejects symlinked paths, and invokes `nextest run` with its
 supported JUnit reporter with failure output disabled. Only bounded failed-test

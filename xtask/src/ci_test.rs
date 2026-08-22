@@ -100,16 +100,10 @@ impl PartialEq<&str> for ParseOutcome {
 /// Run nextest plus doctests and retain only `test-diagnostics.json`.
 pub(crate) fn run(root: &Path) -> Result<(), String> {
     let run_key = std::env::var("CORE_RUN_KEY").unwrap_or_else(|_| "local".to_string());
-    if run_key.is_empty()
-        || !run_key
-            .bytes()
-            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
-    {
-        return Err("CORE_RUN_KEY contained unsafe path characters".to_string());
-    }
+    validate_core_run_key(&run_key)?;
     let staging = if let Some(raw) = std::env::var_os("UNSAFE_REVIEW_CI_HANDOFF_DIR") {
         let handoff_key = std::env::var("CORE_RUN_KEY")
-            .map_err(|_| "private CI handoff requires CORE_RUN_KEY".to_string())?;
+            .map_err(|_error| "private CI handoff requires CORE_RUN_KEY".to_string())?;
         let path = PathBuf::from(raw);
         if handoff_key.is_empty() || !path.to_string_lossy().contains(&handoff_key) {
             return Err("private CI handoff path is not keyed to CORE_RUN_KEY".to_string());
@@ -153,6 +147,18 @@ pub(crate) fn run(root: &Path) -> Result<(), String> {
             "structured test run failed with exit code {core_exit}"
         ))
     }
+}
+
+fn validate_core_run_key(run_key: &str) -> Result<(), String> {
+    if run_key.is_empty()
+        || matches!(run_key, "." | "..")
+        || !run_key
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.'))
+    {
+        return Err("CORE_RUN_KEY contained unsafe path characters".to_string());
+    }
+    Ok(())
 }
 
 /// Validate the exact sanitized handoff immediately before artifact upload.
@@ -290,7 +296,7 @@ fn required_exit(
         .get(key)
         .and_then(serde_json::Value::as_i64)
         .ok_or_else(|| format!("test diagnostics {key} is not an integer"))?;
-    i32::try_from(value).map_err(|_| format!("test diagnostics {key} is out of range"))
+    i32::try_from(value).map_err(|_error| format!("test diagnostics {key} is out of range"))
 }
 
 fn bounded_json_string(value: Option<&serde_json::Value>) -> Result<String, String> {
@@ -376,12 +382,25 @@ fn resolve_runner(root: &Path, run_key: &str) -> Result<PathBuf, String> {
     let executable = tool_dir.join(asset.executable);
     let archive_name = format!("cargo-nextest-{NEXTEST_VERSION}-{}.tar.gz", asset.target);
     let archive = tool_dir.join(&archive_name);
-    if archive.exists() {
-        verify_sha256(&archive, asset.archive_sha256)?;
-    } else {
-        let url = format!("{NEXTEST_RELEASE}/{archive_name}");
-        download(&url, &archive)?;
-        verify_sha256(&archive, asset.archive_sha256)?;
+    let url = format!("{NEXTEST_RELEASE}/{archive_name}");
+    let verified_cache = tool_dir.join("cargo-nextest.verified.tar.gz");
+    let mut redownloaded = false;
+    loop {
+        let verification = if archive.exists() {
+            verify_sha256(&archive, asset.archive_sha256)
+        } else {
+            download(&url, &archive).and_then(|_| verify_sha256(&archive, asset.archive_sha256))
+        };
+        match verification {
+            Ok(()) => break,
+            Err(_error) if !redownloaded => {
+                let _ = fs::remove_file(&archive);
+                let _ = fs::remove_file(&verified_cache);
+                redownloaded = true;
+                continue;
+            }
+            Err(error) => return Err(error),
+        }
     }
     #[cfg(unix)]
     {
@@ -414,6 +433,16 @@ fn verified_archive(archive: &Path, directory: &Path, expected: &str) -> Result<
     if verified.exists() {
         if let Ok(metadata) = fs::metadata(&verified) {
             let mut permissions = metadata.permissions();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                permissions.set_mode(0o600);
+            }
+            #[cfg(windows)]
+            #[allow(
+                clippy::permissions_set_readonly_false,
+                reason = "Windows cache files may retain the read-only bit"
+            )]
             permissions.set_readonly(false);
             let _ = fs::set_permissions(&verified, permissions);
         }
@@ -580,6 +609,16 @@ fn unpack(archive: &Path, directory: &Path) -> Result<(), String> {
         let existing = directory.join(name);
         if let Ok(metadata) = fs::metadata(&existing) {
             let mut permissions = metadata.permissions();
+            #[cfg(unix)]
+            {
+                use std::os::unix::fs::PermissionsExt;
+                permissions.set_mode(0o700);
+            }
+            #[cfg(windows)]
+            #[allow(
+                clippy::permissions_set_readonly_false,
+                reason = "Windows cache files may retain the read-only bit"
+            )]
             permissions.set_readonly(false);
             fs::set_permissions(&existing, permissions)
                 .map_err(|error| format!("unlock cached runner {}: {error}", existing.display()))?;
@@ -934,7 +973,7 @@ fn validate_root_opening(text: &str) -> Result<(), ()> {
     ];
     parse_attributes(tag, root, &allowed)
         .map(|_| ())
-        .map_err(|_| ())
+        .map_err(|_error| ())
 }
 
 fn validate_testcase_body(body: &str) -> Result<(), ()> {
@@ -965,10 +1004,8 @@ fn validate_testcase_body(body: &str) -> Result<(), ()> {
         if !closing && parse_attributes(tag, name, allowed_attributes).is_err() {
             return Err(());
         }
-        if closing {
-            if tag != format!("</{name}>") {
-                return Err(());
-            }
+        if closing && tag != format!("</{name}>") {
+            return Err(());
         }
         if closing {
             if open.take() != Some(name) {
@@ -1114,27 +1151,36 @@ fn write_diagnostics(
             serde_json::Value::String(reason.to_string())
         }),
     );
-    output.insert(
-        "records".to_string(),
-        serde_json::Value::Array(
-            records
-                .iter()
-                .take(MAX_RECORDS)
-                .map(|record| {
-                    serde_json::json!({
-                        "package": record.package,
-                        "test": record.test,
-                        "status": record.status,
-                    })
-                })
-                .collect(),
-        ),
-    );
-    let bytes = serde_json::to_vec(&serde_json::Value::Object(output))
-        .map_err(|error| format!("serialize test diagnostics: {error}"))?;
-    if bytes.len() > MAX_OUTPUT_BYTES {
-        return Err("test diagnostics exceeded 16-KiB bound".to_string());
-    }
+    let mut record_values: Vec<serde_json::Value> = records
+        .iter()
+        .take(MAX_RECORDS)
+        .map(|record| {
+            serde_json::json!({
+                "package": record.package,
+                "test": record.test,
+                "status": record.status,
+            })
+        })
+        .collect();
+    let bytes = loop {
+        output.insert(
+            "records".to_string(),
+            serde_json::Value::Array(record_values.clone()),
+        );
+        let bytes = serde_json::to_vec(&serde_json::Value::Object(output.clone()))
+            .map_err(|error| format!("serialize test diagnostics: {error}"))?;
+        if bytes.len() <= MAX_OUTPUT_BYTES {
+            break bytes;
+        }
+        if record_values.pop().is_none() {
+            return Err("test diagnostics exceeded 16-KiB bound".to_string());
+        }
+        output.insert(
+            "stream_status".to_string(),
+            serde_json::json!("truncated_input"),
+        );
+        output.insert("parse_reason".to_string(), serde_json::json!("input_limit"));
+    };
     if bytes
         .iter()
         .any(|byte| *byte < 0x20 && *byte != b'\n' && *byte != b'\r' && *byte != b'\t')
@@ -1142,19 +1188,26 @@ fn write_diagnostics(
         return Err("test diagnostics contained control bytes".to_string());
     }
     let temp = path.with_extension("tmp");
+    let _ = fs::remove_file(&temp);
     reject_symlink(&temp)?;
-    let mut file = OpenOptions::new()
-        .create_new(true)
-        .write(true)
-        .open(&temp)
-        .map_err(|error| format!("create {}: {error}", temp.display()))?;
-    file.write_all(&bytes)
-        .and_then(|_| file.write_all(b"\n"))
-        .map_err(|error| format!("write {}: {error}", temp.display()))?;
-    file.sync_all()
-        .map_err(|error| format!("sync {}: {error}", temp.display()))?;
-    drop(file);
-    fs::rename(&temp, path).map_err(|error| format!("publish {}: {error}", path.display()))
+    let result = (|| {
+        let mut file = OpenOptions::new()
+            .create_new(true)
+            .write(true)
+            .open(&temp)
+            .map_err(|error| format!("create {}: {error}", temp.display()))?;
+        file.write_all(&bytes)
+            .and_then(|_| file.write_all(b"\n"))
+            .map_err(|error| format!("write {}: {error}", temp.display()))?;
+        file.sync_all()
+            .map_err(|error| format!("sync {}: {error}", temp.display()))?;
+        drop(file);
+        fs::rename(&temp, path).map_err(|error| format!("publish {}: {error}", path.display()))
+    })();
+    if result.is_err() {
+        let _ = fs::remove_file(&temp);
+    }
+    result
 }
 
 #[cfg(test)]
@@ -1255,6 +1308,16 @@ esac
                     .all(|byte| byte.is_ascii_hexdigit())
             {
                 return Err(format!("invalid hash for {}", asset.target));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn core_run_key_rejects_dot_path_segments() -> Result<(), String> {
+        for run_key in [".", ".."] {
+            if validate_core_run_key(run_key).is_ok() {
+                return Err(format!("CORE_RUN_KEY value {run_key:?} was accepted"));
             }
         }
         Ok(())
@@ -1499,6 +1562,39 @@ exit 101
         if bytes.len() > MAX_OUTPUT_BYTES + 1 {
             return Err(format!("diagnostics exceeded bound: {}", bytes.len()));
         }
+        let _ = fs::remove_dir_all(&dir);
+        Ok(())
+    }
+
+    #[test]
+    fn oversized_diagnostics_truncate_records_with_closed_status() -> Result<(), String> {
+        let dir = temp_dir("truncated")?;
+        let path = dir.join("test-diagnostics.json");
+        let mut records = BTreeSet::new();
+        for index in 0..MAX_RECORDS {
+            records.insert(Diagnostic {
+                package: format!("package-{index}-{}", "p".repeat(MAX_FIELD_BYTES - 16)),
+                test: format!("test-{index}-{}", "t".repeat(MAX_FIELD_BYTES - 12)),
+                status: "failed".to_string(),
+            });
+        }
+        write_diagnostics(&path, 101, 0, 101, "ok", None, &records)?;
+        let value: serde_json::Value = serde_json::from_slice(
+            &fs::read(&path).map_err(|error| format!("read fixture: {error}"))?,
+        )
+        .map_err(|error| format!("parse fixture: {error}"))?;
+        if value["core_exit"] != 101
+            || value["stream_status"] != "truncated_input"
+            || value["parse_reason"] != "input_limit"
+            || value["records"]
+                .as_array()
+                .is_none_or(|items| items.len() >= MAX_RECORDS)
+        {
+            return Err(
+                "oversized diagnostics were not truncated with a closed status".to_string(),
+            );
+        }
+        validate_diagnostics(&path)?;
         let _ = fs::remove_dir_all(&dir);
         Ok(())
     }
