@@ -92,8 +92,10 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "head -n 80",
             "head -c 16384",
             // Staging is recreated after the core finishes in a private,
-            // unpredictable runner-temp path. Only two exact regular files are
-            // exposed to upload-artifact via step outputs.
+            // unpredictable runner-temp path. Only the baseline two files plus
+            // the optional sanitized structured diagnostic are exposed.
+            "cargo run --locked -p xtask -- ci-test",
+            "UNSAFE_REVIEW_CI_HANDOFF_DIR=\"${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}\"",
             "id: core-verdict",
             "${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}",
             "rm -rf \"$failure_root\"",
@@ -107,6 +109,10 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "[ ! -L \"$failure_metadata_path\" ]",
             "summary_path=$failure_summary_path",
             "metadata_path=$failure_metadata_path",
+            "diagnostics_path=$diagnostics_path",
+            "diagnostics_source=\"${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json\"",
+            "cp --no-dereference \"$diagnostics_source\" \"$diagnostics_path\"",
+            "cargo run --locked -p xtask -- ci-test-validate \"$diagnostics_path\"",
             "if [ \"${core_exit}\" != \"0\" ]; then",
             // Artifact retention is always attempted but cannot change the job.
             "name: Upload bounded core-gate failure evidence",
@@ -116,6 +122,7 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "path: |",
             "${{ steps.core-verdict.outputs.summary_path }}",
             "${{ steps.core-verdict.outputs.metadata_path }}",
+            "${{ steps.core-verdict.outputs.diagnostics_path }}",
             "if-no-files-found: ignore",
             "retention-days: 7",
         ],
@@ -266,6 +273,8 @@ mod tests {
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
 CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
 core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
+cargo run --locked -p xtask -- ci-test
+UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}"
 base_ref="${GITHUB_BASE_REF:-main}"
 git diff --name-only "origin/${base_ref}...HEAD"
 _changed_rs="__diff_unavailable__"
@@ -293,8 +302,12 @@ if [ "${core_exit}" != "0" ]; then
   failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
   excerpt_path="${failure_dir}/step-status.txt"
   excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
-  failure_summary_path="${failure_dir}/summary.md"
-  failure_metadata_path="${failure_dir}/metadata.json"
+failure_summary_path="${failure_dir}/summary.md"
+failure_metadata_path="${failure_dir}/metadata.json"
+diagnostics_source="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json"
+diagnostics_path="${failure_dir}/test-diagnostics.json"
+cp --no-dereference "$diagnostics_source" "$diagnostics_path"
+cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path"
   if ! {
     printf 'step_id\telapsed_seconds\texit_status\n'
   } > "$excerpt_tmp"; then
@@ -308,6 +321,7 @@ if [ "${core_exit}" != "0" ]; then
     && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
     echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
     echo "metadata_path=$failure_metadata_path" >> "$GITHUB_OUTPUT"
+    echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT"
   fi
 fi
 - name: Upload bounded core-gate failure evidence
@@ -321,6 +335,7 @@ fi
     path: |
       ${{ steps.core-verdict.outputs.summary_path }}
       ${{ steps.core-verdict.outputs.metadata_path }}
+      ${{ steps.core-verdict.outputs.diagnostics_path }}
     if-no-files-found: ignore
     retention-days: 7
 "#;

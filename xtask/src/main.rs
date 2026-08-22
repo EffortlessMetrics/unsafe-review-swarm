@@ -21,6 +21,7 @@ mod calibration_manifest;
 mod check_local;
 mod ci_lanes;
 mod ci_routing_contract;
+mod ci_test;
 mod cleanup_auditor;
 mod command_args;
 mod commands;
@@ -901,6 +902,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
             source_truth_ledgers::check_package_boundary()
         }
         commands::XtaskCommand::CheckCiLanes => ci_lanes::check(),
+        commands::XtaskCommand::CiTest => ci_test::run(&root),
+        commands::XtaskCommand::CiTestValidate(path) => ci_test::validate_diagnostics(&path),
         commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
         commands::XtaskCommand::CheckFixtures => fixture_surfaces::check_fixtures(),
         commands::XtaskCommand::CheckCalibration => check_calibration(),
