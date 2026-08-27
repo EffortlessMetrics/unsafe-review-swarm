@@ -1908,35 +1908,81 @@ mod tests {
     // consumer honestly `partial` rather than mistaken for full parity.
     // ------------------------------------------------------------------
 
-    /// Exact diff-scope card row, rebuilt from the canonical `ReviewCard`
-    /// producers named in `policy/spec-coverage.toml`.
-    fn expected_diff_card_row(card: &ReviewCard) -> String {
+    // The expected rows below are an independent oracle: they are built from
+    // raw `ReviewCard` fields with test-local formatting, and deliberately do
+    // NOT call the renderer's `md_cell`, `one_line`, `card_location`,
+    // `missing_summary`, or route-selection helpers. Reusing those would move
+    // both sides of the comparison together whenever a helper drifted, so the
+    // lock could not see the drift it exists to catch.
+
+    /// Test-local restatement of the table-cell contract: collapse every run
+    /// of whitespace to one space, then escape pipes so a card value cannot
+    /// forge a column.
+    fn oracle_cell(value: &str) -> String {
+        value
+            .split_whitespace()
+            .collect::<Vec<_>>()
+            .join(" ")
+            .replace('|', "\\|")
+    }
+
+    /// Test-local restatement of the rendered location contract.
+    fn oracle_location(card: &ReviewCard) -> String {
         format!(
-            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
-            md_cell(&card.id.to_string()),
-            card.class.as_str(),
-            card.proof_path.as_str(),
-            md_cell(&one_line(&card.operation.expression)),
-            card.hazards.first().map_or("unknown", |h| h.as_str()),
-            card.missing.first().map_or("", |m| m.kind.as_str()),
-            diff_primary_route(card),
-            md_cell(&card.next_action.summary)
+            "{}:{}",
+            path_display(&card.site.location.file),
+            card.site.location.line
         )
     }
 
-    /// Exact repo-scope card row, rebuilt from the same canonical producers.
+    /// Test-local restatement of the joined missing-evidence contract.
+    fn oracle_missing_summary(card: &ReviewCard) -> String {
+        if card.missing.is_empty() {
+            return "No missing evidence recorded".to_string();
+        }
+        card.missing
+            .iter()
+            .map(|missing| missing.message.as_str())
+            .collect::<Vec<_>>()
+            .join("; ")
+    }
+
+    /// Test-local restatement of primary-route selection: the first recorded
+    /// route, else the default review route.
+    fn oracle_primary_route(card: &ReviewCard) -> &str {
+        card.routes
+            .first()
+            .map_or(DEFAULT_REVIEW_ROUTE, |route| route.kind.as_str())
+    }
+
+    /// Exact diff-scope card row, rebuilt from raw `ReviewCard` fields.
+    fn expected_diff_card_row(card: &ReviewCard) -> String {
+        format!(
+            "| `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | `{}` | {} |",
+            oracle_cell(&card.id.to_string()),
+            card.class.as_str(),
+            card.proof_path.as_str(),
+            oracle_cell(&card.operation.expression),
+            card.hazards.first().map_or("unknown", |h| h.as_str()),
+            card.missing.first().map_or("", |m| m.kind.as_str()),
+            oracle_primary_route(card),
+            oracle_cell(&card.next_action.summary)
+        )
+    }
+
+    /// Exact repo-scope card row, rebuilt from raw `ReviewCard` fields.
     fn expected_repo_card_row(card: &ReviewCard) -> String {
         format!(
             "| `{}` | `{}` | `{}` | {} | `{}` | `{}` | {} | `{}` | {} |",
-            md_cell(&card.id.to_string()),
+            oracle_cell(&card.id.to_string()),
             card.class.as_str(),
             card.proof_path.as_str(),
-            md_cell(&card_location(card)),
+            oracle_cell(&oracle_location(card)),
             card.operation.family.as_str(),
-            md_cell(&one_line(&card.operation.expression)),
-            md_cell(&missing_summary(card)),
-            repo_primary_route(card),
-            md_cell(&card.next_action.summary)
+            oracle_cell(&card.operation.expression),
+            oracle_cell(&oracle_missing_summary(card)),
+            oracle_primary_route(card),
+            oracle_cell(&card.next_action.summary)
         )
     }
 
@@ -2043,7 +2089,7 @@ mod tests {
             "second_missing_kind",
             "Second missing evidence message for parity coverage",
         ));
-        let card_missing_summary = missing_summary(card);
+        let card_missing_summary = oracle_missing_summary(card);
 
         let diff_rendered = render(&output);
         let mut repo_output = output.clone();
@@ -2083,7 +2129,7 @@ mod tests {
             "diff-scope direct markdown emits only the first missing kind; a second kind means the recorded omission changed:\n{diff_rendered}"
         );
         assert!(
-            repo_rendered.contains(&md_cell(&card_missing_summary)),
+            repo_rendered.contains(&oracle_cell(&card_missing_summary)),
             "repo-scope direct markdown must emit the joined canonical missing-evidence summary:\n{repo_rendered}"
         );
         Ok(())
@@ -2107,7 +2153,7 @@ mod tests {
         for group in &declaration_groups {
             let row = format!(
                 "| `{}` | {} | {} | {} | {} | {} | {} |",
-                md_cell(&group.module_or_file),
+                oracle_cell(&group.module_or_file),
                 group.total,
                 group.new_or_worsened,
                 group.inherited,
@@ -2135,7 +2181,7 @@ mod tests {
         for group in &feature_groups {
             let row = format!(
                 "| `{}` | `{}` | {} | {} | {} |",
-                md_cell(&group.module_or_file),
+                oracle_cell(&group.module_or_file),
                 group.class,
                 group.total,
                 render_backtick_string_list(&group.features, 4),
