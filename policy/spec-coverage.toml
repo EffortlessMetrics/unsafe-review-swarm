@@ -210,15 +210,15 @@ note = "Maps aggregate coverage movement and card fields for specific-operation 
 name = "direct_markdown"
 surface = "markdown"
 disposition = "partial"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2119"
-note = "Direct `--format markdown` output maps identity, class/code, missing evidence, next action, and the advisory trust boundary in both scopes. Repo scope additionally maps location and operation family plus declaration/target-feature aggregates; diff scope emits operation text, proof path, hazard, and route without dedicated field rows and only the first missing-evidence kind. Scope-dependent omissions and all non-listed card fields are explicitly parked."
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Direct `--format markdown` output maps identity, class/code, missing evidence, next action, and the advisory trust boundary in both scopes. Repo scope additionally maps location and operation family plus declaration/target-feature aggregates; diff scope emits operation text, proof path, hazard, and route without dedicated field rows and only the first missing-evidence kind. Focused renderer tests in output/markdown.rs (#2119) rebuild each scope's exact card row and the repo-scope declaration/target-feature group rows from their canonical producers, assert the diff-scope location, operation-family, and later-missing-kind omissions as omissions, and lock the consumer separately from the human, PR-summary, and GitHub-summary renderers. The consumer stays partial: rowless proof path, operation text, hazard, and route detail carry no canonical row and remain parked under shared owner #2124."
 
 [[consumer]]
 name = "explain_markdown"
 surface = "explain_markdown"
 disposition = "partial"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2120"
-note = "Single-card `explain --format markdown` maps identity, class/code, location, operation family, missing evidence, next action, and the advisory trust boundary. Operation text, proof path, hazards, obligation descriptions, contract/discharge/reach/witness summaries, obligation-evidence states, verify commands, and witness routes are emitted directly from the selected ReviewCard but have no dedicated canonical field rows here and remain explicitly parked pending #2120; priority, movement, readiness, and surfacing disposition are absent."
+follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2124"
+note = "Single-card `explain --format markdown` maps identity, class/code, location, operation family, missing evidence, next action, and the advisory trust boundary. Operation text, proof path, hazards, obligation descriptions, contract/discharge/reach/witness summaries, obligation-evidence states, verify commands, and witness routes are emitted directly from the selected ReviewCard but have no dedicated canonical field rows here; priority, movement, readiness, and surfacing disposition are absent. Focused render_card_detail tests (#2120) prove every one of those emitted values is projected from the selected card without reclassification, prove the empty missing-evidence, route-less, and command-less fallbacks are explicit, and keep the projection distinct from the direct-markdown consumer. The consumer stays partial: the rowless detail above remains parked under shared owner #2124."
 
 [[consumer]]
 name = "first_pr_terminal"
