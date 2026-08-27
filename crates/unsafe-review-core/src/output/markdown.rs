@@ -1871,15 +1871,30 @@ mod tests {
     /// Phrases that would strengthen the advisory boundary into a safety,
     /// UB-freedom, Miri-cleanliness, or site-execution claim. A renderer may
     /// narrow the boundary; it may never assert any of these.
+    ///
+    /// Kept lowercase and matched against lowercased render output by
+    /// [`assert_no_claim_strengthening`], so a capitalized or title-cased
+    /// overclaim cannot slip past the scan.
     const CLAIM_STRENGTHENING_PHRASES: [&str; 7] = [
         "proven safe",
         "guaranteed safe",
         "is memory-safety proof",
-        "is UB-free",
-        "is Miri-clean",
+        "is ub-free",
+        "is miri-clean",
         "proves site execution",
         "proof of memory safety",
     ];
+
+    /// Case-insensitive assertion that `rendered` strengthens no claim.
+    fn assert_no_claim_strengthening(label: &str, rendered: &str) {
+        let lowered = rendered.to_lowercase();
+        for forbidden in CLAIM_STRENGTHENING_PHRASES {
+            assert!(
+                !lowered.contains(forbidden),
+                "{label} must not strengthen the advisory boundary with `{forbidden}` (matched case-insensitively):\n{rendered}"
+            );
+        }
+    }
 
     // ------------------------------------------------------------------
     // issue #2119: direct `--format markdown` ReviewCard field parity.
@@ -2214,13 +2229,73 @@ mod tests {
             );
             // The renderer may narrow the boundary; it must never strengthen
             // it into a safety, UB-free, Miri, or execution claim.
-            for forbidden in CLAIM_STRENGTHENING_PHRASES {
-                assert!(
-                    !rendered.contains(forbidden),
-                    "{label}-scope direct markdown must not strengthen the advisory boundary with `{forbidden}`:\n{rendered}"
-                );
-            }
+            assert_no_claim_strengthening(&format!("{label}-scope direct markdown"), rendered);
         }
+        Ok(())
+    }
+
+    /// The parity rows above are assembled with the same `md_cell`/`one_line`
+    /// helpers the renderer uses, so helper drift would move both sides
+    /// together. These two tests pin the helpers' contract independently, with
+    /// hardcoded expectations, so that drift fails here instead of silently
+    /// passing everywhere.
+    #[test]
+    fn md_cell_and_one_line_normalize_table_hostile_text() {
+        // `one_line` collapses every run of whitespace, including newlines
+        // and tabs, into single spaces and trims the ends.
+        assert_eq!(one_line("  alpha \n\t beta   gamma  "), "alpha beta gamma");
+        assert_eq!(one_line(""), "");
+        assert_eq!(one_line("   "), "");
+        assert_eq!(one_line("single"), "single");
+
+        // `md_cell` collapses the same way and additionally escapes the pipe
+        // so a card value can never forge a table column.
+        assert_eq!(md_cell("alpha | beta"), "alpha \\| beta");
+        assert_eq!(md_cell("a|b|c"), "a\\|b\\|c");
+        assert_eq!(md_cell("alpha\n| beta"), "alpha \\| beta");
+        assert_eq!(md_cell("no pipes here"), "no pipes here");
+    }
+
+    /// End-to-end version of the same contract, asserted against the rendered
+    /// table with literal expectations rather than through the helpers: a card
+    /// value carrying a pipe and a newline must not break the row's shape.
+    #[test]
+    fn direct_markdown_row_shape_survives_table_hostile_card_text() -> Result<(), String> {
+        let mut output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first_mut()
+            .ok_or_else(|| "fixture should emit one card".to_string())?;
+        card.next_action.summary = "alpha | beta\n  gamma".to_string();
+
+        let rendered = render(&output);
+        // Only the table row is escaped; the prose "Recommended next action"
+        // section legitimately emits the summary verbatim.
+        let row = rendered
+            .lines()
+            .find(|line| line.starts_with("| `") && line.contains("gamma"))
+            .ok_or_else(|| format!("rendered output should contain the card row:\n{rendered}"))?;
+        assert!(
+            row.contains("alpha \\| beta gamma"),
+            "the pipe must be escaped and the newline collapsed in the rendered row:\n{row}"
+        );
+        assert!(
+            !row.contains("alpha | beta"),
+            "an unescaped pipe would forge a table column:\n{row}"
+        );
+
+        let mut unescaped_pipes = 0usize;
+        let mut previous = ' ';
+        for current in row.chars() {
+            if current == '|' && previous != '\\' {
+                unescaped_pipes += 1;
+            }
+            previous = current;
+        }
+        assert_eq!(
+            unescaped_pipes, 9,
+            "the diff-scope card row must keep exactly eight columns; row was:\n{row}"
+        );
         Ok(())
     }
 
@@ -2528,12 +2603,7 @@ mod tests {
                 "explain markdown must keep the obligation-level non-resolution guidance:\n{rendered}"
             );
         }
-        for forbidden in CLAIM_STRENGTHENING_PHRASES {
-            assert!(
-                !rendered.contains(forbidden),
-                "explain markdown must not strengthen the advisory boundary with `{forbidden}`:\n{rendered}"
-            );
-        }
+        assert_no_claim_strengthening("explain markdown", &rendered);
         Ok(())
     }
 
