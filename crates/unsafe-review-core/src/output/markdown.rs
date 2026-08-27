@@ -1874,16 +1874,54 @@ mod tests {
     ///
     /// Kept lowercase and matched against lowercased render output by
     /// [`assert_no_claim_strengthening`], so a capitalized or title-cased
-    /// overclaim cannot slip past the scan.
-    const CLAIM_STRENGTHENING_PHRASES: [&str; 7] = [
+    /// overclaim cannot slip past the scan. This list covers common
+    /// inflections of each prohibited claim class; it is the cheap half of
+    /// the check, and [`assert_claim_tokens_stay_negated`] covers rewordings
+    /// the list cannot anticipate.
+    const CLAIM_STRENGTHENING_PHRASES: [&str; 17] = [
+        // Safety claims.
         "proven safe",
         "guaranteed safe",
-        "is memory-safety proof",
-        "is ub-free",
-        "is miri-clean",
-        "proves site execution",
+        "verified safe",
+        "this code is safe",
+        "proves safety",
+        "proves memory safety",
         "proof of memory safety",
+        "is memory-safety proof",
+        // UB-freedom claims.
+        "is ub-free",
+        "free of ub",
+        "free of undefined behavior",
+        "no undefined behavior",
+        // Miri-cleanliness claims.
+        "is miri-clean",
+        "miri verified",
+        "miri-verified",
+        "verified by miri",
+        // Site-execution claims.
+        "proves site execution",
     ];
+
+    /// Claim tokens that may appear in a render only inside a negation.
+    ///
+    /// A denylist of exact phrases cannot anticipate every rewording, and the
+    /// most dangerous rewording is to the shared boundary constant itself:
+    /// dropping one `not` turns the disclaimer into the claim while every
+    /// phrase in [`CLAIM_STRENGTHENING_PHRASES`] still passes. These tokens
+    /// are therefore checked positionally instead — each occurrence must sit
+    /// inside a negating clause.
+    const NEGATION_REQUIRED_CLAIM_TOKENS: [&str; 4] = [
+        "memory-safety proof",
+        "ub-free",
+        "miri-clean",
+        "site-execution claim",
+    ];
+
+    /// Clause separators. The negation must appear in the claim token's own
+    /// clause: the advisory boundary is a comma-separated list of negated
+    /// items, so a fixed-width lookback would happily borrow the `not` from
+    /// the item before and pass a boundary that had lost its own.
+    const CLAUSE_SEPARATORS: [char; 5] = [';', ',', '.', '\n', ':'];
 
     /// Case-insensitive assertion that `rendered` strengthens no claim.
     fn assert_no_claim_strengthening(label: &str, rendered: &str) {
@@ -1893,6 +1931,27 @@ mod tests {
                 !lowered.contains(forbidden),
                 "{label} must not strengthen the advisory boundary with `{forbidden}` (matched case-insensitively):\n{rendered}"
             );
+        }
+        assert_claim_tokens_stay_negated(label, rendered);
+    }
+
+    /// Assert every occurrence of a prohibited claim token is negated.
+    fn assert_claim_tokens_stay_negated(label: &str, rendered: &str) {
+        let lowered = rendered.to_lowercase();
+        for token in NEGATION_REQUIRED_CLAIM_TOKENS {
+            let mut search_from = 0usize;
+            while let Some(offset) = lowered[search_from..].find(token) {
+                let at = search_from + offset;
+                let clause_start = lowered[..at]
+                    .rfind(CLAUSE_SEPARATORS)
+                    .map_or(0, |sep| sep + 1);
+                let clause = &lowered[clause_start..at];
+                assert!(
+                    clause.contains("not") || clause.contains("never"),
+                    "{label} may state `{token}` only inside a negation, and the negation must be in the token's own clause; it is asserted here:\n  ...[{clause}][{token}]...\nfull render:\n{rendered}"
+                );
+                search_from = at + token.len();
+            }
         }
     }
 
