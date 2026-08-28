@@ -53,6 +53,28 @@ impl ReviewClass {
         )
     }
 
+    /// Return the stable actionability label projected by reviewer-facing
+    /// comment plans and aggregate usefulness telemetry.
+    ///
+    /// This is a presentation bucket derived from the review class. It does
+    /// not change comment eligibility, ranking, calibration, or policy.
+    pub(crate) fn actionability_label(&self) -> &'static str {
+        match self {
+            Self::GuardMissing => "specific_guard_missing",
+            Self::ContractMissing => "specific_contract_missing",
+            Self::GuardedUnwitnessed
+            | Self::ReachableUnwitnessed
+            | Self::RequiresLoom
+            | Self::RequiresSanitizer
+            | Self::RequiresKaniOrCrux
+            | Self::MiriUnsupported => "specific_witness_missing",
+            Self::WitnessMismatch => "specific_receipt_missing",
+            Self::UnsafeUnreached => "specific_reach_missing",
+            Self::StaticUnknown => "human_review_only",
+            Self::GuardedAndWitnessed | Self::BaselineKnown | Self::Suppressed => "not_actionable",
+        }
+    }
+
     /// Return the SARIF result level for this class.
     ///
     /// The mapping is the single severity language for all surfaces — SARIF
@@ -186,6 +208,33 @@ mod tests {
 
         for (class, expected) in cases {
             assert_eq!(class.as_str(), expected);
+        }
+    }
+
+    #[test]
+    fn review_class_actionability_labels_cover_every_variant() {
+        let cases = [
+            (ReviewClass::GuardedAndWitnessed, "not_actionable"),
+            (ReviewClass::GuardedUnwitnessed, "specific_witness_missing"),
+            (ReviewClass::ContractMissing, "specific_contract_missing"),
+            (ReviewClass::GuardMissing, "specific_guard_missing"),
+            (
+                ReviewClass::ReachableUnwitnessed,
+                "specific_witness_missing",
+            ),
+            (ReviewClass::UnsafeUnreached, "specific_reach_missing"),
+            (ReviewClass::WitnessMismatch, "specific_receipt_missing"),
+            (ReviewClass::RequiresLoom, "specific_witness_missing"),
+            (ReviewClass::RequiresSanitizer, "specific_witness_missing"),
+            (ReviewClass::RequiresKaniOrCrux, "specific_witness_missing"),
+            (ReviewClass::MiriUnsupported, "specific_witness_missing"),
+            (ReviewClass::StaticUnknown, "human_review_only"),
+            (ReviewClass::BaselineKnown, "not_actionable"),
+            (ReviewClass::Suppressed, "not_actionable"),
+        ];
+
+        for (class, expected) in cases {
+            assert_eq!(class.actionability_label(), expected, "{}", class.as_str());
         }
     }
 

@@ -138,7 +138,9 @@ Object. Confidence histogram over all cards.
 #### `actionability_distribution`
 
 Object (BTreeMap). Histogram over all cards, keyed by actionability label.
-Mirrors the `actionability()` logic in `output/comment_plan/selection.rs`.
+Both this histogram and comment-plan selection project the canonical
+`ReviewClass::actionability_label()` derivation; neither consumer reclassifies
+cards or owns an independent label mapping.
 Only keys with count > 0 are emitted.
 
 Known keys: `specific_guard_missing`, `specific_contract_missing`,
