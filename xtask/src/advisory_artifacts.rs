@@ -298,26 +298,126 @@ const REPAIR_QUEUE_READINESS_STATES: [&str; 4] = [
     "requires_witness_receipt",
     "unsupported",
 ];
-const FIRST_PR_BUNDLE_ARTIFACTS: [&str; 18] = [
-    "review-kit.json",
-    "unsafe-review-gate.json",
-    "cards.json",
-    "pr-summary.md",
-    "github-summary.md",
-    "cards.sarif",
-    "comment-plan.json",
-    "witness-plan.md",
-    "receipt-audit.md",
-    "receipt-audit.json",
-    "policy-report.json",
-    "policy-report.md",
-    "manual-candidates.json",
-    "manual-repair-queue.json",
-    "tokmd-packets.json",
-    "usefulness-telemetry.json",
-    "lsp.json",
-    "repair-queue.json",
+#[derive(Clone, Copy)]
+struct ArtifactIdentity {
+    path: &'static str,
+    kind: &'static str,
+    format: &'static str,
+    schema_version: Option<&'static str>,
+}
+
+const FIRST_PR_ARTIFACT_IDENTITIES: [ArtifactIdentity; 18] = [
+    ArtifactIdentity {
+        path: "review-kit.json",
+        kind: "review_kit_manifest",
+        format: "json",
+        schema_version: Some("0.1"),
+    },
+    ArtifactIdentity {
+        path: "unsafe-review-gate.json",
+        kind: "gate_manifest",
+        format: "json",
+        schema_version: Some("unsafe-review-gate/v1"),
+    },
+    ArtifactIdentity {
+        path: "cards.json",
+        kind: "review_cards",
+        format: "json",
+        schema_version: Some("0.2"),
+    },
+    ArtifactIdentity {
+        path: "pr-summary.md",
+        kind: "reviewer_summary",
+        format: "markdown",
+        schema_version: None,
+    },
+    ArtifactIdentity {
+        path: "github-summary.md",
+        kind: "github_summary",
+        format: "markdown",
+        schema_version: None,
+    },
+    ArtifactIdentity {
+        path: "cards.sarif",
+        kind: "sarif",
+        format: "sarif",
+        schema_version: Some("2.1.0"),
+    },
+    ArtifactIdentity {
+        path: "comment-plan.json",
+        kind: "comment_plan",
+        format: "json",
+        schema_version: Some("0.1"),
+    },
+    ArtifactIdentity {
+        path: "witness-plan.md",
+        kind: "witness_plan",
+        format: "markdown",
+        schema_version: None,
+    },
+    ArtifactIdentity {
+        path: "receipt-audit.md",
+        kind: "receipt_audit",
+        format: "markdown",
+        schema_version: None,
+    },
+    ArtifactIdentity {
+        path: "receipt-audit.json",
+        kind: "receipt_audit",
+        format: "json",
+        schema_version: Some("0.1"),
+    },
+    ArtifactIdentity {
+        path: "policy-report.json",
+        kind: "policy_report_json",
+        format: "json",
+        schema_version: Some("0.1"),
+    },
+    ArtifactIdentity {
+        path: "policy-report.md",
+        kind: "policy_report_markdown",
+        format: "markdown",
+        schema_version: None,
+    },
+    ArtifactIdentity {
+        path: "manual-candidates.json",
+        kind: "manual_candidates",
+        format: "json",
+        schema_version: Some("manual-candidates/v1"),
+    },
+    ArtifactIdentity {
+        path: "manual-repair-queue.json",
+        kind: "manual_repair_queue",
+        format: "json",
+        schema_version: Some("manual-repair-queue/v1"),
+    },
+    ArtifactIdentity {
+        path: "tokmd-packets.json",
+        kind: "tokmd_packets",
+        format: "json",
+        schema_version: Some("tokmd-packets/v1"),
+    },
+    ArtifactIdentity {
+        path: "usefulness-telemetry.json",
+        kind: "usefulness_telemetry",
+        format: "json",
+        schema_version: Some("usefulness-telemetry/v1"),
+    },
+    ArtifactIdentity {
+        path: "lsp.json",
+        kind: "saved_lsp",
+        format: "json",
+        schema_version: Some("0.2"),
+    },
+    ArtifactIdentity {
+        path: "repair-queue.json",
+        kind: "repair_queue",
+        format: "json",
+        schema_version: Some("0.1"),
+    },
 ];
+
+const MINIMUM_FIRST_PR_PRODUCER_VERSION: (u64, u64, u64) = (0, 3, 8);
 const REPAIR_QUEUE_TRUST_BOUNDARY_LIMITS: [&str; 7] = [
     "not an automatic repair queue",
     "does not run agents",
@@ -336,6 +436,7 @@ pub(crate) fn check_advisory_artifacts(dir: &Path) -> Result<(), String> {
 }
 
 pub(crate) fn check_first_pr_artifacts(dir: &Path) -> Result<(), String> {
+    check_review_kit_artifact_identities(dir)?;
     let summary = check_advisory_artifact_set(dir)?;
     require_expected_value(
         &summary.scope,
@@ -4057,6 +4158,79 @@ fn require_projected_optional_string_array(
     Ok(())
 }
 
+fn check_review_kit_artifact_identities(dir: &Path) -> Result<(), String> {
+    let review_kit = super::parse_json_file(&dir.join("review-kit.json"))?;
+    require_supported_review_kit_tool_version(&review_kit)?;
+    let Some(artifacts) = review_kit.get("artifacts") else {
+        return Err(artifact_identity_error(
+            "review-kit.json",
+            "artifacts",
+            "array containing the exact 18 first-pr artifact identities",
+            "missing",
+        ));
+    };
+    let Some(artifacts) = artifacts.as_array() else {
+        return Err(artifact_identity_error(
+            "review-kit.json",
+            "artifacts",
+            "array containing the exact 18 first-pr artifact identities",
+            &json_identity_actual(artifacts),
+        ));
+    };
+    let mut seen = BTreeSet::new();
+    for entry in artifacts {
+        let artifact_path = require_artifact_identity_string(
+            entry,
+            "review-kit.json artifacts[]",
+            "path",
+            "known first-pr artifact path",
+        )?;
+        check_review_kit_artifact_path(artifact_path)?;
+        let identity = first_pr_artifact_identity(artifact_path).ok_or_else(|| {
+            artifact_identity_error(
+                artifact_path,
+                "path",
+                "known first-pr artifact path",
+                artifact_path,
+            )
+        })?;
+        if !seen.insert(artifact_path.to_string()) {
+            return Err(artifact_identity_error(
+                artifact_path,
+                "path",
+                "unique first-pr artifact path",
+                artifact_path,
+            ));
+        }
+        if !dir.join(artifact_path).is_file() {
+            return Err(artifact_identity_error(
+                artifact_path,
+                "file",
+                "regular file",
+                "missing",
+            ));
+        }
+        require_artifact_identity_value(entry, identity, "kind", identity.kind)?;
+        require_artifact_identity_value(entry, identity, "format", identity.format)?;
+        check_review_kit_artifact_schema_version(entry, identity)?;
+        check_artifact_payload_schema_version(dir, identity)?;
+    }
+
+    let expected = FIRST_PR_ARTIFACT_IDENTITIES
+        .iter()
+        .map(|artifact| artifact.path.to_string())
+        .collect::<BTreeSet<_>>();
+    if seen != expected {
+        return Err(artifact_identity_error(
+            "review-kit.json",
+            "artifacts",
+            "exact 18 first-pr artifact paths",
+            &format!("{:?}", seen),
+        ));
+    }
+    Ok(())
+}
+
 #[expect(
     clippy::too_many_arguments,
     reason = "verifier mirrors the review-kit.json manifest surface; a parameter struct would only restate the artifact schema"
@@ -4089,7 +4263,6 @@ fn check_review_kit_manifest(
     super::require_json_str(&review_kit, "source", "first_pr", "review-kit.json")?;
     super::require_json_str(&review_kit, "policy", "advisory", "review-kit.json")?;
     super::require_json_str(&review_kit, "scope", scope, "review-kit.json")?;
-    super::require_non_empty_json_str(&review_kit, "tool_version", "review-kit.json")?;
     require_review_kit_summary_count(
         &review_kit,
         "changed_files",
@@ -4175,45 +4348,6 @@ fn check_review_kit_manifest(
         manual_repair_queue,
     )?;
 
-    let artifacts = super::json_array_at(&review_kit, "/artifacts", "review-kit.json")?;
-    let mut seen = BTreeSet::new();
-    for entry in artifacts {
-        let artifact_path =
-            super::require_non_empty_json_str(entry, "path", "review-kit.json artifact")?;
-        check_review_kit_artifact_path(artifact_path)?;
-        if !seen.insert(artifact_path.to_string()) {
-            return Err(format!(
-                "review-kit.json repeats artifact path `{artifact_path}`"
-            ));
-        }
-        if !dir.join(artifact_path).is_file() {
-            return Err(format!(
-                "review-kit.json lists missing artifact `{artifact_path}`"
-            ));
-        }
-        require_expected_value(
-            super::require_non_empty_json_str(entry, "kind", "review-kit.json artifact")?,
-            expected_review_kit_artifact_kind(artifact_path),
-            "review-kit.json artifact kind",
-        )?;
-        require_expected_value(
-            super::require_non_empty_json_str(entry, "format", "review-kit.json artifact")?,
-            expected_review_kit_artifact_format(artifact_path),
-            "review-kit.json artifact format",
-        )?;
-        check_review_kit_artifact_schema_version(entry, artifact_path)?;
-    }
-
-    let expected = FIRST_PR_BUNDLE_ARTIFACTS
-        .iter()
-        .map(|artifact| artifact.to_string())
-        .collect::<BTreeSet<_>>();
-    if seen != expected {
-        return Err(format!(
-            "review-kit.json artifact set must be {:?}; got {:?}",
-            expected, seen
-        ));
-    }
     Ok(())
 }
 
@@ -5451,8 +5585,11 @@ fn check_review_kit_top_card_handoff(
 fn check_review_kit_artifact_path(path: &str) -> Result<(), String> {
     let artifact = Path::new(path);
     if artifact.is_absolute() {
-        return Err(format!(
-            "review-kit.json artifact path `{path}` must be relative"
+        return Err(artifact_identity_error(
+            path,
+            "path",
+            "relative bundle-local path",
+            path,
         ));
     }
     if artifact.components().any(|component| {
@@ -5461,102 +5598,228 @@ fn check_review_kit_artifact_path(path: &str) -> Result<(), String> {
             Component::ParentDir | Component::RootDir | Component::Prefix(_)
         )
     }) {
-        return Err(format!(
-            "review-kit.json artifact path `{path}` must not escape the artifact directory"
+        return Err(artifact_identity_error(
+            path,
+            "path",
+            "relative bundle-local path without escape components",
+            path,
         ));
     }
     Ok(())
 }
 
-fn expected_review_kit_artifact_kind(path: &str) -> &'static str {
-    match path {
-        "review-kit.json" => "review_kit_manifest",
-        "unsafe-review-gate.json" => "gate_manifest",
-        "cards.json" => "review_cards",
-        "pr-summary.md" => "reviewer_summary",
-        "github-summary.md" => "github_summary",
-        "cards.sarif" => "sarif",
-        "comment-plan.json" => "comment_plan",
-        "witness-plan.md" => "witness_plan",
-        "receipt-audit.md" => "receipt_audit",
-        "receipt-audit.json" => "receipt_audit",
-        "policy-report.json" => "policy_report_json",
-        "policy-report.md" => "policy_report_markdown",
-        "manual-candidates.json" => "manual_candidates",
-        "manual-repair-queue.json" => "manual_repair_queue",
-        "tokmd-packets.json" => "tokmd_packets",
-        "lsp.json" => "saved_lsp",
-        "repair-queue.json" => "repair_queue",
-        "usefulness-telemetry.json" => "usefulness_telemetry",
-        _ => "unknown",
-    }
+fn first_pr_artifact_identity(path: &str) -> Option<&'static ArtifactIdentity> {
+    FIRST_PR_ARTIFACT_IDENTITIES
+        .iter()
+        .find(|identity| identity.path == path)
 }
 
-fn expected_review_kit_artifact_format(path: &str) -> &'static str {
-    match path {
-        "review-kit.json"
-        | "unsafe-review-gate.json"
-        | "cards.json"
-        | "comment-plan.json"
-        | "lsp.json"
-        | "repair-queue.json"
-        | "manual-candidates.json"
-        | "manual-repair-queue.json"
-        | "tokmd-packets.json"
-        | "policy-report.json"
-        | "receipt-audit.json"
-        | "usefulness-telemetry.json" => "json",
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
-        | "policy-report.md" => "markdown",
-        "cards.sarif" => "sarif",
-        _ => "unknown",
+fn require_artifact_identity_string<'a>(
+    value: &'a serde_json::Value,
+    artifact: &str,
+    field: &str,
+    expected: &str,
+) -> Result<&'a str, String> {
+    let Some(actual) = value.get(field) else {
+        return Err(artifact_identity_error(
+            artifact, field, expected, "missing",
+        ));
+    };
+    let Some(actual) = actual.as_str() else {
+        return Err(artifact_identity_error(
+            artifact,
+            field,
+            expected,
+            &json_identity_actual(actual),
+        ));
+    };
+    if actual.trim().is_empty() {
+        return Err(artifact_identity_error(artifact, field, expected, "empty"));
+    }
+    Ok(actual)
+}
+
+fn require_artifact_identity_value(
+    entry: &serde_json::Value,
+    identity: &ArtifactIdentity,
+    field: &str,
+    expected: &str,
+) -> Result<(), String> {
+    let actual = require_artifact_identity_string(entry, identity.path, field, expected)?;
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(artifact_identity_error(
+            identity.path,
+            field,
+            expected,
+            actual,
+        ))
     }
 }
 
 fn check_review_kit_artifact_schema_version(
     entry: &serde_json::Value,
-    path: &str,
+    identity: &ArtifactIdentity,
 ) -> Result<(), String> {
-    let Some(schema_version) = entry.get("schema_version") else {
-        return Err(format!(
-            "review-kit.json artifact `{path}` is missing schema_version"
+    match identity.schema_version {
+        Some(expected) => {
+            require_artifact_identity_value(entry, identity, "schema_version", expected)
+        }
+        None => match entry.get("schema_version") {
+            Some(serde_json::Value::Null) => Ok(()),
+            Some(actual) => Err(artifact_identity_error(
+                identity.path,
+                "schema_version",
+                "null",
+                &json_identity_actual(actual),
+            )),
+            None => Err(artifact_identity_error(
+                identity.path,
+                "schema_version",
+                "null",
+                "missing",
+            )),
+        },
+    }
+}
+
+fn check_artifact_payload_schema_version(
+    dir: &Path,
+    identity: &ArtifactIdentity,
+) -> Result<(), String> {
+    let Some(expected) = identity.schema_version else {
+        return Ok(());
+    };
+    let payload = super::parse_json_file(&dir.join(identity.path))?;
+    let field = if identity.format == "sarif" {
+        "version"
+    } else {
+        "schema_version"
+    };
+    let Some(actual) = payload.get(field) else {
+        return Err(artifact_identity_error(
+            identity.path,
+            field,
+            expected,
+            "missing",
         ));
     };
-    let expected = match path {
-        // cards.json was bumped to 0.2 when provenance metadata was added.
-        "cards.json" => Some("0.2"),
-        "review-kit.json" | "comment-plan.json" | "lsp.json" | "repair-queue.json"
-        | "policy-report.json" | "receipt-audit.json" => Some("0.1"),
-        "unsafe-review-gate.json" => Some("unsafe-review-gate/v1"),
-        "manual-candidates.json" => Some("manual-candidates/v1"),
-        "manual-repair-queue.json" => Some("manual-repair-queue/v1"),
-        "tokmd-packets.json" => Some("tokmd-packets/v1"),
-        "usefulness-telemetry.json" => Some("usefulness-telemetry/v1"),
-        "cards.sarif" => Some("2.1.0"),
-        "pr-summary.md" | "github-summary.md" | "witness-plan.md" | "receipt-audit.md"
-        | "policy-report.md" => None,
-        _ => {
-            return Err(format!("review-kit.json artifact `{path}` is unknown"));
-        }
+    let Some(actual) = actual.as_str() else {
+        return Err(artifact_identity_error(
+            identity.path,
+            field,
+            expected,
+            &json_identity_actual(actual),
+        ));
     };
-    match expected {
-        Some(expected) => {
-            let Some(actual) = schema_version.as_str() else {
-                return Err(format!(
-                    "review-kit.json artifact `{path}` schema_version must be `{expected}`"
-                ));
-            };
-            require_expected_value(
-                actual,
-                expected,
-                &format!("review-kit.json artifact `{path}` schema_version"),
-            )
-        }
-        None if schema_version.is_null() => Ok(()),
-        None => Err(format!(
-            "review-kit.json artifact `{path}` schema_version must be null for unversioned markdown"
-        )),
+    if actual == expected {
+        Ok(())
+    } else {
+        Err(artifact_identity_error(
+            identity.path,
+            field,
+            expected,
+            actual,
+        ))
     }
+}
+
+fn require_supported_review_kit_tool_version(review_kit: &serde_json::Value) -> Result<(), String> {
+    let expected = ">=0.3.8 semantic version";
+    let actual =
+        require_artifact_identity_string(review_kit, "review-kit.json", "tool_version", expected)?;
+    let Some(version) = parse_semver_core(actual) else {
+        return Err(artifact_identity_error(
+            "review-kit.json",
+            "tool_version",
+            expected,
+            actual,
+        ));
+    };
+    let core = (version.0, version.1, version.2);
+    if core > MINIMUM_FIRST_PR_PRODUCER_VERSION
+        || (core == MINIMUM_FIRST_PR_PRODUCER_VERSION && !version.3)
+    {
+        Ok(())
+    } else {
+        Err(artifact_identity_error(
+            "review-kit.json",
+            "tool_version",
+            expected,
+            actual,
+        ))
+    }
+}
+
+fn parse_semver_core(value: &str) -> Option<(u64, u64, u64, bool)> {
+    let (core_and_prerelease, build) = value
+        .split_once('+')
+        .map_or((value, None), |(core, build)| (core, Some(build)));
+    if build.is_some_and(|build| !valid_semver_identifiers(build, false))
+        || core_and_prerelease.contains('+')
+    {
+        return None;
+    }
+    let (core, prerelease) = core_and_prerelease
+        .split_once('-')
+        .map_or((core_and_prerelease, None), |(core, prerelease)| {
+            (core, Some(prerelease))
+        });
+    if prerelease.is_some_and(|prerelease| !valid_semver_identifiers(prerelease, true)) {
+        return None;
+    }
+    let mut parts = core.split('.');
+    let major = parse_semver_numeric(parts.next()?)?;
+    let minor = parse_semver_numeric(parts.next()?)?;
+    let patch = parse_semver_numeric(parts.next()?)?;
+    if parts.next().is_some() {
+        None
+    } else {
+        Some((major, minor, patch, prerelease.is_some()))
+    }
+}
+
+fn parse_semver_numeric(value: &str) -> Option<u64> {
+    if value.is_empty()
+        || !value.bytes().all(|byte| byte.is_ascii_digit())
+        || (value.len() > 1 && value.starts_with('0'))
+    {
+        None
+    } else {
+        value.parse().ok()
+    }
+}
+
+fn valid_semver_identifiers(value: &str, reject_numeric_leading_zero: bool) -> bool {
+    !value.is_empty()
+        && value.split('.').all(|identifier| {
+            !identifier.is_empty()
+                && identifier
+                    .bytes()
+                    .all(|byte| byte.is_ascii_alphanumeric() || byte == b'-')
+                && !(reject_numeric_leading_zero
+                    && identifier.len() > 1
+                    && identifier.starts_with('0')
+                    && identifier.bytes().all(|byte| byte.is_ascii_digit()))
+        })
+}
+
+fn json_identity_actual(value: &serde_json::Value) -> String {
+    match value {
+        serde_json::Value::Null => "null".to_string(),
+        serde_json::Value::Bool(_) => "boolean".to_string(),
+        serde_json::Value::Number(_) => "number".to_string(),
+        serde_json::Value::String(value) => value.clone(),
+        serde_json::Value::Array(_) => "array".to_string(),
+        serde_json::Value::Object(_) => "object".to_string(),
+    }
+}
+
+fn artifact_identity_error(artifact: &str, field: &str, expected: &str, actual: &str) -> String {
+    format!(
+        "artifact identity mismatch: artifact=`{artifact}` field=`{field}` expected=`{expected}` actual=`{actual}`"
+    )
 }
 
 fn require_text_mentions_all_card_ids(

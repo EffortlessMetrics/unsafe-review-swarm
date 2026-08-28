@@ -16826,7 +16826,7 @@ Snapshot reports:
     }
 
     #[test]
-    fn first_pr_artifact_checker_rejects_review_kit_missing_artifact() -> Result<(), String> {
+    fn first_pr_artifact_checker_rejects_review_kit_extra_artifact() -> Result<(), String> {
         let dir = unique_temp_dir("unsafe-review-first-pr-review-kit-missing-artifact")?;
         fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
         write_valid_first_pr_artifacts(&dir)?;
@@ -16852,14 +16852,336 @@ Snapshot reports:
         fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
         let err = match result {
             Ok(()) => {
-                return Err("missing review-kit artifact should fail verification".to_string());
+                return Err("extra review-kit artifact should fail verification".to_string());
             }
             Err(err) => err,
         };
         assert!(
-            err.contains("review-kit.json lists missing artifact `sidecar.json`"),
+            err.contains("artifact=`sidecar.json` field=`path`"),
             "{err}"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_missing_identity_file() -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-identity-missing-file")?;
+        fs::remove_file(dir.join("cards.sarif"))
+            .map_err(|err| format!("remove cards.sarif failed: {err}"))?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(
+            err.contains(
+                "artifact=`cards.sarif` field=`file` expected=`regular file` actual=`missing`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_missing_manifest_identity() -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-identity-missing-entry")?;
+        mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+            let artifacts = review_kit["artifacts"]
+                .as_array_mut()
+                .ok_or_else(|| "review-kit artifacts fixture must be an array".to_string())?;
+            artifacts.retain(|entry| entry["path"] != "cards.sarif");
+            Ok(())
+        })?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(
+            err.contains("artifact=`review-kit.json` field=`artifacts`"),
+            "{err}"
+        );
+        assert!(err.contains("exact 18 first-pr artifact paths"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_escaping_identity_path() -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-identity-path-escape")?;
+        let path = dir.join("review-kit.json");
+        mutate_json_fixture(&path, |review_kit| {
+            review_kit_artifact_entry_mut(review_kit, "cards.json")?["path"] =
+                serde_json::json!("../cards.json");
+            Ok(())
+        })?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(
+            err.contains("artifact=`../cards.json` field=`path`"),
+            "{err}"
+        );
+        assert!(err.contains("without escape components"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_kind_and_format_identity_drift() -> Result<(), String> {
+        for (field, value, expected) in [
+            ("kind", "other_cards", "review_cards"),
+            ("format", "markdown", "json"),
+        ] {
+            let dir = first_pr_identity_fixture(&format!(
+                "unsafe-review-first-pr-identity-{field}-drift"
+            ))?;
+            let path = dir.join("review-kit.json");
+            mutate_json_fixture(&path, |review_kit| {
+                review_kit_artifact_entry_mut(review_kit, "cards.json")?[field] =
+                    serde_json::json!(value);
+                Ok(())
+            })?;
+
+            let err = finish_first_pr_identity_error(&dir)?;
+            assert!(err.contains("artifact=`cards.json`"), "{field}: {err}");
+            assert!(err.contains(&format!("field=`{field}`")), "{field}: {err}");
+            assert!(
+                err.contains(&format!("expected=`{expected}` actual=`{value}`")),
+                "{field}: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_manifest_schema_missing_type_and_unsupported()
+    -> Result<(), String> {
+        for (case, value, actual) in [
+            ("missing", None, "missing"),
+            ("type", Some(serde_json::json!(2)), "number"),
+            ("unsupported", Some(serde_json::json!("9.0")), "9.0"),
+        ] {
+            let dir = first_pr_identity_fixture(&format!(
+                "unsafe-review-first-pr-manifest-schema-{case}"
+            ))?;
+            let path = dir.join("review-kit.json");
+            mutate_json_fixture(&path, |review_kit| {
+                let entry = review_kit_artifact_entry_mut(review_kit, "lsp.json")?;
+                if let Some(value) = value {
+                    entry["schema_version"] = value;
+                } else {
+                    entry
+                        .as_object_mut()
+                        .ok_or_else(|| "lsp identity fixture must be an object".to_string())?
+                        .remove("schema_version");
+                }
+                Ok(())
+            })?;
+
+            let err = finish_first_pr_identity_error(&dir)?;
+            assert!(
+                err.contains(&format!(
+                    "artifact=`lsp.json` field=`schema_version` expected=`0.2` actual=`{actual}`"
+                )),
+                "{case}: {err}"
+            );
+        }
+
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-markdown-schema-version")?;
+        mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+            review_kit_artifact_entry_mut(review_kit, "pr-summary.md")?["schema_version"] =
+                serde_json::json!("0.1");
+            Ok(())
+        })?;
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(
+            err.contains(
+                "artifact=`pr-summary.md` field=`schema_version` expected=`null` actual=`0.1`"
+            ),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_payload_schema_missing_type_and_unsupported()
+    -> Result<(), String> {
+        for (case, value, actual) in [
+            ("missing", None, "missing"),
+            ("type", Some(serde_json::json!(2)), "number"),
+            ("unsupported", Some(serde_json::json!("9.0")), "9.0"),
+        ] {
+            let dir = first_pr_identity_fixture(&format!(
+                "unsafe-review-first-pr-payload-schema-{case}"
+            ))?;
+            let path = dir.join("lsp.json");
+            mutate_json_fixture(&path, |lsp| {
+                if let Some(value) = value {
+                    lsp["schema_version"] = value;
+                } else {
+                    lsp.as_object_mut()
+                        .ok_or_else(|| "lsp fixture must be an object".to_string())?
+                        .remove("schema_version");
+                }
+                Ok(())
+            })?;
+
+            let err = finish_first_pr_identity_error(&dir)?;
+            assert!(
+                err.contains(&format!(
+                    "artifact=`lsp.json` field=`schema_version` expected=`0.2` actual=`{actual}`"
+                )),
+                "{case}: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_accepts_additive_unknown_object_fields() -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-additive-object-fields")?;
+        mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+            review_kit["future_optional"] = serde_json::json!({"nested": true});
+            review_kit_artifact_entry_mut(review_kit, "cards.json")?["future_optional"] =
+                serde_json::json!({"nested": true});
+            Ok(())
+        })?;
+        mutate_json_fixture(&dir.join("cards.json"), |cards| {
+            cards["future_optional"] = serde_json::json!({"nested": true});
+            cards["cards"][0]["future_optional"] = serde_json::json!({"nested": true});
+            Ok(())
+        })?;
+
+        let result = check_first_pr_artifacts(&dir);
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        result.map_err(|err| format!("additive optional fields should be accepted: {err}"))
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_accepts_consistent_additive_operation_family() -> Result<(), String>
+    {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-additive-operation-family")?;
+        for entry in fs::read_dir(&dir).map_err(|err| format!("read fixture dir failed: {err}"))? {
+            let path = entry
+                .map_err(|err| format!("read fixture entry failed: {err}"))?
+                .path();
+            if !path.is_file() {
+                continue;
+            }
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {} failed: {err}", path.display()))?;
+            fs::write(
+                &path,
+                text.replace("raw_pointer_read", "future_raw_pointer_family"),
+            )
+            .map_err(|err| format!("write {} failed: {err}", path.display()))?;
+        }
+
+        let result = check_first_pr_artifacts(&dir);
+        fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        result.map_err(|err| format!("additive operation family should be accepted: {err}"))
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_inconsistent_additive_operation_family()
+    -> Result<(), String> {
+        let dir =
+            first_pr_identity_fixture("unsafe-review-first-pr-inconsistent-operation-family")?;
+        mutate_json_fixture(&dir.join("cards.json"), |cards| {
+            cards["cards"][0]["operation_family"] = serde_json::json!("future_raw_pointer_family");
+            Ok(())
+        })?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(err.contains("cards.sarif"), "{err}");
+        assert!(err.contains("future_raw_pointer_family"), "{err}");
+        assert!(err.contains("raw_pointer_read"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_additive_closed_vocabulary_value() -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-closed-review-class")?;
+        mutate_json_fixture(&dir.join("cards.json"), |cards| {
+            cards["cards"][0]["class"] = serde_json::json!("future_review_class");
+            Ok(())
+        })?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(err.contains("cards.json"), "{err}");
+        assert!(err.contains("class"), "{err}");
+        assert!(err.contains("future_review_class"), "{err}");
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_rejects_unsupported_schema_from_future_producer()
+    -> Result<(), String> {
+        let dir = first_pr_identity_fixture("unsafe-review-first-pr-future-tool-schema-drift")?;
+        mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+            review_kit["tool_version"] = serde_json::json!("0.4.0");
+            Ok(())
+        })?;
+        mutate_json_fixture(&dir.join("lsp.json"), |lsp| {
+            lsp["schema_version"] = serde_json::json!("9.0");
+            Ok(())
+        })?;
+
+        let err = finish_first_pr_identity_error(&dir)?;
+        assert!(
+            err.contains("artifact=`lsp.json` field=`schema_version` expected=`0.2` actual=`9.0`"),
+            "{err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn first_pr_artifact_checker_enforces_minimum_producer_version() -> Result<(), String> {
+        for version in ["0.3.8", "0.3.9-test", "0.4.0", "1.0.0+build"] {
+            let dir = first_pr_identity_fixture(&format!(
+                "unsafe-review-first-pr-producer-accept-{}",
+                version.replace(['.', '+'], "-")
+            ))?;
+            mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+                review_kit["tool_version"] = serde_json::json!(version);
+                Ok(())
+            })?;
+            let result = check_first_pr_artifacts(&dir);
+            fs::remove_dir_all(&dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+            result.map_err(|err| format!("producer {version} should be accepted: {err}"))?;
+        }
+
+        for (case, value, actual) in [
+            ("old", Some(serde_json::json!("0.3.7")), "0.3.7"),
+            (
+                "floor-prerelease",
+                Some(serde_json::json!("0.3.8-test")),
+                "0.3.8-test",
+            ),
+            ("malformed", Some(serde_json::json!("current")), "current"),
+            ("leading-zero", Some(serde_json::json!("00.3.8")), "00.3.8"),
+            (
+                "empty-prerelease",
+                Some(serde_json::json!("0.3.8-")),
+                "0.3.8-",
+            ),
+            ("type", Some(serde_json::json!(308)), "number"),
+            ("missing", None, "missing"),
+        ] {
+            let dir = first_pr_identity_fixture(&format!(
+                "unsafe-review-first-pr-producer-reject-{case}"
+            ))?;
+            mutate_json_fixture(&dir.join("review-kit.json"), |review_kit| {
+                if let Some(value) = value {
+                    review_kit["tool_version"] = value;
+                } else {
+                    review_kit
+                        .as_object_mut()
+                        .ok_or_else(|| "review-kit fixture must be an object".to_string())?
+                        .remove("tool_version");
+                }
+                Ok(())
+            })?;
+            let err = finish_first_pr_identity_error(&dir)?;
+            assert!(
+                err.contains(&format!(
+                    "artifact=`review-kit.json` field=`tool_version` expected=`>=0.3.8 semantic version` actual=`{actual}`"
+                )),
+                "{case}: {err}"
+            );
+        }
         Ok(())
     }
 
@@ -21766,7 +22088,9 @@ Snapshot reports:
             result
                 .err()
                 .unwrap_or_default()
-                .contains("lsp.json key `schema_version` is `2.0`, expected `0.2`")
+                .contains(
+                    "artifact identity mismatch: artifact=`lsp.json` field=`schema_version` expected=`0.2` actual=`2.0`"
+                )
         );
         Ok(())
     }
@@ -21992,6 +22316,43 @@ review_after = "2026-08-01"
         "static unsafe contract review, not a proof of memory safety, not UB-free status, not a Miri result, and not an automatic repair queue. It does not run agents, does not run witnesses, does not edit source, does not post comments, does not suppress cards, and does not resolve cards"
     }
 
+    fn mutate_json_fixture(
+        path: &Path,
+        mutate: impl FnOnce(&mut serde_json::Value) -> Result<(), String>,
+    ) -> Result<(), String> {
+        let mut value = parse_json_file(path)?;
+        mutate(&mut value)?;
+        fs::write(path, value.to_string())
+            .map_err(|err| format!("write {} failed: {err}", path.display()))
+    }
+
+    fn first_pr_identity_fixture(name: &str) -> Result<PathBuf, String> {
+        let dir = unique_temp_dir(name)?;
+        fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        write_valid_first_pr_artifacts(&dir)?;
+        Ok(dir)
+    }
+
+    fn finish_first_pr_identity_error(dir: &Path) -> Result<String, String> {
+        let result = check_first_pr_artifacts(dir);
+        fs::remove_dir_all(dir).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        result
+            .err()
+            .ok_or_else(|| "mutated first-pr identity should fail verification".to_string())
+    }
+
+    fn review_kit_artifact_entry_mut<'a>(
+        review_kit: &'a mut serde_json::Value,
+        path: &str,
+    ) -> Result<&'a mut serde_json::Value, String> {
+        review_kit["artifacts"]
+            .as_array_mut()
+            .ok_or_else(|| "review-kit artifacts fixture must be an array".to_string())?
+            .iter_mut()
+            .find(|entry| entry["path"] == path)
+            .ok_or_else(|| format!("review-kit fixture is missing artifact `{path}`"))
+    }
+
     fn write_review_kit_artifact(
         dir: &Path,
         card_count: usize,
@@ -22057,7 +22418,7 @@ review_after = "2026-08-01"
         let value = serde_json::json!({
             "schema_version": "0.1",
             "tool": "unsafe-review",
-            "tool_version": "0.2.1-test",
+            "tool_version": "0.3.8",
             "mode": "review_kit_manifest",
             "source": "first_pr",
             "policy": "advisory",
@@ -22150,7 +22511,7 @@ review_after = "2026-08-01"
                 {"path":"manual-repair-queue.json","kind":"manual_repair_queue","format":"json","schema_version":"manual-repair-queue/v1"},
                 {"path":"tokmd-packets.json","kind":"tokmd_packets","format":"json","schema_version":"tokmd-packets/v1"},
                 {"path":"usefulness-telemetry.json","kind":"usefulness_telemetry","format":"json","schema_version":"usefulness-telemetry/v1"},
-                {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.1"},
+                {"path":"lsp.json","kind":"saved_lsp","format":"json","schema_version":"0.2"},
                 {"path":"repair-queue.json","kind":"repair_queue","format":"json","schema_version":"0.1"}
             ],
             "trust_boundary": "Static unsafe contract review kit manifest only; this indexes first-pr artifacts and does not reclassify ReviewCards. It is not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, and not site-execution proof. unsafe-review did not run witnesses, post comments, edit source, run an agent, or enforce blocking policy.",
