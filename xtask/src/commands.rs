@@ -14,6 +14,8 @@ pub(crate) enum XtaskCommand {
     CheckGoals,
     CheckPackageBoundary,
     CheckCiLanes,
+    CiTest,
+    CiTestValidate(PathBuf),
     CheckSupportTiers,
     CheckFixtures,
     CheckCalibration,
@@ -78,6 +80,10 @@ impl XtaskCommand {
                 parse_no_extra(args, "check-package-boundary", Self::CheckPackageBoundary)
             }
             Some("check-ci-lanes") => parse_no_extra(args, "check-ci-lanes", Self::CheckCiLanes),
+            Some("ci-test") => parse_no_extra(args, "ci-test", Self::CiTest),
+            Some("ci-test-validate") => Ok(Self::CiTestValidate(
+                command_args::require_subcommand_dir_arg(args, "ci-test-validate")?,
+            )),
             Some("check-support-tiers") => {
                 parse_no_extra(args, "check-support-tiers", Self::CheckSupportTiers)
             }

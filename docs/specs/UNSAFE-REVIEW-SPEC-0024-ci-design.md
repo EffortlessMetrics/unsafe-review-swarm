@@ -162,7 +162,7 @@ map is:
 | --- | --- | --- | --- |
 | Syntax and codemod candidates | `ast-grep`; Rust-specific authority through Rust-aware syntax data such as rust-analyzer crates | `xtask` policy checks, analyzer code, ReviewCard projections | Candidate generation only; not final Rust identity authority |
 | Workspace graph | `cargo_metadata`; `guppy` when richer graph queries are justified | `xtask` lane planning, package-boundary checks, release planning | Allowed when wrapped by repo policy |
-| Test execution | `cargo test` today; `cargo-nextest` may become the wrapped serious test runner when introduced | `xtask check-pr` / future explicit test wrappers | Cheap deterministic PR testing; doctests remain separate |
+| Test execution | pinned `cargo-nextest 0.9.143` through `xtask ci-test`, with `cargo test --workspace --doc --locked` parity | `xtask ci-test` and bounded `test-diagnostics.json` | Deterministic test result; doctests remain an explicit part of the combined result |
 | Coverage | `cargo-llvm-cov` and Codecov | coverage lane and CI-lane ledger | Advisory telemetry only |
 | Static mutation exposure | `ripr` | future explicit `xtask`/artifact lane | Candidate weak-oracle signal; not killed/survived mutation proof |
 | Runtime mutation | `cargo-mutants` | targeted, nightly, or release lane | Not default PR full-workspace tax |
@@ -179,7 +179,9 @@ Substrate adoption rules:
 ```text
 ast-grep finds syntactic candidates; Rust-aware tooling decides Rust identity.
 cargo_metadata/guppy describe the workspace; xtask decides CI routing.
-cargo-nextest may run tests; xtask decides which test lane is authoritative.
+cargo-nextest may run tests; `xtask ci-test` resolves only the pinned, hashed
+asset and keeps `core_exit` authoritative. The wrapper retains no runner
+stdout/stderr and runs doctests separately when nextest does not execute them.
 cargo-llvm-cov measures execution surface; it does not prove correctness.
 ripr shifts mutation signal left; cargo-mutants remains the runtime backstop.
 unsafe-review makes unsafe changes reviewable; Miri provides concrete witness evidence only when run and receipted.
@@ -189,9 +191,31 @@ cargo-semver-checks owns release API compatibility; it is not a default PR witne
 
 A new upstream tool may be added to workflow YAML only when the PR also records
 its repo-facing surface, trigger policy, artifact policy, cost posture, and
-claim boundary in the relevant spec or policy ledger. If the wrapper does not
-yet exist, the spec must describe it as future or planned rather than as a live
-command.
+claim boundary in the relevant spec or policy ledger. The live structured
+runner pin is:
+
+```text
+cargo-nextest 0.9.143
+x86_64-unknown-linux-gnu archive sha256:
+66786b9abe23920d022a182d1416b1bbc8130dd4872a9553d76985a1708dcd1e
+x86_64-pc-windows-msvc archive sha256:
+c42a1dbde532da06dc9b4a43d44fd0ce668b836c2ab7388410f10ff9834476a2
+```
+
+For local reproduction, run `cargo run --locked -p xtask -- ci-test`; the
+wrapper emits the bounded `test-diagnostics.json` handoff. Validate that file
+with `cargo run --locked -p xtask -- ci-test-validate <path>` before treating
+it as an upload-ready diagnostic.
+
+The wrapper resolves the binary under `target/ci-tools`, verifies the archive
+before extraction, rejects symlinked paths, and invokes `nextest run` with its
+supported JUnit reporter with failure output disabled. Only bounded failed-test
+package/name pairs survive into the diagnostic projection. Unexpected,
+malformed, overlong, control-character,
+secret-like, PEM-like, duplicate, or over-limit records are dropped or mapped
+to a fixed status. This proves only a structured failed-test-result surface; it
+does not prove root cause, PR causality, safety, UB-freedom, Miri cleanliness,
+or site execution.
 
 ## 4. CI lane taxonomy
 
@@ -259,8 +283,9 @@ Step shape inside the one gate job:
    exit code != 0; stale `core_exit` files are removed before launch and cannot
    satisfy the run-keyed wait
 4. failure evidence: when the core exit is non-zero, create only a bounded,
-   allowlisted step-status summary plus machine-readable
-   command/commit/exit/path metadata; always attempt a non-fatal upload with
+   allowlisted step-status summary, machine-readable command/commit/exit/path
+   metadata, and (when the structured test step produced it) the exact regular
+   `test-diagnostics.json` projection; always attempt a non-fatal upload with
    seven-day retention and never read or upload the raw core log
 ```
 
@@ -272,7 +297,15 @@ core gate fail. On success no evidence paths are exposed, so the
 and recreated as a private unpredictable directory under the per-job
 `RUNNER_TEMP`: cleanup is followed immediately by `mkdir -m 700` for the
 private parent and then `mktemp -d` for unpredictable staging. The upload action receives only the exact `summary.md` and
-`metadata.json` regular-file paths, never a workspace or staging directory.
+`metadata.json`, and optional `test-diagnostics.json` regular-file paths, never
+a workspace or staging directory. `test-diagnostics.json` is capped at 16 KiB
+and contains no raw output, panic text, backtrace, source snippet, environment
+value, secret, or arbitrary path. It is a diagnostic projection only and can
+never alter the run/attempt-keyed `core_exit` verdict. The workflow invokes
+`cargo run --locked -p xtask -- ci-test-validate <path>` immediately after the
+private copy and before exposing the optional path as an upload output; that
+validator rejects schema drift, malformed JSON, unknown fields, authority drift,
+unsorted/duplicate records, hostile values, and symlinks.
 Pre-populated workspace extras and `core.log` symlinks are therefore outside the
 artifact selection. The intermediate closed-vocabulary step-status excerpt is
 also created atomically inside that private staging directory and verified as a
@@ -287,7 +320,7 @@ content have no projection into the artifact.
 This same-job design cannot fully isolate staging from a deliberately persistent
 hostile process running as the runner user after the core command returns. The
 fresh unpredictable runner-temp directory, owner-only permissions, atomic file
-replacement, regular-file/no-symlink checks, and exact two-file upload selection
+replacement, regular-file/no-symlink checks, and exact two-or-three-file upload selection
 bound that residual risk. Strong isolation would require a separately trusted
 job that downloads and validates a prior artifact, which is outside this
 diagnostic-only lane.
