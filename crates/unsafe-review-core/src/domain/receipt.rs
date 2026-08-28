@@ -96,6 +96,68 @@ pub struct ProofReceiptInput {
     pub limitations: Vec<String>,
 }
 
+/// Typed output captured by an explicit unsafe-review witness execution.
+///
+/// The wrapped inputs intentionally match the saved-output constructors so
+/// callers can preserve the same tool-specific validation and receipt shape
+/// while recording truthful execution provenance.
+#[non_exhaustive]
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExecutedReceiptInput {
+    Miri(MiriReceiptInput),
+    CargoCareful(CargoCarefulReceiptInput),
+    Sanitizer(SanitizerReceiptInput),
+    Concurrency(ConcurrencyReceiptInput),
+    Proof(ProofReceiptInput),
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum OutputProvenance {
+    SavedOutput,
+    ExecutedCommand,
+}
+
+impl OutputProvenance {
+    fn summary_prefix(self) -> &'static str {
+        match self {
+            Self::SavedOutput => "saved",
+            Self::ExecutedCommand => "executed",
+        }
+    }
+
+    fn limitation(self, executor: &str) -> String {
+        match self {
+            Self::SavedOutput => {
+                format!("saved-output adapter; unsafe-review did not run {executor}")
+            }
+            Self::ExecutedCommand => {
+                format!("executed-output adapter; unsafe-review ran {executor}")
+            }
+        }
+    }
+
+    fn captured_output(self, subject: &str) -> String {
+        match self {
+            Self::SavedOutput => format!("saved {subject} output"),
+            Self::ExecutedCommand => format!("executed {subject} output"),
+        }
+    }
+}
+
+struct ClassifiedOutput {
+    card_id: String,
+    tool: String,
+    summary: String,
+    verdict: String,
+    author: String,
+    recorded_at: String,
+    expires_at: String,
+    command: String,
+    executor: &'static str,
+    extra_limitations: Vec<String>,
+    limitations: Vec<String>,
+}
+
 impl WitnessReceipt {
     pub fn validate(&self) -> Result<(), String> {
         validate_required(&self.schema_version, "schema_version")?;
@@ -149,181 +211,57 @@ impl WitnessReceipt {
     }
 
     pub fn from_miri_output(input: MiriReceiptInput) -> Result<Self, String> {
-        validate_saved_success_output(&input.output, "Miri")?;
-        validate_required(&input.command, "command")?;
-        if !input.command.to_ascii_lowercase().contains("miri") {
-            return Err("Miri receipt command must mention `miri`".to_string());
-        }
-        let command_hash = Self::command_hash(&input.command);
-        let mut limitations = vec![
-            "saved-output adapter; unsafe-review did not run Miri".to_string(),
-            "receipt strength is `ran`; site reach is not claimed".to_string(),
-        ];
-        limitations.extend(input.limitations);
-        let receipt = Self {
-            schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
-            card_id: input.card_id,
-            tool: "miri".to_string(),
-            strength: "ran".to_string(),
-            author: Some(input.author),
-            recorded_at: Some(input.recorded_at),
-            expires_at: Some(input.expires_at),
-            summary: Some("saved Miri output reported `test result: ok`".to_string()),
-            command: Some(input.command),
-            command_hash: Some(command_hash),
-            limitations: Some(limitations),
-            // The saved-output adapter only accepts clean targeted runs
-            // (hazard markers are rejected above), so the only derivable
-            // verdict here is `not_reproduced`: this single run did not
-            // reproduce the hypothesis. It is not a safety claim.
-            verdict: Some("not_reproduced".to_string()),
-        };
-        receipt.validate()?;
-        Ok(receipt)
+        Self::from_output(
+            OutputProvenance::SavedOutput,
+            ExecutedReceiptInput::Miri(input),
+        )
     }
 
     pub fn from_cargo_careful_output(input: CargoCarefulReceiptInput) -> Result<Self, String> {
-        validate_saved_success_output(&input.output, "cargo-careful")?;
-        validate_required(&input.command, "command")?;
-        if !input.command.to_ascii_lowercase().contains("careful") {
-            return Err("cargo-careful receipt command must mention `careful`".to_string());
-        }
-        let command_hash = Self::command_hash(&input.command);
-        let mut limitations = vec![
-            "saved-output adapter; unsafe-review did not run cargo-careful".to_string(),
-            "receipt strength is `ran`; site reach is not claimed".to_string(),
-        ];
-        limitations.extend(input.limitations);
-        let receipt = Self {
-            schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
-            card_id: input.card_id,
-            tool: "cargo-careful".to_string(),
-            strength: "ran".to_string(),
-            author: Some(input.author),
-            recorded_at: Some(input.recorded_at),
-            expires_at: Some(input.expires_at),
-            summary: Some("saved cargo-careful output reported `test result: ok`".to_string()),
-            command: Some(input.command),
-            command_hash: Some(command_hash),
-            limitations: Some(limitations),
-            // Clean targeted run only (failure markers rejected above), so
-            // the derivable verdict is `not_reproduced`; not a safety claim.
-            verdict: Some("not_reproduced".to_string()),
-        };
-        receipt.validate()?;
-        Ok(receipt)
+        Self::from_output(
+            OutputProvenance::SavedOutput,
+            ExecutedReceiptInput::CargoCareful(input),
+        )
     }
 
     pub fn from_sanitizer_output(input: SanitizerReceiptInput) -> Result<Self, String> {
-        validate_sanitizer_tool(&input.tool)?;
-        validate_required(&input.command, "command")?;
-        validate_sanitizer_command(&input.command)?;
-        let command_hash = Self::command_hash(&input.command);
-
-        let (summary, verdict, extra_limitations) = if input.allow_runtime {
-            sanitizer_runtime_classify(&input.output, &input.tool)?
-        } else {
-            validate_saved_success_output(&input.output, &input.tool)?;
-            validate_sanitizer_success_output(&input.output, &input.tool)?;
-            (
-                format!("saved {} output reported `test result: ok`", input.tool),
-                "not_reproduced".to_string(),
-                vec![],
-            )
-        };
-
-        let mut limitations = vec![
-            "saved-output adapter; unsafe-review did not run a sanitizer".to_string(),
-            "receipt strength is `ran`; site reach is not claimed".to_string(),
-        ];
-        limitations.extend(extra_limitations);
-        limitations.extend(input.limitations);
-        let receipt = Self {
-            schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
-            card_id: input.card_id,
-            tool: input.tool,
-            strength: "ran".to_string(),
-            author: Some(input.author),
-            recorded_at: Some(input.recorded_at),
-            expires_at: Some(input.expires_at),
-            summary: Some(summary),
-            command: Some(input.command),
-            command_hash: Some(command_hash),
-            limitations: Some(limitations),
-            verdict: Some(verdict),
-        };
-        receipt.validate()?;
-        Ok(receipt)
+        Self::from_output(
+            OutputProvenance::SavedOutput,
+            ExecutedReceiptInput::Sanitizer(input),
+        )
     }
 
     pub fn from_concurrency_output(input: ConcurrencyReceiptInput) -> Result<Self, String> {
-        validate_concurrency_tool(&input.tool)?;
-        validate_saved_success_output(&input.output, &input.tool)?;
-        validate_required(&input.command, "command")?;
-        validate_concurrency_command(&input.command)?;
-        let command_hash = Self::command_hash(&input.command);
-        let mut limitations = vec![
-            "saved-output adapter; unsafe-review did not run a concurrency witness".to_string(),
-            "receipt strength is `ran`; site reach is not claimed".to_string(),
-        ];
-        limitations.extend(input.limitations);
-        let receipt = Self {
-            schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
-            card_id: input.card_id,
-            tool: input.tool.clone(),
-            strength: "ran".to_string(),
-            author: Some(input.author),
-            recorded_at: Some(input.recorded_at),
-            expires_at: Some(input.expires_at),
-            summary: Some(format!(
-                "saved {} output reported `test result: ok`",
-                input.tool
-            )),
-            command: Some(input.command),
-            command_hash: Some(command_hash),
-            limitations: Some(limitations),
-            // Clean targeted run only (failure markers rejected above), so
-            // the derivable verdict is `not_reproduced`; not a safety claim.
-            verdict: Some("not_reproduced".to_string()),
-        };
-        receipt.validate()?;
-        Ok(receipt)
+        Self::from_output(
+            OutputProvenance::SavedOutput,
+            ExecutedReceiptInput::Concurrency(input),
+        )
     }
 
     pub fn from_proof_output(input: ProofReceiptInput) -> Result<Self, String> {
-        validate_proof_tool(&input.tool)?;
-        validate_saved_proof_success_output(&input.output, &input.tool)?;
-        validate_required(&input.command, "command")?;
-        validate_proof_command(&input.command)?;
-        let command_hash = Self::command_hash(&input.command);
-        let mut limitations = vec![
-            "saved-output adapter; unsafe-review did not run a proof tool".to_string(),
-            "receipt strength is `ran`; site reach is not claimed".to_string(),
-            "proof scope is limited to the recorded harness/output".to_string(),
-        ];
-        limitations.extend(input.limitations);
-        let receipt = Self {
-            schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
-            card_id: input.card_id,
-            tool: input.tool.clone(),
-            strength: "ran".to_string(),
-            author: Some(input.author),
-            recorded_at: Some(input.recorded_at),
-            expires_at: Some(input.expires_at),
-            summary: Some(format!(
-                "saved {} proof output reported verification success",
-                input.tool
-            )),
-            command: Some(input.command),
-            command_hash: Some(command_hash),
-            limitations: Some(limitations),
-            // Successful verification output only (failure markers rejected
-            // above); the recorded run did not reproduce the hypothesis, so
-            // the derivable verdict is `not_reproduced`; not a safety claim.
-            verdict: Some("not_reproduced".to_string()),
-        };
-        receipt.validate()?;
-        Ok(receipt)
+        Self::from_output(
+            OutputProvenance::SavedOutput,
+            ExecutedReceiptInput::Proof(input),
+        )
+    }
+
+    /// Classifies output from an already-executed witness command.
+    ///
+    /// This constructor does not execute the command. The caller attests that
+    /// `output` was captured from the exact `command` recorded in the wrapped
+    /// input. The CLI's `confirm --allow-heavy` path provides the stronger
+    /// authorization and execution boundary and appends its single-local-run
+    /// limitation before calling this classifier.
+    pub fn from_executed_output(input: ExecutedReceiptInput) -> Result<Self, String> {
+        Self::from_output(OutputProvenance::ExecutedCommand, input)
+    }
+
+    fn from_output(
+        provenance: OutputProvenance,
+        input: ExecutedReceiptInput,
+    ) -> Result<Self, String> {
+        let classified = classify_output(provenance, input)?;
+        finalize_output_receipt(provenance, classified)
     }
 
     fn validate_command_hash(&self) -> Result<(), String> {
@@ -339,6 +277,170 @@ impl WitnessReceipt {
             Err("`command_hash` does not match `command`".to_string())
         }
     }
+}
+
+fn classify_output(
+    provenance: OutputProvenance,
+    input: ExecutedReceiptInput,
+) -> Result<ClassifiedOutput, String> {
+    match input {
+        ExecutedReceiptInput::Miri(input) => {
+            validate_success_output(provenance, &input.output, "Miri")?;
+            validate_required(&input.command, "command")?;
+            if !input.command.to_ascii_lowercase().contains("miri") {
+                return Err("Miri receipt command must mention `miri`".to_string());
+            }
+            Ok(ClassifiedOutput {
+                card_id: input.card_id,
+                tool: "miri".to_string(),
+                summary: format!(
+                    "{} Miri output reported `test result: ok`",
+                    provenance.summary_prefix()
+                ),
+                verdict: "not_reproduced".to_string(),
+                author: input.author,
+                recorded_at: input.recorded_at,
+                expires_at: input.expires_at,
+                command: input.command,
+                executor: "Miri",
+                extra_limitations: Vec::new(),
+                limitations: input.limitations,
+            })
+        }
+        ExecutedReceiptInput::CargoCareful(input) => {
+            validate_success_output(provenance, &input.output, "cargo-careful")?;
+            validate_required(&input.command, "command")?;
+            if !input.command.to_ascii_lowercase().contains("careful") {
+                return Err("cargo-careful receipt command must mention `careful`".to_string());
+            }
+            Ok(ClassifiedOutput {
+                card_id: input.card_id,
+                tool: "cargo-careful".to_string(),
+                summary: format!(
+                    "{} cargo-careful output reported `test result: ok`",
+                    provenance.summary_prefix()
+                ),
+                verdict: "not_reproduced".to_string(),
+                author: input.author,
+                recorded_at: input.recorded_at,
+                expires_at: input.expires_at,
+                command: input.command,
+                executor: "cargo-careful",
+                extra_limitations: Vec::new(),
+                limitations: input.limitations,
+            })
+        }
+        ExecutedReceiptInput::Sanitizer(input) => {
+            validate_sanitizer_tool(&input.tool)?;
+            validate_required(&input.command, "command")?;
+            validate_sanitizer_command(&input.command)?;
+            let (summary, verdict, extra_limitations) = if input.allow_runtime {
+                sanitizer_runtime_classify(provenance, &input.output, &input.tool)?
+            } else {
+                validate_success_output(provenance, &input.output, &input.tool)?;
+                validate_sanitizer_success_output(provenance, &input.output, &input.tool)?;
+                (
+                    format!(
+                        "{} {} output reported `test result: ok`",
+                        provenance.summary_prefix(),
+                        input.tool
+                    ),
+                    "not_reproduced".to_string(),
+                    Vec::new(),
+                )
+            };
+            Ok(ClassifiedOutput {
+                card_id: input.card_id,
+                tool: input.tool,
+                summary,
+                verdict,
+                author: input.author,
+                recorded_at: input.recorded_at,
+                expires_at: input.expires_at,
+                command: input.command,
+                executor: "a sanitizer",
+                extra_limitations,
+                limitations: input.limitations,
+            })
+        }
+        ExecutedReceiptInput::Concurrency(input) => {
+            validate_concurrency_tool(&input.tool)?;
+            validate_success_output(provenance, &input.output, &input.tool)?;
+            validate_required(&input.command, "command")?;
+            validate_concurrency_command(&input.command)?;
+            Ok(ClassifiedOutput {
+                card_id: input.card_id,
+                summary: format!(
+                    "{} {} output reported `test result: ok`",
+                    provenance.summary_prefix(),
+                    input.tool
+                ),
+                tool: input.tool,
+                verdict: "not_reproduced".to_string(),
+                author: input.author,
+                recorded_at: input.recorded_at,
+                expires_at: input.expires_at,
+                command: input.command,
+                executor: "a concurrency witness",
+                extra_limitations: Vec::new(),
+                limitations: input.limitations,
+            })
+        }
+        ExecutedReceiptInput::Proof(input) => {
+            validate_proof_tool(&input.tool)?;
+            validate_proof_success_output(provenance, &input.output, &input.tool)?;
+            validate_required(&input.command, "command")?;
+            validate_proof_command(&input.command)?;
+            Ok(ClassifiedOutput {
+                card_id: input.card_id,
+                summary: format!(
+                    "{} {} proof output reported verification success",
+                    provenance.summary_prefix(),
+                    input.tool
+                ),
+                tool: input.tool,
+                verdict: "not_reproduced".to_string(),
+                author: input.author,
+                recorded_at: input.recorded_at,
+                expires_at: input.expires_at,
+                command: input.command,
+                executor: "a proof tool",
+                extra_limitations: vec![
+                    "proof scope is limited to the recorded harness/output".to_string(),
+                ],
+                limitations: input.limitations,
+            })
+        }
+    }
+}
+
+fn finalize_output_receipt(
+    provenance: OutputProvenance,
+    classified: ClassifiedOutput,
+) -> Result<WitnessReceipt, String> {
+    let command_hash = WitnessReceipt::command_hash(&classified.command);
+    let mut limitations = vec![
+        provenance.limitation(classified.executor),
+        "receipt strength is `ran`; site reach is not claimed".to_string(),
+    ];
+    limitations.extend(classified.extra_limitations);
+    limitations.extend(classified.limitations);
+    let receipt = WitnessReceipt {
+        schema_version: WITNESS_RECEIPT_SCHEMA_VERSION.to_string(),
+        card_id: classified.card_id,
+        tool: classified.tool,
+        strength: "ran".to_string(),
+        author: Some(classified.author),
+        recorded_at: Some(classified.recorded_at),
+        expires_at: Some(classified.expires_at),
+        summary: Some(classified.summary),
+        command: Some(classified.command),
+        command_hash: Some(command_hash),
+        limitations: Some(limitations),
+        verdict: Some(classified.verdict),
+    };
+    receipt.validate()?;
+    Ok(receipt)
 }
 
 fn is_supported_receipt_strength(value: &str) -> bool {
@@ -509,9 +611,14 @@ fn validate_proof_command(command: &str) -> Result<(), String> {
     }
 }
 
-fn validate_saved_success_output(output: &str, tool: &str) -> Result<(), String> {
+fn validate_success_output(
+    provenance: OutputProvenance,
+    output: &str,
+    tool: &str,
+) -> Result<(), String> {
+    let captured_output = provenance.captured_output(tool);
     if output.trim().is_empty() {
-        return Err(format!("saved {tool} output is empty"));
+        return Err(format!("{captured_output} is empty"));
     }
     let lower = output.to_ascii_lowercase();
     for needle in [
@@ -523,21 +630,24 @@ fn validate_saved_success_output(output: &str, tool: &str) -> Result<(), String>
     ] {
         if lower.contains(needle) {
             return Err(format!(
-                "saved {tool} output contains failure marker `{needle}`"
+                "{captured_output} contains failure marker `{needle}`"
             ));
         }
     }
     if !lower.contains("test result: ok") {
-        return Err(format!(
-            "saved {tool} output must contain `test result: ok`"
-        ));
+        return Err(format!("{captured_output} must contain `test result: ok`"));
     }
     Ok(())
 }
 
-fn validate_saved_proof_success_output(output: &str, tool: &str) -> Result<(), String> {
+fn validate_proof_success_output(
+    provenance: OutputProvenance,
+    output: &str,
+    tool: &str,
+) -> Result<(), String> {
+    let captured_output = provenance.captured_output(&format!("{tool} proof"));
     if output.trim().is_empty() {
-        return Err(format!("saved {tool} proof output is empty"));
+        return Err(format!("{captured_output} is empty"));
     }
     let lower = output.to_ascii_lowercase();
     for needle in [
@@ -552,7 +662,7 @@ fn validate_saved_proof_success_output(output: &str, tool: &str) -> Result<(), S
     ] {
         if lower.contains(needle) {
             return Err(format!(
-                "saved {tool} proof output contains failure marker `{needle}`"
+                "{captured_output} contains failure marker `{needle}`"
             ));
         }
     }
@@ -569,12 +679,17 @@ fn validate_saved_proof_success_output(output: &str, tool: &str) -> Result<(), S
         Ok(())
     } else {
         Err(format!(
-            "saved {tool} proof output must contain a verification success marker"
+            "{captured_output} must contain a verification success marker"
         ))
     }
 }
 
-fn validate_sanitizer_success_output(output: &str, tool: &str) -> Result<(), String> {
+fn validate_sanitizer_success_output(
+    provenance: OutputProvenance,
+    output: &str,
+    tool: &str,
+) -> Result<(), String> {
+    let captured_output = provenance.captured_output(tool);
     let lower = output.to_ascii_lowercase();
     for needle in [
         "addresssanitizer:",
@@ -587,7 +702,7 @@ fn validate_sanitizer_success_output(output: &str, tool: &str) -> Result<(), Str
     ] {
         if lower.contains(needle) {
             return Err(format!(
-                "saved {tool} output contains sanitizer failure marker `{needle}`"
+                "{captured_output} contains sanitizer failure marker `{needle}`"
             ));
         }
     }
@@ -601,11 +716,12 @@ fn validate_sanitizer_success_output(output: &str, tool: &str) -> Result<(), Str
 /// claim). A clean run → `not_reproduced` (no signal this run, not a safety
 /// claim).
 fn sanitizer_runtime_classify(
+    provenance: OutputProvenance,
     output: &str,
     tool: &str,
 ) -> Result<(String, String, Vec<String>), String> {
     if output.trim().is_empty() {
-        return Err(format!("saved {tool} output is empty"));
+        return Err(format!("{} is empty", provenance.captured_output(tool)));
     }
     let lower = output.to_ascii_lowercase();
     let sanitizer_fired = [
@@ -1093,6 +1209,273 @@ mod tests {
         );
         assert!(limitations.iter().any(|item| item == "fixture only"));
         Ok(())
+    }
+
+    #[test]
+    fn executed_output_records_truthful_provenance_without_changing_receipt_shape()
+    -> Result<(), String> {
+        let receipt = WitnessReceipt::from_executed_output(ExecutedReceiptInput::Miri(
+            MiriReceiptInput {
+                card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                    .to_string(),
+                output: "test result: ok. 1 passed; 0 failed; finished in 0.01s\n".to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                expires_at: "2026-08-18".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                limitations: vec!["single explicit run".to_string()],
+            },
+        ))?;
+
+        assert_eq!(
+            receipt.summary.as_deref(),
+            Some("executed Miri output reported `test result: ok`")
+        );
+        let limitations = receipt.limitations.as_ref().ok_or("missing limitations")?;
+        assert!(
+            limitations
+                .iter()
+                .any(|item| item == "executed-output adapter; unsafe-review ran Miri")
+        );
+        assert!(limitations.iter().all(|item| !item.contains("did not run")));
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+
+        let value = serde_json::to_value(&receipt)
+            .map_err(|err| format!("serialize executed receipt failed: {err}"))?;
+        let object = value
+            .as_object()
+            .ok_or("executed receipt did not serialize as an object")?;
+        for key in [
+            "schema_version",
+            "card_id",
+            "tool",
+            "strength",
+            "author",
+            "recorded_at",
+            "expires_at",
+            "summary",
+            "command",
+            "command_hash",
+            "limitations",
+            "verdict",
+        ] {
+            assert!(object.contains_key(key), "missing receipt field `{key}`");
+        }
+        assert_eq!(object.len(), 12);
+        Ok(())
+    }
+
+    #[test]
+    fn executed_output_supports_all_five_typed_input_variants() -> Result<(), String> {
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let output = "test result: ok. 1 passed; 0 failed; finished in 0.01s\n";
+        let receipts = vec![
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Miri(MiriReceiptInput {
+                card_id: card_id.to_string(),
+                output: output.to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                expires_at: "2026-08-18".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                limitations: Vec::new(),
+            }))?,
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::CargoCareful(
+                CargoCarefulReceiptInput {
+                    card_id: card_id.to_string(),
+                    output: output.to_string(),
+                    author: "core/fixtures".to_string(),
+                    recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                    expires_at: "2026-08-18".to_string(),
+                    command: "cargo +nightly careful test read_header".to_string(),
+                    limitations: Vec::new(),
+                },
+            ))?,
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(
+                SanitizerReceiptInput {
+                    card_id: card_id.to_string(),
+                    tool: "asan".to_string(),
+                    output: output.to_string(),
+                    author: "core/fixtures".to_string(),
+                    recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                    expires_at: "2026-08-18".to_string(),
+                    command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header"
+                        .to_string(),
+                    limitations: Vec::new(),
+                    allow_runtime: false,
+                },
+            ))?,
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Concurrency(
+                ConcurrencyReceiptInput {
+                    card_id: card_id.to_string(),
+                    tool: "loom".to_string(),
+                    output: output.to_string(),
+                    author: "core/fixtures".to_string(),
+                    recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                    expires_at: "2026-08-18".to_string(),
+                    command: "cargo test --features loom read_header".to_string(),
+                    limitations: Vec::new(),
+                },
+            ))?,
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Proof(ProofReceiptInput {
+                card_id: card_id.to_string(),
+                tool: "kani".to_string(),
+                output: "verification result: verified\n".to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                expires_at: "2026-08-18".to_string(),
+                command: "cargo kani --harness read_header".to_string(),
+                limitations: Vec::new(),
+            }))?,
+        ];
+
+        assert_eq!(
+            receipts
+                .iter()
+                .map(|receipt| receipt.tool.as_str())
+                .collect::<Vec<_>>(),
+            vec!["miri", "cargo-careful", "asan", "loom", "kani"]
+        );
+        for receipt in receipts {
+            let limitations = receipt.limitations.ok_or("missing limitations")?;
+            assert!(
+                limitations
+                    .iter()
+                    .any(|item| item.starts_with("executed-output adapter; unsafe-review ran"))
+            );
+            assert!(limitations.iter().all(|item| !item.contains("did not run")));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn output_validation_errors_preserve_saved_and_executed_provenance() {
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let miri = |output: &str| MiriReceiptInput {
+            card_id: card_id.to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly miri test read_header".to_string(),
+            limitations: Vec::new(),
+        };
+        assert_eq!(
+            WitnessReceipt::from_miri_output(miri("warning: nothing ran\n")),
+            Err("saved Miri output must contain `test result: ok`".to_string())
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Miri(miri(
+                "warning: nothing ran\n",
+            ))),
+            Err("executed Miri output must contain `test result: ok`".to_string())
+        );
+
+        let careful = |output: &str| CargoCarefulReceiptInput {
+            card_id: card_id.to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly careful test read_header".to_string(),
+            limitations: Vec::new(),
+        };
+        assert_eq!(
+            WitnessReceipt::from_cargo_careful_output(careful("")),
+            Err("saved cargo-careful output is empty".to_string())
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::CargoCareful(careful(""))),
+            Err("executed cargo-careful output is empty".to_string())
+        );
+
+        let concurrency = |output: &str| ConcurrencyReceiptInput {
+            card_id: card_id.to_string(),
+            tool: "loom".to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo test --features loom read_header".to_string(),
+            limitations: Vec::new(),
+        };
+        assert_eq!(
+            WitnessReceipt::from_concurrency_output(concurrency("error: scheduler failed\n")),
+            Err("saved loom output contains failure marker `error:`".to_string())
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Concurrency(concurrency(
+                "error: scheduler failed\n",
+            ))),
+            Err("executed loom output contains failure marker `error:`".to_string())
+        );
+
+        let sanitizer = |output: &str, allow_runtime: bool| SanitizerReceiptInput {
+            card_id: card_id.to_string(),
+            tool: "asan".to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
+            limitations: Vec::new(),
+            allow_runtime,
+        };
+        let sanitizer_output = "test result: ok\nAddressSanitizer: use-after-free\n";
+        assert_eq!(
+            WitnessReceipt::from_sanitizer_output(sanitizer(sanitizer_output, false)),
+            Err(
+                "saved asan output contains sanitizer failure marker `addresssanitizer:`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(sanitizer(
+                sanitizer_output,
+                false,
+            ))),
+            Err(
+                "executed asan output contains sanitizer failure marker `addresssanitizer:`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            WitnessReceipt::from_sanitizer_output(sanitizer("", true)),
+            Err("saved asan output is empty".to_string())
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(sanitizer(
+                "", true,
+            ))),
+            Err("executed asan output is empty".to_string())
+        );
+
+        let proof = |output: &str| ProofReceiptInput {
+            card_id: card_id.to_string(),
+            tool: "kani".to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo kani --harness read_header".to_string(),
+            limitations: Vec::new(),
+        };
+        assert_eq!(
+            WitnessReceipt::from_proof_output(proof("verification failed\n")),
+            Err(
+                "saved kani proof output contains failure marker `verification failed`".to_string()
+            )
+        );
+        assert_eq!(
+            WitnessReceipt::from_executed_output(ExecutedReceiptInput::Proof(proof(
+                "verification failed\n",
+            ))),
+            Err(
+                "executed kani proof output contains failure marker `verification failed`"
+                    .to_string()
+            )
+        );
     }
 
     #[test]

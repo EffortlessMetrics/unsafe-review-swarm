@@ -7,6 +7,7 @@ Linked proposal: ../proposals/UNSAFE-REVIEW-PROP-0001-product-contract.md
 Linked plan: ../../plans/0.1.0/implementation-plan.md
 Linked issues:
 - EffortlessMetrics/unsafe-review-swarm#1602 (WitnessMismatch is_actionable fix)
+- EffortlessMetrics/unsafe-review-swarm#2123 (confirm executed-output provenance)
 
 ## Problem
 
@@ -135,6 +136,25 @@ with that proof tool and `strength = "ran"`. It must not execute Kani or Crux,
 infer site reach, create a card, or claim proof beyond the recorded
 harness/output scope.
 
+Saved-output import and explicit execution have distinct provenance. The five
+saved-output import constructors classify an existing output file and retain a
+limitation stating that unsafe-review did not run the tool. The additive
+`WitnessReceipt::from_executed_output(ExecutedReceiptInput)` constructor uses
+the same tool-specific output classification and emits the same serialized
+`WitnessReceipt` shape, but records that unsafe-review ran the selected tool.
+The constructor only classifies already-executed output and does not execute a
+command itself; its caller attests that the captured output came from the exact
+recorded command. The CLI provides the stronger explicit authorization,
+execution, and single-local-run limitation at the `confirm --allow-heavy`
+boundary.
+
+`confirm --allow-heavy` must use this executed-output constructor after it
+resolves the exact current ReviewCard, selects a command-bearing card-owned
+route and supported receipt lane, and applies any explicit command-text
+override. Both provenance paths retain `strength = "ran"`, the exact command
+and command hash, and limitations that deny site-reach and safety claims.
+Neither path may post-hoc filter, rewrite, or upgrade the classified receipt.
+
 The CLI may also validate receipt files without running analysis. Validation must
 use the same importer checks as normal card analysis so users do not get a
 separate receipt truth.
@@ -245,9 +265,11 @@ must include a non-empty `command`.
 - no duplicate truth outside this spec and linked policy files
 - no witness execution by `unsafe-review` by default; the explicit
   `confirm --allow-heavy` opt-in executes one routed witness command locally
-  and records the result only as a saved witness receipt through the existing
-  saved-output import constructors, with no success claim without a receipt;
-  the template and `import-*` commands still never execute anything
+  and records classifiable output through the explicit executed-output
+  constructor, with no success claim without a receipt; the template and
+  `import-*` commands still never execute anything
+- no claim that explicit execution proves the unsafe site was reached, the
+  witness was correct, the operation is safe, or the repository is UB-free
 - no receipt match without exact card identity
 - no claim that a receipt proves arbitrary callers or the whole repository safe
 
@@ -314,6 +336,13 @@ must include a non-empty `command`.
 - The CLI proof saved-output adapter writes a receipt from a success-looking
   Kani/Crux log, rejects unsupported proof tools, and rejects failure-looking
   output.
+- A `confirm --allow-heavy` run whose executed output classifies successfully
+  records a routed-tool receipt through
+  `WitnessReceipt::from_executed_output`, retains `strength = "ran"`, and states
+  both that unsafe-review ran the selected tool and that the evidence came from
+  a single local run.
+- A `confirm --allow-heavy` run whose executed output does not classify fails
+  and writes no receipt.
 - The CLI receipt-validate command counts importable receipts and rejects the
   same invalid receipt files as normal analysis.
 - The CLI receipt-audit command reports matched, stale, expired,
