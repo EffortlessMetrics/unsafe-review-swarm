@@ -1,0 +1,16 @@
+schema = "bounded-subagent-brief-v1"
+action = "investigate"
+capability = "read_only"
+objective = "Inspect one bounded contract."
+read_scope = ["docs/specs/"]
+write_scope = []
+authorities = ["spec:UNSAFE-REVIEW-SPEC-0044"]
+proof_obligations = ["Return exact paths."]
+non_goals = ["No mutation."]
+stop_when = ["The question is answered."]
+return_schema = "bounded-subagent-result-v1"
+[work_item]
+issue = "https://github.com/Effortless@Metrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"

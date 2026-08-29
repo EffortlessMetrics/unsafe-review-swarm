@@ -192,6 +192,16 @@ linked_proposal = "UNSAFE-REVIEW-PROP-0002"
 linked_spec = "UNSAFE-REVIEW-SPEC-0044"
 
 [[artifact]]
+id = "UNSAFE-REVIEW-WORK-1924"
+kind = "plan_item"
+path = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+status = "draft"
+owner = "repo-infra"
+created = "2026-08-14"
+linked_proposal = "UNSAFE-REVIEW-PROP-0002"
+linked_spec = "UNSAFE-REVIEW-SPEC-0044"
+
+[[artifact]]
 id = "UNSAFE-REVIEW-CUTLINE-1915"
 kind = "plan_item"
 path = "plans/release-cutline/UNSAFE-REVIEW-CUTLINE-1915.toml"

@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EffortlessMetrics/unsafe-review-swarm/blob/main/docs/schemas/bounded-subagent-brief.schema.json",
+  "title": "Bounded subagent brief v1",
+  "description": "One bounded delegation input referencing an accepted issue-linked work spec. It is not a scheduler or a second work contract.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "schema", "work_item", "basis", "action", "capability", "objective", "read_scope",
+    "write_scope", "authorities", "proof_obligations", "non_goals",
+    "stop_when", "return_schema"
+  ],
+  "properties": {
+    "schema": { "const": "bounded-subagent-brief-v1" },
+    "work_item": { "$ref": "#/$defs/work_item" },
+    "basis": { "$ref": "#/$defs/basis" },
+    "action": {
+      "enum": ["investigate", "challenge_plan", "build", "verify", "review", "triage_ci", "audit_cleanup"]
+    },
+    "capability": { "enum": ["read_only", "write"] },
+    "objective": { "type": "string", "minLength": 1, "pattern": "\\S" },
+    "read_scope": { "$ref": "#/$defs/non_empty_strings" },
+    "write_scope": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repository_relative_path" }
+    },
+    "authorities": {
+      "type": "array",
+      "minItems": 1,
+      "uniqueItems": true,
+      "items": { "$ref": "#/$defs/authority" }
+    },
+    "proof_obligations": { "$ref": "#/$defs/non_empty_strings" },
+    "non_goals": { "$ref": "#/$defs/non_empty_strings" },
+    "stop_when": { "$ref": "#/$defs/non_empty_strings" },
+    "return_schema": { "const": "bounded-subagent-result-v1" },
+    "admission": { "$ref": "#/$defs/admission" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "const": "build" } }, "required": ["action"] },
+      "then": {
+        "required": ["admission"],
+        "properties": {
+          "capability": { "const": "write" },
+          "write_scope": { "minItems": 1 }
+        }
+      },
+      "else": {
+        "not": { "required": ["admission"] },
+        "properties": {
+          "capability": { "const": "read_only" },
+          "write_scope": { "maxItems": 0 }
+        }
+      }
+    },
+    {
+      "if": { "properties": { "action": { "enum": ["verify", "review"] } }, "required": ["action"] },
+      "then": {
+        "properties": { "basis": { "required": ["pr", "head_sha"] } }
+      }
+    }
+  ],
+  "$defs": {
+    "strings": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
+    "non_empty_strings": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
+    "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repository_relative_path": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*/?$"
+    },
+    "authority": {
+      "type": "string",
+      "anyOf": [
+        { "pattern": "^(spec|adr):[A-Z][A-Z0-9._-]+$" },
+        { "pattern": "^(policy|artifact):[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*$" },
+        { "pattern": "^work_spec:plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$" },
+        { "pattern": "^issue:https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/issues/[1-9][0-9]*$" },
+        { "pattern": "^pr:https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/pull/[1-9][0-9]*$" },
+        { "pattern": "^external:https://\\S+$" }
+      ]
+    },
+    "work_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "work_spec"],
+      "properties": {
+        "issue": {
+          "type": "string",
+          "pattern": "^https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/issues/[1-9][0-9]*$"
+        },
+        "work_spec": {
+          "type": "string",
+          "pattern": "^plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$"
+        }
+      }
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_sha"],
+      "properties": {
+        "base_sha": { "$ref": "#/$defs/sha" },
+        "pr": {
+          "type": "string",
+          "pattern": "^https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/pull/[1-9][0-9]*$"
+        },
+        "head_sha": { "$ref": "#/$defs/sha" }
+      },
+      "dependentRequired": {
+        "pr": ["head_sha"],
+        "head_sha": ["pr"]
+      }
+    },
+    "admission": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["state", "worktree"],
+      "properties": {
+        "state": { "const": "admitted" },
+        "worktree": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    }
+  }
+}
