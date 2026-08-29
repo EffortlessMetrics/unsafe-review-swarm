@@ -293,6 +293,48 @@ surfaces = ["json", "lsp", "agent", "file_range_scan"]
 single_truth = true
 note = "Manual-candidate overlay state for this ReviewCard (present/absent). Bare cards default to absent; higher layers may upgrade to present. It is ledger state, not safety proof."
 
+[[field]]
+name = "confirmation_cue"
+canonical_source = "output/confirmation.rs::ConfirmationCue (output/confirmation.rs::hypothesis_to_confirm, build_this_first, minimal_repro, confirmation_step, domain/witness.rs::WitnessEvidence::runtime_executed, domain/review_card.rs::ReviewCard.witness.confirmation_state)"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Advisory per-card confirmation cue emitted by the agent packet and forwarded through each nested file-range packet, framing the static hypothesis, the smallest build/run cue (verify command or witness route or human review), the minimal repro steps, and the confirmation step before confidence is upgraded. runtime_executed and confirmation_state remain imported receipt state, not execution by unsafe-review; hypothesis and repro steps do not prove site execution, UB, or safety."
+
+[[field]]
+name = "source_context"
+canonical_source = "output/agent/context.rs::AgentSourceContext (output/agent/context.rs::AgentSourceSite, AgentContextEvidence, AgentRelatedTest; domain/review_card.rs::ReviewCard.site.snippet, contract.summary, obligation_evidence.discharge, related_tests)"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Bounded source context emitted by the agent packet and forwarded through each nested file-range packet, projecting the unsafe site snippet, nearby safety-contract summary (when present), bounded nearby guard evidence summaries (up to three), bounded related test mentions (up to three), and fixed limits text. It does not include whole files; related tests and summaries are ReviewCard projections and do not prove the unsafe site executed or that evidence is discharged. Advisory only."
+
+[[field]]
+name = "safety_conditions"
+canonical_source = "output/agent/evidence.rs::AgentSafetyContract (output/agent/packet.rs::AgentPacket.required_safety_conditions + safety_contract.required_conditions; domain/obligation.rs::SafetyObligation.description, domain/evidence.rs::ContractEvidence/DischargeEvidence/ReachEvidence/WitnessEvidence.summary)"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Per-card required safety conditions and their contract/discharge/reach/witness evidence summaries as framed by the agent packet and forwarded through each nested file-range packet. Required conditions project the same SafetyObligation descriptions as the shared obligations row without reclassification; summaries are advisory evidence, not discharged proof, and the included reach limitation is not site-execution proof."
+
+[[field]]
+name = "repair_scope"
+canonical_source = "output/agent/packet.rs::AgentPacket.repair_scope (fixed literal 'this card only')"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Fixed repair scope emitted by the agent packet and preserved in each nested file-range packet that authorizes work on this card/site only; sibling cards in the same target-feature group or file range remain distinct and are not repaired by fixing one representative. Advisory only."
+
+[[field]]
+name = "do_not_do"
+canonical_source = "output/agent.rs::DO_NOT_DO (output/agent/packet.rs::AgentPacket.do_not_do, output/agent/range_scan.rs::FileRangeScanEnvelope.do_not_do)"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Fixed do-not-do guidance emitted by the agent packet and by the file-range envelope (same canonical constant) forbidding broad suppression, replacing guard evidence with docs, claiming Miri proof without running, claiming automatic repair, claiming agent/witness execution or edits, changing unrelated unsafe code, or treating test mentions as execution proof. Advisory boundary only."
+
+[[field]]
+name = "stop_conditions"
+canonical_source = "output/agent/packet.rs::AgentPacket.stop_conditions"
+surfaces = ["agent", "file_range_scan"]
+single_truth = true
+note = "Fixed stop conditions emitted by the agent packet and forwarded through each nested file-range packet that stop work when missing evidence is present or explicitly waived with owner and expiry, the focused test or witness command has been run or marked unavailable, no unrelated unsafe code was changed, and the ReviewCard still maps to the same seam. Advisory only, not a safety or completion proof."
+
 # The editor adapter is intentionally represented by the existing `lsp`
 # surface vocabulary. The named consumers are saved lsp.json, live
 # unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
@@ -469,14 +511,14 @@ name = "reviewcard_agent_packet"
 surface = "agent"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2125"
-note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Shared canonical rows for confidence, proof path, operation text, hazards, obligations/obligation-evidence, contract/discharge/reach/witness details, witness routes, verify commands, and confirmation state are owned by #2124 and projected by this packet without reclassification; dependent #2125 adds agent/file-range-specific confirmation-cue, source-context, safety-condition, repair-scope, do-not-do, and stop-condition framing. Advisory only."
+note = "ReviewCard agent/context packet emitted by output/agent.rs::render_with_output; it maps every existing canonical agent field row, including identity, coverage, readiness, repair, evidence summary slots, next action, target-feature grouping, and trust. Shared canonical rows for confidence, proof path, operation text, hazards, obligations/obligation-evidence, contract/discharge/reach/witness details, witness routes, verify commands, and confirmation state are owned by #2124 and projected by this packet without reclassification; dedicated packet-specific rows for confirmation cues, source context, safety conditions, repair scope, do-not-do guidance, and stop conditions are owned by #2125 and projected directly (file_range_scan forwards each through its nested packets). Advisory only."
 
 [[consumer]]
 name = "file_range_scan"
 surface = "file_range_scan"
 disposition = "aggregate_projection"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1880"
-note = "The context file-range renderer deterministically filters ReviewCards by normalized file and inclusive line range, optionally restricts them to canonical new/worsened baseline states, and wraps zero or more complete output-backed agent packets. Nested packets map the agent packet's canonical identity, location, class, priority, confidence, proof path, family, operation text, hazards, obligations/evidence, contract/discharge/reach/witness details, witness routes, verify commands, confirmation state, coverage, readiness, comment status, repairs, missing evidence, target-feature group, next action, and trust boundary via shared canonical rows owned by #2124; the envelope's query geometry, changed-only filter, empty-result meaning, deterministic ordering with input-card multiplicity and duplicates preserved, schema metadata, and staleness marker remain aggregate or range-specific rather than separate ReviewCard fields. Advisory only."
+note = "The context file-range renderer deterministically filters ReviewCards by normalized file and inclusive line range, optionally restricts them to canonical new/worsened baseline states, and wraps zero or more complete output-backed agent packets. Nested packets map the agent packet's canonical identity, location, class, priority, confidence, proof path, family, operation text, hazards, obligations/evidence, contract/discharge/reach/witness details, witness routes, verify commands, confirmation state, plus the dedicated agent/file-range confirmation cues, source context, safety conditions, repair scope, do-not-do guidance, and stop conditions via rows owned by #2125, and coverage, readiness, comment status, repairs, missing evidence, target-feature group, next action, and trust boundary via shared canonical rows owned by #2124; the envelope's query geometry, changed-only filter, empty-result meaning, deterministic ordering with input-card multiplicity and duplicates preserved, schema metadata, and staleness marker remain aggregate or range-specific rather than separate ReviewCard fields, while the envelope's own do_not_do shares the same canonical constant as the packets. Advisory only."
 
 [[consumer]]
 name = "tokmd_packets_json"
