@@ -406,7 +406,7 @@ name = "ub_review"
 surface = "ub_review"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
-note = "Operation-family and trust-boundary intent are mapped, but a pinned real producer/consumer smoke is not yet proven."
+note = "Pinned 2026-08-29 smoke at unsafe-review 6f595070 -> ub-review 55e4fba proves the real parser routes unsafe-review-gate/v1, follows the comment_plan pointer, parses the 0.1 object envelope, and preserves card identity, operation_family, and trust_boundary (receipt docs/receipts/ub-review-smoke-6f595070.md). Advisory only; not a cross-version or correctness proof."
 
 [[gap]]
 name = "human_cli_field_parity"
@@ -420,5 +420,6 @@ note = "Locked via #2131: first-pr bundle carries bundle_version 0.2 and 18 type
 
 [[gap]]
 name = "ub_review_real_consumer_smoke"
-status = "builder_ready"
+status = "done"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
+note = "Closed via 2026-08-29 bounded smoke docs/receipts/ub-review-smoke-6f595070.md at unsafe-review 6f595070 -> ub-review 55e4fba: v1 gate routed, 0.1 envelope parsed, card identity / operation_family / trust_boundary preserved, v999 unknown-schema and malformed-array negative controls typed."
