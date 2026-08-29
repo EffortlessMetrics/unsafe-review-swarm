@@ -196,9 +196,8 @@ note = "Canonical machine-readable ReviewCard set that maps every existing `json
 [[consumer]]
 name = "human_cli"
 surface = "human"
-disposition = "uncovered"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
-note = "The direct human renderer consumes ReviewCards, but its emitted field subset is not yet locked to this map."
+disposition = "partial"
+note = "The direct human renderer projects ReviewCards via output/human/mod.rs and is locked by 7 focused parity tests (#2130): header projects the five Summary movement counts, cards project selected ReviewCard fields structurally, omissions of named canonical rows and bounded aliases are asserted, optional rows follow independently derived inputs, parser rejects duplicate structural headers and header keys, empty output uses the standard advisory wording, and conditions/evidence/routes are named. Identity, location, operation family, missing evidence, next action, trust boundary, and declaration/target-feature aggregates are mapped; proof path, hazard, and other unnamed rowless detail remain parked under #2124. This is advisory only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[consumer]]
 name = "markdown_pr_summary"
@@ -318,7 +317,7 @@ note = "Maps only aggregate coverage movement, agent readiness, comment selectio
 name = "unsafe_review_gate_json"
 surface = "gate_manifest"
 disposition = "routing_manifest"
-note = "Artifact-routing manifest plus an aggregate projection of the five exact Summary movement counts and the advisory trust boundary. Per-card fields are absent/parked; paths, kinds, and schema versions require the compatibility contract tracked by #2115."
+note = "Artifact-routing manifest plus an aggregate projection of the five exact Summary movement counts and the advisory trust boundary. Per-card fields are absent/parked; paths, kinds, and schema_version 0.2 plus the 18 typed artifact identities are locked by the #2131 bundle identity contract (FIRST_PR_ARTIFACT_IDENTITIES) and validated by check-first-pr-artifacts including drift/missing/extra rejection. This is advisory routing/bundle identity only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[consumer]]
 name = "outcome_report"
@@ -390,13 +389,13 @@ note = "Operation-family and trust-boundary intent are mapped, but a pinned real
 
 [[gap]]
 name = "human_cli_field_parity"
-status = "builder_ready"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2114"
+status = "done"
+note = "Parity locked via #2130 with 7 tests in output/human/mod.rs proving the human header, card projection, omission, optional-row, and duplicate-header contracts; consumer human_cli now maps identity, location, family, missing evidence, next action, and trust boundary as partial parity. Advisory only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[gap]]
 name = "artifact_schema_identity_and_compatibility"
-status = "builder_ready"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2115"
+status = "done"
+note = "Locked via #2131: first-pr bundle carries bundle_version 0.2 and 18 typed artifact identities (FIRST_PR_ARTIFACT_IDENTITIES) with per-artifact schema_version; xtask advisory_artifacts and check_first_pr_artifacts validate the 18 identities, schema_version 0.2, and missing/extra drift rejection. Advisory bundle-identity only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[gap]]
 name = "ub_review_real_consumer_smoke"
