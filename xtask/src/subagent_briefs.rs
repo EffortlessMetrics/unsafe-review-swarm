@@ -57,6 +57,7 @@ const INVALID_FIXTURES: &[&str] = &[
     "read-only-copying-objective.toml",
     "read-only-cp-objective.toml",
     "read-only-generate-objective.toml",
+    "read-only-git-commit-objective.toml",
     "read-only-overwrite-objective.toml",
     "read-only-rm-proof.toml",
     "read-only-synonym-objective.toml",
@@ -217,6 +218,7 @@ fn invalid_expectation(path: &Path) -> Result<&'static str, String> {
         Some("read-only-copying-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-cp-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-generate-objective.toml") => Ok("requests mutation in objective"),
+        Some("read-only-git-commit-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-overwrite-objective.toml") => Ok("requests mutation in objective"),
         Some("read-only-rm-proof.toml") => Ok("requests mutation in proof_obligations[0]"),
         Some("read-only-synonym-objective.toml") => Ok("requests mutation in objective"),
@@ -734,9 +736,39 @@ fn validate_work_spec(reference: &str, issue: &str, path: &str, field: &str) -> 
     Ok(())
 }
 
+fn is_hex_sha_token(value: &str) -> bool {
+    (7..=40).contains(&value.len()) && value.chars().all(|character| character.is_ascii_hexdigit())
+}
+
+fn is_commit_reference(words: &[String], index: usize) -> bool {
+    if words[index] != "commit" {
+        return false;
+    }
+    if index > 0 && words[index - 1] == "git" {
+        return false;
+    }
+    if index + 1 < words.len() && is_hex_sha_token(&words[index + 1]) {
+        return true;
+    }
+    if index + 2 < words.len() && words[index + 1] == "head" && words[index + 2] == "sha" {
+        return true;
+    }
+    if index + 3 < words.len()
+        && words[index + 1] == "head"
+        && words[index + 2] == "sha"
+        && is_hex_sha_token(&words[index + 3])
+    {
+        return true;
+    }
+    false
+}
+
 fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), String> {
     // Closed vocabulary: directive prose may use arbitrary nouns, but only these
     // normalized operation forms can appoint repository mutation.
+    // Deterministic reference-noun exemption: `commit` as a noun referencing a SHA
+    // (`commit <hex>`, `commit head sha` with optional hex) is not a mutation
+    // directive. `git commit` remains a governed host mutation.
     const MUTATION_OPERATION_FORMS: &[&str] = &[
         "add",
         "added",
@@ -895,10 +927,14 @@ fn reject_mutation_text(value: &str, path: &str, field: &str) -> Result<(), Stri
         "wrote",
     ];
     let words = normalized_operation_words(value);
-    if let Some(word) = words
-        .iter()
-        .find(|word| MUTATION_OPERATION_FORMS.contains(&word.as_str()))
-    {
+    if let Some(word) = words.iter().enumerate().find_map(|(index, word)| {
+        if MUTATION_OPERATION_FORMS.contains(&word.as_str()) && !is_commit_reference(&words, index)
+        {
+            Some(word)
+        } else {
+            None
+        }
+    }) {
         Err(format!(
             "{path} read-only action requests mutation in {field} via `{word}`"
         ))
@@ -1370,6 +1406,38 @@ mod tests {
             ),
             "surrounding whitespace",
         )
+    }
+
+    #[test]
+    fn accepts_commit_reference_nouns() -> Result<(), String> {
+        for text in [
+            "Review commit 298c634 head SHA.",
+            "Review commit 0f306ea0b6737c13df7abb97bdebb819eaeffdc7 for duplication.",
+            "Report the commit head SHA at 2222222222222222222222222222222222222222.",
+            "Report the commit head sha with evidence.",
+        ] {
+            let source = valid().replace("Answer one bounded question.", text);
+            let value: toml::Value =
+                toml::from_str(&source).map_err(|error| format!("test TOML: {error}"))?;
+            validate(&value, "test.toml")?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_host_mutation_directives_retained() -> Result<(), String> {
+        for text in [
+            "Run git commit -m fix.",
+            "Run cp AGENTS.md docs/backup.md.",
+            "Move the file with mv old new.",
+            "Run rm -rf target.",
+        ] {
+            rejects(
+                &valid().replace("Answer one bounded question.", text),
+                "requests mutation in objective",
+            )?;
+        }
+        Ok(())
     }
 
     fn rejects(source: &str, expected: &str) -> Result<(), String> {
