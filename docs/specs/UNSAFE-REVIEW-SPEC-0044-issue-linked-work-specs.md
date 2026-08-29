@@ -54,7 +54,12 @@ normalized vocabulary of mutation operations in `objective`,
 underscore, and CamelCase boundaries before matching, so prose in any
 directive-bearing field cannot expand the declared capability. Governed
 operation aliases include `cp`; broader structured operation semantics remain
-outside this lexical version-one contract.
+outside this lexical version-one contract. Exact-head reference nouns are
+exempted deterministically: `commit` followed by a 7-40 character lowercase
+hex SHA (`commit <sha>`) and `commit head sha` with an optional trailing SHA
+are treated as descriptive references, not directives. `git commit` remains a
+governed host mutation and is still rejected, as are `cp`, `rm`, and all other
+vocabulary entries outside the exempt reference pattern.
 
 Every `write_scope` entry is a canonical slash-separated repository-relative
 path. Components use ASCII letters, digits, dot, underscore, or hyphen; the

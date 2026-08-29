@@ -1,7 +1,7 @@
 schema = "bounded-subagent-brief-v1"
 action = "review"
 capability = "read_only"
-objective = "Review the exact head for work-contract duplication."
+objective = "Review commit 298c634 at head SHA 2222222222222222222222222222222222222222 for work-contract duplication."
 read_scope = [
     "docs/schemas/bounded-subagent-brief.schema.json",
     "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md",
