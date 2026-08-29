@@ -11,6 +11,59 @@ comments, edit source, or block by default.
 
 ## Unreleased
 
+Unreleased remains advisory static review evidence. It does not prove UB,
+memory safety, UB-free status, Miri-clean status, site execution, calibrated
+precision/recall, or policy readiness, and it does not run witnesses, post
+comments, edit source, or block by default.
+
+### Added
+
+- Added `bounded-subagent-brief-v1` schema and offline validator
+  (`xtask/src/subagent_briefs.rs`, `docs/schemas/bounded-subagent-brief.schema.json`)
+  for issue-linked delegation contracts with 7 valid and 50 invalid fixtures.
+  Structural only; no scheduling, no tool execution.
+  ([#2109](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2109))
+- Added executed `confirm` provenance for receipts
+  (`crates/unsafe-review-core/src/domain/receipt.rs`) — records provenance
+  when a confirm was executed, not proof of site execution.
+  ([#2129](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2129))
+- Added human `ReviewCard` field parity tests for the human CLI projection
+  (`crates/unsafe-review-core/src/output/human/mod.rs`, 7 tests; duplicate
+  header rejected). Advisory; no renderer behavior change beyond coverage.
+  ([#2130](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2130))
+- Added direct and `explain --format markdown` `ReviewCard` parity tests for
+  Markdown projections (`crates/unsafe-review-core/src/output/markdown.rs`)
+  with shared advisory boundary denylist; consumers remain `partial`.
+  ([#2138](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2138))
+
+### Changed
+
+- Centralized actionability labels from `comment_plan/selection.rs` and
+  `usefulness_telemetry.rs` into
+  `crates/unsafe-review-core/src/domain/classification.rs` with
+  spec-coverage ledger alignment. No behavioral change.
+  ([#2128](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2128))
+- Extracted calibration snapshot sync from `xtask/src/main.rs` into
+  `xtask/src/calibration_snapshot.rs`. No behavior change.
+  ([#2105](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2105))
+- Bumped `ra_ap_syntax` `0.0.347` → `0.0.348`.
+  ([#2136](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2136))
+- Bumped `github-actions` group (`Factory-AI/droid-action` `4e44f79` →
+  `9547b0c`, `EffortlessMetrics/ub-review` `26b1094` → `3e51ec8`) and synced
+  `policy/workflow-allowlist.toml`.
+  ([#2139](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2139))
+
+### Fixed
+
+- Normalized `first-pr` shell handoff roots
+  (`crates/unsafe-review-cli/src/execute/first_pr.rs`) for shell-safe
+  execution. Advisory.
+  ([#2095](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2095))
+- Joined bundle identity contracts for first-pr artifacts: `bundle_version`
+  bumped `0.1` → `0.2` with joined identity fields and `xtask` advisory
+  artifact validation. Advisory; no new detection.
+  ([#2131](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2131))
+
 ## 0.3.8 - 2026-06-18
 
 0.3.8 is the corpus control-plane and declaration/surfacing correctness patch.
