@@ -140,11 +140,32 @@ single_truth = true
 note = "Missing evidence is typed card data. Consumers may format it for humans or LLMs, but may not replace it with a prose-derived obligation, severity, or repair bucket."
 
 [[field]]
+name = "contract_coverage"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> Coverage"
+surfaces = ["json", "agent", "file_range_scan", "lsp", "baseline_add"]
+single_truth = true
+note = "Contract coverage slot is CoverageBlock::derive output for the exact card; baseline_add persists this slot without reclassification. It is ledger/snapshot evidence, not a safety, UB-free, or site-execution claim."
+
+[[field]]
+name = "guard_coverage"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> Coverage"
+surfaces = ["json", "agent", "file_range_scan", "lsp", "baseline_add"]
+single_truth = true
+note = "Guard coverage slot is CoverageBlock::derive output for the exact card; baseline_add persists this slot without reclassification. It is ledger/snapshot evidence, not a safety, UB-free, or site-execution claim."
+
+[[field]]
+name = "test_reach_coverage"
+canonical_source = "domain/coverage.rs::CoverageBlock::derive -> Coverage"
+surfaces = ["json", "agent", "file_range_scan", "lsp", "baseline_add"]
+single_truth = true
+note = "Test-reach coverage slot is CoverageBlock::derive output for the exact card; baseline_add persists this slot without reclassification. It is ledger/snapshot evidence, not a safety, UB-free, or site-execution claim."
+
+[[field]]
 name = "witness_receipt_coverage"
 canonical_source = "domain/coverage.rs::CoverageBlock::derive -> WitnessReceiptCoverage"
 surfaces = ["json", "comment_plan", "lsp", "agent", "file_range_scan", "pr_summary", "usefulness_telemetry", "baseline_add"]
 single_truth = true
-note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness."
+note = "Receipt coverage is imported metadata for the exact card; it is not evidence that unsafe-review executed a witness. baseline_add persists this slot via CoverageBlock::derive parity."
 
 [[field]]
 name = "editor_action_contract"
@@ -291,7 +312,7 @@ name = "baseline_add"
 surface = "baseline_add"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2122"
-note = "Baseline add reanalyzes the repository, resolves the requested canonical ReviewCard identity, persists CoverageBlock-derived contract, guard, test-reach, and witness-receipt snapshot slots for that card, and emits its fixed advisory trust boundary. Identity, the existing witness-receipt-coverage row, and the trust boundary are mapped here; the other three coverage slots plus owner/reason/evidence/review-date ledger metadata have no dedicated field rows and remain parked pending #2122."
+note = "Baseline add reanalyzes the repository, resolves the requested canonical ReviewCard identity, persists CoverageBlock-derived contract, guard, test-reach, and witness-receipt snapshot slots for that card, and emits its fixed advisory trust boundary. Identity, all four coverage slots via their dedicated field rows, and the trust boundary are mapped here and locked by baseline-add parity tests (#2122). Owner/reason/evidence/review_after remain ledger metadata, not ReviewCard classification, and have no dedicated field row; this debt floor is advisory only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[consumer]]
 name = "baseline_status"

@@ -1206,6 +1206,10 @@ pub use receipts::ReceiptAuditReport;
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::domain::coverage::CoverageBlock;
+    use crate::policy::{LedgerKind, load_coverage_snapshot, load_ledger_entries};
+    use std::fs;
+    use std::time::{SystemTime, UNIX_EPOCH};
 
     #[test]
     fn analysis_mode_strings_cover_every_variant() {
@@ -1260,5 +1264,324 @@ mod tests {
             baseline_snapshot_path(ledger),
             PathBuf::from("elsewhere/baseline-snapshot.toml")
         );
+    }
+
+    #[test]
+    fn baseline_add_persists_exact_coverage_block_snapshot_for_canonical_identity()
+    -> Result<(), String> {
+        // Advisory parity proof for issue #2122: baseline_add is a ReviewCard
+        // consumer. It must resolve the exact canonical id from the current repo
+        // scan and persist the four CoverageBlock::derive slots without
+        // reclassification. This is ledger/snapshot evidence, not a safety,
+        // UB-free, Miri-clean, or site-execution claim.
+        let root = unique_temp_dir("baseline-add-parity-success")?;
+        fs::create_dir_all(&root).map_err(|err| format!("create temp root failed: {err}"))?;
+        install_fixture_repo(&root, "raw_pointer_alignment")?;
+
+        let output = pipeline::analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let card_id = output
+            .cards
+            .first()
+            .ok_or("fixture should emit at least one card")?
+            .id
+            .0
+            .clone();
+        let source_card = output
+            .cards
+            .iter()
+            .find(|card| card.id.0 == card_id)
+            .ok_or("selected card disappeared")?
+            .clone();
+        let expected_block = CoverageBlock::derive(&source_card);
+
+        baseline_add(
+            &root,
+            &card_id,
+            "triage-owner",
+            "pre-existing debt; not reviewed as safe",
+            "baseline-add parity proof",
+            Some("2027-08-10"),
+            None,
+        )?;
+
+        let ledger_path = root.join("policy/unsafe-review-baseline.toml");
+        let snapshot_path = baseline_snapshot_path(&ledger_path);
+        let ledger_entries = load_ledger_entries(&ledger_path, LedgerKind::Baseline)?;
+        expect_eq("ledger entry count", ledger_entries.len(), 1)?;
+        let ledger_entry = &ledger_entries[0];
+        expect_eq(
+            "ledger card_id",
+            ledger_entry.card_id.as_str(),
+            card_id.as_str(),
+        )?;
+        expect_eq("ledger owner", ledger_entry.owner.as_str(), "triage-owner")?;
+        expect_eq(
+            "ledger reason",
+            ledger_entry.reason.as_str(),
+            "pre-existing debt; not reviewed as safe",
+        )?;
+        expect_eq(
+            "ledger evidence",
+            ledger_entry.evidence.as_str(),
+            "baseline-add parity proof",
+        )?;
+        expect_eq(
+            "ledger review_after",
+            ledger_entry.review_after.as_deref(),
+            Some("2027-08-10"),
+        )?;
+        // Advisory ledger fields stay as ledger metadata; classification stays on the card.
+        expect_eq(
+            "ledger owner does not reclassify ReviewCard class",
+            ledger_entry.owner.as_str() != source_card.class.as_str(),
+            true,
+        )?;
+
+        let snapshot = load_coverage_snapshot(&snapshot_path)?;
+        let stored = snapshot
+            .get(&card_id)
+            .ok_or_else(|| format!("snapshot missing card_id {card_id}"))?;
+        expect_eq(
+            "contract_coverage parity",
+            stored.contract_coverage.as_str(),
+            expected_block.contract_coverage.as_str(),
+        )?;
+        expect_eq(
+            "guard_coverage parity",
+            stored.guard_coverage.as_str(),
+            expected_block.guard_coverage.as_str(),
+        )?;
+        expect_eq(
+            "test_reach_coverage parity",
+            stored.test_reach_coverage.as_str(),
+            expected_block.test_reach_coverage.as_str(),
+        )?;
+        expect_eq(
+            "witness_receipt_coverage parity",
+            stored.witness_receipt_coverage.as_str(),
+            expected_block.witness_receipt_coverage.as_str(),
+        )?;
+
+        // Updating the same card keeps the same snapshot derivation but overwrites
+        // ledger metadata (owner/reason/evidence are ledger fields, not ReviewCard fields).
+        baseline_add(
+            &root,
+            &card_id,
+            "second-owner",
+            "updated reason; still debt",
+            "second evidence",
+            Some("2027-09-01"),
+            None,
+        )?;
+        let ledger_entries_2 = load_ledger_entries(&ledger_path, LedgerKind::Baseline)?;
+        expect_eq("ledger entry count after update", ledger_entries_2.len(), 1)?;
+        expect_eq(
+            "ledger owner after update",
+            ledger_entries_2[0].owner.as_str(),
+            "second-owner",
+        )?;
+        let snapshot_2 = load_coverage_snapshot(&snapshot_path)?;
+        let stored_2 = snapshot_2
+            .get(&card_id)
+            .ok_or_else(|| format!("snapshot missing after update {card_id}"))?;
+        expect_eq(
+            "contract_coverage stable after ledger update",
+            stored_2.contract_coverage.as_str(),
+            expected_block.contract_coverage.as_str(),
+        )?;
+        expect_eq(
+            "witness_receipt_coverage stable after ledger update",
+            stored_2.witness_receipt_coverage.as_str(),
+            expected_block.witness_receipt_coverage.as_str(),
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn baseline_add_missing_identity_fails_without_mutating_ledger_or_snapshot()
+    -> Result<(), String> {
+        // Advisory parity proof: a missing identity must fail closed with an
+        // error naming the requested id, and must not mutate existing ledger or
+        // snapshot state. No safety or reviewed-as-safe claim.
+        let root = unique_temp_dir("baseline-add-missing-no-mutate")?;
+        fs::create_dir_all(&root).map_err(|err| format!("create temp root failed: {err}"))?;
+        install_fixture_repo(&root, "raw_pointer_alignment")?;
+
+        let output = pipeline::analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+        let real_id = output
+            .cards
+            .first()
+            .ok_or("fixture should emit at least one card")?
+            .id
+            .0
+            .clone();
+
+        baseline_add(
+            &root,
+            &real_id,
+            "owner-a",
+            "existing debt",
+            "evidence-a",
+            Some("2027-08-10"),
+            None,
+        )?;
+
+        let ledger_path = root.join("policy/unsafe-review-baseline.toml");
+        let snapshot_path = baseline_snapshot_path(&ledger_path);
+        let ledger_before = fs::read_to_string(&ledger_path)
+            .map_err(|err| format!("read ledger before failed: {err}"))?;
+        let snapshot_before = fs::read_to_string(&snapshot_path)
+            .map_err(|err| format!("read snapshot before failed: {err}"))?;
+
+        let missing_id = "UR-missing-fixture-src-lib-rs-owner-operation-unknown-c999";
+        let err = baseline_add(
+            &root,
+            missing_id,
+            "owner-b",
+            "reason-b",
+            "evidence-b",
+            Some("2027-08-10"),
+            None,
+        )
+        .err()
+        .ok_or_else(|| "baseline_add with missing id should fail".to_string())?;
+        if !err.contains(missing_id) {
+            return Err(format!(
+                "missing-id error should name the requested id: actual={err:?}, expected fragment={missing_id:?}"
+            ));
+        }
+        if !err.contains("not found in current repo scan") {
+            return Err(format!(
+                "missing-id error should mention not found in current repo scan: actual={err:?}"
+            ));
+        }
+
+        let ledger_after = fs::read_to_string(&ledger_path)
+            .map_err(|err| format!("read ledger after failed: {err}"))?;
+        let snapshot_after = fs::read_to_string(&snapshot_path)
+            .map_err(|err| format!("read snapshot after failed: {err}"))?;
+        expect_eq(
+            "ledger unchanged after missing-id failure",
+            ledger_after,
+            ledger_before,
+        )?;
+        expect_eq(
+            "snapshot unchanged after missing-id failure",
+            snapshot_after,
+            snapshot_before,
+        )?;
+
+        // A missing id must also fail when no ledger exists yet (fresh repo),
+        // without creating one.
+        let fresh_root = unique_temp_dir("baseline-add-missing-fresh")?;
+        fs::create_dir_all(&fresh_root)
+            .map_err(|err| format!("create fresh root failed: {err}"))?;
+        install_fixture_repo(&fresh_root, "raw_pointer_alignment")?;
+        let missing_err = baseline_add(
+            &fresh_root,
+            missing_id,
+            "owner-c",
+            "reason-c",
+            "evidence-c",
+            Some("2027-08-10"),
+            None,
+        )
+        .err()
+        .ok_or_else(|| "fresh missing-id baseline_add should fail".to_string())?;
+        if !missing_err.contains(missing_id) {
+            return Err(format!(
+                "fresh missing-id error should name the requested id: actual={missing_err:?}"
+            ));
+        }
+        let fresh_ledger = fresh_root.join("policy/unsafe-review-baseline.toml");
+        let fresh_snapshot = baseline_snapshot_path(&fresh_ledger);
+        if fresh_ledger.exists() {
+            return Err("fresh missing-id must not create a ledger file".to_string());
+        }
+        if fresh_snapshot.exists() {
+            return Err("fresh missing-id must not create a snapshot file".to_string());
+        }
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        fs::remove_dir_all(&fresh_root)
+            .map_err(|err| format!("remove fresh root failed: {err}"))?;
+        Ok(())
+    }
+
+    fn unique_temp_dir(prefix: &str) -> Result<PathBuf, String> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
+            .as_nanos();
+        let pid = std::process::id();
+        Ok(std::env::temp_dir().join(format!("{prefix}-{pid}-{nanos}")))
+    }
+
+    fn install_fixture_repo(root: &Path, fixture: &str) -> Result<(), String> {
+        let manifest_dir = PathBuf::from(env!("CARGO_MANIFEST_DIR"));
+        let fixture_root = manifest_dir.join("../../fixtures").join(fixture);
+        if !fixture_root.is_dir() {
+            return Err(format!("fixture not found: {}", fixture_root.display()));
+        }
+        copy_dir_recursive(&fixture_root.join("src"), &root.join("src"))?;
+        let cargo_src = fixture_root.join("Cargo.toml");
+        let cargo_dst = root.join("Cargo.toml");
+        if cargo_src.is_file() {
+            fs::copy(&cargo_src, &cargo_dst)
+                .map_err(|err| format!("copy Cargo.toml failed: {err}"))?;
+        }
+        Ok(())
+    }
+
+    fn copy_dir_recursive(src: &Path, dst: &Path) -> Result<(), String> {
+        fs::create_dir_all(dst).map_err(|err| format!("create {} failed: {err}", dst.display()))?;
+        for entry in
+            fs::read_dir(src).map_err(|err| format!("read_dir {} failed: {err}", src.display()))?
+        {
+            let entry = entry.map_err(|err| format!("read_dir entry failed: {err}"))?;
+            let file_type = entry
+                .file_type()
+                .map_err(|err| format!("file_type failed: {err}"))?;
+            let src_path = entry.path();
+            let dst_path = dst.join(entry.file_name());
+            if file_type.is_dir() {
+                copy_dir_recursive(&src_path, &dst_path)?;
+            } else if file_type.is_file() {
+                fs::copy(&src_path, &dst_path)
+                    .map_err(|err| format!("copy {} failed: {err}", src_path.display()))?;
+            }
+        }
+        Ok(())
+    }
+
+    fn expect_eq<T>(context: &str, actual: T, expected: T) -> Result<(), String>
+    where
+        T: std::fmt::Debug + PartialEq,
+    {
+        if actual == expected {
+            Ok(())
+        } else {
+            Err(format!(
+                "{context} mismatch: actual={actual:?}, expected={expected:?}"
+            ))
+        }
     }
 }
