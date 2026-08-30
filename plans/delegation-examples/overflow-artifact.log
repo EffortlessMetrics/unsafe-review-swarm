@@ -1,0 +1,18 @@
+overflow artifact for valid-overflow.toml — stable reference for omitted 40 candidates
+# This file is the complete evidence; the bounded result inlines only 3.
+candidate-001: docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md
+candidate-002: xtask/src/subagent_briefs.rs
+candidate-003: xtask/src/work_specs.rs
+candidate-004: plans/subagent-briefs/examples/investigate.toml
+candidate-005: plans/subagent-briefs/examples/challenge-plan.toml
+candidate-006: plans/subagent-briefs/examples/build.toml
+candidate-007: plans/subagent-briefs/examples/verify.toml
+candidate-008: plans/subagent-briefs/examples/review.toml
+candidate-009: plans/subagent-briefs/examples/triage-ci.toml
+candidate-010: plans/subagent-briefs/examples/audit-cleanup.toml
+candidate-011: fixtures/raw_pointer_alignment/src/lib.rs
+candidate-012: docs/ci/UB_RISK_REVIEW_CI.md
+candidate-013: docs/MISSION.md
+candidate-014: docs/ROADMAP.md
+...
+candidate-043: Cargo.lock

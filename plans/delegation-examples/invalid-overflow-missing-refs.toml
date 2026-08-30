@@ -1,0 +1,27 @@
+# Invalid bounded result — large result claims completeness without overflow counts/refs.
+# Validator must reject: omitted/total mismatch and missing stable refs.
+schema = "bounded-subagent-result-v1"
+action = "investigate"
+verdict = "clear"
+summary = "Claims all 43 candidates were checked but only 3 evidence lines inlined and no overflow provided."
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "d0fb8f0053606a2390983166d095e532945cfd20"
+
+[[findings]]
+severity = "P1"
+claim = "Claims completeness without overflow."
+evidence = ["plans/delegation-examples/invalid-overflow-missing-refs.toml:1"]
+
+# Missing overflow table entirely — invalid for large N.
+# If present, would also need: selected + omitted == total and non-empty refs.
+
+[uncertainty]
+items = ["Large result truncated but overflow not declared."]
+
+[recommended_next_action]
+action = "Reject: require selected/omitted/total + refs for truncated results."

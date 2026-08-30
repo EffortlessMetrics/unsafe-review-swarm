@@ -29,6 +29,7 @@ mod commands;
 mod corpus_backstop;
 mod corpus_partitions;
 mod corpus_usefulness;
+mod delegation;
 mod detector_contracts;
 mod docs_automation_check;
 mod docs_automation_paths;
