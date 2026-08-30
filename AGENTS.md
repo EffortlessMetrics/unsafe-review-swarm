@@ -11,6 +11,12 @@ For the research-to-contract boundary, use the progressive-disclosure skills
 copying their bodies — the links are the discovery surface. When a skill runtime
 is unavailable, the same trigger and outcome guidance applies via manual issue
 inspection and the lifecycle map.
+For the build-and-review boundary, use the progressive-disclosure skills
+[`build-from-work-spec`](.opencode/skills/build-from-work-spec/SKILL.md) and
+[`review-current-head`](.opencode/skills/review-current-head/SKILL.md) rather
+than copying their bodies — the links are the discovery surface. When a skill
+runtime is unavailable, the same trigger and outcome guidance applies via manual
+inspection and the lifecycle map.
 Manual and non-agent contributors use the same repository contracts and direct
 Git, GitHub, Cargo, and xtask paths.
 
@@ -171,3 +177,4 @@ unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, 
 
 Every handoff and PR states what its evidence establishes, what it does not
 establish, and which follow-ups were intentionally left outside the slice.
+
