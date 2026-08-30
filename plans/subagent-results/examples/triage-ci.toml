@@ -1,0 +1,24 @@
+# Valid bounded result — triage_ci (read-only).
+schema = "bounded-subagent-result-v1"
+action = "triage_ci"
+verdict = "blocked"
+summary = "CI triage found flaky lane; evidence cites log artifact."
+proof = ["cargo run --locked -p xtask -- check-local --format json"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P2"
+claim = "CI lane failure is external pilot flake, not review content."
+evidence = ["artifact:plans/delegation-examples/overflow-artifact.log", "xtask/src/delegation.rs:1"]
+
+[uncertainty]
+items = ["Runner log not reproduced locally."]
+
+[recommended_next_action]
+action = "Re-run CI lane with --strict flag."

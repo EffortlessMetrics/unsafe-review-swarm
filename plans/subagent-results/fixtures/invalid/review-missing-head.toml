@@ -1,0 +1,23 @@
+# Invalid: review without exact-head identity.
+schema = "bounded-subagent-result-v1"
+action = "review"
+verdict = "clear"
+summary = "Claims clear but missing PR/head."
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P2"
+claim = "Should fail for missing head."
+evidence = ["xtask/src/subagent_results.rs:1"]
+
+[uncertainty]
+items = ["Missing head not named."]
+
+[recommended_next_action]
+action = "Add pr and head_sha."
