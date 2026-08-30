@@ -1,6 +1,8 @@
 # Support summary
 
-Date: 2026-08-09
+Date: 2026-08-30 (audited against swarm `origin/main` at
+`c741f69d75e9fc9f590b638d37086b6e87d65e68`, dependency freeze
+`125de5f683286c4e8da04b76c6633a2a8e123f5a`)
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).

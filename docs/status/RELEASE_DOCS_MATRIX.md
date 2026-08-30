@@ -1,9 +1,16 @@
 # Release documentation and support matrix
 
-Audited 2026-08-09 against swarm `origin/main` at
-`5a903227b592dae01b01d76d8d3648283b861fd7` and the public source-of-record
+Audited 2026-08-30 against swarm `origin/main` at
+`c741f69d75e9fc9f590b638d37086b6e87d65e68` (dependency freeze
+`125de5f683286c4e8da04b76c6633a2a8e123f5a`) and the public source-of-record
 release `v0.3.8` (`2026-06-18`). This is an inventory and claim-boundary
-receipt, not a candidate qualification or publication decision.
+receipt, not a candidate qualification or publication decision. Recent
+integrations through `c741f69d` include rowless ReviewCard detail inventories
+(PRs #2124–#2127: shared detail fields, agent packet, witness plan, outcome
+snapshot parity), first-PR terminal ReviewCard parity (#2121), baseline-add
+ReviewCard snapshot parity (#2122), and `xtask` check-dispatch extraction
+(#1806 slice at `ed345b71`); these are present on swarm main as observed
+inventory and do not change the experimental/unavailable posture below.
 
 ## Availability vocabulary
 
