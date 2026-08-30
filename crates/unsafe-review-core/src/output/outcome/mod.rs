@@ -1775,6 +1775,240 @@ mod tests {
         );
     }
 
+    /// Locks #2127 outcome snapshot projection parity:
+    /// - canonical identity, class/code, priority, operation_family, missing, next_action, trust are preserved from saved snapshot state
+    /// - reduced file/line location, rowless operation text, proof_path, witness state, snapshot movement/reason, receipt delta, and manual fields are owned by dedicated #2127 rows (not shared #2124)
+    /// - before/after, absent-leg, and ManualCandidate paths are all covered without treating a saved snapshot as current analyzer output
+    #[test]
+    fn outcome_snapshot_projection_locks_canonical_and_dedicated_rows() -> Result<(), String> {
+        let before = snapshot_json(&[
+            card_with_location(
+                "UR-parity-c1",
+                "guard_missing",
+                "high",
+                &["guard"],
+                "src/lib.rs",
+                10,
+                "unsafe { ptr.cast::<Header>().read() }",
+                "source_route_only",
+                "No imported witness receipt was found",
+            ),
+            card("UR-absent-c1", "guard_missing", "high", &["guard"]),
+        ]);
+        let after = snapshot_json(&[
+            card_with_location(
+                "UR-parity-c1",
+                "guard_missing",
+                "high",
+                &[],
+                "src/lib.rs",
+                10,
+                "unsafe { ptr.cast::<Header>().read() }",
+                "observable_red_green",
+                "Imported miri receipt with `ran` strength: focused fixture witness passed",
+            ),
+            card("UR-new-c1", "contract_missing", "high", &["contract"]),
+        ]);
+
+        // Mix manual candidate index as after to also prove manual detail via index path
+        let manual_after = manual_candidate_index_json(&[manual_candidate_json("R4R2-S003", 1)]);
+        let manual_report = compare_json(&snapshot_json(&[]), &manual_after)?;
+        assert_eq!(
+            manual_report.after.schema_version,
+            MANUAL_CANDIDATE_INDEX_SCHEMA_VERSION
+        );
+        let manual_state = manual_report.cards.new[0]
+            .after
+            .as_ref()
+            .ok_or("manual index after state missing")?;
+        assert_eq!(manual_state.manual_candidate, Some(true));
+        assert_eq!(manual_state.analyzer_discovered, Some(false));
+        assert_eq!(manual_state.source.as_deref(), Some("manual"));
+
+        let report = compare_json(&before, &after)?;
+
+        // Canonical preservation: identity, class, priority, operation_family, missing, next_action, trust
+        assert_eq!(report.summary.new, 1);
+        assert_eq!(report.summary.resolved, 1);
+        // UR-parity-c1 improved (missing 1->0 + witness + proof path), so improved
+        assert!(report.summary.improved >= 1);
+
+        // Find the parity card in improved (witness + proof path improvement)
+        let parity = report
+            .cards
+            .improved
+            .iter()
+            .find(|card| card.card_id == "UR-parity-c1")
+            .ok_or("UR-parity-c1 should be improved")?;
+
+        let before_state = parity.before.as_ref().ok_or("before leg missing")?;
+        let after_state = parity.after.as_ref().ok_or("after leg missing")?;
+
+        // Canonical fields preserved from snapshot (not recomputed)
+        assert_eq!(before_state.class_name, "guard_missing");
+        assert_eq!(after_state.class_name, "guard_missing");
+        assert_eq!(before_state.priority, "high");
+        assert_eq!(after_state.priority, "high");
+        assert_eq!(
+            before_state.operation_family.as_deref(),
+            Some("raw_pointer_read")
+        );
+        assert_eq!(
+            after_state.operation_family.as_deref(),
+            Some("raw_pointer_read")
+        );
+        assert_eq!(before_state.missing_count, 1);
+        assert_eq!(after_state.missing_count, 0);
+        assert!(before_state.next_action.is_some());
+        assert!(after_state.next_action.is_some());
+        // trust_boundary is card-level advisory; snapshot cards carry it if present
+        // outcome report itself carries advisory trust boundary (not per-card safety proof)
+        assert!(
+            report
+                .trust_boundary
+                .contains("compares existing ReviewCard snapshots")
+        );
+
+        // Dedicated #2127 rows: reduced file/line location (not full ReviewCard site)
+        assert_eq!(
+            before_state.location.as_ref().map(|loc| loc.file.as_str()),
+            Some("src/lib.rs")
+        );
+        assert_eq!(before_state.location.as_ref().map(|loc| loc.line), Some(10));
+        assert_eq!(
+            after_state.location.as_ref().map(|loc| loc.file.as_str()),
+            Some("src/lib.rs")
+        );
+        // Rowless operation text preserved from snapshot
+        assert_eq!(
+            before_state.operation.as_deref(),
+            Some("unsafe { ptr.cast::<Header>().read() }")
+        );
+        assert_eq!(
+            after_state.operation.as_deref(),
+            Some("unsafe { ptr.cast::<Header>().read() }")
+        );
+        // Rowless proof_path via dedicated outcome_proof_path row (not shared #2124)
+        assert_eq!(
+            before_state.proof_path.as_deref(),
+            Some("source_route_only")
+        );
+        assert_eq!(
+            after_state.proof_path.as_deref(),
+            Some("observable_red_green")
+        );
+        // Rowless witness state via dedicated outcome_witness_state row
+        assert_eq!(before_state.witness, "missing");
+        assert_eq!(after_state.witness, "ran");
+
+        // Snapshot movement/reason via dedicated rows (not CoverageBlock movement)
+        assert!(
+            parity
+                .reason
+                .contains("missing evidence count changed from 1 to 0")
+        );
+        assert!(
+            parity
+                .reason
+                .contains("witness receipt strength changed from `missing` to `ran`")
+        );
+        assert!(
+            parity
+                .reason
+                .contains("proof path changed from `source_route_only` to `observable_red_green`")
+        );
+        assert_eq!(report.summary.new, 1);
+        assert_eq!(report.summary.resolved, 1);
+
+        // Receipt delta via dedicated outcome_receipt_movement row
+        assert_eq!(report.reviewer_delta.receipt_movement.improved, 1);
+        assert_eq!(report.reviewer_delta.receipt_movement.regressed, 0);
+
+        // Absent-current-card path: new and resolved legs have exactly one side
+        let new_card = report
+            .cards
+            .new
+            .iter()
+            .find(|card| card.card_id == "UR-new-c1")
+            .ok_or("UR-new-c1 should be new")?;
+        assert!(new_card.before.is_none());
+        assert!(new_card.after.is_some());
+        assert!(
+            new_card
+                .reason
+                .contains("new card: appears in the after snapshot")
+        );
+
+        let resolved_card = report
+            .cards
+            .resolved
+            .iter()
+            .find(|card| card.card_id == "UR-absent-c1")
+            .ok_or("UR-absent-c1 should be resolved")?;
+        assert!(resolved_card.before.is_some());
+        assert!(resolved_card.after.is_none());
+        assert!(
+            resolved_card
+                .reason
+                .contains("resolved card: was present in the before snapshot"),
+            "reason was {}",
+            resolved_card.reason
+        );
+
+        // ManualCandidate path: separate snapshot comparison, preserves manual detail without analyzer conflation
+        let manual_new = compare_json(&snapshot_json(&[]), &manual_candidate_json("R4R2-S001", 1))?;
+        assert_eq!(manual_new.summary.new, 1);
+        let new_manual = &manual_new.cards.new[0];
+        assert!(new_manual.reason.contains("new manual candidate"));
+        let manual_after_state = new_manual.after.as_ref().ok_or("manual after missing")?;
+        assert_eq!(manual_after_state.source.as_deref(), Some("manual"));
+        assert_eq!(manual_after_state.manual_candidate, Some(true));
+        assert_eq!(manual_after_state.analyzer_discovered, Some(false));
+        assert_eq!(manual_after_state.evidence_count, Some(1));
+        assert_eq!(
+            manual_after_state.proof_path.as_deref(),
+            Some("human_review_only")
+        );
+
+        let manual_resolved =
+            compare_json(&manual_candidate_json("R4R2-S002", 2), &snapshot_json(&[]))?;
+        assert_eq!(manual_resolved.summary.resolved, 1);
+        let resolved_manual = &manual_resolved.cards.resolved[0];
+        assert!(
+            resolved_manual.reason.contains("resolved manual candidate"),
+            "reason was {}",
+            resolved_manual.reason
+        );
+        let resolved_before = resolved_manual.before.as_ref().unwrap();
+        assert_eq!(resolved_before.source.as_deref(), Some("manual"));
+        assert_eq!(resolved_before.manual_candidate, Some(true));
+        assert_eq!(resolved_before.analyzer_discovered, Some(false));
+        assert_eq!(resolved_before.evidence_count, Some(2));
+
+        // Do not treat saved snapshot as current analyzer output: limitations and trust boundary are advisory
+        assert!(
+            report
+                .limitations
+                .iter()
+                .any(|lim| lim.contains("does not rerun analysis")),
+            "limitations missing rerun guard: {:?}",
+            report.limitations
+        );
+        assert!(
+            report.trust_boundary.contains("not memory-safety proof"),
+            "trust boundary missing advisory phrase"
+        );
+
+        // Markdown also preserves the same movement semantics without reclassification
+        let markdown = render_markdown(&report);
+        assert!(markdown.contains("UR-parity-c1"));
+        assert!(markdown.contains("operation `unsafe { ptr.cast::<Header>().read() }`"));
+        assert!(markdown.contains("proof path `observable_red_green`"));
+        assert!(markdown.contains("witness `ran`"));
+
+        Ok(())
+    }
+
     fn snapshot_json(cards: &[String]) -> String {
         format!(
             r#"{{
@@ -1844,6 +2078,38 @@ mod tests {
       "class": "{class_name}",
       "operation": "unsafe {{ ptr.cast::<Header>().read() }}",
       "operation_family": "raw_pointer_read"{proof_path},
+      "priority": "{priority}",
+      "witness": "{witness}",
+      "next_action": "Add or expose a safety contract, guard, test, or witness for raw_pointer_read.",
+      "missing": [{missing}]
+    }}"#
+        )
+    }
+
+    fn card_with_location(
+        id: &str,
+        class_name: &str,
+        priority: &str,
+        missing: &[&str],
+        file: &str,
+        line: usize,
+        operation: &str,
+        proof_path: &str,
+        witness: &str,
+    ) -> String {
+        let missing = missing
+            .iter()
+            .map(|item| format!(r#""{item}""#))
+            .collect::<Vec<_>>()
+            .join(", ");
+        format!(
+            r#"{{
+      "id": "{id}",
+      "class": "{class_name}",
+      "location": {{ "file": "{file}", "line": {line} }},
+      "operation": "{operation}",
+      "operation_family": "raw_pointer_read",
+      "proof_path": "{proof_path}",
       "priority": "{priority}",
       "witness": "{witness}",
       "next_action": "Add or expose a safety contract, guard, test, or witness for raw_pointer_read.",

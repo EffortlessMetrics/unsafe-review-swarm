@@ -79,9 +79,9 @@ note = "All editor, packet, queue, SARIF, and PR projections join by the exact R
 [[field]]
 name = "site_location"
 canonical_source = "domain/operation.rs::UnsafeSite.location and owner (analysis/pipeline/card_builder.rs)"
-surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "baseline_init", "outcome", "witness_plan", "review_kit"]
+surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "repair_queue", "lsp", "sarif", "agent", "file_range_scan", "baseline_init", "witness_plan", "review_kit"]
 single_truth = true
-note = "File, range, owner, visibility, and changed-line state are card facts. Saved/live LSP and VS Code adapters project the same range; none may infer binding from nearby lines or hover prose."
+note = "File, range, owner, visibility, and changed-line state are card facts. Saved/live LSP and VS Code adapters project the same range; none may infer binding from nearby lines or hover prose. Outcome snapshots do not project this full site location; they emit a reduced file and line via the dedicated outcome_snapshot_location row owned by #2127."
 
 [[field]]
 name = "rule_class_code"
@@ -363,6 +363,62 @@ surfaces = ["witness_plan"]
 single_truth = true
 note = "Witness-plan-specific evidence-summary grouping for each card: the required safety conditions list plus the per-obligation contract/discharge/reach/witness state line, hazard summary, missing-evidence summary, and witness-evidence summary. Each value projects the shared canonical obligation-evidence, hazard, missing-evidence, and witness-detail sources without reclassification; the grouping is witness-plan presentation only and does not discharge proof or prove safety, UB-freedom, or site execution. Advisory only."
 
+[[field]]
+name = "outcome_snapshot_location"
+canonical_source = "output/outcome/mod.rs::OutcomeLocation (from SnapshotCard.location.file/line; ManualCandidate.location) — reduced file+line only"
+surfaces = ["outcome"]
+single_truth = true
+note = "Reduced file and line location emitted by the outcome comparer for each saved before/after snapshot state. It preserves the file and line from the snapshot's stored location (ReviewCard-derived or ManualCandidate) without projecting current ReviewCard owner, visibility, or byte range; absent snapshot legs emit no location. This is saved-snapshot evidence, not a current analyzer output, and does not infer binding from nearby lines. Advisory only."
+
+[[field]]
+name = "outcome_operation_text"
+canonical_source = "output/outcome/mod.rs::OutcomeCardState.operation (from SnapshotCard.operation; ManualCandidate.unsafe_operation)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Rowless operation text emitted by the outcome comparer for each saved before/after snapshot state. It projects the stored snapshot operation string (ReviewCard-derived or ManualCandidate unsafe_operation) without reclassification; absent or manual legs may carry the manual operation. This is saved-snapshot evidence, not a current ReviewCard operation projection via shared #2124 ownership. Advisory only."
+
+[[field]]
+name = "outcome_proof_path"
+canonical_source = "output/outcome/mod.rs::OutcomeCardState.proof_path (from SnapshotCard.proof_path; ManualCandidate proof_mode)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Rowless proof path emitted by the outcome comparer for each saved before/after snapshot state. It projects the stored snapshot proof_path (ReviewCard-derived or manual human_review_only) without reclassification; the outcome comparer additionally ranks proof paths for movement. This is saved-snapshot evidence, not a current ReviewCard proof_path projection via shared #2124 ownership. Advisory only."
+
+[[field]]
+name = "outcome_witness_state"
+canonical_source = "output/outcome/witness.rs::witness_state -> output/outcome/mod.rs::OutcomeCardState.witness (from SnapshotCard.witness)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Rowless witness state emitted by the outcome comparer for each saved before/after snapshot state. It derives the witness label and rank from the snapshot's stored witness summary via output/outcome/witness.rs without executing witnesses; the label may be missing/present/strength-specific. This is saved-snapshot receipt metadata, not a current ReviewCard witness_detail projection via shared #2124 ownership and not witness execution. Advisory only."
+
+[[field]]
+name = "outcome_snapshot_movement"
+canonical_source = "output/outcome/mod.rs::compare_snapshots -> OutcomeSummary + outcome_status/changed_status (new/resolved/improved/regressed/unchanged derived from SnapshotCard class/missing/witness/proof_path/evidence_count/source_marker)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Snapshot movement classification emitted by the outcome comparer for each card identity: new, resolved, improved, regressed, or unchanged. It is derived from comparing the saved before and after SnapshotCard states (class, missing count, witness rank, proof-path rank, evidence count, source/manual markers) without rerunning analysis; absent legs produce new/resolved. This is saved-snapshot comparison, not per-card OutcomeMovement or CoverageBlock baseline movement, and does not claim safety or execution. Advisory only."
+
+[[field]]
+name = "outcome_movement_reason"
+canonical_source = "output/outcome/mod.rs::outcome_reason / changed_reason (from SnapshotCard class, source_marker, manual_candidate_marker, analyzer_discovered_marker, missing, witness_state, evidence_count, proof_path, manual_handoff_changed)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Per-card movement reason emitted by the outcome comparer for each card identity, naming why the snapshot movement was chosen: class change, source/manual/analyzer markers, missing count delta, witness strength delta, evidence count delta, proof path delta, or manual handoff change. It is deterministic text derived from the saved before/after SnapshotCard pair without inferring current ReviewCard obligations. Advisory only."
+
+[[field]]
+name = "outcome_receipt_movement"
+canonical_source = "output/outcome/mod.rs::receipt_movement -> OutcomeReviewerDelta.receipt_movement (from OutcomeCard before/after witness ranks)"
+surfaces = ["outcome"]
+single_truth = true
+note = "Aggregate receipt movement emitted by the outcome comparer counting improved vs regressed witness receipt strengths across the compared snapshots. It counts cards whose after witness rank exceeds/must be below the before rank (via outcome/witness.rs ranking) and is bounded to improved/regressed/unchanged legs; new/resolved legs are not receipt-counted. This is saved-snapshot receipt comparison, not witness execution or coverage-block receipt coverage. Advisory only."
+
+[[field]]
+name = "outcome_manual_candidate_detail"
+canonical_source = "candidate::ManualCandidate fields projected via output/outcome/mod.rs::SnapshotCard::from ManualCandidate and OutcomeCardState (safe_caller, invariant, oracle_map, proof_mode, fix_boundary, pr_aperture, evidence, fix_options, test_targets, do_not_touch, evidence_count, title, analyzer_discovered)"
+surfaces = ["outcome"]
+single_truth = true
+note = "ManualCandidate-specific snapshot detail emitted by the outcome comparer when a before or after snapshot leg is a manual candidate (source manual, manual_candidate=true, analyzer_discovered=false). It projects the stored ManualCandidate handoff fields (title, safe_caller, invariant, oracle_map, proof_mode, fix_boundary, pr_aperture, evidence with command/limitation, fix_options, test_targets, do_not_touch) without treating the manual artifact as analyzer-discovered or as a current ReviewCard. Advisory only."
+
 # The editor adapter is intentionally represented by the existing `lsp`
 # surface vocabulary. The named consumers are saved lsp.json, live
 # unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
@@ -504,8 +560,7 @@ note = "Artifact-routing manifest plus an aggregate projection of the five exact
 name = "outcome_report"
 surface = "outcome"
 disposition = "partial"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2127"
-note = "Maps the bounded before/after ReviewCard-backed identity, class/code, priority, operation family, missing evidence, next action, and advisory trust subset, with location reduced to file and line. Saved snapshot and ManualCandidate states may lack a current ReviewCard; rowless operation text, proof path, witness state, snapshot movement/reasons, receipt deltas, and manual fields remain outcome-specific and parked to #2127 rather than shared #2124 ownership."
+note = "Maps the bounded before/after ReviewCard-backed identity, class/code, priority, operation family, missing evidence, next action, and advisory trust subset, with location reduced to file and line. Saved snapshot and ManualCandidate states may lack a current ReviewCard; rowless operation text, proof path, witness state, snapshot movement/reasons, receipt deltas, and manual fields are owned by dedicated #2127 outcome rows (outcome_snapshot_location, outcome_operation_text, outcome_proof_path, outcome_witness_state, outcome_snapshot_movement, outcome_movement_reason, outcome_receipt_movement, outcome_manual_candidate_detail) rather than shared #2124 ownership. Each saved before/after leg remains saved-snapshot evidence, not a current ReviewCard, and the comparison does not rerun analysis, execute witnesses, or claim safety, UB-freedom, Miri-clean, or site-execution. Advisory only."
 
 [[consumer]]
 name = "receipt_audit"
