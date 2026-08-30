@@ -3,7 +3,7 @@ use std::collections::{BTreeMap, BTreeSet};
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::{Command, Stdio};
+use std::process::Command;
 use std::sync::OnceLock;
 
 use calibration_constants::{
@@ -19,6 +19,7 @@ mod advisory_artifacts;
 mod calibration_constants;
 mod calibration_manifest;
 mod calibration_snapshot;
+mod check_dispatch;
 mod check_local;
 mod ci_lanes;
 mod ci_routing_contract;
@@ -946,9 +947,11 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckExternalPilots => external_pilots::check(),
         commands::XtaskCommand::ExternalPilotRollup => external_pilot_rollup::write(),
         commands::XtaskCommand::CheckLocal(raw_args) => {
-            check_local::run(&raw_args, &|id, quiet| run_named_check(id, quiet))
+            check_local::run(&raw_args, &|id, quiet| {
+                check_dispatch::run_named_check(id, quiet)
+            })
         }
-        commands::XtaskCommand::CheckLocalRun(id) => run_named_check(&id, false),
+        commands::XtaskCommand::CheckLocalRun(id) => check_dispatch::run_named_check(&id, false),
         commands::XtaskCommand::LspSmoke => lsp_smoke::run(&root),
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
@@ -960,72 +963,6 @@ fn run(args: Vec<String>) -> Result<(), String> {
 
 fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
     !matches!(command, commands::XtaskCommand::Help)
-}
-
-/// Map a `check_local::CATALOG` id to the `check-pr` component that runs it.
-///
-/// Returns `None` for an unrecognized id. Splitting recognition (this function)
-/// from execution ([`run_named_check`]) lets a test assert every catalog id has
-/// a dispatch arm without executing the heavyweight checks — the guard against
-/// `CATALOG`/dispatch drift. Keep this arm-for-arm in sync with the `CheckPr`
-/// match arm and `check_local::CATALOG`.
-fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
-    let check: fn() -> Result<(), String> = match id {
-        "docs" => check_docs,
-        "generated-projection" => public_badges::check_generated_projection,
-        "policy" => check_policy,
-        "support-tiers" => check_support_tiers,
-        "fixtures" => fixture_surfaces::check_fixtures,
-        "calibration" => check_calibration,
-        "fixture-surface-parity" => fixture_surfaces::check_fixture_surface_parity,
-        "surface-determinism" => fixture_surfaces::check_surface_determinism,
-        "real-pr-corpus" => real_pr_corpus::check,
-        "corpus-partitions" => corpus_partitions::check,
-        "evidence-loss-challenges" => evidence_loss_challenges::check,
-        "external-pilots" => external_pilots::check,
-        "dogfood" => check_dogfood,
-        "fuzz-manual-harness" => fuzz_artifact_checks::check_manual_fuzz_harness,
-        "fuzz-tracked-artifacts" => fuzz_artifact_checks::check_tracked_generated_artifacts,
-        "self-unsafe" => self_unsafe::check_self_unsafe,
-        _ => return None,
-    };
-    Some(check)
-}
-
-/// Execute a single `check-pr` component by its `check_local::CATALOG` id.
-///
-/// This is the execution seam for `check-local`: the selection logic lives in
-/// `check_local` (pure, unit-tested) and this dispatch maps each catalog id to
-/// the same function `check-pr` invokes, so the two can never drift in behavior.
-fn run_named_check(id: &str, quiet: bool) -> Result<(), String> {
-    if quiet {
-        let executable = std::env::current_exe()
-            .map_err(|err| format!("check-local: failed to resolve xtask executable: {err}"))?;
-        let output = Command::new(&executable)
-            .arg("check-local-run")
-            .arg(id)
-            .stdout(Stdio::null())
-            .output()
-            .map_err(|err| {
-                format!(
-                    "check-local: failed to run `{id}` quietly via `{}`: {err}",
-                    executable.display()
-                )
-            })?;
-        if output.status.success() {
-            return Ok(());
-        }
-        let detail = String::from_utf8_lossy(&output.stderr).trim().to_string();
-        return Err(if detail.is_empty() {
-            format!("check-local: `{id}` exited with {}", output.status)
-        } else {
-            detail
-        });
-    }
-    match dispatch_check(id) {
-        Some(check) => check(),
-        None => Err(format!("check-local: unknown check id `{id}`")),
-    }
 }
 
 fn print_help() {
@@ -8905,24 +8842,6 @@ fn is_forbidden_generated_path(path: &str) -> bool {
 mod tests {
     use super::*;
     use std::time::{SystemTime, UNIX_EPOCH};
-
-    #[test]
-    fn every_check_local_catalog_id_has_a_dispatch_arm() {
-        // Guards against `check_local::CATALOG` and `dispatch_check` drifting:
-        // every catalog id must resolve to a dispatch arm (no execution needed).
-        for spec in check_local::CATALOG {
-            assert!(
-                dispatch_check(spec.id).is_some(),
-                "no dispatch arm for check-local catalog id `{}`",
-                spec.id
-            );
-        }
-    }
-
-    #[test]
-    fn dispatch_check_rejects_unknown_id() {
-        assert!(dispatch_check("not-a-real-check").is_none());
-    }
 
     fn registry_view<'a>(
         families: &'a BTreeSet<String>,
