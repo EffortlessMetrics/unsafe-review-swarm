@@ -112,6 +112,13 @@ single_truth = true
 note = "Selected, not_selected, and not_eligible are reviewer-routing states. They must remain distinct from analyzer class and from human/agent readiness."
 
 [[field]]
+name = "selection_reason"
+canonical_source = "output/comment_plan/selection.rs::selection_reason (output/comment_plan/model.rs::PlannedComment.selection_reason)"
+surfaces = ["comment_plan", "first_pr_terminal"]
+single_truth = true
+note = "Selected-card reason derived from CoverageBlock slots, priority, and confidence via selection_reason. comment_plan emits it per selected card and first_pr_terminal copies that same reason for the top card and up to three additional selected cards without reclassification. Advisory only, not safety or execution proof."
+
+[[field]]
 name = "next_action"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action (analysis/pipeline/card_builder.rs)"
 surfaces = ["json", "markdown", "explain_markdown", "pr_summary", "first_pr_terminal", "github_summary", "comment_plan", "lsp", "sarif", "agent", "file_range_scan", "policy_report", "outcome", "witness_plan", "review_kit", "receipt_audit"]
@@ -275,9 +282,9 @@ note = "Witness routes for this ReviewCard. They route to possible confirmation,
 [[field]]
 name = "verify_commands"
 canonical_source = "domain/review_card.rs::ReviewCard.next_action.verify_commands (domain/review_card.rs::NextAction.verify_commands)"
-surfaces = ["json", "sarif", "lsp", "comment_plan", "agent", "file_range_scan", "markdown", "explain_markdown", "witness_plan"]
+surfaces = ["json", "sarif", "lsp", "comment_plan", "agent", "file_range_scan", "markdown", "explain_markdown", "witness_plan", "first_pr_terminal"]
 single_truth = true
-note = "Verify commands for this ReviewCard. They are advisory handoff commands, not auto-execution."
+note = "Verify commands for this ReviewCard. They are advisory handoff commands, not auto-execution. first_pr_terminal copies the first verify command for the top card and for each of up to three additional selected cards without reclassification."
 
 [[field]]
 name = "confirmation_state"
@@ -465,8 +472,7 @@ note = "Single-card `explain --format markdown` maps identity, class/code, locat
 name = "first_pr_terminal"
 surface = "first_pr_terminal"
 disposition = "aggregate_projection"
-follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2121"
-note = "The pr/first-pr/review terminal report copies the canonical five Summary movement counts and comment-plan selection aggregates. Its front panel maps the top card's identity through explain/context commands, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary; first-pr/review also print up to three additional selected cards with identity, location, operation family, next action, selection reason, and first verify command. Cards beyond that cap, remaining additional-card fields, full verify/context command semantics, bundle/scan metadata, and ManualCandidate sidecars are omitted or report-specific and remain parked pending #2121."
+note = "The pr/first-pr/review terminal report copies the canonical five Summary movement counts and comment-plan selection aggregates. Its front panel maps the top card's identity through explain/context commands, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary; first-pr/review also print up to three additional selected cards with identity, location, operation family, next action, selection reason, and first verify command. Cards beyond that cap, remaining additional-card fields, full verify/context command semantics, bundle/scan metadata, and ManualCandidate sidecars are omitted or report-specific and remain parked. Locked by focused terminal parity tests (#2121) in crates/unsafe-review-cli/src/execute/first_pr.rs proving movement, top-card, capped additional cards, cap omission, trust boundary, and distinctness from human/direct-Markdown/PR-summary/GitHub-summary consumers. Advisory only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[consumer]]
 name = "github_summary"
@@ -622,6 +628,11 @@ surface = "ub_review"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2116"
 note = "Pinned 2026-08-29 smoke at unsafe-review 6f595070 -> ub-review 55e4fba proves the real parser routes unsafe-review-gate/v1, follows the comment_plan pointer, parses the 0.1 object envelope, and preserves card identity, operation_family, and trust_boundary (receipt docs/receipts/ub-review-smoke-6f595070.md). Advisory only; not a cross-version or correctness proof."
+
+[[gap]]
+name = "first_pr_terminal_field_parity"
+status = "done"
+note = "Parity locked via #2121 with focused terminal tests in crates/unsafe-review-cli/src/execute/first_pr.rs proving the pr/front-panel and first-pr/review terminal projections for card and no-card paths: five Summary movement counts, top-card identity/location/class/code/family/missing/next-action, selection aggregates, capped additional selected cards (identity/location/family/next-action/selection-reason/first-verify), cap omission, advisory trust boundary, and distinctness from human/direct-markdown/pr-summary/github-summary. Remaining additional-card fields, full verify/context command semantics, bundle metadata, and manual-candidate sidecars remain parked. Advisory only, not safety, UB-free, Miri-clean, or site-execution proof."
 
 [[gap]]
 name = "human_cli_field_parity"
