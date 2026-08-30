@@ -1,0 +1,166 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/EffortlessMetrics/unsafe-review-swarm/blob/main/docs/schemas/bounded-subagent-result.schema.json",
+  "title": "Bounded subagent result v1",
+  "description": "One bounded delegation output referencing an accepted issue-linked work spec. Preserves exact input identity, evidence, uncertainty, and contradictions without treating repeated claims or builder self-report as independent proof.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema", "work_item", "basis", "action", "verdict", "summary"],
+  "properties": {
+    "schema": { "const": "bounded-subagent-result-v1" },
+    "work_item": { "$ref": "#/$defs/work_item" },
+    "basis": { "$ref": "#/$defs/basis" },
+    "action": {
+      "enum": ["investigate", "challenge_plan", "build", "verify", "review", "triage_ci", "audit_cleanup"]
+    },
+    "verdict": {
+      "enum": ["clear", "revise", "blocked", "not_proven"]
+    },
+    "summary": { "type": "string", "minLength": 1, "maxLength": 400, "pattern": "\\S" },
+    "findings": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/finding" }
+    },
+    "changes": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/repository_relative_path" }
+    },
+    "proof": {
+      "type": "array",
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
+    "contradictions": {
+      "type": "array",
+      "items": { "$ref": "#/$defs/contradiction" }
+    },
+    "uncertainty": { "$ref": "#/$defs/uncertainty" },
+    "recommended_next_action": { "$ref": "#/$defs/recommended_next_action" },
+    "overflow": { "$ref": "#/$defs/overflow" }
+  },
+  "allOf": [
+    {
+      "if": { "properties": { "action": { "enum": ["verify", "review"] } }, "required": ["action"] },
+      "then": {
+        "properties": { "basis": { "required": ["pr", "head_sha"] } }
+      }
+    },
+    {
+      "if": { "properties": { "action": { "const": "build" } }, "required": ["action"] },
+      "then": {},
+      "else": {
+        "properties": { "changes": { "maxItems": 0 } }
+      }
+    }
+  ],
+  "$defs": {
+    "non_empty_strings": {
+      "type": "array",
+      "minItems": 1,
+      "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+    },
+    "sha": { "type": "string", "pattern": "^[0-9a-f]{40}$" },
+    "repository_relative_path": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_-][A-Za-z0-9._-]*(/[A-Za-z0-9_-][A-Za-z0-9._-]*)*/?$"
+    },
+    "work_item": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["issue", "work_spec"],
+      "properties": {
+        "issue": {
+          "type": "string",
+          "pattern": "^https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/issues/[1-9][0-9]*$"
+        },
+        "work_spec": {
+          "type": "string",
+          "pattern": "^plans/work-specs/examples/[A-Za-z0-9_-][A-Za-z0-9._-]*\\.toml$"
+        }
+      }
+    },
+    "basis": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["base_sha"],
+      "properties": {
+        "base_sha": { "$ref": "#/$defs/sha" },
+        "pr": {
+          "type": "string",
+          "pattern": "^https://github\\.com/(?![A-Za-z0-9-]*--)[A-Za-z0-9](?:[A-Za-z0-9-]{0,37}[A-Za-z0-9])?/(?=[A-Za-z0-9._-]{1,100}/)(?=[A-Za-z0-9._-]*[A-Za-z0-9_-]/)[A-Za-z0-9._-]+/pull/[1-9][0-9]*$"
+        },
+        "head_sha": { "$ref": "#/$defs/sha" }
+      },
+      "dependentRequired": {
+        "pr": ["head_sha"],
+        "head_sha": ["pr"]
+      }
+    },
+    "finding": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["severity", "claim", "evidence"],
+      "properties": {
+        "severity": { "enum": ["P0", "P1", "P2", "P3"] },
+        "claim": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "evidence": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    },
+    "contradiction": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["claim", "evidence_a", "evidence_b"],
+      "properties": {
+        "claim": { "type": "string", "minLength": 1, "pattern": "\\S" },
+        "evidence_a": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        },
+        "evidence_b": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    },
+    "uncertainty": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["items"],
+      "properties": {
+        "items": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    },
+    "recommended_next_action": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["action"],
+      "properties": {
+        "action": { "type": "string", "minLength": 1, "pattern": "\\S" }
+      }
+    },
+    "overflow": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["selected", "omitted", "total", "refs"],
+      "properties": {
+        "selected": { "type": "integer", "minimum": 0 },
+        "omitted": { "type": "integer", "minimum": 0 },
+        "total": { "type": "integer", "minimum": 0 },
+        "refs": {
+          "type": "array",
+          "minItems": 1,
+          "items": { "type": "string", "minLength": 1, "pattern": "\\S" }
+        }
+      }
+    }
+  }
+}

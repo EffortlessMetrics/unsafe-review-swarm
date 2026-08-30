@@ -1,0 +1,30 @@
+# Valid bounded result — audit_cleanup (read-only).
+schema = "bounded-subagent-result-v1"
+action = "audit_cleanup"
+verdict = "clear"
+summary = "Cleanup audit: no stale worktrees; inventory bounded."
+proof = ["cargo run --locked -p xtask -- cleanup-audit"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P3"
+claim = "No stale worktrees for base 0f306ea."
+evidence = ["xtask/src/cleanup_auditor.rs:1", "xtask/src/subagent_results.rs:1"]
+
+[uncertainty]
+items = ["none_found: scanned xtask/src/cleanup_auditor.rs and git worktree list; one base only."]
+
+[recommended_next_action]
+action = "No cleanup required."
+
+[overflow]
+selected = 2
+omitted = 0
+total = 2
+refs = ["artifact:plans/delegation-examples/overflow-artifact.log"]

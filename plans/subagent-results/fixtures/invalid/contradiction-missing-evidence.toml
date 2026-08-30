@@ -1,0 +1,31 @@
+# Invalid: contradiction missing one evidence direction.
+schema = "bounded-subagent-result-v1"
+action = "review"
+verdict = "revise"
+summary = "Contradiction without both sides."
+proof = ["cargo test --locked -p xtask -- subagent_results"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2124"
+head_sha = "2222222222222222222222222222222222222222"
+
+[[findings]]
+severity = "P1"
+claim = "Missing evidence side."
+evidence = ["xtask/src/subagent_results.rs:1"]
+
+[[contradictions]]
+claim = "Incomplete."
+evidence_a = ["xtask/src/subagent_results.rs:1"]
+evidence_b = []
+
+[uncertainty]
+items = ["Contradiction not preserved."]
+
+[recommended_next_action]
+action = "Add both evidence directions."

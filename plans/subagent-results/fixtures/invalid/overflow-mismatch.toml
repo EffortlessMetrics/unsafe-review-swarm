@@ -1,0 +1,30 @@
+# Invalid: overflow counts mismatch.
+schema = "bounded-subagent-result-v1"
+action = "investigate"
+verdict = "not_proven"
+summary = "Large result with bad counts."
+proof = ["cargo test --locked -p xtask -- subagent_results"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P2"
+claim = "Truncated."
+evidence = ["plans/subagent-results/fixtures/invalid/overflow-mismatch.toml:1"]
+
+[overflow]
+selected = 3
+omitted = 40
+total = 42
+refs = ["artifact:plans/delegation-examples/overflow-artifact.log"]
+
+[uncertainty]
+items = ["Overflow mismatch."]
+
+[recommended_next_action]
+action = "Fix selected+omitted==total."

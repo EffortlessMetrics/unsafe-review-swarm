@@ -1,0 +1,30 @@
+# Valid bounded result — build (writer) with changes.
+schema = "bounded-subagent-result-v1"
+action = "build"
+verdict = "revise"
+summary = "Built bounded-subagent-result schema and validator; one file change applied."
+changes = ["docs/schemas/bounded-subagent-result.schema.json"]
+proof = ["cargo test --locked -p xtask -- subagent_results", "cargo run --locked -p xtask -- check-subagent-results"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P1"
+claim = "Result schema was missing; added overflow and contradiction fields."
+evidence = ["docs/schemas/bounded-subagent-result.schema.json:1", "xtask/src/subagent_results.rs:1"]
+
+[[findings]]
+severity = "P2"
+claim = "Validator now rejects builder self-green as independent proof."
+evidence = ["xtask/src/subagent_results.rs:80", "plans/subagent-results/fixtures/invalid/builder-self-proof.toml:1"]
+
+[uncertainty]
+items = ["Writer did not re-run full workspace gate; local proof only."]
+
+[recommended_next_action]
+action = "Run cargo test --workspace and xtask check-pr before merge."

@@ -1,0 +1,25 @@
+# Invalid: builder self-green encoded as independent proof.
+schema = "bounded-subagent-result-v1"
+action = "build"
+verdict = "clear"
+summary = "Builder claims green as proof."
+changes = ["docs/schemas/bounded-subagent-result.schema.json"]
+proof = ["builder:self-green all tests passed"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P1"
+claim = "Builder self-report."
+evidence = ["xtask/src/subagent_results.rs:1"]
+
+[uncertainty]
+items = ["No independent verification."]
+
+[recommended_next_action]
+action = "Replace with receipt or command."

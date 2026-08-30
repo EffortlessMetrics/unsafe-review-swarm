@@ -53,6 +53,7 @@ mod source_truth_ledgers;
 mod spec_status;
 mod stance_checks;
 mod subagent_briefs;
+mod subagent_results;
 mod support_tiers;
 mod unsafe_review_ledger;
 mod work_specs;
@@ -899,6 +900,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::CheckDocArtifacts => check_doc_artifacts(),
         commands::XtaskCommand::CheckWorkSpecs => work_specs::check(),
         commands::XtaskCommand::CheckSubagentBriefs => subagent_briefs::check(),
+        commands::XtaskCommand::CheckSubagentResults => subagent_results::check(),
         commands::XtaskCommand::CheckDocsAutomation => check_docs_automation(),
         commands::XtaskCommand::CheckSpecStatus => spec_status::check(),
         commands::XtaskCommand::CheckPublicSurfaces => public_surfaces::check(),
@@ -1230,6 +1232,7 @@ fn check_policy() -> Result<(), String> {
     check_doc_artifacts()?;
     work_specs::check()?;
     subagent_briefs::check()?;
+    subagent_results::check()?;
     check_docs_automation()?;
     public_surfaces::check()?;
     source_truth_ledgers::check_package_boundary()?;

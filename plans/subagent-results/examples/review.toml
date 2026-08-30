@@ -1,0 +1,31 @@
+# Valid bounded result — review (exact-head) with contradiction.
+schema = "bounded-subagent-result-v1"
+action = "review"
+verdict = "revise"
+summary = "Review of head 2222 found one P1 contradiction; exact head named, both evidence sides preserved."
+proof = ["cargo test --locked -p xtask -- subagent_briefs::tests::rejects_global_lane_authority"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2124"
+head_sha = "2222222222222222222222222222222222222222"
+
+[[findings]]
+severity = "P1"
+claim = "Review surface has contradictory authority claim."
+evidence = ["xtask/src/subagent_briefs.rs:50", "docs/schemas/bounded-subagent-brief.schema.json:20"]
+
+[[contradictions]]
+claim = "Authority is global vs bounded."
+evidence_a = ["xtask/src/subagent_briefs.rs:539 -- global authority check"]
+evidence_b = ["docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md:10 -- bounded authority only"]
+
+[uncertainty]
+items = ["One open contradiction; remaining review scope not expanded."]
+
+[recommended_next_action]
+action = "Resolve contradiction by clarifying authority grammar before merge."

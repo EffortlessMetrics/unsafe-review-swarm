@@ -1,0 +1,24 @@
+# Valid bounded result — investigate (read-only).
+schema = "bounded-subagent-result-v1"
+action = "investigate"
+verdict = "not_proven"
+summary = "Investigated SPEC-0044 validator surfaces; no blocking contradiction found, one uncertainty remains."
+proof = ["cargo test --locked -p xtask -- subagent_briefs"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P2"
+claim = "No unsafe operation found in truncated surface; searched xtask/src/subagent_briefs.rs."
+evidence = ["xtask/src/subagent_briefs.rs:1", "docs/schemas/bounded-subagent-brief.schema.json:1"]
+
+[uncertainty]
+items = ["Remaining surfaces not inlined; scope was limited to validator modules."]
+
+[recommended_next_action]
+action = "Coordinator may expand read_scope if deeper search is needed."

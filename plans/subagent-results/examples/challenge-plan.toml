@@ -1,0 +1,24 @@
+# Valid bounded result — challenge_plan (read-only).
+schema = "bounded-subagent-result-v1"
+action = "challenge_plan"
+verdict = "revise"
+summary = "Challenge plan: found one missing invariant."
+proof = ["cargo test --locked -p xtask -- subagent_briefs"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+
+[[findings]]
+severity = "P1"
+claim = "Work spec missing explicit overflow handling."
+evidence = ["plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml:20", "docs/schemas/bounded-subagent-result.schema.json:30"]
+
+[uncertainty]
+items = ["Plan challenge limited to scope section."]
+
+[recommended_next_action]
+action = "Add invariant for overflow budgeting."

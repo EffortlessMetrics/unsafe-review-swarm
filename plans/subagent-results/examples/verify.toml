@@ -1,0 +1,26 @@
+# Valid bounded result — verify (exact-head).
+schema = "bounded-subagent-result-v1"
+action = "verify"
+verdict = "clear"
+summary = "Verified head 1111 at PR 2124 meets AC-1 and AC-2; exact head named."
+proof = ["cargo run --locked -p xtask -- check-subagent-briefs"]
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "0f306ea0b6737c13df7abb97bdebb819eaeffdc7"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2124"
+head_sha = "1111111111111111111111111111111111111111"
+
+[[findings]]
+severity = "P2"
+claim = "Exact head 1111 passes bounded brief validation."
+evidence = ["xtask/src/subagent_briefs.rs:10", "plans/subagent-briefs/examples/verify.toml:1"]
+
+[uncertainty]
+items = ["none_found: searched xtask/src/subagent_briefs.rs and docs/schemas/bounded-subagent-brief.schema.json; checked one head only."]
+
+[recommended_next_action]
+action = "No further action; head is clear for this scope."
