@@ -4,18 +4,18 @@ issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
 status = "draft_not_active"
 activation = "requires_owner_decision_after_targeted_dependency_proof"
 freeze_scope = "candidate_dependency_inputs_only"
-audited_at = "2026-08-09"
-audit_swarm_base = "d4ed927a06984593ec610bbb79bd19ae902dc7db"
+audited_at = "2026-08-30"
+audit_swarm_base = "125de5f683286c4e8da04b76c6633a2a8e123f5a"
 audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "d4ed927a06984593ec610bbb79bd19ae902dc7db"
-lockfile_sha256 = "5079ce778c690aee8d48200a342ebdec7cd199cae6f9fb86d4d3ba65c73a7a4c"
-ra_ap_syntax = "0.0.344"
-ignore = "0.4.31"
+commit = "125de5f683286c4e8da04b76c6633a2a8e123f5a"
+lockfile_sha256 = "f40cad0ed06d2c4cedcfbaccead979186315605c5d6e1c2c6d5de986f31c03fe"
+ra_ap_syntax = "0.0.348"
+ignore = "0.4.33"
 signal_hook = "0.4.4"
 
 [source]
@@ -69,19 +69,19 @@ reset_receipts = ["affected tests", "clippy", "check-pr", "lockfile refresh"]
 
 [[deferred_input]]
 id = "SWARM-1874-1875"
-reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path."
+reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path. Reviewed 2026-08-30; no open duplicate remains at 125de5f6."
 
 [[deferred_input]]
 id = "SWARM-2014"
-reason = "The swarm Actions pin update remains open and fails the paired workflow-allowlist contract; retain it as an owner-gated maintenance path until workflows and policy move together."
+reason = "The swarm Actions pin update remains open and fails the paired workflow-allowlist contract; retain it as an owner-gated maintenance path until workflows and policy move together. Reviewed 2026-08-30; paired contract still applies."
 
 [[deferred_input]]
 id = "SWARM-2013-SOURCE-PROMOTION"
-reason = "Swarm #2013 is integrated in the workbench at the audited base, but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred."
+reason = "Swarm ra_ap_syntax 0.0.348 is integrated in the workbench at the audited base (via 0.0.344/0.345/0.347/0.348 bumps), but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred. Reviewed 2026-08-30 at 125de5f6 with source_divergence new_source_commits=0."
 
 [[deferred_input]]
 id = "SWARM-1620"
-reason = "RSS/self-unsafe telemetry remains parked outside the candidate absent its separate owner decision."
+reason = "RSS/self-unsafe telemetry remains parked outside the candidate absent its separate owner decision. Reviewed 2026-08-30; still parked at 125de5f6."
 
 [[rule]]
 id = "EXCEPTION-1"
