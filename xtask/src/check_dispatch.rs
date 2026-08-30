@@ -101,7 +101,10 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::panic, reason = "test assertion uses panic for unreachable OK branch")]
+    #[allow(
+        clippy::panic,
+        reason = "test assertion uses panic for unreachable OK branch"
+    )]
     fn run_named_check_rejects_unknown_id() {
         let err = match run_named_check("not-a-real-check", false) {
             Ok(()) => panic!("run_named_check should reject unknown id"),
