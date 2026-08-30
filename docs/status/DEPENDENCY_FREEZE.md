@@ -5,16 +5,16 @@ activating a repository-wide or permanent dependency freeze. Its machine-
 readable source is
 [`UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml`](../../plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml).
 
-Audited 2026-08-09 against swarm `main` at
-`d4ed927a06984593ec610bbb79bd19ae902dc7db` and source `main` at
+Audited 2026-08-30 against swarm `main` at
+`125de5f683286c4e8da04b76c6633a2a8e123f5a` and source `main` at
 `c25d65272c760c3630eb9528b7efaae2234d9e19`. This remains a draft and is not an
-active dependency freeze.
+active dependency freeze. Source divergence is `new_source_commits=0`.
 
 ## Exact snapshot
 
 | Repository | Commit | `Cargo.lock` SHA-256 | `ra_ap_syntax` | `ignore` | `signal-hook` |
 | --- | --- | --- | --- | --- | --- |
-| swarm | `d4ed927a06984593ec610bbb79bd19ae902dc7db` | `5079ce778c690aee8d48200a342ebdec7cd199cae6f9fb86d4d3ba65c73a7a4c` | 0.0.344 | 0.4.31 | 0.4.4 |
+| swarm | `125de5f683286c4e8da04b76c6633a2a8e123f5a` | `f40cad0ed06d2c4cedcfbaccead979186315605c5d6e1c2c6d5de986f31c03fe` | 0.0.348 | 0.4.33 | 0.4.4 |
 | source | `c25d65272c760c3630eb9528b7efaae2234d9e19` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
 
 These are two live repository baselines, not one frozen release candidate.
@@ -41,11 +41,14 @@ workbench input, not a source-candidate or publication claim.
 - Dependency group PR [#550](https://github.com/EffortlessMetrics/unsafe-review/pull/550)
   remains owner-gated for its own affected-test and lockfile proof.
 
-Swarm #2013 (`ra_ap_syntax 0.0.344`) is now integrated on the workbench base
-above. Source #551 remains the owner-gated publication history for the source
-repository; this does not promote the swarm commit or authorize a release.
-Issue #2014 remains open and deferred because its paired Actions pins still
-lack the matching workflow-allowlist update.
+Swarm `ra_ap_syntax 0.0.348` is now integrated on the workbench base above
+(through #2089 `0.0.345`, #2112 `0.0.347`, and #2136 `0.0.348`; prior #2013
+`0.0.344` remains recorded as workbench state). Source #551 remains the
+owner-gated publication history for the source repository; this does not
+promote the swarm commit or authorize a release. The `ignore 0.4.33` update
+is absorbed via the `cargo-minor-and-patch` batch. Source #549 / swarm
+Actions pins remain owner-gated and require the paired workflow-allowlist
+contract; no bare pin bump is a release candidate.
 
 The merged swarm audit [#1943](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/1943)
 records why swarm #1874/#1875 are deferred and why #1620 remains parked.
