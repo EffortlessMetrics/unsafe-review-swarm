@@ -17,6 +17,13 @@ For the build-and-review boundary, use the progressive-disclosure skills
 than copying their bodies — the links are the discovery surface. When a skill
 runtime is unavailable, the same trigger and outcome guidance applies via manual
 inspection and the lifecycle map.
+For the feedback, publication, and reconciliation boundary, use the
+progressive-disclosure skills [`respond-to-feedback`](.opencode/skills/respond-to-feedback/SKILL.md),
+[`publish-pr`](.opencode/skills/publish-pr/SKILL.md), and
+[`reconcile-merge`](.opencode/skills/reconcile-merge/SKILL.md) rather than
+copying their bodies — the links are the discovery surface. When a skill runtime
+is unavailable, the same trigger and outcome guidance applies via manual
+inspection and the lifecycle map.
 Manual and non-agent contributors use the same repository contracts and direct
 Git, GitHub, Cargo, and xtask paths.
 
