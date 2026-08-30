@@ -335,6 +335,34 @@ surfaces = ["agent", "file_range_scan"]
 single_truth = true
 note = "Fixed stop conditions emitted by the agent packet and forwarded through each nested file-range packet that stop work when missing evidence is present or explicitly waived with owner and expiry, the focused test or witness command has been run or marked unavailable, no unrelated unsafe code was changed, and the ReviewCard still maps to the same seam. Advisory only, not a safety or completion proof."
 
+[[field]]
+name = "witness_plan_route_group"
+canonical_source = "output/witness_plan.rs::ROUTE_GROUPS (RouteGroup::heading, kinds, include_unrouted, limit)"
+surfaces = ["witness_plan"]
+single_truth = true
+note = "Fixed witness-plan route-group presentation metadata: the five headings (Miri / cargo-careful, Sanitizers, Loom / Shuttle, Kani / Crux, Human deep review / unsupported), their member WitnessKind sets, the include-unrouted flag for the human-review group, and the per-group limit wording. Grouping routes cards without reclassification; it does not prove witness applicability, execution, or safety. Advisory only."
+
+[[field]]
+name = "witness_plan_route_instruction"
+canonical_source = "output/witness_plan.rs::render_group_card, route_can_show, route_cannot_prove, receipt_hint (domain/witness.rs::WitnessRoute.reason, required, command, WitnessKind::as_str)"
+surfaces = ["witness_plan"]
+single_truth = true
+note = "Per-route instruction detail emitted for each routed card: required flag, reason, what it can show, what it cannot prove, optional command, and receipt-import hint (or the human-deep-review fallback when no command exists). It frames possible confirmation routes without running witnesses, proving site execution, or claiming safety or UB-freedom. Advisory only."
+
+[[field]]
+name = "witness_plan_confirmation_cue"
+canonical_source = "output/witness_plan.rs::card_hypothesis, card_confirmation_step (output/confirmation.rs::hypothesis_to_confirm, confirmation_step, build_this_first, domain/review_card.rs::ReviewCard.class, operation.expression, next_action.verify_commands, routes)"
+surfaces = ["witness_plan"]
+single_truth = true
+note = "Advisory per-card hypothesis to confirm and confirmation step rendered by the witness plan, derived from class, operation text, verify commands, and witness routes via the same confirmation helpers that back the agent packet's confirmation cue. The hypothesis names a static finding; the step names the smallest build/run or route-derived repro to try before upgrading confidence. It does not prove site execution, UB, or safety and does not execute the command. Advisory only."
+
+[[field]]
+name = "witness_plan_evidence_summary"
+canonical_source = "output/witness_plan.rs::render_obligation_evidence, hazard_summary, missing_summary (domain/review_card.rs::ReviewCard.missing, hazards, witness.summary, obligation_evidence.contract/discharge/reach/witness)"
+surfaces = ["witness_plan"]
+single_truth = true
+note = "Witness-plan-specific evidence-summary grouping for each card: the required safety conditions list plus the per-obligation contract/discharge/reach/witness state line, hazard summary, missing-evidence summary, and witness-evidence summary. Each value projects the shared canonical obligation-evidence, hazard, missing-evidence, and witness-detail sources without reclassification; the grouping is witness-plan presentation only and does not discharge proof or prove safety, UB-freedom, or site execution. Advisory only."
+
 # The editor adapter is intentionally represented by the existing `lsp`
 # surface vocabulary. The named consumers are saved lsp.json, live
 # unsafe-review-cli LSP, editors/vscode, agent packets, repair_queue, SARIF,
@@ -498,7 +526,7 @@ name = "witness_plan_markdown"
 surface = "witness_plan"
 disposition = "partial"
 follow_up = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2126"
-note = "Maps ReviewCard identity, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary into an advisory witness-routing plan. Shared proof-path, operation text, hazard, obligations/obligation-evidence, contract/discharge/reach/witness details, verify-command, witness-route, and confirmation-state fields are now mapped via shared canonical rows owned by #2124 and consumed without reclassification; witness-plan-specific rendering/group metadata remains parked to dependent #2126. The plan does not execute witnesses. Advisory only."
+note = "Maps ReviewCard identity, location, class/code, operation family, missing evidence, next action, and the advisory trust boundary into an advisory witness-routing plan grouped by fixed witness routes. Shared proof-path, operation text, hazard, obligations/obligation-evidence, contract/discharge/reach/witness details, verify-command, witness-route, and confirmation-state fields are mapped via shared canonical rows owned by #2124 and consumed without reclassification; dedicated witness-plan route-group metadata, per-route instruction detail (reason/what-it-can-show/what-it-cannot-prove/command/receipt-hint), per-card hypothesis/confirmation-step cues, and evidence-summary grouping are owned by #2126 and projected directly via dedicated rows. Header summary counts/policy mode and the capped-scan notice are aggregate Summary projections and the empty-state wording reuses the shared NO_CHANGED_GAPS advisory. The plan does not execute witnesses. Advisory only."
 
 [[consumer]]
 name = "review_kit_json"
