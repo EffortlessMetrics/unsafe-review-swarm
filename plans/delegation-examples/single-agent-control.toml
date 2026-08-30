@@ -1,0 +1,27 @@
+# Single-agent control — deliberately narrow docs change kept single-agent.
+# Delegation would be wasteful: briefing + isolation + synthesis exceeds a one-line typo fix.
+# No subagent needed; root edits directly.
+schema = "bounded-subagent-brief-v1"
+action = "investigate"
+capability = "read_only"
+objective = "Single-agent control: fix one typo in docs/README.md without delegation."
+read_scope = ["docs/README.md"]
+write_scope = []
+authorities = ["issue:https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924", "spec:UNSAFE-REVIEW-SPEC-0044"]
+proof_obligations = ["Return exact line of typo; do not delegate."]
+non_goals = ["Do not launch a subagent; cost exceeds benefit for one line."]
+stop_when = ["Typo located or premise false."]
+return_schema = "bounded-subagent-result-v1"
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "d0fb8f0053606a2390983166d095e532945cfd20"
+
+[control]
+kind = "single_agent"
+reason = "Delegation would be wasteful: one-file, one-line fix requires no isolation or parallel synthesis; briefing overhead exceeds direct edit cost."
+delegation_cost = "brief + worktree + validation"
+direct_cost = "one read + one edit + one check"

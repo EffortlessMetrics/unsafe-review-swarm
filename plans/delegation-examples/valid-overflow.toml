@@ -1,0 +1,32 @@
+# Valid bounded result — large log stays within summary budget via overflow.
+# References #1924 work spec; all identities are exact and retrievable.
+schema = "bounded-subagent-result-v1"
+action = "investigate"
+verdict = "not_proven"
+summary = "Scanned 43 candidates; 3 shown. Remainder in overflow artifact."
+
+[work_item]
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1924"
+work_spec = "plans/work-specs/examples/UNSAFE-REVIEW-WORK-1924.toml"
+
+[basis]
+base_sha = "d0fb8f0053606a2390983166d095e532945cfd20"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2124"
+head_sha = "2222222222222222222222222222222222222222"
+
+[[findings]]
+severity = "P2"
+claim = "No unsafe operation found in truncated surface."
+evidence = ["plans/delegation-examples/valid-overflow.toml:1", "artifact:plans/delegation-examples/overflow-artifact.log"]
+
+[overflow]
+selected = 3
+omitted = 40
+total = 43
+refs = ["artifact:plans/delegation-examples/overflow-artifact.log"]
+
+[uncertainty]
+items = ["Remaining 40 candidates not inlined; see overflow refs."]
+
+[recommended_next_action]
+action = "Root may fetch artifact:plans/delegation-examples/overflow-artifact.log if needed."
