@@ -6,23 +6,20 @@ publication, or `v1` decision. Its machine-readable source is
 
 ## Live snapshot
 
-Audited 2026-08-14.
+Audited 2026-08-29.
 
-- Swarm base: `aae31001431a69f4a4fc318423d1566257eebde1`
-  (`docs(dogfood): record mio movement pilot evidence (#2101)`)
+- Swarm base: `ed345b71f84e3cc4344fba52c21322f8fd4efbf6`
+  (`refactor(xtask): extract check dispatch (#1806) (#2150)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
-- Draft candidate head: unset. A candidate commit is named only at freeze.
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=276`; the swarm
-  contains expected unpromoted workbench commits.
+- Draft candidate head: `ed345b71f84e3cc4344fba52c21322f8fd4efbf6` (refresh candidate; advisory only, not a freeze, tag, or publication).
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=309`; the swarm
+  contains expected unpromoted workbench commits. See `cargo run --locked -p xtask -- source-divergence`.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
   integrated public surface.
 
-The previous snapshot named `7649bff733b7f4cf1676b9b4b4fb40226c5744b5` as the
-draft candidate head. That SHA resolves to no object on any swarm or source ref,
-so it could not be checked out, diffed, or qualified. It is withdrawn rather
-than carried forward, and no qualification result was ever recorded against it.
+The previous drafts named `7649bff733b7f4cf1676b9b4b4fb40226c5744b5` (no object on any swarm or source ref, withdrawn) and `aae31001431a69f4a4fc318423d1566257eebde1` (mio pilot #2101). No qualification result was recorded against the withdrawn SHA. This refresh moves the draft candidate to `ed345b71` to reflect the integrated slices `b8ddd802..ed345b71` (PRs #2141–#2150); it remains an advisory snapshot, not a qualification, safety, or publication claim.
 
 ## Disposition
 
@@ -54,6 +51,25 @@ Deferred work can still be integrated, and required work can still be absent.
 
 Integration on swarm main is not a qualification result. Each item still needs
 its own implementation proof and hosted CI before freeze.
+
+### Done / closed since 2026-08-14 (b8ddd802..ed345b71) — advisory
+
+| Item | Disposition | Integration | Evidence |
+|---|---|---|---|
+| Human CLI ReviewCard field parity (#2114) | done (was builder_ready) | on swarm main | `27d1563f` in #2141 |
+| Schema identity and consumer compatibility (#2115) | done (was builder_ready) | on swarm main | `27d1563f` in #2141 |
+| Baseline-add ReviewCard snapshot parity (#2122) | done (was builder_ready) | on swarm main | `f7bbb06b` in #2142 |
+| Mutation-directive vs reference-noun governance (#2110) | done (was builder_ready) | on swarm main | `6f595070` in #2143 |
+| Ub-review artifact smoke (#2116) | done (was builder_ready) | on swarm main | `bdbfef68` in #2144, `docs/receipts/ub-review-smoke-6f595070.md` |
+| Shared rowless ReviewCard details (#2124) | done | on swarm main | `e266d490` in #2145 |
+| Rowless agent-packet details (#2125) | done | on swarm main | `c5a8c496` in #2146 |
+| Rowless witness-plan details (#2126) | done | on swarm main | `8d91fae3` in #2147 |
+| Outcome snapshot projection parity (#2127) | done | on swarm main | `48b082b7` in #2148 |
+| First-PR terminal ReviewCard parity (#2121) | done | on swarm main | `96766340` in #2149 |
+| Xtask check-dispatch extraction (#1806 slice) | required, partial | partial on swarm main | `ed345b71` in #2150; lane remains open |
+| CI cost / hosted fallback gate (#1515) | closed | on swarm main | `e3912c11` (#2085), `20905d31`, `d873b8e7`; closed `2026-08-29T11:56:45Z` as COMPLETED |
+
+All rows are advisory; none claims memory safety, UB-free, Miri-clean, or calibrated precision/recall. `done` records GitHub closed state plus on-swarm-main integration, not a safety or qualification claim.
 
 ### Deferred inputs
 
