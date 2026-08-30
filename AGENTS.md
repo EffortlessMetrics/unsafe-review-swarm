@@ -5,6 +5,12 @@ operating rules. It intentionally does not store a current task, active lane,
 session owner, or default goal. Detailed lifecycle guidance lives in
 [`docs/contributing/LIFECYCLE_SURFACE_MAP.md`](docs/contributing/LIFECYCLE_SURFACE_MAP.md)
 and [`docs/contributing/AGENT-ORCHESTRATION.md`](docs/contributing/AGENT-ORCHESTRATION.md).
+For the research-to-contract boundary, use the progressive-disclosure skills
+[`prepare-issue`](.opencode/skills/prepare-issue/SKILL.md) and
+[`compile-work-spec`](.opencode/skills/compile-work-spec/SKILL.md) rather than
+copying their bodies — the links are the discovery surface. When a skill runtime
+is unavailable, the same trigger and outcome guidance applies via manual issue
+inspection and the lifecycle map.
 Manual and non-agent contributors use the same repository contracts and direct
 Git, GitHub, Cargo, and xtask paths.
 
