@@ -1,13 +1,13 @@
 # UNSAFE-REVIEW-CUTLINE-1915
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
-candidate = "TBD_FROM_LIVE_STATE"
+candidate = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
 status = "draft"
-swarm_base = "aae31001431a69f4a4fc318423d1566257eebde1"
+swarm_base = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
-candidate_commit = "unset"
-candidate_commit_rationale = "A candidate commit is named only at freeze. The previous draft named 7649bff733b7f4cf1676b9b4b4fb40226c5744b5, which resolves to no object on any swarm or source ref and could not be checked out, diffed, or qualified; it is recorded here as withdrawn rather than carried forward."
-audited_at = "2026-08-14"
+candidate_commit = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
+candidate_commit_rationale = "Candidate refreshed to ed345b71f84e3cc4344fba52c21322f8fd4efbf6 (refactor(xtask): extract check dispatch #1806 slice #2150) at audit 2026-08-29; prior draft base aae31001431a69f4a4fc318423d1566257eebde1 and withdrawn 7649bff733b7f4cf1676b9b4b4fb40226c5744b5 remain audit records. Advisory refresh only; no safety, UB-free, or qualification claim follows from the refresh alone."
+audited_at = "2026-08-29"
 owner = "repo-infra"
 semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
 dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
@@ -273,6 +273,102 @@ integration_evidence = [
 ]
 reason = "The remaining platform-sensitive robustness rows require an owner decision on a reliable test strategy; this refresh neither invents that strategy nor converts the completed slices into a broad robustness claim."
 proof = []
+
+[[item]]
+id = "ISSUE-2114"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["27d1563f policy(spec-coverage): reconcile human CLI and artifact identity parity (#2114, #2115) (#2141)"]
+reason = "Advisory artifact parity: human CLI and artifact ReviewCard identity now locked and on swarm main; no safety, UB-free, or completeness claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2115"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["27d1563f policy(spec-coverage): reconcile human CLI and artifact identity parity (#2114, #2115) (#2141)"]
+reason = "Advisory schema identity: artifact identity and consumer compatibility covered by the same 27d1563f slice on swarm main; no published compatibility or safety claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2122"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["f7bbb06b test(api): lock baseline_add ReviewCard snapshot parity (#2122) (#2142)"]
+reason = "Advisory baseline-add parity locked on swarm main; no memory-safety or UB-free claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2110"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["6f595070 fix(governance): distinguish mutation directives from commit reference nouns (#2143)"]
+reason = "Advisory governance fix: mutation directives distinguished from reference nouns; no policy enforcement or safety claim beyond the advisory finding."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2116"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["bdbfef68 feat(2116): smoke unsafe-review artifacts through ub-review (#2144)", "docs/receipts/ub-review-smoke-6f595070.md"]
+reason = "Advisory ub-review smoke: unsafe-review artifacts smoked through ub-review on selected fixtures; bounded receipt only, no broad ub-review compatibility or safety claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2124"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["e266d490 policy(spec-coverage): inventory shared rowless ReviewCard detail fields (#2124) (#2145)"]
+reason = "Advisory inventory: shared rowless ReviewCard detail fields inventoried on swarm main; no safety or completeness claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2125"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["c5a8c496 policy(spec-coverage): inventory rowless agent-packet details (#2125) (#2146)"]
+reason = "Advisory inventory: rowless agent-packet details inventoried on swarm main; no safety claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2126"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["8d91fae3 policy(spec-coverage): inventory rowless witness-plan details (#2126) (#2147)"]
+reason = "Advisory inventory: rowless witness-plan details inventoried on swarm main; no witness-execution or safety claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2127"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["48b082b7 policy(spec-coverage): lock outcome snapshot projection parity (#2127) (#2148)"]
+reason = "Advisory parity: outcome snapshot projection parity locked on swarm main; no UB-free or Miri-clean claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2121"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["96766340 artifacts: lock first-PR terminal ReviewCard parity (#2121) (#2149)"]
+reason = "Advisory terminal parity: first-PR terminal ReviewCard parity locked on swarm main; no safety or blocking-policy claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-1806"
+disposition = "required"
+integration = "partial_on_swarm_main"
+integration_evidence = ["ed345b71 refactor(xtask): extract check dispatch (#1806) (#2150) is one slice of the multi-PR maintainability lane; issue remains open for remaining extractions"]
+reason = "Maintainability extraction lane is advisory and partially integrated; remaining xtask/advisory_artifacts slices remain open and required only as maintainability work, not as safety evidence."
+proof = ["cargo run --locked -p xtask -- check-pr", "cargo test -p xtask --locked"]
+
+[[item]]
+id = "ISSUE-1515"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["e3912c11 ci(#1515): share rust-cache key across lanes, warm it weekly, report real cache_hit_state (#2085)", "20905d31 ci: skip cargo test for docs-only PRs (#1515 candidate 2) (#1855)", "d873b8e7 ci: emit per-step timing for fmt/clippy/test/check-pr (#1515) (#1848)", "closed 2026-08-29T11:56:45Z as COMPLETED"]
+reason = "Advisory CI cost lane closed; cache sharing and timing evidence integrated on swarm main. No performance or safety claim; hosted gate remains advisory."
+proof = ["cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "PUBLICATION-1879"
