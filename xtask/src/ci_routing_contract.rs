@@ -223,13 +223,19 @@ fn check_ub_review_advisory_contract() -> Result<(), String> {
     let path = ".github/workflows/ub-review.yml";
     let text =
         std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
+    check_ub_review_advisory_text(path, &text)
+}
+
+fn check_ub_review_advisory_text(path: &str, text: &str) -> Result<(), String> {
     check_lane_markers(
         path,
-        &text,
+        text,
         "advisory ub-review lane",
         &[
             // SHA-pinned advisory action; a re-tag cannot silently change the lane.
             "uses: EffortlessMetrics/ub-review@",
+            // The checkout is a merge result; admission also needs the PR head.
+            "pr-head-sha: ${{ github.event.pull_request.head.sha }}",
             // Non-blocking advisory posture.
             "continue-on-error: true",
             "fail-on-gate: 'false'",
@@ -257,7 +263,7 @@ fn check_ub_review_advisory_contract() -> Result<(), String> {
 
 #[cfg(test)]
 mod tests {
-    use super::check_core_failure_evidence_contract;
+    use super::{check_core_failure_evidence_contract, check_ub_review_advisory_text};
     use std::{
         io::Write,
         process::{Command, Stdio},
@@ -366,6 +372,27 @@ fi
             || (!status.is_empty()
                 && status.len() <= 3
                 && status.bytes().all(|byte| byte.is_ascii_digit()))
+    }
+
+    #[test]
+    fn advisory_merge_review_requires_hosted_pr_head_metadata() -> Result<(), String> {
+        let path = ".github/workflows/ub-review.yml";
+        let text = include_str!("../../.github/workflows/ub-review.yml");
+        check_ub_review_advisory_text(path, text)?;
+
+        let required = "pr-head-sha: ${{ github.event.pull_request.head.sha }}";
+        for replacement in ["", "pr-head-sha: ${{ github.sha }}", "pr-head-sha: HEAD"] {
+            let invalid = text.replace(required, replacement);
+            let Err(error) = check_ub_review_advisory_text(path, &invalid) else {
+                return Err(format!(
+                    "accepted missing or wrong PR head metadata: {replacement:?}"
+                ));
+            };
+            if !error.contains(required) {
+                return Err(format!("unexpected PR head metadata rejection: {error}"));
+            }
+        }
+        Ok(())
     }
 
     #[test]
