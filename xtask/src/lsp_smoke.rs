@@ -5,6 +5,7 @@ use std::sync::mpsc::{self, Receiver};
 use std::thread;
 use std::time::{Duration, Instant};
 
+use ls_types::Uri;
 use serde_json::{Value, json};
 
 const INITIALIZE_ID: u64 = 1;
@@ -63,6 +64,8 @@ pub(crate) fn run(workspace_root: &Path) -> Result<(), String> {
 }
 
 fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> {
+    let fixture_uri = file_uri(fixture_root)?;
+    let source_uri = file_uri(&fixture_root.join("src/lib.rs"))?;
     let mut stdin = child
         .stdin
         .take()
@@ -104,10 +107,10 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
             "method": "initialize",
             "params": {
                 "processId": null,
-                "rootUri": file_uri(fixture_root),
+                "rootUri": fixture_uri,
                 "capabilities": {},
                 "workspaceFolders": [{
-                    "uri": file_uri(fixture_root),
+                    "uri": fixture_uri,
                     "name": "raw_pointer_alignment"
                 }]
             }
@@ -126,7 +129,6 @@ fn protocol_smoke(child: &mut Child, fixture_root: &Path) -> Result<(), String> 
     )?;
     let diagnostics = wait_for_method(&messages_rx, "textDocument/publishDiagnostics")?;
     let (card_id, position) = validate_diagnostics_notification(&diagnostics)?;
-    let source_uri = file_uri(&fixture_root.join("src/lib.rs"));
 
     write_message(
         &mut stdin,
@@ -458,21 +460,16 @@ fn write_message(writer: &mut impl Write, message: &Value) -> Result<(), String>
         .map_err(|error| format!("flush LSP message: {error}"))
 }
 
-fn file_uri(path: &Path) -> String {
-    let raw = path.to_string_lossy().replace('\\', "/");
-    let encoded = raw.bytes().fold(String::new(), |mut uri, byte| {
-        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'.' | b'_' | b'~' | b'/') {
-            uri.push(byte as char);
-        } else {
-            uri.push_str(&format!("%{byte:02X}"));
-        }
-        uri
-    });
-    if encoded.starts_with('/') {
-        format!("file://{encoded}")
-    } else {
-        format!("file:///{encoded}")
+fn file_uri(path: &Path) -> Result<Uri, String> {
+    if !path.is_absolute() {
+        return Err(format!(
+            "LSP smoke file URI requires an absolute path: {}",
+            path.display()
+        ));
     }
+    // Match the server's document identity, including Windows verbatim paths.
+    Uri::from_file_path(path)
+        .ok_or_else(|| format!("failed to encode LSP smoke file URI: {}", path.display()))
 }
 
 #[cfg(test)]
@@ -481,10 +478,131 @@ mod tests {
     use std::path::Path;
 
     #[test]
-    fn file_uri_is_absolute_and_percent_encoded() {
-        assert_eq!(
-            file_uri(Path::new("/tmp/review space/src/lib.rs")),
-            "file:///tmp/review%20space/src/lib.rs"
-        );
+    fn file_uri_rejects_relative_inputs() -> Result<(), String> {
+        for input in ["", ".", "fixtures/raw_pointer_alignment"] {
+            let path = Path::new(input);
+            let error = file_uri(path)
+                .err()
+                .ok_or_else(|| format!("relative path {input:?} was accepted"))?;
+            if !error.contains("absolute") || !error.contains(input) {
+                return Err(format!("relative path error lacks context: {error}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn file_uri_canonical_fixture_remains_readable() -> Result<(), String> {
+        let fixture = Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../fixtures/raw_pointer_alignment/src/lib.rs")
+            .canonicalize()
+            .map_err(|error| format!("canonicalize LSP fixture: {error}"))?;
+        let expected = std::fs::read(&fixture)
+            .map_err(|error| format!("read canonical LSP fixture: {error}"))?;
+        let uri = file_uri(&fixture)?;
+        let decoded = uri
+            .to_file_path()
+            .ok_or_else(|| format!("file URI did not decode: {uri:?}"))?;
+        let actual = std::fs::read(&decoded).map_err(|error| {
+            format!(
+                "read decoded LSP fixture {} from {uri:?}: {error}",
+                decoded.display()
+            )
+        })?;
+        if actual != expected {
+            return Err("file URI resolved to different fixture contents".to_string());
+        }
+        Ok(())
+    }
+
+    fn check_file_uri(input: &str, expected_uri: &str, expected_path: &str) -> Result<(), String> {
+        let uri = file_uri(Path::new(input))?;
+        if uri.as_str() != expected_uri {
+            return Err(format!(
+                "{input:?} encoded as {uri:?}, expected {expected_uri}"
+            ));
+        }
+        let decoded = uri
+            .to_file_path()
+            .ok_or_else(|| format!("file URI did not decode: {uri:?}"))?;
+        if decoded.to_string_lossy().replace('\\', "/") != expected_path {
+            return Err(format!(
+                "{uri:?} decoded as {}, expected {expected_path}",
+                decoded.display()
+            ));
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_uri_windows_drive_paths() -> Result<(), String> {
+        for input in [r"C:\review\src\lib.rs", r"c:\review\src\lib.rs"] {
+            check_file_uri(
+                input,
+                "file:///C%3A/review/src/lib.rs",
+                "C:/review/src/lib.rs",
+            )?;
+        }
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_uri_windows_verbatim_drive_path() -> Result<(), String> {
+        check_file_uri(
+            r"\\?\C:\review\src\lib.rs",
+            "file://///%3F/C%3A/review/src/lib.rs",
+            "//?/C:/review/src/lib.rs",
+        )
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_uri_windows_unc_paths() -> Result<(), String> {
+        // Lexical checks only: these synthetic shares are never accessed.
+        check_file_uri(
+            r"\\server\share\review\src\lib.rs",
+            "file://///server/share/review/src/lib.rs",
+            "//server/share/review/src/lib.rs",
+        )?;
+        check_file_uri(
+            r"\\?\UNC\server\share\review\src\lib.rs",
+            "file://///%3F/UNC/server/share/review/src/lib.rs",
+            "//?/UNC/server/share/review/src/lib.rs",
+        )
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_uri_windows_encodes_reserved_and_unicode_characters() -> Result<(), String> {
+        check_file_uri(
+            r"C:\review space\café #%\lib.rs",
+            "file:///C%3A/review%20space/caf%C3%A9%20%23%25/lib.rs",
+            "C:/review space/café #%/lib.rs",
+        )
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn file_uri_windows_rejects_incomplete_absolute_paths() -> Result<(), String> {
+        for input in [r"C:review\lib.rs", r"\review\lib.rs", "/tmp/review/lib.rs"] {
+            if file_uri(Path::new(input)).is_ok() {
+                return Err(format!(
+                    "path without an absolute Windows root was accepted: {input}"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_uri_unix_encodes_reserved_and_unicode_characters() -> Result<(), String> {
+        check_file_uri(
+            "/tmp/review space/café #%/lib.rs",
+            "file:///tmp/review%20space/caf%C3%A9%20%23%25/lib.rs",
+            "/tmp/review space/café #%/lib.rs",
+        )
     }
 }
