@@ -45,7 +45,7 @@ The public `v0.3.8` installation path remains:
 install the public v0.3.8 CLI
 → doctor
 → pr
-→ open the reviewer summary
+→ open the public release's reviewer summary
 → explain/context or route to human review
 → run a named verification command externally
 → attach a receipt only when the external evidence matches the ReviewCard

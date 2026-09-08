@@ -1,14 +1,24 @@
 # Support summary
 
-Date: 2026-08-30 (audited against swarm `origin/main` at
-`c741f69d75e9fc9f590b638d37086b6e87d65e68`, dependency freeze
+Retained table evidence: 2026-08-30 (audited against swarm `origin/main` at
+`c741f69d75e9fc9f590b638d37086b6e87d65e68`, inactive dependency ledger
 `125de5f683286c4e8da04b76c6633a2a8e123f5a`)
+
+CLI and compatibility wording refreshed 2026-09-07 against the release
+documentation input `a78770cfabe5daf631e5829133a0cae8db0210d7`. This narrow
+refresh does not rerun the table's checks, repin historical receipts, activate
+a dependency freeze, or qualify a candidate.
 
 This is the front panel for current `unsafe-review` support posture. The full
 claim-to-proof ledger remains [`SUPPORT_TIERS.md`](SUPPORT_TIERS.md).
 The current schema and availability receipt is
-[`RELEASE_COMPATIBILITY.md`](RELEASE_COMPATIBILITY.md); it records owner-pending
-unknown-field policy rather than inferring a compatibility guarantee.
+[`RELEASE_COMPATIBILITY.md`](RELEASE_COMPATIBILITY.md); it records the accepted
+[SPEC-0011](../specs/UNSAFE-REVIEW-SPEC-0011-pr-ci-output.md) producer/verifier
+contract, including required and additive fields, closed vocabularies, the
+producer floor, and deprecation boundaries. Review-kit remains schema `0.1`;
+saved LSP is `0.2`, with legacy rendering separately bounded by SPEC-0012.
+Accepted contract rules do not establish current-candidate consumer execution;
+that qualification remains with #1921.
 
 All surfaces describe static unsafe-review evidence. None of them is a
 memory-safety proof, UB-free claim, Miri-clean claim, target-feature availability
@@ -25,7 +35,7 @@ proof, site-execution proof, or calibrated policy gate.
 No current surface is calibrated. Blocking policy remains out of scope until
 calibration exists and support tiers are explicitly promoted.
 
-## Current Posture
+## Retained posture and evidence
 
 | Surface | Current posture | Evidence | Not claimed |
 |---|---|---|---|
@@ -46,11 +56,18 @@ unfrozen: its version, candidate SHA, dependency freeze, and publication state
 remain unset in the [draft release cutline](RELEASE_CUTLINE.md). Do not read
 Swarm main integration as public availability or qualification.
 
-The current first-use contract is install → `doctor` → `pr` → bounded
-action-first reviewer front panel → `explain`/`context` or human review →
-named external verification. The
-preview-only baseline slice does not make a completed top-level `init` command
-part of the supported path.
+The public `v0.3.8` first-use path is install → `doctor` → `pr` → reviewer
+summary → `explain`/`context` or human review → named external verification.
+That release has `baseline init` but no top-level `init`.
+
+On unpublished swarm main, optional top-level `init` previews repository
+adoption before `doctor` and `pr`; the integrated `pr` route presents the
+bounded action-first front panel. Preview `init` applies no workflow or
+configuration; explicit `--out` writes only the proposal JSON. It remains
+separate from baseline creation. The [first-use guide](../FIRST_USE.md#preview-repository-adoption)
+selects the workspace binary explicitly. These integrated commands retain
+the existing experimental posture and require separate installed-candidate
+qualification.
 
 ## Promotion Posture
 

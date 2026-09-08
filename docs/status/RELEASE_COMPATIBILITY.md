@@ -50,9 +50,9 @@ retain their original producer and consumer identities.
 
 ## CLI and distribution posture
 
-- `pr` is the preferred first-use entrypoint and presents the bounded
-  action-first front panel; `first-pr` and `review` remain compatibility names
-  for the same advisory bundle and detailed route.
+- On unpublished swarm main, `pr` is the preferred first-use entrypoint and
+  presents the bounded action-first front panel; `first-pr` and `review` remain
+  compatibility names for the same advisory bundle and detailed route.
 - `doctor`, `explain`, `context`, saved artifacts, and `baseline init` are
   present in the current tree. Top-level `init` is also integrated on
   unpublished swarm main: it previews an adoption proposal and applies no
