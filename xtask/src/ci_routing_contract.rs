@@ -261,11 +261,12 @@ fn check_ub_review_advisory_text(path: &str, text: &str) -> Result<(), String> {
 /// Read only the shipped workflow's block layout (jobs at column 0, steps at
 /// column 4, step entries at column 6). This deliberately does not interpret
 /// alternate YAML layouts. Comments and scalar bodies cannot supply step keys.
+/// Exactly one action must retain both the merge checkout and hosted PR identity.
 fn check_ub_review_head_input(path: &str, text: &str) -> Result<(), String> {
     let mut in_jobs = false;
     let mut in_steps = false;
     let mut step = Vec::new();
-    let mut found_review = false;
+    let mut review_steps = 0usize;
     for line in text.lines() {
         let trimmed = line.trim();
         if trimmed.starts_with('#') || trimmed.is_empty() {
@@ -273,7 +274,9 @@ fn check_ub_review_head_input(path: &str, text: &str) -> Result<(), String> {
         }
         let indent = line.bytes().take_while(|byte| *byte == b' ').count();
         if indent <= 6 && !step.is_empty() {
-            found_review |= check_ub_review_step_head(path, &step)?;
+            if check_ub_review_step_head(path, &step)? {
+                review_steps = review_steps.saturating_add(1);
+            }
             step.clear();
         }
         if indent == 0 {
@@ -290,12 +293,12 @@ fn check_ub_review_head_input(path: &str, text: &str) -> Result<(), String> {
             step.push((indent, trimmed));
         }
     }
-    if !step.is_empty() {
-        found_review |= check_ub_review_step_head(path, &step)?;
+    if !step.is_empty() && check_ub_review_step_head(path, &step)? {
+        review_steps = review_steps.saturating_add(1);
     }
-    if !found_review {
+    if review_steps != 1 {
         return Err(format!(
-            "{path} missing active EffortlessMetrics/ub-review step in the supported block layout"
+            "{path} must have exactly one active EffortlessMetrics/ub-review step in the supported block layout; found {review_steps}"
         ));
     }
     Ok(())
@@ -316,30 +319,35 @@ fn check_ub_review_step_head(path: &str, step: &[(usize, &str)]) -> Result<bool,
         return Ok(false);
     }
     let mut in_with = false;
-    let mut with_count = 0;
+    let mut with_count = 0usize;
     let mut inputs = Vec::new();
-    let mut after_head_input = false;
+    let mut after_identity_input = false;
     let mut continued_input = false;
     for (indent, field) in step {
-        continued_input |= after_head_input && *indent > 10;
-        after_head_input = false;
+        continued_input |= after_identity_input && *indent > 10;
+        after_identity_input = false;
         if *indent == 8 {
             in_with = false;
             if let Some(("with", value)) = ub_review_mapping_field(field) {
-                with_count += 1;
+                with_count = with_count.saturating_add(1);
                 in_with = value.is_empty();
             }
         } else if in_with
             && *indent == 10
-            && let Some(("pr-head-sha", value)) = ub_review_mapping_field(field)
+            && let Some((key @ ("head" | "pr-head-sha"), value)) = ub_review_mapping_field(field)
         {
-            inputs.push(value);
-            after_head_input = true;
+            inputs.push((key, value));
+            after_identity_input = true;
         }
     }
-    if uses.len() != 1 || with_count != 1 || inputs.as_slice() != [REQUIRED] || continued_input {
+    inputs.sort_unstable();
+    if uses.len() != 1
+        || with_count != 1
+        || inputs.as_slice() != [("head", "HEAD"), ("pr-head-sha", REQUIRED)]
+        || continued_input
+    {
         return Err(format!(
-            "{path} active EffortlessMetrics/ub-review step must have exactly one with mapping containing pr-head-sha: {REQUIRED}; duplicate keys and continued input values are not supported"
+            "{path} active EffortlessMetrics/ub-review step must have exactly one with mapping containing head: HEAD and pr-head-sha: {REQUIRED}; duplicate keys and continued input values are not supported"
         ));
     }
     Ok(true)
@@ -518,6 +526,81 @@ fi
     }
 
     #[test]
+    fn advisory_merge_head_requires_checked_out_head() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ub-review.yml");
+        for replacement in [
+            "",
+            "head: ${{ github.event.pull_request.head.sha }}",
+            "head: ${{ github.sha }}",
+        ] {
+            let invalid = text.replace(
+                "head: HEAD",
+                &format!("# head: HEAD\n          {replacement}"),
+            );
+            reject_pr_head_decoy(&invalid)?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_merge_head_rejects_duplicate_keys() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ub-review.yml");
+        for duplicate in [
+            "head: ${{ github.event.pull_request.head.sha }}",
+            "'head': wrong",
+            "\"head\": wrong",
+            "head : wrong",
+            "head: HEAD",
+        ] {
+            for replacement in [
+                format!("head: HEAD\n          {duplicate}"),
+                format!("{duplicate}\n          head: HEAD"),
+            ] {
+                reject_pr_head_decoy(&text.replace("head: HEAD", &replacement))?;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_merge_head_rejects_continued_plain_scalar() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ub-review.yml");
+        for continuation in [
+            "\n            wrong",
+            "\n          # comment\n\n            wrong",
+        ] {
+            reject_pr_head_decoy(
+                &text.replace("head: HEAD", &format!("head: HEAD{continuation}")),
+            )?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn advisory_rejects_duplicate_complete_review_steps() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ub-review.yml");
+        let review_marker = "      - name: Run ub-review";
+        let upload_marker = "      - name: Upload artifacts";
+        let (before, rest) = text
+            .split_once(review_marker)
+            .ok_or_else(|| "shipped review step missing".to_string())?;
+        let (review, after) = rest
+            .split_once(upload_marker)
+            .ok_or_else(|| "shipped upload step missing".to_string())?;
+        let invalid =
+            format!("{before}{review_marker}{review}{review_marker}{review}{upload_marker}{after}");
+        let Err(error) = check_ub_review_advisory_text("fixture.yml", &invalid) else {
+            return Err("accepted duplicate complete valid ub-review steps".to_string());
+        };
+        if !error.contains("exactly one active EffortlessMetrics/ub-review step") {
+            return Err(format!(
+                "unexpected duplicate review-step rejection: {error}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn advisory_pr_head_in_another_step_cannot_supply_action_input() -> Result<(), String> {
         let text = include_str!("../../.github/workflows/ub-review.yml");
         let required = "pr-head-sha: ${{ github.event.pull_request.head.sha }}";
@@ -620,6 +703,7 @@ fi
         for (old, new) in [
             ("uses:", "'uses':"),
             ("with:", "\"with\":"),
+            ("head:", "'head':"),
             ("pr-head-sha:", "pr-head-sha :"),
         ] {
             check_ub_review_advisory_text("fixture.yml", &text.replace(old, new))?;
