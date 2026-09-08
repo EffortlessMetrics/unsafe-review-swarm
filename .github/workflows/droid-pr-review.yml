@@ -50,7 +50,7 @@ jobs:
       - name: Run Droid Auto Review
         continue-on-error: true
         timeout-minutes: 40
-        uses: Factory-AI/droid-action@9547b0cf20a6357bfac0aa715fcfd0f47e5cf621
+        uses: Factory-AI/droid-action@f8b3d9f872c85b54a582c53a1950caacf0560b73
         env:
           ANTHROPIC_AUTH_TOKEN: ""
           ANTHROPIC_BASE_URL: ""
