@@ -4,3 +4,5 @@
 /fixtures/**/expected.repair-queue.json text eol=lf
 /fixtures/**/expected.comment-plan.json text eol=lf
 /docs/dogfood/USEFULNESS.md text eol=lf
+/docs/dogfood/reports/external-pilot-usefulness-rollup.json text eol=lf
+/docs/dogfood/reports/external-pilot-usefulness-rollup.md text eol=lf
