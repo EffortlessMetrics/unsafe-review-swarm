@@ -217,6 +217,22 @@ to a fixed status. This proves only a structured failed-test-result surface; it
 does not prove root cause, PR causality, safety, UB-freedom, Miri cleanliness,
 or site execution.
 
+The diagnostic identity subset is explicit: binary IDs accept ASCII Cargo
+name components, `package::target`, and `package::bin/target` (also `bench`
+and `example`). Test names accept `::`-separated ASCII Rust identifiers,
+including raw `r#` identifiers. Arbitrary paths and unsupported identities are
+omitted with a fixed diagnostic status. This subset does not restrict which
+tests run or change their result.
+
+JUnit retry elements, including `rerunError`, describe attempt history. Only
+direct `failure` or `error` testcase children identify a currently failed test;
+flaky history alone does not. Failure-message attributes and output bodies are
+discarded rather than projected. Report-lock and diagnostic-write failures
+after child execution are diagnostic unavailability, not test failures. The
+combined nextest/doctest result remains authoritative in those cases, and the
+workflow checks copy-before-validation-before-output ordering against its
+shipped text.
+
 ## 4. CI lane taxonomy
 
 Every live or planned CI lane must have a named purpose. High-cost or

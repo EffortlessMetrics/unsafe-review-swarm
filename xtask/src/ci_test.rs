@@ -28,6 +28,10 @@ const PARSE_REASONS: &[&str] = &[
     "unknown_attribute",
     "malformed_tag",
     "unsupported_structure",
+    "unknown_element",
+    "malformed_nesting",
+    "unsupported_identity",
+    "report_io",
     "input_limit",
 ];
 
@@ -79,6 +83,10 @@ impl ParseOutcome {
         }
     }
 
+    const fn unavailable_report() -> Self {
+        Self::status("unavailable_report", "report_io")
+    }
+
     const fn malformed(reason: &'static str) -> Self {
         Self::status("malformed_report", reason)
     }
@@ -117,8 +125,14 @@ pub(crate) fn run(root: &Path) -> Result<(), String> {
     reject_symlink(&output_path)?;
 
     let runner = resolve_runner(root, &run_key)?;
-    let (nextest_exit, records, parse_outcome) = run_nextest(&runner, root, &staging)?;
-    let doctest_exit = run_doctests(root)?;
+    run_with_tools(root, &staging, &runner, Path::new("cargo"))
+}
+
+/// Execute both authoritative children; reporting after execution is best effort.
+/// Explicit tool paths let fixtures exercise this same path without global env changes.
+fn run_with_tools(root: &Path, staging: &Path, runner: &Path, cargo: &Path) -> Result<(), String> {
+    let (nextest_exit, records, parse_outcome) = run_nextest(runner, root, staging)?;
+    let doctest_exit = run_doctests(root, cargo)?;
     let core_exit = if nextest_exit == 0 && doctest_exit == 0 {
         0
     } else if nextest_exit != 0 {
@@ -126,17 +140,26 @@ pub(crate) fn run(root: &Path) -> Result<(), String> {
     } else {
         doctest_exit
     };
-    write_diagnostics(
-        &output_path,
+    let diagnostics_status = if write_diagnostics(
+        &staging.join("test-diagnostics.json"),
         nextest_exit,
         doctest_exit,
         core_exit,
         parse_outcome.stream_status,
         parse_outcome.parse_reason,
         &records,
-    )?;
+    )
+    .is_ok()
+    {
+        "written"
+    } else {
+        // Never replace the child verdict with a diagnostic filesystem error.
+        // A stale diagnostic must not become evidence for this execution.
+        let _ = fs::remove_file(staging.join("test-diagnostics.json"));
+        "unavailable"
+    };
     println!(
-        "ci-test: nextest_exit={nextest_exit} doctest_exit={doctest_exit} stream_status={} parse_reason={}",
+        "ci-test: nextest_exit={nextest_exit} doctest_exit={doctest_exit} diagnostics_status={diagnostics_status} stream_status={} parse_reason={}",
         parse_outcome.stream_status,
         parse_outcome.parse_reason.unwrap_or("none")
     );
@@ -221,6 +244,7 @@ pub(crate) fn validate_diagnostics(path: &Path) -> Result<(), String> {
     if !matches!(
         stream_status,
         "ok" | "missing_report"
+            | "unavailable_report"
             | "malformed_report"
             | "malformed_record"
             | "unexpected_field"
@@ -273,7 +297,7 @@ pub(crate) fn validate_diagnostics(path: &Path) -> Result<(), String> {
         if record.get("status").and_then(serde_json::Value::as_str) != Some("failed") {
             return Err("test diagnostic status is outside the closed vocabulary".to_string());
         }
-        if contains_hostile(&package) || contains_hostile(&test) {
+        if !valid_binary_identity(&package) || !valid_test_identity(&test) {
             return Err("test diagnostic contained hostile identity".to_string());
         }
         let current = (package, test);
@@ -307,6 +331,51 @@ fn bounded_json_string(value: Option<&serde_json::Value>) -> Result<String, Stri
         return Err("test diagnostic identity exceeded bound".to_string());
     }
     Ok(value.to_string())
+}
+
+/// A bounded ASCII subset of nextest's stable RustBinaryId representation.
+fn valid_binary_identity(value: &str) -> bool {
+    if value.len() > MAX_FIELD_BYTES || contains_hostile(value) {
+        return false;
+    }
+    let (package, suffix) = value
+        .split_once("::")
+        .map_or((value, None), |(package, suffix)| (package, Some(suffix)));
+    if !valid_cargo_component(package) {
+        return false;
+    }
+    match suffix {
+        None => true,
+        Some(suffix) => match suffix.split_once('/') {
+            None => valid_cargo_component(suffix),
+            Some((kind, target)) => {
+                matches!(kind, "bin" | "bench" | "example") && valid_cargo_component(target)
+            }
+        },
+    }
+}
+
+fn valid_cargo_component(value: &str) -> bool {
+    !value.is_empty()
+        && value
+            .bytes()
+            .all(|byte| byte.is_ascii_alphanumeric() || matches!(byte, b'_' | b'-'))
+}
+
+/// Ordinary ASCII Rust test paths, including raw identifier components.
+fn valid_test_identity(value: &str) -> bool {
+    !value.is_empty()
+        && value.len() <= MAX_FIELD_BYTES
+        && !contains_hostile(value)
+        && value.split("::").all(|component| {
+            let identifier = component.strip_prefix("r#").unwrap_or(component);
+            let mut bytes = identifier.bytes();
+            identifier != "_"
+                && bytes
+                    .next()
+                    .is_some_and(|byte| byte.is_ascii_alphabetic() || byte == b'_')
+                && bytes.all(|byte| byte.is_ascii_alphanumeric() || byte == b'_')
+        })
 }
 
 fn create_private_directory(path: &Path) -> Result<(), String> {
@@ -709,12 +778,21 @@ fn run_nextest(
     let status = if junit.exists() && !junit.is_symlink() {
         let locked_report = handoff.join("nextest-junit.locked.xml");
         let _ = fs::remove_file(&locked_report);
-        fs::rename(&junit, &locked_report)
-            .map_err(|error| format!("lock private nextest report: {error}"))?;
-        reject_symlink(&locked_report)?;
-        let status = match bounded_read(&locked_report) {
-            Ok(bytes) => parse_junit(&bytes, &mut records),
-            Err(_) => ParseOutcome::status("truncated_input", "input_limit"),
+        let status = if fs::rename(&junit, &locked_report).is_err() {
+            ParseOutcome::unavailable_report()
+        } else {
+            match bounded_read(&locked_report) {
+                Ok(bytes) => parse_junit(&bytes, &mut records),
+                Err(_) => {
+                    if fs::symlink_metadata(&locked_report).is_ok_and(|metadata| {
+                        metadata.is_file() && metadata.len() > MAX_INPUT_BYTES
+                    }) {
+                        ParseOutcome::status("truncated_input", "input_limit")
+                    } else {
+                        ParseOutcome::unavailable_report()
+                    }
+                }
+            }
         };
         let _ = fs::remove_file(&locked_report);
         status
@@ -811,7 +889,7 @@ fn parse_junit(bytes: &[u8], records: &mut BTreeSet<Diagnostic>) -> ParseOutcome
         return ParseOutcome::malformed("unexpected_root");
     }
     let mut cursor = 0_usize;
-    let mut count = 0_usize;
+    let mut outcome = ParseOutcome::ok();
     while let Some(relative) = text[cursor..].find("<testcase") {
         let start = cursor + relative;
         let Some(tag_end_relative) = text[start..].find('>') else {
@@ -829,11 +907,17 @@ fn parse_junit(bytes: &[u8], records: &mut BTreeSet<Diagnostic>) -> ParseOutcome
             let close = tag_end + 1 + close_relative;
             (&text[tag_end + 1..close], close + "</testcase>".len())
         };
-        if body.contains("<testcase") || validate_testcase_body(body).is_err() {
-            return ParseOutcome::status("malformed_record", "unsupported_structure");
-        }
+        let failed = match validate_testcase_body(body) {
+            Ok(failed) => failed,
+            Err(reason) => return ParseOutcome::status("malformed_record", reason),
+        };
         let attrs = match parse_xml_attributes(tag) {
             Ok(attrs) => attrs,
+            Err(status @ ("hostile_record" | "overlong_record")) => {
+                outcome = ParseOutcome::status(status, parser_reason(status));
+                cursor = next_cursor;
+                continue;
+            }
             Err(status) => return ParseOutcome::status(status, parser_reason(status)),
         };
         let Some(package) = attrs.get("classname") else {
@@ -842,32 +926,25 @@ fn parse_junit(bytes: &[u8], records: &mut BTreeSet<Diagnostic>) -> ParseOutcome
         let Some(test) = attrs.get("name") else {
             return ParseOutcome::status("malformed_record", "malformed_tag");
         };
-        let status = if body.contains("<failure")
-            || body.contains("<error")
-            || body.contains("<rerunFailure")
-            || body.contains("<flakyFailure")
-            || body.contains("<flakyError")
-        {
-            "failed"
-        } else if body.contains("<skipped") {
-            "skipped"
-        } else {
-            "passed"
-        };
-        if status == "failed" {
-            if count >= MAX_RECORDS {
-                return ParseOutcome::status("record_limit", "input_limit");
+        if failed {
+            if !valid_binary_identity(package) || !valid_test_identity(test) {
+                outcome = ParseOutcome::status("hostile_record", "unsupported_identity");
+                cursor = next_cursor;
+                continue;
             }
-            records.insert(Diagnostic {
+            let record = Diagnostic {
                 package: package.clone(),
                 test: test.clone(),
-                status: status.to_string(),
-            });
-            count += 1;
+                status: "failed".to_string(),
+            };
+            if records.len() >= MAX_RECORDS && !records.contains(&record) {
+                return ParseOutcome::status("record_limit", "input_limit");
+            }
+            records.insert(record);
         }
         cursor = next_cursor;
     }
-    ParseOutcome::ok()
+    outcome
 }
 
 fn parser_reason(status: &'static str) -> &'static str {
@@ -971,17 +1048,18 @@ fn validate_root_opening(text: &str) -> Result<(), ()> {
         "uuid",
         "package",
     ];
-    parse_attributes(tag, root, &allowed)
+    parse_attributes(tag, root, &allowed, false)
         .map(|_| ())
         .map_err(|_error| ())
 }
 
-fn validate_testcase_body(body: &str) -> Result<(), ()> {
+fn validate_testcase_body(body: &str) -> Result<bool, &'static str> {
     let mut rest = body;
     let mut open = Vec::new();
+    let mut failed = false;
     while let Some(start) = rest.find('<') {
         rest = &rest[start..];
-        let end = rest.find('>').ok_or(())?;
+        let end = rest.find('>').ok_or("malformed_tag")?;
         let tag = rest[..=end].trim();
         let closing = tag.starts_with("</");
         let self_closing = tag.ends_with("/>");
@@ -992,60 +1070,53 @@ fn validate_testcase_body(body: &str) -> Result<(), ()> {
             .trim_end_matches('/')
             .split(|character: char| character.is_whitespace())
             .next()
-            .ok_or(())?;
+            .ok_or("malformed_tag")?;
         let name = name.trim();
         let allowed_attributes = match name {
             "failure" | "error" | "skipped" => &["message", "type"][..],
-            "rerunFailure" | "flakyFailure" | "flakyError" => {
+            "rerunFailure" | "rerunError" | "flakyFailure" | "flakyError" => {
                 &["message", "type", "time", "timestamp"][..]
             }
             "system-out" | "system-err" => &[][..],
-            _ => return Err(()),
+            _ => return Err("unknown_element"),
         };
         if !closing
             && open.last().is_some_and(|parent| {
                 !matches!(
                     (*parent, name),
                     (
-                        "rerunFailure" | "flakyFailure" | "flakyError",
+                        "rerunFailure" | "rerunError" | "flakyFailure" | "flakyError",
                         "system-out" | "system-err"
                     )
                 )
             })
         {
-            return Err(());
+            return Err("malformed_nesting");
         }
-        if !closing && parse_attributes(tag, name, allowed_attributes).is_err() {
-            return Err(());
+        if !closing {
+            parse_attributes(tag, name, allowed_attributes, true).map_err(parser_reason)?;
+            // Retry/flaky elements alone are history of an ultimately passing
+            // test. Only the direct current-result element establishes failure.
+            if open.is_empty() && matches!(name, "failure" | "error") {
+                failed = true;
+            }
         }
         if closing && tag != format!("</{name}>") {
-            return Err(());
+            return Err("malformed_tag");
         }
         if closing {
             if open.pop() != Some(name) {
-                return Err(());
+                return Err("malformed_nesting");
             }
-        } else if self_closing {
-            if open.last().is_some_and(|parent| {
-                !matches!(
-                    (*parent, name),
-                    (
-                        "rerunFailure" | "flakyFailure" | "flakyError",
-                        "system-out" | "system-err"
-                    )
-                )
-            }) {
-                return Err(());
-            }
-        } else {
+        } else if !self_closing {
             open.push(name);
         }
         rest = &rest[end + 1..];
     }
     if !open.is_empty() {
-        return Err(());
+        return Err("malformed_nesting");
     }
-    Ok(())
+    Ok(failed)
 }
 
 fn parse_xml_attributes(
@@ -1055,6 +1126,7 @@ fn parse_xml_attributes(
         tag,
         "testcase",
         &["name", "classname", "time", "timestamp", "file", "line"],
+        false,
     )
 }
 
@@ -1062,6 +1134,7 @@ fn parse_attributes(
     tag: &str,
     expected_name: &str,
     allowed: &[&str],
+    discard_values: bool,
 ) -> Result<std::collections::BTreeMap<String, String>, &'static str> {
     let mut attrs = std::collections::BTreeMap::new();
     let mut rest = tag
@@ -1093,10 +1166,25 @@ fn parse_attributes(
         let Some(end) = quoted[1..].find('"').map(|offset| offset + 1) else {
             return Err("malformed_record");
         };
-        let value = xml_unescape(&quoted[1..end])?;
-        if value.is_empty() || value.len() > MAX_FIELD_BYTES || contains_hostile(&value) {
-            return Err("hostile_record");
+        let raw_value = &quoted[1..end];
+        if raw_value.contains('<') {
+            return Err("malformed_record");
         }
+        // Producer messages are arbitrary failure content even with JUnit
+        // stdout/stderr disabled. Validate their attribute shape, then discard
+        // their values under the report's total input bound without projection.
+        let value = if discard_values {
+            String::new()
+        } else {
+            let value = xml_unescape(raw_value)?;
+            if value.len() > MAX_FIELD_BYTES {
+                return Err("overlong_record");
+            }
+            if value.is_empty() || contains_hostile(&value) {
+                return Err("hostile_record");
+            }
+            value
+        };
         if attrs.insert(key.to_string(), value).is_some() {
             return Err("unexpected_field");
         }
@@ -1132,8 +1220,8 @@ fn contains_hostile(value: &str) -> bool {
         || value.contains("eyJhbGci")
 }
 
-fn run_doctests(root: &Path) -> Result<i32, String> {
-    let mut child = Command::new("cargo")
+fn run_doctests(root: &Path, cargo: &Path) -> Result<i32, String> {
+    let mut child = runner_command(cargo)
         .current_dir(root)
         .args(["test", "--workspace", "--doc", "--locked"])
         .stdout(Stdio::null())
@@ -1335,6 +1423,400 @@ esac
         Ok(())
     }
 
+    /// Producer structure from nextest 60fa45f638ffc3f35e74afa65737f45fcd32db2a,
+    /// fixtures/fixture-project-junit.xml. Failure descriptions/output omitted.
+    /// The added execution-error case follows quick-junit
+    /// 670fdd1846ea456fb9c0033faee374f31f7c79b8, serialize_rerun.
+    const PINNED_PRODUCER_REPORT: &str = r#"<?xml version="1.0" encoding="UTF-8"?>
+<testsuites name="nextest-run" tests="4" failures="1" errors="1" skipped="0" uuid="45c50042-482e-477e-88a2-60cfcc3eaf95">
+  <testsuite name="fixture-project::basic" tests="4" failures="1" errors="1" skipped="0">
+    <testcase name="test_cwd" classname="fixture-project::basic" time="0.004"/>
+    <testcase name="test_failure_assert" classname="fixture-project::basic" time="0.004">
+      <failure type="test failure"/>
+      <rerunFailure timestamp="2024-01-09T07:50:12.670+00:00" time="0.004" type="test failure"/>
+    </testcase>
+    <testcase name="test_flaky_mod_4" classname="fixture-project::basic" time="0.004">
+      <flakyFailure timestamp="2024-01-09T07:50:12.665+00:00" time="0.004" type="test failure"/>
+      <flakyError timestamp="2024-01-09T07:50:12.671+00:00" time="0.004" type="execution failure"/>
+    </testcase>
+    <testcase name="test_execution_error" classname="fixture-project::basic" time="0.004">
+      <error type="execution failure"/>
+      <rerunError timestamp="2024-01-09T07:50:12.670+00:00" time="0.004" type="execution failure"/>
+    </testcase>
+  </testsuite>
+</testsuites>"#;
+
+    fn write_authority_tools(
+        dir: &Path,
+        nextest_exit: i32,
+        doctest_exit: i32,
+    ) -> Result<(PathBuf, PathBuf), String> {
+        let (runner, cargo, nextest_script, cargo_script) = if cfg!(windows) {
+            (
+                dir.join("authority-nextest.ps1"),
+                dir.join("authority-cargo.ps1"),
+                format!(
+                    r#"$ErrorActionPreference = 'Stop'
+$configIndex = [Array]::IndexOf($args, '--config-file')
+if ($configIndex -lt 0 -or $args.Count -ne 10) {{ exit 91 }}
+if (($args[0..3] -join ' ') -ne 'nextest run --profile ci') {{ exit 92 }}
+if (($args[6..9] -join ' ') -ne '--workspace --all-targets --locked --no-fail-fast') {{ exit 93 }}
+$configText = Get-Content -Raw -LiteralPath $args[$configIndex + 1]
+$match = [regex]::Match($configText, '(?m)^path = "([^"]+)"')
+if (-not $match.Success) {{ exit 94 }}
+if (Test-Path -LiteralPath 'authority-report.xml') {{
+  Copy-Item -LiteralPath 'authority-report.xml' -Destination $match.Groups[1].Value
+}}
+Set-Content -LiteralPath 'nextest-ran' -Value 'ran' -NoNewline
+Write-Output 'ghp_untrusted_child_output'
+[Console]::Error.WriteLine('-----BEGIN PRIVATE KEY-----')
+exit {nextest_exit}
+"#
+                ),
+                format!(
+                    r#"$ErrorActionPreference = 'Stop'
+if (($args -join ' ') -ne 'test --workspace --doc --locked') {{ exit 95 }}
+if (-not (Test-Path -LiteralPath 'nextest-ran')) {{ exit 96 }}
+Set-Content -LiteralPath 'doctests-ran' -Value 'ran' -NoNewline
+exit {doctest_exit}
+"#
+                ),
+            )
+        } else {
+            (
+                dir.join("authority-nextest.sh"),
+                dir.join("authority-cargo.sh"),
+                format!(
+                    r#"#!/bin/sh
+[ "$#" = 10 ] || exit 91
+[ "$1 $2 $3 $4 $5" = 'nextest run --profile ci --config-file' ] || exit 92
+config="$6"
+shift 6
+[ "$*" = '--workspace --all-targets --locked --no-fail-fast' ] || exit 93
+report=$(sed -n 's/^path = "\(.*\)"$/\1/p' "$config")
+[ -n "$report" ] || exit 94
+if [ -f authority-report.xml ]; then cp authority-report.xml "$report" || exit 97; fi
+printf '%s' ran > nextest-ran
+printf '%s\n' ghp_untrusted_child_output
+printf '%s\n' '-----BEGIN PRIVATE KEY-----' >&2
+exit {nextest_exit}
+"#
+                ),
+                format!(
+                    r#"#!/bin/sh
+[ "$*" = 'test --workspace --doc --locked' ] || exit 95
+[ -f nextest-ran ] || exit 96
+printf '%s' ran > doctests-ran
+exit {doctest_exit}
+"#
+                ),
+            )
+        };
+        fs::write(&runner, nextest_script)
+            .map_err(|error| format!("write nextest fixture: {error}"))?;
+        fs::write(&cargo, cargo_script).map_err(|error| format!("write cargo fixture: {error}"))?;
+        Ok((runner, cargo))
+    }
+
+    fn authority_case(
+        dir: &Path,
+        nextest_exit: i32,
+        doctest_exit: i32,
+        fault: &str,
+    ) -> Result<(), String> {
+        let handoff = dir.join("handoff-run-1");
+        create_private_directory(&handoff)?;
+        let report = match fault {
+            "missing" => None,
+            "malformed" => Some("<testsuite><testcase>"),
+            "hostile" => Some(
+                r#"<testsuite><testcase classname="/tmp/private-path" name="test_failure"><failure/></testcase></testsuite>"#,
+            ),
+            _ => Some(PINNED_PRODUCER_REPORT),
+        };
+        if let Some(report) = report {
+            fs::write(dir.join("authority-report.xml"), report)
+                .map_err(|error| format!("write report fixture: {error}"))?;
+        }
+        let diagnostic = handoff.join("test-diagnostics.json");
+        match fault {
+            "publication" => fs::create_dir(&diagnostic)
+                .map_err(|error| format!("obstruct diagnostic: {error}"))?,
+            "lock" => fs::create_dir(handoff.join("nextest-junit.locked.xml"))
+                .map_err(|error| format!("obstruct report lock: {error}"))?,
+            _ => {}
+        }
+        let (runner, cargo) = write_authority_tools(dir, nextest_exit, doctest_exit)?;
+        let result = run_with_tools(dir, &handoff, &runner, &cargo);
+        let expected_exit = if nextest_exit != 0 {
+            nextest_exit
+        } else {
+            doctest_exit
+        };
+        match (result, expected_exit) {
+            (Ok(()), 0) => {}
+            (Err(error), code)
+                if code != 0
+                    && error == format!("structured test run failed with exit code {code}") => {}
+            (actual, _) => {
+                return Err(format!(
+                    "child verdict changed: fault={fault}, expected={expected_exit}, actual={actual:?}"
+                ));
+            }
+        }
+        if fs::read(dir.join("doctests-ran"))
+            .map_err(|error| format!("read doctest receipt: {error}"))?
+            != b"ran"
+        {
+            return Err("doctest fixture did not execute after nextest".to_string());
+        }
+        if fault == "publication" {
+            if !diagnostic.is_dir() {
+                return Err("diagnostic failure fixture did not obstruct publication".to_string());
+            }
+        } else {
+            validate_diagnostics(&diagnostic)?;
+            let bytes =
+                fs::read(&diagnostic).map_err(|error| format!("read diagnostic: {error}"))?;
+            let text = std::str::from_utf8(&bytes)
+                .map_err(|error| format!("diagnostic UTF-8: {error}"))?;
+            if text.contains("untrusted_child_output")
+                || text.contains("PRIVATE KEY")
+                || text.contains("private-path")
+            {
+                return Err("child output or rejected identity entered diagnostics".to_string());
+            }
+            let value: serde_json::Value = serde_json::from_slice(&bytes)
+                .map_err(|error| format!("parse diagnostic: {error}"))?;
+            let expected_status = match fault {
+                "lock" => "unavailable_report",
+                "missing" => "missing_report",
+                "malformed" => "malformed_report",
+                "hostile" => "hostile_record",
+                _ => "ok",
+            };
+            if value.get("nextest_exit") != Some(&serde_json::json!(nextest_exit))
+                || value.get("doctest_exit") != Some(&serde_json::json!(doctest_exit))
+                || value.get("core_exit") != Some(&serde_json::json!(expected_exit))
+                || value
+                    .get("stream_status")
+                    .and_then(serde_json::Value::as_str)
+                    != Some(expected_status)
+            {
+                return Err(format!("component diagnostic drifted for {fault}: {value}"));
+            }
+        }
+        if handoff.join("nextest-junit.xml").exists() || handoff.join("nextest.toml").exists() {
+            return Err("raw handoff survived completed execution".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn complete_runner_preserves_child_verdicts_across_diagnostic_failures() -> Result<(), String> {
+        for (nextest_exit, doctest_exit, fault) in [
+            (0, 0, "none"),
+            (100, 0, "none"),
+            (0, 101, "none"),
+            (100, 101, "none"),
+            (0, 0, "publication"),
+            (100, 0, "publication"),
+            (0, 0, "lock"),
+            (100, 0, "lock"),
+            (0, 0, "malformed"),
+            (0, 0, "missing"),
+            (0, 0, "hostile"),
+        ] {
+            let dir = temp_dir("authority")?;
+            let result = authority_case(&dir, nextest_exit, doctest_exit, fault);
+            fs::remove_dir_all(&dir)
+                .map_err(|error| format!("clean authority fixture: {error}"))?;
+            result?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pinned_producer_reports_current_failure_without_flaky_pass_history() -> Result<(), String> {
+        let mut records = BTreeSet::new();
+        let outcome = parse_junit(PINNED_PRODUCER_REPORT.as_bytes(), &mut records);
+        let names: Vec<_> = records.iter().map(|record| record.test.as_str()).collect();
+        if outcome != "ok" || names != ["test_execution_error", "test_failure_assert"] {
+            return Err(format!(
+                "pinned producer classification drifted: {outcome:?}, {names:?}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn identity_projection_and_validation_accept_supported_binary_and_rust_names()
+    -> Result<(), String> {
+        let dir = temp_dir("supported-identities")?;
+        let result = (|| {
+            for (package, test) in [
+                ("unsafe-review-core", "tests::checks_contract"),
+                ("unsafe-review-cli::e2e", "first_pr_smoke"),
+                ("xtask::bin/xtask", "ci_test::tests::r#type"),
+                ("pkg_name::bench/target-name", "_module::test2"),
+                ("pkg-name::example/demo", "r#match::example_test"),
+            ] {
+                let report = format!(
+                    r#"<testsuite><testcase classname="{package}" name="{test}"><failure/></testcase></testsuite>"#
+                );
+                let mut records = BTreeSet::new();
+                let outcome = parse_junit(report.as_bytes(), &mut records);
+                if outcome != "ok"
+                    || records.len() != 1
+                    || records
+                        .iter()
+                        .next()
+                        .is_none_or(|record| record.package != package || record.test != test)
+                {
+                    return Err(format!(
+                        "supported identity rejected: {package}, {test}, {outcome:?}"
+                    ));
+                }
+                let path = dir.join("test-diagnostics.json");
+                write_diagnostics(&path, 100, 0, 100, "ok", None, &records)?;
+                validate_diagnostics(&path)?;
+            }
+            Ok(())
+        })();
+        let cleanup =
+            fs::remove_dir_all(&dir).map_err(|error| format!("clean identity fixture: {error}"));
+        result?;
+        cleanup
+    }
+
+    #[test]
+    fn unsupported_identities_are_omitted_and_independently_rejected_before_upload()
+    -> Result<(), String> {
+        let dir = temp_dir("rejected-identities")?;
+        let result = (|| {
+            for (package, test) in [
+                ("/tmp/private-path", "test_case"),
+                (r"C:\private\file", "test_case"),
+                ("pkg::bin/../private", "test_case"),
+                ("pkg::bin/name/extra", "test_case"),
+                ("pkg::unknown/target", "test_case"),
+                ("pkg::bin/name::nested", "test_case"),
+                ("pkg", "module::../private"),
+                ("pkg", "tests::test.rs"),
+                ("pkg", "tests::"),
+                ("pkg", "tests:::case"),
+                ("pkg", "tests::r#"),
+                ("pkg", "tests::_"),
+                ("pkg", "9test"),
+                ("pkg", "tests::ghp_secret"),
+                ("github_pat_redacted", "test_case"),
+                ("pkg", "test\nspoof"),
+                ("pkg", "模块::case"),
+                ("näme", "test_case"),
+            ] {
+                // A rejected record must not discard a later usable identity.
+                let report = format!(
+                    r#"<testsuite><testcase classname="{package}" name="{test}"><failure/></testcase><testcase classname="retained" name="tests::retained"><failure/></testcase></testsuite>"#
+                );
+                let mut records = BTreeSet::new();
+                let outcome = parse_junit(report.as_bytes(), &mut records);
+                if outcome != "hostile_record"
+                    || records.len() != 1
+                    || records.iter().next().is_none_or(|record| {
+                        record.package != "retained" || record.test != "tests::retained"
+                    })
+                {
+                    return Err(format!(
+                        "identity omission or continuation failed: {outcome:?}"
+                    ));
+                }
+                // Bypass the projector to exercise the upload validator independently.
+                let invalid = BTreeSet::from([Diagnostic {
+                    package: package.to_string(),
+                    test: test.to_string(),
+                    status: "failed".to_string(),
+                }]);
+                let path = dir.join("test-diagnostics.json");
+                write_diagnostics(&path, 100, 0, 100, "ok", None, &invalid)?;
+                if validate_diagnostics(&path).is_ok() {
+                    return Err("upload validator accepted an unsupported identity".to_string());
+                }
+            }
+            Ok(())
+        })();
+        let cleanup = fs::remove_dir_all(&dir)
+            .map_err(|error| format!("clean rejected identity fixture: {error}"));
+        result?;
+        cleanup
+    }
+
+    #[test]
+    fn discarded_failure_messages_do_not_reject_or_enter_identity_diagnostics() -> Result<(), String>
+    {
+        let dir = temp_dir("discarded-message")?;
+        let result = (|| {
+            let long_message = format!(
+                "ghp_discarded_message_{}&quot;&lt;&gt;",
+                "x".repeat(MAX_FIELD_BYTES + 1)
+            );
+            let report = format!(
+                r#"<testsuite><testcase classname="xtask::bin/xtask" name="tests::failed_case"><failure message="{long_message}" type="test failure">-----BEGIN PRIVATE KEY-----</failure><rerunError message="github_pat_discarded" type="execution failure"><system-err>private-output</system-err></rerunError></testcase></testsuite>"#
+            );
+            let mut records = BTreeSet::new();
+            let outcome = parse_junit(report.as_bytes(), &mut records);
+            if outcome != "ok" || records.len() != 1 {
+                return Err(format!(
+                    "discarded message affected identity parsing: {outcome:?}"
+                ));
+            }
+            let path = dir.join("test-diagnostics.json");
+            write_diagnostics(&path, 100, 0, 100, "ok", None, &records)?;
+            validate_diagnostics(&path)?;
+            let text = fs::read_to_string(&path)
+                .map_err(|error| format!("read message fixture: {error}"))?;
+            if [
+                "discarded",
+                "PRIVATE KEY",
+                "private-output",
+                "test failure",
+                "execution failure",
+            ]
+            .iter()
+            .any(|value| text.contains(value))
+            {
+                return Err("discarded failure content entered diagnostics".to_string());
+            }
+            Ok(())
+        })();
+        let cleanup =
+            fs::remove_dir_all(&dir).map_err(|error| format!("clean message fixture: {error}"));
+        result?;
+        cleanup
+    }
+
+    #[test]
+    fn parser_rejection_reasons_distinguish_structure_from_discarded_attributes()
+    -> Result<(), String> {
+        for (body, expected_reason) in [
+            ("<unknown/>", "unknown_element"),
+            ("<failure></error>", "malformed_nesting"),
+            (r#"<failure unexpected="ignored"/>"#, "unknown_attribute"),
+        ] {
+            let report = format!(
+                r#"<testsuite><testcase classname="demo" name="test_case">{body}</testcase></testsuite>"#
+            );
+            let mut records = BTreeSet::new();
+            let outcome = parse_junit(report.as_bytes(), &mut records);
+            if outcome.stream_status != "malformed_record"
+                || outcome.parse_reason != Some(expected_reason)
+                || !records.is_empty()
+            {
+                return Err(format!("parser reason drifted: {outcome:?}"));
+            }
+        }
+        Ok(())
+    }
+
     #[test]
     fn core_run_key_rejects_dot_path_segments() -> Result<(), String> {
         for run_key in [".", ".."] {
@@ -1513,7 +1995,7 @@ exit 101
         // cargo-nextest may emit retry/flaky failure elements plus diagnostic
         // streams under one testcase. Accept their bounded attributes and
         // structure, but project only the failed identity, never their body.
-        let nextest_nested_failures = br#"<testsuite name="demo"><testcase classname="demo::tests" name="rerun-fails"><rerunFailure message="retry" type="panic" timestamp="2026-08-22T03:00:00Z" time="0.01"><system-out>nested retry output</system-out>raw retry output</rerunFailure><flakyFailure message="flaky" type="panic"><system-err>nested flaky output</system-err>raw flaky output</flakyFailure><flakyError message="error" type="panic">raw flaky error</flakyError><system-out>raw stdout</system-out><system-err>raw stderr</system-err></testcase></testsuite>"#;
+        let nextest_nested_failures = br#"<testsuite name="demo"><testcase classname="demo::tests" name="rerun_fails"><failure type="panic"/><rerunFailure message="retry" type="panic" timestamp="2026-08-22T03:00:00Z" time="0.01"><system-out>nested retry output</system-out>raw retry output</rerunFailure><rerunError type="execution failure"><system-err>nested error output</system-err></rerunError><system-out>raw stdout</system-out><system-err>raw stderr</system-err></testcase></testsuite>"#;
         records.clear();
         if parse_junit(nextest_nested_failures, &mut records) != "ok" || records.len() != 1 {
             return Err("nextest nested failure fixture was rejected".to_string());
@@ -1522,17 +2004,17 @@ exit 101
             "nextest nested failure fixture did not retain its identity".to_string()
         })?;
         if projected.package != "demo::tests"
-            || projected.test != "rerun-fails"
+            || projected.test != "rerun_fails"
             || projected.status != "failed"
         {
             return Err("nextest nested failure projection drifted".to_string());
         }
-        let uuid_root = br#"<testsuite name="demo" uuid="6f6f2b1e-1eb2-4f5c-8b0e-1e0d6ebf5a10"><testcase classname="demo::tests" name="uuid-fails"><failure/></testcase></testsuite>"#;
+        let uuid_root = br#"<testsuite name="demo" uuid="6f6f2b1e-1eb2-4f5c-8b0e-1e0d6ebf5a10"><testcase classname="demo::tests" name="uuid_fails"><failure/></testcase></testsuite>"#;
         records.clear();
         if parse_junit(uuid_root, &mut records) != "ok" || records.len() != 1 {
             return Err("UUID-bearing JUnit root fixture was rejected".to_string());
         }
-        let cdata_failure = br#"<testsuite><testcase classname="demo::tests" name="cdata-fails"><failure><![CDATA[assertion details]]></failure></testcase></testsuite>"#;
+        let cdata_failure = br#"<testsuite><testcase classname="demo::tests" name="cdata_fails"><failure><![CDATA[assertion details]]></failure></testcase></testsuite>"#;
         records.clear();
         if parse_junit(cdata_failure, &mut records) != "ok" || records.len() != 1 {
             return Err("CDATA-wrapped failure fixture was rejected".to_string());
@@ -1574,7 +2056,7 @@ exit 101
         for index in 0..MAX_RECORDS {
             records.insert(Diagnostic {
                 package: format!("package-{index}"),
-                test: format!("test-{index}"),
+                test: format!("test_{index}"),
                 status: "failed".to_string(),
             });
         }
@@ -1596,7 +2078,7 @@ exit 101
         for index in 0..MAX_RECORDS {
             records.insert(Diagnostic {
                 package: format!("package-{index}-{}", "p".repeat(MAX_FIELD_BYTES - 16)),
-                test: format!("test-{index}-{}", "t".repeat(MAX_FIELD_BYTES - 12)),
+                test: format!("test_{index}_{}", "t".repeat(MAX_FIELD_BYTES - 12)),
                 status: "failed".to_string(),
             });
         }
@@ -1664,6 +2146,7 @@ exit 101
         for status in [
             "ok",
             "missing_report",
+            "unavailable_report",
             "malformed_report",
             "malformed_record",
             "unexpected_field",
@@ -1676,6 +2159,7 @@ exit 101
             let records = BTreeSet::new();
             let parse_reason = match status {
                 "ok" | "missing_report" => None,
+                "unavailable_report" => Some("report_io"),
                 _ => Some(parser_reason(status)),
             };
             write_diagnostics(&path, 101, 0, 101, status, parse_reason, &records)?;

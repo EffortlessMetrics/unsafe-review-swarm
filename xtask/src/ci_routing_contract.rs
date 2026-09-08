@@ -160,7 +160,28 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
         ],
     )?;
     check_private_staging_order(path, text)?;
-    check_core_gate_launch_order(path, text)
+    check_core_gate_launch_order(path, text)?;
+    check_diagnostics_staging_order(path, text)
+}
+
+fn check_diagnostics_staging_order(path: &str, text: &str) -> Result<(), String> {
+    let mut previous = None;
+    for marker in [
+        r#"cp --no-dereference "$diagnostics_source" "$diagnostics_path""#,
+        r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#,
+        r#"echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT""#,
+    ] {
+        let position = text
+            .find(marker)
+            .ok_or_else(|| format!("{path} missing diagnostic staging operation: {marker}"))?;
+        if previous.is_some_and(|previous| previous >= position) {
+            return Err(format!(
+                "{path} must copy diagnostics before validation and expose them only after validation"
+            ));
+        }
+        previous = Some(position);
+    }
+    Ok(())
 }
 
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
@@ -781,6 +802,28 @@ fi
         }
         if !text.contains("${{ steps.core-verdict.outputs.diagnostics_path }}") {
             return Err("diagnostics_path is missing from the upload vector".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn live_workflow_rejects_reordered_diagnostic_staging() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        check_core_failure_evidence_contract("ci.yml", text)?;
+        let copy = r#"cp --no-dereference "$diagnostics_source" "$diagnostics_path""#;
+        let validate = r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#;
+        let expose = r#"echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT""#;
+        for (earlier, later) in [(copy, validate), (validate, expose)] {
+            let reordered = text
+                .replace(earlier, "REORDERED_DIAGNOSTIC_OPERATION")
+                .replace(later, earlier)
+                .replace("REORDERED_DIAGNOSTIC_OPERATION", later);
+            let Err(error) = check_core_failure_evidence_contract("ci.yml", &reordered) else {
+                return Err(format!("accepted reordered diagnostic staging: {earlier}"));
+            };
+            if !error.contains("must copy diagnostics before validation") {
+                return Err(format!("unexpected staging rejection: {error}"));
+            }
         }
         Ok(())
     }
