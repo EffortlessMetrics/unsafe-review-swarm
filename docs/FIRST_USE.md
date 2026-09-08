@@ -27,6 +27,10 @@ is for development.
 
 ## Preview Repository Adoption
 
+Top-level `init` is available only in the unpublished swarm/candidate command
+surface; the public `v0.3.8` install above does not include it. Use an explicitly
+identified local checkout for this preview, or continue to Get A First Card.
+
 Before adding a workflow, inspect a deterministic proposal:
 
 ```bash
