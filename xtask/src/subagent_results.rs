@@ -549,15 +549,14 @@ fn check_evidence_followable(value: &toml::Value, path: &str) -> Result<(), Stri
                         if !file_part.is_empty() && file_part.contains('/') {
                             // Only check if it looks like a repo file path
                             let p = workspace_path(file_part);
-                            if file_part.starts_with("xtask/")
+                            if (file_part.starts_with("xtask/")
                                 || file_part.starts_with("docs/")
-                                || file_part.starts_with("plans/")
+                                || file_part.starts_with("plans/"))
+                                && !p.is_file()
                             {
-                                if !p.is_file() {
-                                    return Err(format!(
-                                        "{path} findings[{i}].evidence[{j}] file `{file_part}` must resolve to a tracked file"
-                                    ));
-                                }
+                                return Err(format!(
+                                    "{path} findings[{i}].evidence[{j}] file `{file_part}` must resolve to a tracked file"
+                                ));
                             }
                         }
                     }

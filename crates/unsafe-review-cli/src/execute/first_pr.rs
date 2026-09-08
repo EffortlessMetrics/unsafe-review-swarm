@@ -3935,9 +3935,8 @@ mod tests {
                 )
             })
             .collect::<Result<Vec<_>, _>>()?;
-        let output = synthetic_output_with_cards(cards.clone());
         // Manually craft comment_plan JSON with 5 comments, top is cards[0]
-        let comment_plan = synthetic_comment_plan_with_comments(&cards, 0);
+        let comment_plan = synthetic_comment_plan_with_comments(&cards);
         let rendered =
             format_comment_plan_summary(Some(&comment_plan), Path::new("."), Some(&cards[0].id.0));
         // Must show 3 of 4 additional (total 5 - top 1 = 4 additional, capped at 3)
@@ -4118,16 +4117,18 @@ mod tests {
         inherited: usize,
         cards: Vec<unsafe_review_core::ReviewCard>,
     ) -> AnalyzeOutput {
-        let mut summary = unsafe_review_core::api::Summary::default();
-        summary.new_gaps = new_gaps;
-        summary.worsened_gaps = worsened;
-        summary.improved_gaps = improved;
-        summary.resolved_gaps = resolved;
-        summary.inherited_gaps = inherited;
-        summary.cards = cards.len();
-        summary.open_actionable_gaps = cards.len();
-        summary.changed_files = 2;
-        summary.changed_rust_files = 1;
+        let summary = unsafe_review_core::api::Summary {
+            new_gaps,
+            worsened_gaps: worsened,
+            improved_gaps: improved,
+            resolved_gaps: resolved,
+            inherited_gaps: inherited,
+            cards: cards.len(),
+            open_actionable_gaps: cards.len(),
+            changed_files: 2,
+            changed_rust_files: 1,
+            ..Default::default()
+        };
         AnalyzeOutput {
             analysis_identity: unsafe_review_core::AnalysisIdentity::for_test(1, "test", "diff"),
             schema_version: "0.1".to_string(),
@@ -4215,10 +4216,7 @@ mod tests {
         .to_string()
     }
 
-    fn synthetic_comment_plan_with_comments(
-        cards: &[unsafe_review_core::ReviewCard],
-        top_index: usize,
-    ) -> String {
+    fn synthetic_comment_plan_with_comments(cards: &[unsafe_review_core::ReviewCard]) -> String {
         let comments: Vec<serde_json::Value> = cards
             .iter()
             .map(|card| {

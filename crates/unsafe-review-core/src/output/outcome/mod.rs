@@ -1787,9 +1787,11 @@ mod tests {
                 "guard_missing",
                 "high",
                 &["guard"],
-                "src/lib.rs",
-                10,
-                "unsafe { ptr.cast::<Header>().read() }",
+                SnapshotSite {
+                    file: "src/lib.rs",
+                    line: 10,
+                    operation: "unsafe { ptr.cast::<Header>().read() }",
+                },
                 "source_route_only",
                 "No imported witness receipt was found",
             ),
@@ -1801,9 +1803,11 @@ mod tests {
                 "guard_missing",
                 "high",
                 &[],
-                "src/lib.rs",
-                10,
-                "unsafe { ptr.cast::<Header>().read() }",
+                SnapshotSite {
+                    file: "src/lib.rs",
+                    line: 10,
+                    operation: "unsafe { ptr.cast::<Header>().read() }",
+                },
                 "observable_red_green",
                 "Imported miri receipt with `ran` strength: focused fixture witness passed",
             ),
@@ -1979,7 +1983,10 @@ mod tests {
             "reason was {}",
             resolved_manual.reason
         );
-        let resolved_before = resolved_manual.before.as_ref().unwrap();
+        let resolved_before = resolved_manual
+            .before
+            .as_ref()
+            .ok_or("resolved manual before state missing")?;
         assert_eq!(resolved_before.source.as_deref(), Some("manual"));
         assert_eq!(resolved_before.manual_candidate, Some(true));
         assert_eq!(resolved_before.analyzer_discovered, Some(false));
@@ -2086,17 +2093,26 @@ mod tests {
         )
     }
 
+    struct SnapshotSite<'a> {
+        file: &'a str,
+        line: usize,
+        operation: &'a str,
+    }
+
     fn card_with_location(
         id: &str,
         class_name: &str,
         priority: &str,
         missing: &[&str],
-        file: &str,
-        line: usize,
-        operation: &str,
+        site: SnapshotSite<'_>,
         proof_path: &str,
         witness: &str,
     ) -> String {
+        let SnapshotSite {
+            file,
+            line,
+            operation,
+        } = site;
         let missing = missing
             .iter()
             .map(|item| format!(r#""{item}""#))
