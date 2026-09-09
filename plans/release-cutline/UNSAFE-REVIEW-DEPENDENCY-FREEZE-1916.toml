@@ -4,17 +4,17 @@ issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
 status = "draft_not_active"
 activation = "requires_owner_decision_after_targeted_dependency_proof"
 freeze_scope = "candidate_dependency_inputs_only"
-audited_at = "2026-08-30"
-audit_swarm_base = "125de5f683286c4e8da04b76c6633a2a8e123f5a"
+audited_at = "2026-09-09"
+audit_swarm_base = "100595121b584521117722165b5caa61cae4ca6f"
 audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "125de5f683286c4e8da04b76c6633a2a8e123f5a"
-lockfile_sha256 = "f40cad0ed06d2c4cedcfbaccead979186315605c5d6e1c2c6d5de986f31c03fe"
-ra_ap_syntax = "0.0.348"
+commit = "100595121b584521117722165b5caa61cae4ca6f"
+lockfile_sha256 = "0a3b6a6f12d83cc042f8798f2ad89b7ce535e27f"
+ra_ap_syntax = "0.0.349"
 ignore = "0.4.33"
 signal_hook = "0.4.4"
 
@@ -57,7 +57,7 @@ reset_receipts = ["parser/input tests", "detector contracts", "fixture/calibrati
 id = "SOURCE-549"
 surface = "github_actions"
 version = "paired pins"
-status = "owner_gated_open_source_pr_549_workflow_allowlist_pair_required"
+status = "closed_unmerged_source_pr_549_open_source_pr_565_owner_gated"
 reset_receipts = ["check-policy", "Unsafe Review Rust Result", "hosted CI"]
 
 [[candidate_input]]
@@ -67,21 +67,32 @@ version = "live source dependency group"
 status = "owner_gated_open_source_pr_550_targeted_disposition_required"
 reset_receipts = ["affected tests", "clippy", "check-pr", "lockfile refresh"]
 
+[[candidate_input]]
+id = "SOURCE-565"
+surface = "github_actions"
+version = "live source actions group, 5 updates"
+status = "owner_gated_open_source_pr_565_head_f5a99574"
+reset_receipts = ["check-policy", "Unsafe Review Rust Result", "hosted CI"]
+
 [[deferred_input]]
 id = "SWARM-1874-1875"
-reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path. Reviewed 2026-08-30; no open duplicate remains at 125de5f6."
+reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path. Reviewed 2026-09-09; no open duplicate remains at 10059512."
 
 [[deferred_input]]
 id = "SWARM-2014"
-reason = "The swarm Actions pin update remains open and fails the paired workflow-allowlist contract; retain it as an owner-gated maintenance path until workflows and policy move together. Reviewed 2026-08-30; paired contract still applies."
+reason = "The historical swarm Actions pin update is integrated; follow-on paired droid-action repairs #2183 and #2185 moved workflow pins and allowlist entries together with pin-sync and policy proof green. Bare bumps #2181 and #2184 were closed as superseded. Reviewed 2026-09-09; the paired contract still applies to future bumps."
 
 [[deferred_input]]
 id = "SWARM-2013-SOURCE-PROMOTION"
-reason = "Swarm ra_ap_syntax 0.0.348 is integrated in the workbench at the audited base (via 0.0.344/0.345/0.347/0.348 bumps), but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred. Reviewed 2026-08-30 at 125de5f6 with source_divergence new_source_commits=0."
+reason = "Swarm ra_ap_syntax 0.0.349 is integrated in the workbench at the audited base (via 0.0.344/0.345/0.347/0.348 plus #2165 0.0.349), but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred. Reviewed 2026-09-09 at 10059512 with source_divergence new_source_commits=0."
+
+[[deferred_input]]
+id = "SWARM-2180"
+reason = "Swarm ra_ap_syntax 0.0.350 bump is blocked: it requires rustc 1.98 while rust-toolchain.toml pins 1.95.0, failing local targeted proof and the hosted Rust gate. Kept open with evidence behind the owner MSRV decision; #2135 retains its separate runner lane. Reviewed 2026-09-09."
 
 [[deferred_input]]
 id = "SWARM-1620"
-reason = "RSS/self-unsafe telemetry remains parked outside the candidate absent its separate owner decision. Reviewed 2026-08-30; still parked at 125de5f6."
+reason = "RSS/self-unsafe telemetry is closed unmerged and remains outside the candidate absent its separate owner decision. Reviewed 2026-09-09."
 
 [[rule]]
 id = "EXCEPTION-1"
