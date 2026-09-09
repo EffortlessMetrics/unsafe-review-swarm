@@ -67,7 +67,7 @@ Binary acquisition decision: `cargo install` from crates.io is the MVP path
 because the `unsafe-review` crate is published to crates.io and no
 pre-compiled release binaries are currently distributed through GitHub
 Releases. The `cargo install` step runs inside the caller's job and uses the
-caller's Rust toolchain; the action installs `dtolnay/rust-toolchain@1.95.0`
+caller's Rust toolchain; the action installs `dtolnay/rust-toolchain@1.98`
 as a prerequisite.
 
 Optimization path: if pre-compiled binaries are later distributed as GitHub

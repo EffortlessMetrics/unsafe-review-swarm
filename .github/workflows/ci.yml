@@ -17,7 +17,7 @@ name: CI
 #
 #   0. route (advisory, ubuntu-latest): pick self-hosted (idle trusted em-ci
 #      runner) else ubuntu-latest overflow; emit a runs-on value + runner_kind.
-#   1. Shared setup once (checkout fetch-depth 0, toolchain 1.95.0, rust-cache
+#   1. Shared setup once (checkout fetch-depth 0, toolchain 1.98, rust-cache
 #      with the shared ci-gate cache key also used by cache-warm.yml).
 #   2. Fast precontext (~seconds, no full build): a runner-kind-aware disk/scratch
 #      check, then cargo fmt --check plus repo/PR facts written to
@@ -149,7 +149,7 @@ jobs:
           # Full history for the diff-scoped test skip and base comparisons.
           fetch-depth: 0
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
         with:
           components: rustfmt, clippy
       # shared-key (#1515 candidate 3): one cache entry family shared by the PR

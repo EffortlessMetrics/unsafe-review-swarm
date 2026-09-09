@@ -1,5 +1,5 @@
 schema_version = "0.1"
-msrv = "1.95"
+msrv = "1.98"
 owner = "core/policy"
 
 [workspace]

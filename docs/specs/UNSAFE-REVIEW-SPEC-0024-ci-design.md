@@ -246,7 +246,7 @@ Step shape inside the one gate job:
 0. route (advisory, ubuntu-latest, not a required check): pick the gate runner —
    idle trusted self-hosted em-ci runner else ubuntu-latest overflow — and emit a
    runs-on value plus runner_kind (see section 7)
-1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.95.0
+1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.98
    with rustfmt + clippy, Swatinem/rust-cache@v2
 2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
    --check plus repo/PR facts written to target/ci-core/precontext.md as a
@@ -768,12 +768,12 @@ or immutable SHA.
 
 ## 7. Toolchain, runner, and cost posture
 
-The repo toolchain is Rust 1.95.0.
+The repo toolchain is Rust 1.98.
 
 CI should install the pinned toolchain and Rust components:
 
 ```yaml
-- uses: dtolnay/rust-toolchain@1.95.0
+- uses: dtolnay/rust-toolchain@1.98
   with:
     components: rustfmt, clippy
 ```
@@ -1148,7 +1148,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Generate LCOV
@@ -1258,7 +1258,7 @@ jobs:
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
         with:
           components: rustfmt, clippy
       - run: cargo fmt --check
@@ -1289,7 +1289,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
         with:
           components: rustfmt, clippy
       - uses: Swatinem/rust-cache@v2
@@ -1401,7 +1401,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
       - run: cargo build --locked -p unsafe-review
       - name: Render first-pr advisory bundle
         env:

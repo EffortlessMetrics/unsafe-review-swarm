@@ -122,8 +122,9 @@ fn sha256(data: &[u8]) -> [u8; 32] {
     // Append 64-bit big-endian bit length.
     padded.extend_from_slice(&bit_len.to_be_bytes());
 
-    // Process each 64-byte block.
-    for block in padded.chunks_exact(64) {
+    // Process each 64-byte block (padded length is a multiple of 64, so the
+    // remainder is empty).
+    for block in padded.as_chunks::<64>().0 {
         compress(&mut state, block);
     }
 
@@ -141,8 +142,8 @@ fn compress(state: &mut [u32; 8], block: &[u8]) {
 
     // Build message schedule W[0..64].
     let mut w = [0u32; 64];
-    for (i, chunk) in block.chunks_exact(4).enumerate().take(16) {
-        w[i] = u32::from_be_bytes([chunk[0], chunk[1], chunk[2], chunk[3]]);
+    for (i, chunk) in block.as_chunks::<4>().0.iter().enumerate().take(16) {
+        w[i] = u32::from_be_bytes(*chunk);
     }
     for i in 16..64 {
         // σ0(w[i-15])

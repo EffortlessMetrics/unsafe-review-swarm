@@ -160,7 +160,7 @@ jobs:
         with:
           persist-credentials: false
 
-      - uses: dtolnay/rust-toolchain@1.95.0
+      - uses: dtolnay/rust-toolchain@1.98
 
       - name: Download unsafe-review artifacts
         run: |
