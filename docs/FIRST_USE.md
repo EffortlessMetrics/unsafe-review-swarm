@@ -27,12 +27,21 @@ is for development.
 
 ## Preview Repository Adoption
 
-Before adding a workflow, inspect a deterministic proposal:
+Top-level `init` is available only in the unpublished swarm/candidate command
+surface; the public `v0.3.8` install above does not include it. Use an explicitly
+identified local checkout for this preview, or continue to
+[Get A First Card](#get-a-first-card).
+
+From the root of that unpublished `unsafe-review-swarm` checkout, inspect a
+deterministic proposal with the workspace binary:
 
 ```bash
-unsafe-review init
-unsafe-review init --format json --out target/unsafe-review-init
+cargo run --locked -p unsafe-review-cli --bin cargo-unsafe-review -- init
+cargo run --locked -p unsafe-review-cli --bin cargo-unsafe-review -- init --format json --out target/unsafe-review-init
 ```
+
+These commands select the checkout explicitly; entering its directory alone
+does not change the installed `unsafe-review` command.
 
 The default is preview-only: it does not create or edit repository files. The
 proposal includes workflow content, conflict status, rollback guidance,

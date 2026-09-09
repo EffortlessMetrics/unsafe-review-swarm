@@ -18,6 +18,11 @@ comments, edit source, or block by default.
 
 ### Added
 
+- Added top-level preview-only `init` on unpublished swarm main. It prints a
+  repository adoption proposal; explicit `--out` writes only the proposal JSON,
+  without applying workflows or configuration. Public `v0.3.8` does not include
+  this command; baseline creation remains separate.
+  ([#2044](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2044))
 - Added `bounded-subagent-brief-v1` schema and offline validator
   (`xtask/src/subagent_briefs.rs`, `docs/schemas/bounded-subagent-brief.schema.json`)
   for issue-linked delegation contracts with 7 valid and 50 invalid fixtures.
@@ -59,9 +64,9 @@ comments, edit source, or block by default.
   (`crates/unsafe-review-cli/src/execute/first_pr.rs`) for shell-safe
   execution. Advisory.
   ([#2095](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2095))
-- Joined bundle identity contracts for first-pr artifacts: `bundle_version`
-  bumped `0.1` → `0.2` with joined identity fields and `xtask` advisory
-  artifact validation. Advisory; no new detection.
+- Joined first-pr manifest and payload artifact identities in `xtask` advisory
+  validation, including saved-LSP manifest metadata matching its `0.2` payload.
+  The review-kit manifest remains schema `0.1`. Advisory; no new detection.
   ([#2131](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2131))
 
 ## 0.3.8 - 2026-06-18
