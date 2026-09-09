@@ -969,9 +969,20 @@ fn command_requires_workspace_root(command: &commands::XtaskCommand) -> bool {
 }
 
 fn print_help() {
-    println!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-usefulness, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]"
-    );
+    println!("{}", help_text());
+}
+
+/// Production xtask help text.
+///
+/// This is the single source for the `--help` listing: tests exercise this
+/// function directly so advertised names cannot drift from the parser again.
+/// `check-goals` (deprecated compatibility) and `check-local-run` (internal
+/// subprocess plumbing) remain parseable but are intentionally omitted from the
+/// command list; the trailing note records that classification.
+fn help_text() -> String {
+    format!(
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
+    )
 }
 
 #[derive(Debug, PartialEq, Eq)]
@@ -8944,6 +8955,82 @@ mod tests {
         let check_pr_args = parse_runtime_args(vec!["xtask".to_string(), "check-pr".to_string()])?;
         let check_pr_command = commands::XtaskCommand::parse(&check_pr_args.command_args)?;
         assert!(command_requires_workspace_root(&check_pr_command));
+        Ok(())
+    }
+
+    #[test]
+    fn help_text_advertises_supported_operational_commands() -> Result<(), String> {
+        // Exercises the production help text directly: every supported
+        // operational command must be discoverable and must parse.
+        let help = help_text();
+        for name in [
+            "cleanup-audit",
+            "check-subagent-results",
+            "check-self-unsafe",
+            "external-pilot-rollup",
+        ] {
+            assert!(
+                help.contains(name),
+                "production help text should advertise supported command `{name}`"
+            );
+            let args = vec!["xtask".to_string(), name.to_string()];
+            commands::XtaskCommand::parse(&args)
+                .map_err(|err| format!("advertised command `{name}` should parse, got: {err}"))?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn help_text_rejects_unknown_advertised_spelling() -> Result<(), String> {
+        // `external-pilot-usefulness` was advertised but never parsed; the
+        // supported command is `external-pilot-rollup`.
+        assert!(
+            !help_text().contains("external-pilot-usefulness"),
+            "production help text must not advertise the unknown `external-pilot-usefulness` spelling"
+        );
+        let args = vec!["xtask".to_string(), "external-pilot-usefulness".to_string()];
+        let err = err_text(commands::XtaskCommand::parse(&args))?;
+        assert!(
+            err.contains("unknown xtask command"),
+            "unexpected parser error: {err}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn help_text_classifies_deliberate_exclusions() -> Result<(), String> {
+        // `check-goals` (deprecated compatibility) and `check-local-run`
+        // (internal subprocess plumbing) stay parseable but are intentionally
+        // omitted from the command list; the trailing note records that.
+        let help = help_text();
+        let mut lines = help.split('\n');
+        lines
+            .next()
+            .ok_or_else(|| "production help text should open with the options line".to_string())?;
+        let commands_line = lines.next().ok_or_else(|| {
+            "production help text should list commands on its second line".to_string()
+        })?;
+        let note: String = lines.collect::<Vec<_>>().join("\n");
+        assert!(
+            !commands_line.contains("check-goals"),
+            "deprecated `check-goals` must stay out of the advertised command list"
+        );
+        assert!(
+            !commands_line.contains("check-local-run"),
+            "internal `check-local-run` must stay out of the advertised command list"
+        );
+        assert!(
+            note.contains("check-goals") && note.contains("check-local-run"),
+            "help note should classify the deliberate exclusions"
+        );
+        commands::XtaskCommand::parse(&["xtask".to_string(), "check-goals".to_string()])
+            .map_err(|err| format!("`check-goals` should remain parseable, got: {err}"))?;
+        commands::XtaskCommand::parse(&[
+            "xtask".to_string(),
+            "check-local-run".to_string(),
+            "policy".to_string(),
+        ])
+        .map_err(|err| format!("`check-local-run` should remain parseable, got: {err}"))?;
         Ok(())
     }
 
