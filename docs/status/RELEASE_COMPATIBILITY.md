@@ -61,7 +61,7 @@ retain their original producer and consumer identities.
 - Public `v0.3.8` has `baseline init` but no top-level `init`, as recorded by
   its [command parser](https://github.com/EffortlessMetrics/unsafe-review/blob/9751f9567c21a64e830f2a64217fba04eb49b976/crates/unsafe-review-cli/src/parse.rs).
   Keep the public install path separate from the unpublished preview command.
-- Workspace MSRV is Rust `1.95`; the three published packages remain `0.3.8`
+- Workspace MSRV is Rust `1.98`; the three published packages remain `0.3.8`
   until a candidate version is explicitly frozen.
 - The VS Code/Open VSX surface is a saved-bundle MVP. Marketplace listings,
   prebuilt binaries, crates.io candidate publication, GitHub Release, and

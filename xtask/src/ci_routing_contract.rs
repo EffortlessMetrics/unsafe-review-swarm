@@ -173,7 +173,7 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
             "fromJSON(needs.route.outputs.runner)",
             "runs-on: ubuntu-latest",
             // Shared warmed setup, runner-kind agnostic.
-            "dtolnay/rust-toolchain@1.95.0",
+            "dtolnay/rust-toolchain@1.98",
             "Swatinem/rust-cache@v2",
             // Fast precontext writes the run record, the deterministic core gate
             // runs in the background (guarded by a disk-headroom check), and the
