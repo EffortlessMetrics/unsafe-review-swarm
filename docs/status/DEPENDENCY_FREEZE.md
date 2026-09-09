@@ -6,7 +6,7 @@ readable source is
 [`UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml`](../../plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml).
 
 Audited 2026-09-09 against swarm `main` at
-`100595121b584521117722165b5caa61cae4ca6f` and source `main` at
+`b2d7bbff4001b7465fe7c516625147d9c0400c8e` and source `main` at
 `c25d65272c760c3630eb9528b7efaae2234d9e19`. This remains a draft and is not an
 active dependency freeze. Source divergence is `new_source_commits=0`.
 
@@ -14,7 +14,7 @@ active dependency freeze. Source divergence is `new_source_commits=0`.
 
 | Repository | Commit | `Cargo.lock` SHA-256 | `ra_ap_syntax` | `ignore` | `signal-hook` |
 | --- | --- | --- | --- | --- | --- |
-| swarm | `100595121b584521117722165b5caa61cae4ca6f` | `0a3b6a6f12d83cc042f8798f2ad89b7ce535e27f` | 0.0.349 | 0.4.33 | 0.4.4 |
+| swarm | `b2d7bbff4001b7465fe7c516625147d9c0400c8e` | `4afb189e3d56487a3d12b40117c90814ae4b9dfe` | 0.0.350 | 0.4.33 | 0.4.4 |
 | source | `c25d65272c760c3630eb9528b7efaae2234d9e19` | `aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203527` | 0.0.341 | 0.4.27 | 0.3.18 |
 
 These are two live repository baselines, not one frozen release candidate.
@@ -47,10 +47,10 @@ are canonical Git-blob SHA-256 values (`git hash-object`).
 - Dependency group PR [#550](https://github.com/EffortlessMetrics/unsafe-review/pull/550)
   remains owner-gated for its own affected-test and lockfile proof.
 
-Swarm `ra_ap_syntax 0.0.349` is now integrated on the workbench base above
-(through #2089 `0.0.345`, #2112 `0.0.347`, #2136 `0.0.348`, and #2165
-`0.0.349`; prior #2013 `0.0.344` remains recorded as workbench state). New
-swarm #2180 (`0.0.350`) is blocked on the rustc 1.98-vs-1.95 pin. Source #551
+Swarm `ra_ap_syntax 0.0.350` is now integrated on the workbench base above
+(through #2089 `0.0.345`, #2112 `0.0.347`, #2136 `0.0.348`, #2165 `0.0.349`,
+and merged #2180 `0.0.350`; prior #2013 `0.0.344` remains recorded as
+workbench state). Source #551
 remains the owner-gated publication history for the source repository; this
 does not promote the swarm commit or authorize a release. The `ignore 0.4.33`
 and `toml 1.1.5` updates are absorbed via the `cargo-minor-and-patch` batch

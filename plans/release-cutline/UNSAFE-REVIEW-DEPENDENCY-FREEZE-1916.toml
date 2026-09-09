@@ -5,16 +5,16 @@ status = "draft_not_active"
 activation = "requires_owner_decision_after_targeted_dependency_proof"
 freeze_scope = "candidate_dependency_inputs_only"
 audited_at = "2026-09-09"
-audit_swarm_base = "100595121b584521117722165b5caa61cae4ca6f"
+audit_swarm_base = "b2d7bbff4001b7465fe7c516625147d9c0400c8e"
 audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
 rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
 
 [swarm]
-commit = "100595121b584521117722165b5caa61cae4ca6f"
-lockfile_sha256 = "0a3b6a6f12d83cc042f8798f2ad89b7ce535e27f"
-ra_ap_syntax = "0.0.349"
+commit = "b2d7bbff4001b7465fe7c516625147d9c0400c8e"
+lockfile_sha256 = "4afb189e3d56487a3d12b40117c90814ae4b9dfe"
+ra_ap_syntax = "0.0.350"
 ignore = "0.4.33"
 signal_hook = "0.4.4"
 
@@ -76,7 +76,7 @@ reset_receipts = ["check-policy", "Unsafe Review Rust Result", "hosted CI"]
 
 [[deferred_input]]
 id = "SWARM-1874-1875"
-reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path. Reviewed 2026-09-09; no open duplicate remains at 10059512."
+reason = "Duplicate swarm lockfile updates are deferred while source candidates remain the chosen publication history path. Reviewed 2026-09-09; no open duplicate remains at b2d7bbff."
 
 [[deferred_input]]
 id = "SWARM-2014"
@@ -84,11 +84,11 @@ reason = "The historical swarm Actions pin update is integrated; follow-on paire
 
 [[deferred_input]]
 id = "SWARM-2013-SOURCE-PROMOTION"
-reason = "Swarm ra_ap_syntax 0.0.349 is integrated in the workbench at the audited base (via 0.0.344/0.345/0.347/0.348 plus #2165 0.0.349), but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred. Reviewed 2026-09-09 at 10059512 with source_divergence new_source_commits=0."
+reason = "Swarm ra_ap_syntax 0.0.350 is integrated in the workbench at the audited base (via 0.0.344/0.345/0.347/0.348 plus #2165 0.0.349 and merged #2180 0.0.350), but source #551 remains the owner-gated publication history; no source promotion or public release claim is inferred. Reviewed 2026-09-09 at b2d7bbff with source_divergence new_source_commits=0."
 
 [[deferred_input]]
 id = "SWARM-2180"
-reason = "Swarm ra_ap_syntax 0.0.350 bump is blocked: it requires rustc 1.98 while rust-toolchain.toml pins 1.95.0, failing local targeted proof and the hosted Rust gate. Kept open with evidence behind the owner MSRV decision; #2135 retains its separate runner lane. Reviewed 2026-09-09."
+reason = "Swarm ra_ap_syntax 0.0.350 bump merged as b2d7bbff (#2180) after the MSRV 1.98 floor (#2188); parser proof and hosted Rust gate green. Freeze still draft_not_active pending owner activation; #2135 retains its separate runner lane. Reviewed 2026-09-09."
 
 [[deferred_input]]
 id = "SWARM-1620"
