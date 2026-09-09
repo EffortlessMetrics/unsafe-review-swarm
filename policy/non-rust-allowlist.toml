@@ -40,3 +40,16 @@ reason = "GitHub workflows are required to run advisory PR checks and upload rev
 covered_by = "cargo xtask check-pr"
 created = "2026-05-18"
 review_after = "2026-06-18"
+
+[[allow]]
+id = "non-rust-0004"
+glob = ".gitattributes"
+kind = "git-attributes"
+language = "gitattributes"
+surface = "repository"
+classification = "trusted-control-plane"
+owner = "repo-infra"
+reason = "Preserve the canonical LF bytes required by generated fixture and dogfood report validators in fresh Git checkouts."
+covered_by = "Issue #2168 fresh Windows checkout byte comparison; cargo run --locked -p xtask -- check-fixtures; cargo run --locked -p xtask -- check-fixture-surface-parity; cargo run --locked -p xtask -- check-dogfood; cargo run --locked -p xtask -- check-external-pilots"
+created = "2026-09-07"
+review_after = "2026-12-07"
