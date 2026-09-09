@@ -21,7 +21,6 @@ use std::process::{Command, Stdio};
 pub(crate) fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
     let check: fn() -> Result<(), String> = match id {
         "docs" => crate::check_docs,
-        "generated-projection" => crate::public_badges::check_generated_projection,
         "policy" => crate::check_policy,
         "support-tiers" => crate::support_tiers::check_support_tiers,
         "fixtures" => crate::fixture_surfaces::check_fixtures,
@@ -98,6 +97,13 @@ mod tests {
     #[test]
     fn dispatch_check_rejects_unknown_id() {
         assert!(dispatch_check("not-a-real-check").is_none());
+    }
+
+    #[test]
+    fn dispatch_check_rejects_retired_generated_projection_id() {
+        // Badge freshness now rides with the always-required `policy` entry;
+        // the standalone `generated-projection` id is retired.
+        assert!(dispatch_check("generated-projection").is_none());
     }
 
     #[test]

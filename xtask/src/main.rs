@@ -876,7 +876,6 @@ fn run(args: Vec<String>) -> Result<(), String> {
         commands::XtaskCommand::Help => Ok(()),
         commands::XtaskCommand::CheckPr => {
             check_docs()?;
-            public_badges::check_generated_projection()?;
             check_policy()?;
             check_support_tiers()?;
             fixture_surfaces::check_fixtures()?;
