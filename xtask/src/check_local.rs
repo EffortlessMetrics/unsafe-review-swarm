@@ -146,9 +146,10 @@ pub(crate) struct CheckSpec {
 ///
 /// Rationale for the always-required entries (path-based skip would be unsafe):
 /// `docs` guards front-door / claim-boundary wording across every surface,
-/// `policy` guards ledgers and allowlists, and `self-unsafe` guards the
-/// repository-wide `unsafe` forbiddance — all three are cheap and any change
-/// could regress them.
+/// `policy` guards ledgers, allowlists, and public-surface/badge freshness
+/// (including the generated badge projection), and `self-unsafe` guards the
+/// repository-wide `unsafe` forbiddance — always-required because any change
+/// could regress them, not because every one is cheap.
 pub(crate) const CATALOG: &[CheckSpec] = &[
     CheckSpec {
         id: "docs",
@@ -158,23 +159,8 @@ pub(crate) const CATALOG: &[CheckSpec] = &[
         triggers: &[],
     },
     CheckSpec {
-        id: "generated-projection",
-        name: "generated badge/endpoint projection",
-        command: None,
-        always: false,
-        // Badge/endpoint projections derive from docs, fixtures, calibration,
-        // and corpus-derived counts; trigger conservatively on all four rather
-        // than risk skipping a projection whose inputs a corpus diff touched.
-        triggers: &[
-            PathCategory::Docs,
-            PathCategory::Fixtures,
-            PathCategory::Calibration,
-            PathCategory::Corpus,
-        ],
-    },
-    CheckSpec {
         id: "policy",
-        name: "policy ledgers and allowlists",
+        name: "policy ledgers, allowlists, and public-surface/badge freshness",
         command: Some("check-policy"),
         always: true,
         triggers: &[],
@@ -801,9 +787,11 @@ mod tests {
 
     #[test]
     fn catalog_matches_check_pr_component_count() {
-        // check-pr runs exactly 16 deterministic components; the proof-map must
-        // enumerate all of them so none is silently unmapped.
-        assert_eq!(CATALOG.len(), 16);
+        // check-pr runs exactly 15 deterministic catalog components; the
+        // proof-map must enumerate all of them so none is silently unmapped.
+        // The final LSP smoke operation is separately dispatched and is not a
+        // catalog entry.
+        assert_eq!(CATALOG.len(), 15);
     }
 
     #[test]
@@ -815,7 +803,6 @@ mod tests {
             ids,
             vec![
                 "docs",
-                "generated-projection",
                 "policy",
                 "support-tiers",
                 "fixtures",
@@ -884,12 +871,12 @@ mod tests {
         let plan = plan(&paths(&["docs/specs/FOO.md", "README.md"]));
         assert!(!plan.conservative_full);
         let selected = selected_ids(&plan);
-        // always-required + docs-triggered.
+        // always-required + docs-triggered. Badge freshness rides with the
+        // always-required policy entry rather than a separate projection id.
         assert!(selected.contains(&"docs"));
         assert!(selected.contains(&"policy"));
         assert!(selected.contains(&"self-unsafe"));
         assert!(selected.contains(&"support-tiers"));
-        assert!(selected.contains(&"generated-projection"));
         // heavy corpus/fixture/fuzz checks are skipped.
         let skipped = skipped_ids(&plan);
         assert!(skipped.contains(&"dogfood"));
@@ -917,7 +904,7 @@ mod tests {
         assert!(selected.contains(&"calibration"));
         assert!(selected.contains(&"fixture-surface-parity"));
         assert!(selected.contains(&"surface-determinism"));
-        assert!(selected.contains(&"generated-projection"));
+        assert!(selected.contains(&"policy"));
         let skipped = skipped_ids(&plan);
         assert!(skipped.contains(&"dogfood"));
         assert!(skipped.contains(&"support-tiers"));

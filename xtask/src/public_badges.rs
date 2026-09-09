@@ -49,7 +49,11 @@ pub(crate) fn check_endpoints() -> Result<(), String> {
 }
 
 pub(crate) fn check_generated_projection() -> Result<(), String> {
-    check_generated_projection_with_timeout(Duration::from_secs(GENERATED_PROJECTION_TIMEOUT_SECS))
+    check_generated_projection_with_timeout(Duration::from_secs(
+        GENERATED_PROJECTION_TIMEOUT_SECS,
+    ))?;
+    println!("check-generated-projection: ok");
+    Ok(())
 }
 
 fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), String> {
