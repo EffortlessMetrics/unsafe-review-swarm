@@ -6,20 +6,20 @@ publication, or `v1` decision. Its machine-readable source is
 
 ## Live snapshot
 
-Audited 2026-08-29.
+Audited 2026-09-10.
 
-- Swarm base: `ed345b71f84e3cc4344fba52c21322f8fd4efbf6`
-  (`refactor(xtask): extract check dispatch (#1806) (#2150)`)
+- Swarm base: `46afd7086a90a957f1fcdf08235e42721540253c`
+  (`docs(1916): refresh dependency records to b2d7bbff after MSRV and parser merges (#2189)`)
 - Source base: `c25d65272c760c3630eb9528b7efaae2234d9e19`
   (`sync: remove residual RTK command guidance (#559)`)
-- Draft candidate head: `ed345b71f84e3cc4344fba52c21322f8fd4efbf6` (refresh candidate; advisory only, not a freeze, tag, or publication).
-- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=309`; the swarm
+- Draft candidate head: `46afd7086a90a957f1fcdf08235e42721540253c` (refresh candidate; advisory only, not a freeze, tag, or publication).
+- `source-divergence`: `new_source_commits=0`, `raw_swarm_only=344`; the swarm
   contains expected unpromoted workbench commits. See `cargo run --locked -p xtask -- source-divergence`.
 - Candidate version: not frozen. All three published crates are still `0.3.8`.
   Historical `0.3.9` and `0.4.0` names are references only; semver follows the
   integrated public surface.
 
-The previous drafts named `7649bff733b7f4cf1676b9b4b4fb40226c5744b5` (no object on any swarm or source ref, withdrawn) and `aae31001431a69f4a4fc318423d1566257eebde1` (mio pilot #2101). No qualification result was recorded against the withdrawn SHA. This refresh moves the draft candidate to `ed345b71` to reflect the integrated slices `b8ddd802..ed345b71` (PRs #2141–#2150); it remains an advisory snapshot, not a qualification, safety, or publication claim.
+The previous drafts named `7649bff733b7f4cf1676b9b4b4fb40226c5744b5` (no object on any swarm or source ref, withdrawn), `aae31001431a69f4a4fc318423d1566257eebde1` (mio pilot #2101), and `ed345b71f84e3cc4344fba52c21322f8fd4efbf6` (2026-08-29 audit). No qualification result was recorded against the withdrawn SHA. This refresh moves the draft candidate to `46afd708` to reflect the integrated slices `ed345b71..46afd708` (MSRV 1.98 floor #2188, parser 0.0.350 #2180, badge dedup #2187, disposition refresh #2189, #2095 merge, action-pin pairing #2183/#2185); it remains an advisory snapshot, not a qualification, safety, or publication claim. Main has since advanced with docs-only refreshes plus the structured-runner substrate (#2135) and test-selector fix (#2193); full re-audit lands with the freeze.
 
 ## Disposition
 
@@ -47,12 +47,12 @@ Deferred work can still be integrated, and required work can still be absent.
 | Current-main false-actionability evidence (#1890) | on swarm main — #2017; source #541 dispositioned and closed; the 13-card result was re-confirmed on `79e83eef` after the `ra_ap_syntax` 0.0.344 bump |
 | Tokmd packet acceptance (#1857) | on swarm main — #2016 plus the fresh current-main five-preset consumer receipt (#2083, tokmd 1.15.0 from crates.io) |
 | Thin editor/agent loop proof (#1887) | on swarm main — scripted parity, freshness, quietness, partial/failure, coalescing, and live protocol rails; installed qualification and usability study remain open |
-| Shell-safe first-pr roots (PR #2095) | open draft — required Linux Rust result is failing; retained evidence reports only `test=101`, so failing-test identity is not proven; #2100 stopped before implementation because stable libtest output is spoofable and the alternative substrate is owner-gated |
+| Shell-safe first-pr roots (PR #2095) | on swarm main — merged `5e2faa3a`; bounded failing-test identities are tracked by open #2100 with the structured-runner substrate merged (`fc69a255`) |
 
 Integration on swarm main is not a qualification result. Each item still needs
 its own implementation proof and hosted CI before freeze.
 
-### Done / closed since 2026-08-14 (b8ddd802..ed345b71) — advisory
+### Done / closed since 2026-08-14 (b8ddd802..46afd708) — advisory
 
 | Item | Disposition | Integration | Evidence |
 |---|---|---|---|
@@ -68,6 +68,12 @@ its own implementation proof and hosted CI before freeze.
 | First-PR terminal ReviewCard parity (#2121) | done | on swarm main | `96766340` in #2149 |
 | Xtask check-dispatch extraction (#1806 slice) | required, partial | partial on swarm main | `ed345b71` in #2150; lane remains open |
 | CI cost / hosted fallback gate (#1515) | closed | on swarm main | `e3912c11` (#2085), `20905d31`, `d873b8e7`; closed `2026-08-29T11:56:45Z` as COMPLETED |
+| MSRV 1.98 floor (#2188) | done | on swarm main | `3e1d124c`; registry-verified parser requirement; two 1.98 clippy hits fixed with NIST proof |
+| Parser 0.0.350 (#2180) | done | on swarm main | `b2d7bbff`; parser battery (946 tests, 31 contracts, parity, determinism) plus hosted gate green |
+| Badge-projection dedup (#2169) | done | on swarm main | `bbb7795e`; single freshness route, stale rejection proven |
+| Shell-safe first-pr roots (#2095) | done | on swarm main | `5e2faa3a`, merged 2026-08-29 |
+| Action-pin pairing (#2183, #2185) | done | on swarm main | paired workflow pin plus allowlist mirror with pin-sync proof |
+| Dependency dispositions (#2189) | done | on swarm main | `46afd708`; records describe merged reality |
 
 All rows are advisory; none claims memory safety, UB-free, Miri-clean, or calibrated precision/recall. `done` records GitHub closed state plus on-swarm-main integration, not a safety or qualification claim.
 
@@ -79,7 +85,7 @@ All rows are advisory; none claims memory safety, UB-free, Miri-clean, or calibr
 | Grouping work (#1894, #1895) | on swarm main |
 | Pull diagnostics and progress (#1912) | not on swarm main |
 | Prebuilt binaries (#1886) | not on swarm main |
-| RSS telemetry (PR #1620) | parked open draft at `59b2ca61`, conflicted with a failing required Rust result; the self-unsafe product posture remains owner-gated |
+| RSS telemetry (PR #1620) | closed unmerged; the self-unsafe product posture remains owner-gated |
 | External-pilot usefulness (#1881) | partial on swarm main — ten exact development-binary receipts cover quiet, inherited-only, new-gap, and resolved/improved cases, but the rollup records `public_action=false`; no public Action or released-binary claim |
 | Hostile-input and fail-closed matrix (#1883) | partial on swarm main — deterministic slices through #2061 are integrated; unreadable-file coverage and the broader process-control/resource matrix await an owner-approved test strategy |
 
@@ -89,7 +95,7 @@ swarm main. They therefore form part of the candidate surface that qualification
 must cover, even though they do not gate the cutline. Deferral records only that
 an item does not gate the cutline — never that it is absent from the candidate.
 
-PR #1620 remains parked because its self-unsafe posture is an owner-gated
+PR #1620 is closed unmerged; its self-unsafe posture remains an owner-gated
 product decision. #1883's platform-sensitive remainder likewise needs an owner
 decision on a reliable test strategy. Neither is promoted to release work by
 this refresh.
@@ -117,7 +123,9 @@ title rather than citation. That applies to #1907, #1910, and #1911.
 This draft becomes a frozen cutline only in a follow-up PR that refreshes the
 SHAs, records every required issue/PR disposition, names the candidate semver,
 and attaches the exact proof and installed-product matrix. A new blocker must
-amend the cutline with evidence, semver impact, and schedule impact.
+amend the cutline with evidence, semver impact, and schedule impact. Owner
+posture 2026-09-10: soft freeze (no non-essential dependency churn); full
+freeze reserved for day-before-release.
 
 Because this artifact is not machine-checked by `check-pr`, its snapshot drifts
 silently between audits. Re-run the audit and refresh the snapshot before
