@@ -1,12 +1,12 @@
 # UNSAFE-REVIEW-CUTLINE-1915
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
-candidate = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
+candidate = "46afd7086a90a957f1fcdf08235e42721540253c"
 status = "draft"
-swarm_base = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
+swarm_base = "46afd7086a90a957f1fcdf08235e42721540253c"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
-candidate_commit = "ed345b71f84e3cc4344fba52c21322f8fd4efbf6"
-candidate_commit_rationale = "Candidate refreshed to ed345b71f84e3cc4344fba52c21322f8fd4efbf6 (refactor(xtask): extract check dispatch #1806 slice #2150) at audit 2026-08-29; prior draft base aae31001431a69f4a4fc318423d1566257eebde1 and withdrawn 7649bff733b7f4cf1676b9b4b4fb40226c5744b5 remain audit records. Advisory refresh only; no safety, UB-free, or qualification claim follows from the refresh alone."
+candidate_commit = "46afd7086a90a957f1fcdf08235e42721540253c"
+candidate_commit_rationale = "Candidate refreshed to 46afd7086a90a957f1fcdf08235e42721540253c (docs(1916): refresh dependency records #2189) at audit 2026-09-09; prior draft base ed345b71f84e3cc4344fba52c21322f8fd4efbf6 and withdrawn 7649bff733b7f4cf1676b9b4b4fb40226c5744b5 remain audit records. Since ed345b71: MSRV 1.98 floor (#2188), ra_ap_syntax 0.0.350 (#2180), badge-projection dedup (#2187), disposition refresh (#2189), and #2095 merged; #1620 closed unmerged; #2135 open draft. Advisory refresh only; no safety, UB-free, or qualification claim follows from the refresh alone."
 audited_at = "2026-08-29"
 owner = "repo-infra"
 semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
@@ -29,6 +29,14 @@ rollback = "Supersede this draft with a dated cutline artifact and retain it as 
 # Where a commit does not cite its issue number, `integration_evidence` names
 # the commits matched by scope and title and says so explicitly. Those are
 # attributions, not citations.
+#
+# Refresh 2026-09-09 (candidate 46afd708) re-verified every evidence SHA
+# against main, fixed stale PR-2095/PR-1620 entries, and recorded landed
+# (PR-2188, ISSUE-2169) plus newly blocking (PR-2135, ISSUE-2100, ISSUE-2133,
+# ISSUE-2171) and deferred (ISSUE-2173) items. Not yet re-reviewed in this
+# refresh and therefore undispositioned here (default-deferred pending review,
+# not a verdict): ISSUE-1877, ISSUE-1878, ISSUE-1888, ISSUE-1898, ISSUE-1899,
+# ISSUE-1900, ISSUE-1903, ISSUE-1904, ISSUE-1905.
 
 [[item]]
 id = "PR-1939"
@@ -190,13 +198,9 @@ proof = ["cargo test -p unsafe-review-core lsp --locked", "cargo test -p unsafe-
 [[item]]
 id = "PR-2095"
 disposition = "required"
-integration = "open_pr"
-integration_evidence = [
-  "draft PR #2095 at a2cf91e45a3e3f974d993efebbd02cbf0142b1f6 is blocked by the required Linux Rust result",
-  "the retained CI evidence reports only test=101; failing-test identities remain unproven",
-  "issue #2100 stopped before implementation because stable libtest output is spoofable; a structured runner or explicitly untrusted hint requires a separate owner decision",
-]
-reason = "Shell-safe first-pr handoff roots are part of the required action-first front door, but the open patch cannot be integrated or treated as qualified while its Linux failure is not diagnosable under the current bounded artifact contract."
+integration = "on_swarm_main"
+integration_evidence = ["5e2faa3a fix(cli): normalize first-pr handoff roots (#2095), merged 2026-08-29"]
+reason = "Shell-safe first-pr handoff roots are integrated on swarm main as part of the required action-first front door. Bounded failing-test identities remain unproven; that gap is now owned by ISSUE-2100 with substrate PR-2135, not by this item."
 proof = ["cargo test -p unsafe-review --test e2e --locked", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
@@ -243,11 +247,8 @@ proof = []
 [[item]]
 id = "PR-1620"
 disposition = "deferred"
-integration = "open_pr"
-integration_evidence = [
-  "PR #1620 remains an open draft at 59b2ca6176e5b04b3045c3d5edc4c26ade5e52b0 with a conflicted merge state and failing required Rust result",
-  "the self-unsafe product posture remains owner-gated",
-]
+integration = "not_on_swarm_main"
+integration_evidence = ["swarm #1620 is closed unmerged; no branch state remains on the candidate"]
 reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this draft cutline does not make."
 proof = []
 
@@ -361,6 +362,62 @@ integration = "partial_on_swarm_main"
 integration_evidence = ["ed345b71 refactor(xtask): extract check dispatch (#1806) (#2150) is one slice of the multi-PR maintainability lane; issue remains open for remaining extractions"]
 reason = "Maintainability extraction lane is advisory and partially integrated; remaining xtask/advisory_artifacts slices remain open and required only as maintainability work, not as safety evidence."
 proof = ["cargo run --locked -p xtask -- check-pr", "cargo test -p xtask --locked"]
+
+[[item]]
+id = "PR-2188"
+disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["3e1d124c build(msrv): raise minimum toolchain to Rust 1.98 (#2188)", "b2f55923 build(deps): bump ra_ap_syntax from 0.0.349 to 0.0.350 (#2180)"]
+reason = "The MSRV 1.98 floor and parser 0.0.350 dependency are integrated on swarm main with parser proof (946 core tests, 31 detector contracts, 15 parity goldens, determinism, clippy, workspace tests, full check-pr) plus the hosted Rust gate green. The floor must remain in the candidate."
+proof = ["cargo run --locked -p xtask -- check-pr", "cargo test --workspace --locked"]
+
+[[item]]
+id = "ISSUE-2169"
+disposition = "done"
+integration = "on_swarm_main"
+integration_evidence = ["bbb7795e fix(xtask): run generated badge projection once per check-pr (#2169) (#2187)"]
+reason = "Advisory CI economics: single badge-projection route with freshness preserved; no safety or speedup claim."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "PR-2135"
+disposition = "required"
+integration = "open_pr"
+integration_evidence = ["open draft PR #2135 at e63ba3b1cf9c48d669e45bd41601d07b423486aa (as of 2026-09-09; re-verify at freeze)", "required Rust gate and policy-contracts green on the rebased head", "merge result against post-MSRV main verified locally with no regressions"]
+reason = "Structured runner substrate for bounded failing-test identities (ISSUE-2100). Draft with author undraft pending; review notes are non-blocking. Cannot freeze qualification of CI failure evidence until this lands or is explicitly deferred."
+proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2100"
+disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = ["issue open; no merged implementation; substrate PR-2135 open draft"]
+reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Required for diagnosable CI gates; path is the structured runner substrate."
+proof = []
+
+[[item]]
+id = "ISSUE-2133"
+disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = ["issue open; substrate PR-2135 open draft"]
+reason = "Structured runner substrate prerequisite for ISSUE-2100; needs hosted receipt. Covered by the PR-2135 path."
+proof = []
+
+[[item]]
+id = "ISSUE-2171"
+disposition = "required"
+integration = "not_on_swarm_main"
+integration_evidence = ["issue open; .rs-only selector still skips workspace tests for lockfile/manifest/config changes"]
+reason = "Dependency and build-configuration changes can affect runtime behavior without Rust source edits; the current skip route leaves that runtime-test obligation uncovered. Serialize with PR-2135 surfaces."
+proof = ["cargo test --locked -p xtask ci_routing_contract", "cargo run --locked -p xtask -- check-pr"]
+
+[[item]]
+id = "ISSUE-2173"
+disposition = "deferred"
+integration = "not_on_swarm_main"
+integration_evidence = ["cause unproven per the issue's own claim boundary; diagnosis-only lane"]
+reason = "Windows repeated-rebuild diagnosis is CI cost investigation, not candidate-blocking. Deferred until the fingerprint cause is proven."
+proof = []
 
 [[item]]
 id = "ISSUE-1515"
