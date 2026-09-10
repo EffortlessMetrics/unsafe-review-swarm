@@ -32,9 +32,9 @@ name: CI
 #      exit code != 0. The single required check reflects ONLY the deterministic
 #      core verdict.
 #   4. Failure evidence: on a non-zero core verdict only, upload the bounded
-#      allowlisted summary plus command/commit/exit/path metadata. The upload is
-#      always attempted, non-fatal, short-retention, and never reads or includes
-#      core.log.
+#      allowlisted summary, command/commit/exit/path metadata, and sanitized
+#      structured test-diagnostics. The upload is always attempted, non-fatal,
+#      short-retention, and never reads or includes core.log.
 
 on:
   pull_request:
@@ -218,7 +218,7 @@ jobs:
             echo "  deterministic suite —"
             echo "    cargo fmt --all --check"
             echo "    cargo clippy --workspace --all-targets --locked -- -D warnings"
-            echo "    cargo test --workspace --locked"
+            echo "    cargo run --locked -p xtask -- ci-test"
             echo "    cargo run --locked -p xtask -- check-pr"
             echo "- check-pr covers the repo contract: docs, public badges, policy"
             echo "  bundle, support tiers, fixtures, calibration, dogfood manifest,"
@@ -301,7 +301,7 @@ jobs:
             else
               _step fmt cargo fmt --all --check \
                 && _step clippy cargo clippy --workspace --all-targets --locked -- -D warnings \
-                && _step test cargo test --workspace --locked \
+                && _step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test \
                 && _step check-pr cargo run --locked -p xtask -- check-pr
             fi
             core_rc=$?
@@ -338,7 +338,7 @@ jobs:
           if [ "${core_exit}" != "0" ]; then
             # PR-controlled commands have finished. Discard any predictable
             # staging tree, then create a private unpredictable directory under
-            # this job's RUNNER_TEMP. The upload step receives only the two exact
+            # this job's RUNNER_TEMP. The upload step receives only the exact
             # regular-file paths below, never this directory, so pre-populated
             # workspace extras and core.log symlinks cannot enter the artifact.
             umask 077
@@ -350,6 +350,8 @@ jobs:
             excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
             failure_summary_path="${failure_dir}/summary.md"
             failure_metadata_path="${failure_dir}/metadata.json"
+            diagnostics_source="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json"
+            diagnostics_path="${failure_dir}/test-diagnostics.json"
             failure_summary_source="$(mktemp "${failure_dir}/.summary-source-XXXXXX")"
             failure_summary_tmp="$(mktemp "${failure_dir}/.summary-XXXXXX")"
             failure_metadata_tmp="$(mktemp "${failure_dir}/.metadata-XXXXXX")"
@@ -391,10 +393,23 @@ jobs:
                 core_command="cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo run --locked -p xtask -- check-pr"
                 ;;
               with-tests)
-                core_command="cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo test --workspace --locked && cargo run --locked -p xtask -- check-pr"
+                core_command="cargo fmt --all --check && cargo clippy --workspace --all-targets --locked -- -D warnings && cargo run --locked -p xtask -- ci-test && cargo run --locked -p xtask -- check-pr"
                 ;;
               *) core_command="deterministic core suite (launch mode unavailable)" ;;
             esac
+            # The xtask wrapper owns sanitization. Select only its exact regular
+            # file and keep the upload bounded; no runner stream or arbitrary
+            # path is copied into the artifact.
+            if [ -f "$diagnostics_source" ] && [ ! -L "$diagnostics_source" ] \
+              && [ "$(wc -c < "$diagnostics_source" 2>/dev/null || echo 999999)" -le 16385 ]; then
+              cp --no-dereference "$diagnostics_source" "$diagnostics_path"
+            fi
+            if [ ! -f "$diagnostics_path" ] || [ -L "$diagnostics_path" ]; then
+              rm -f "$diagnostics_path"
+            elif ! cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path"; then
+              echo "structured test diagnostics failed schema/integrity validation" >&2
+              rm -f "$diagnostics_path"
+            fi
             failed_step="$(awk -F '\t' 'NR > 1 && $3 != "0" && $3 != "skipped" { print $1; exit }' "$excerpt_path" 2>/dev/null || true)"
             case "$failed_step" in
               fmt|clippy|test|check-pr) ;;
@@ -427,6 +442,9 @@ jobs:
               && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
               echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
               echo "metadata_path=$failure_metadata_path" >> "$GITHUB_OUTPUT"
+              if [ -f "$diagnostics_path" ] && [ ! -L "$diagnostics_path" ]; then
+                echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT"
+              fi
             else
               echo "core failure evidence staging rejected non-regular output" >&2
               rm -rf "$failure_root"
@@ -492,5 +510,6 @@ jobs:
           path: |
             ${{ steps.core-verdict.outputs.summary_path }}
             ${{ steps.core-verdict.outputs.metadata_path }}
+            ${{ steps.core-verdict.outputs.diagnostics_path }}
           if-no-files-found: ignore
           retention-days: 7

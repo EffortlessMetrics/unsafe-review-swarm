@@ -1,0 +1,11 @@
+# Repo-owned structured runner profile for #2133.
+# JUnit is nextest's supported machine-readable test-run reporter. Failure
+# output is disabled so PR-controlled stdout/stderr never enters the handoff.
+# Local use: `cargo nextest run --profile ci` writes the sanitized report to
+# `target/ci-core/nextest-junit.xml` for inspecting the structured runner
+# inputs without invoking the CI wrapper.
+[profile.ci.junit]
+path = "target/ci-core/nextest-junit.xml"
+store-success-output = false
+store-failure-output = false
+report-skipped = "none"

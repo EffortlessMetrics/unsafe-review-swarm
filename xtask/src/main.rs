@@ -23,6 +23,7 @@ mod check_dispatch;
 mod check_local;
 mod ci_lanes;
 mod ci_routing_contract;
+mod ci_test;
 mod cleanup_auditor;
 mod command_args;
 mod commands;
@@ -908,6 +909,8 @@ fn run(args: Vec<String>) -> Result<(), String> {
             source_truth_ledgers::check_package_boundary()
         }
         commands::XtaskCommand::CheckCiLanes => ci_lanes::check(),
+        commands::XtaskCommand::CiTest => ci_test::run(&root),
+        commands::XtaskCommand::CiTestValidate(path) => ci_test::validate_diagnostics(&path),
         commands::XtaskCommand::CheckSupportTiers => check_support_tiers(),
         commands::XtaskCommand::CheckFixtures => fixture_surfaces::check_fixtures(),
         commands::XtaskCommand::CheckCalibration => check_calibration(),
@@ -980,7 +983,7 @@ fn print_help() {
 /// command list; the trailing note records that classification.
 fn help_text() -> String {
     format!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
     )
 }
 

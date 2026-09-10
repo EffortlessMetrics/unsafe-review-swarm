@@ -59,6 +59,27 @@ fn check_private_staging_order(path: &str, text: &str) -> Result<(), String> {
     Ok(())
 }
 
+/// Require the structured test invocation to be part of the launched core
+/// gate, rather than accepting the `ci-test` prefix from the validator command.
+fn check_core_gate_launch_order(path: &str, text: &str) -> Result<(), String> {
+    let launch = r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#;
+    let launch_index = text
+        .find(launch)
+        .ok_or_else(|| format!("{path} missing exact launched ci-test invocation: {launch}"))?;
+    let background = text
+        .find(") > target/ci-core/core.log 2>&1 &")
+        .ok_or_else(|| format!("{path} missing background core-gate launch"))?;
+    let verdict = text
+        .find("- name: Assert core gate verdict")
+        .ok_or_else(|| format!("{path} missing core-gate verdict step"))?;
+    if !(launch_index < background && background < verdict) {
+        return Err(format!(
+            "{path} must launch the exact ci-test invocation before asserting the core verdict"
+        ));
+    }
+    Ok(())
+}
+
 /// Validate the bounded diagnostic artifact attached to a failed deterministic
 /// core gate. The upload may report evidence, but it must neither retain the
 /// raw log nor replace the final non-zero verdict with an advisory outcome.
@@ -92,8 +113,10 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "head -n 80",
             "head -c 16384",
             // Staging is recreated after the core finishes in a private,
-            // unpredictable runner-temp path. Only two exact regular files are
-            // exposed to upload-artifact via step outputs.
+            // unpredictable runner-temp path. Only the baseline two files plus
+            // the optional sanitized structured diagnostic are exposed.
+            r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#,
+            "UNSAFE_REVIEW_CI_HANDOFF_DIR=\"${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}\"",
             "id: core-verdict",
             "${RUNNER_TEMP}/unsafe-review-core-evidence-${CORE_RUN_KEY}",
             "rm -rf \"$failure_root\"",
@@ -107,6 +130,10 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "[ ! -L \"$failure_metadata_path\" ]",
             "summary_path=$failure_summary_path",
             "metadata_path=$failure_metadata_path",
+            "diagnostics_path=$diagnostics_path",
+            "diagnostics_source=\"${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json\"",
+            "cp --no-dereference \"$diagnostics_source\" \"$diagnostics_path\"",
+            "cargo run --locked -p xtask -- ci-test-validate \"$diagnostics_path\"",
             "if [ \"${core_exit}\" != \"0\" ]; then",
             // Artifact retention is always attempted but cannot change the job.
             "name: Upload bounded core-gate failure evidence",
@@ -116,6 +143,7 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "path: |",
             "${{ steps.core-verdict.outputs.summary_path }}",
             "${{ steps.core-verdict.outputs.metadata_path }}",
+            "${{ steps.core-verdict.outputs.diagnostics_path }}",
             "if-no-files-found: ignore",
             "retention-days: 7",
         ],
@@ -131,7 +159,29 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "origin/${{ github.base_ref",
         ],
     )?;
-    check_private_staging_order(path, text)
+    check_private_staging_order(path, text)?;
+    check_core_gate_launch_order(path, text)?;
+    check_diagnostics_staging_order(path, text)
+}
+
+fn check_diagnostics_staging_order(path: &str, text: &str) -> Result<(), String> {
+    let mut previous = None;
+    for marker in [
+        r#"cp --no-dereference "$diagnostics_source" "$diagnostics_path""#,
+        r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#,
+        r#"echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT""#,
+    ] {
+        let position = text
+            .find(marker)
+            .ok_or_else(|| format!("{path} missing diagnostic staging operation: {marker}"))?;
+        if previous.is_some_and(|previous| previous >= position) {
+            return Err(format!(
+                "{path} must copy diagnostics before validation and expose them only after validation"
+            ));
+        }
+        previous = Some(position);
+    }
+    Ok(())
 }
 
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
@@ -381,6 +431,8 @@ mod tests {
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
 CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
 core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
+cargo run --locked -p xtask -- ci-test
+UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}"
 base_ref="${GITHUB_BASE_REF:-main}"
 git diff --name-only "origin/${base_ref}...HEAD"
 _changed_rs="__diff_unavailable__"
@@ -399,6 +451,8 @@ case "$core_mode" in
 esac
 head -n 80
 head -c 16384
+_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test \
+  ) > target/ci-core/core.log 2>&1 &
 - name: Assert core gate verdict
   id: core-verdict
 if [ "${core_exit}" != "0" ]; then
@@ -408,8 +462,12 @@ if [ "${core_exit}" != "0" ]; then
   failure_dir="$(mktemp -d "${failure_root}/staging-XXXXXX")"
   excerpt_path="${failure_dir}/step-status.txt"
   excerpt_tmp="$(mktemp "${failure_dir}/.step-status-XXXXXX")"
-  failure_summary_path="${failure_dir}/summary.md"
-  failure_metadata_path="${failure_dir}/metadata.json"
+failure_summary_path="${failure_dir}/summary.md"
+failure_metadata_path="${failure_dir}/metadata.json"
+diagnostics_source="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json"
+diagnostics_path="${failure_dir}/test-diagnostics.json"
+cp --no-dereference "$diagnostics_source" "$diagnostics_path"
+cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path"
   if ! {
     printf 'step_id\telapsed_seconds\texit_status\n'
   } > "$excerpt_tmp"; then
@@ -423,6 +481,7 @@ if [ "${core_exit}" != "0" ]; then
     && [ -f "$failure_metadata_path" ] && [ ! -L "$failure_metadata_path" ]; then
     echo "summary_path=$failure_summary_path" >> "$GITHUB_OUTPUT"
     echo "metadata_path=$failure_metadata_path" >> "$GITHUB_OUTPUT"
+    echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT"
   fi
 fi
 - name: Upload bounded core-gate failure evidence
@@ -436,6 +495,7 @@ fi
     path: |
       ${{ steps.core-verdict.outputs.summary_path }}
       ${{ steps.core-verdict.outputs.metadata_path }}
+      ${{ steps.core-verdict.outputs.diagnostics_path }}
     if-no-files-found: ignore
     retention-days: 7
 "#;
@@ -726,6 +786,49 @@ fi
     }
 
     #[test]
+    fn diagnostics_are_validated_before_output_exposure() -> Result<(), String> {
+        let text = FAILURE_EVIDENCE_FIXTURE;
+        let copy = text
+            .find("cp --no-dereference \"$diagnostics_source\" \"$diagnostics_path\"")
+            .ok_or_else(|| "diagnostics copy step is missing".to_string())?;
+        let validate = text
+            .find("cargo run --locked -p xtask -- ci-test-validate \"$diagnostics_path\"")
+            .ok_or_else(|| "diagnostics validator step is missing".to_string())?;
+        let expose = text
+            .find("echo \"diagnostics_path=$diagnostics_path\" >> \"$GITHUB_OUTPUT\"")
+            .ok_or_else(|| "diagnostics output exposure is missing".to_string())?;
+        if !(copy < validate && validate < expose) {
+            return Err("diagnostics were exposed before validation completed".to_string());
+        }
+        if !text.contains("${{ steps.core-verdict.outputs.diagnostics_path }}") {
+            return Err("diagnostics_path is missing from the upload vector".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn live_workflow_rejects_reordered_diagnostic_staging() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        check_core_failure_evidence_contract("ci.yml", text)?;
+        let copy = r#"cp --no-dereference "$diagnostics_source" "$diagnostics_path""#;
+        let validate = r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#;
+        let expose = r#"echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT""#;
+        for (earlier, later) in [(copy, validate), (validate, expose)] {
+            let reordered = text
+                .replace(earlier, "REORDERED_DIAGNOSTIC_OPERATION")
+                .replace(later, earlier)
+                .replace("REORDERED_DIAGNOSTIC_OPERATION", later);
+            let Err(error) = check_core_failure_evidence_contract("ci.yml", &reordered) else {
+                return Err(format!("accepted reordered diagnostic staging: {earlier}"));
+            };
+            if !error.contains("must copy diagnostics before validation") {
+                return Err(format!("unexpected staging rejection: {error}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn allowlisted_summary_rejects_bare_tokens_and_pem_material() -> Result<(), String> {
         let fixture = "fmt\t1\t0\n\
 ghp_AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA\n\
@@ -902,6 +1005,7 @@ clippy\t4\t0\tbare-secret-material\n";
         let expected = vec![
             "${{ steps.core-verdict.outputs.summary_path }}",
             "${{ steps.core-verdict.outputs.metadata_path }}",
+            "${{ steps.core-verdict.outputs.diagnostics_path }}",
         ];
         if selected != expected {
             return Err(format!("unexpected upload selection: {selected:?}"));
