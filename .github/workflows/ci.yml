@@ -250,20 +250,15 @@ jobs:
               ;;
           esac
           echo "${cache_hit_state}" > target/ci-core/cache_hit_state || true
+          # Diff-scoped test skip (#2171): one shared selector implementation
+          # (.github/scripts/select-core-mode.sh, also executed by the xtask
+          # contract fixtures) decides the core mode. It prints with-tests
+          # unless the diff is non-empty and every changed path is a Markdown
+          # document; manifests, lockfiles, toolchain/config files, sources,
+          # and unknown, empty, or unavailable diffs all run the full path.
           base_ref="${GITHUB_BASE_REF:-main}"
-          if changed_paths="$(git diff --name-only "origin/${base_ref}...HEAD")"; then
-            _changed_rs="$(printf '%s\n' "$changed_paths" | grep '\.rs$' || true)"
-          else
-            # Base comparison unavailable: force the full test path instead of
-            # silently treating an unresolved diff as docs-only.
-            echo "diff scope unavailable for origin/${base_ref}...HEAD; forcing cargo test --workspace" >&2
-            _changed_rs="__diff_unavailable__"
-          fi
-          if [ -z "$_changed_rs" ]; then
-            printf 'without-tests\n' > target/ci-core/core_mode
-          else
-            printf 'with-tests\n' > target/ci-core/core_mode
-          fi
+          core_mode="$(bash .github/scripts/select-core-mode.sh "origin/${base_ref}")"
+          printf '%s\n' "$core_mode" > target/ci-core/core_mode
           # Launch the full deterministic core gate in the background, sharing
           # the workspace target dir (cargo's lock serialises any overlap
           # safely). The && chain short-circuits, so the
@@ -274,10 +269,10 @@ jobs:
           # exit status for the retained diagnostic; raw command output never
           # enters the uploaded artifact.
           #
-          # Diff-scoped test skip (#1515 candidate 2): if the PR touches only
-          # docs/specs/policy/CI files (no .rs source), skip the slow
-          # `cargo test --workspace` step. fmt + clippy + check-pr still run —
-          # they are the real gate. This cuts ~3-5 min off docs-only PRs.
+          # Diff-scoped test skip (#1515 candidate 2, #2171): if the PR touches
+          # only Markdown documents (per select-core-mode.sh), skip the slow
+          # test step. fmt + clippy + check-pr still run — they are the real
+          # gate. This cuts ~3-5 min off docs-only PRs.
           (
             _step() {
               local _id="$1" _s _rc _elapsed
@@ -291,12 +286,12 @@ jobs:
               echo "[step-timing] ${_elapsed}s: $*"
               return $_rc
             }
-            if [ -z "$_changed_rs" ]; then
-              echo "[diff-scope] no .rs files changed — skipping cargo test (#1515)"
+            if [ "$core_mode" = "without-tests" ]; then
+              echo "[diff-scope] Markdown-only diff — skipping test step (#2171)"
               _step fmt cargo fmt --all --check \
                 && _step clippy cargo clippy --workspace --all-targets --locked -- -D warnings \
                 && printf 'test\t0\tskipped\n' >> target/ci-core/step-status.tsv \
-                && echo "[diff-scope] skipped cargo test --workspace (docs-only PR)" \
+                && echo "[diff-scope] skipped test step (Markdown-only PR)" \
                 && _step check-pr cargo run --locked -p xtask -- check-pr
             else
               _step fmt cargo fmt --all --check \

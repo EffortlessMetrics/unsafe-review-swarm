@@ -97,11 +97,12 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "rm -f target/ci-core/core_exit \"$core_exit_path\"",
             "while [ ! -f \"$core_exit_path\" ]",
             "mv \"${core_exit_path}.tmp\" \"$core_exit_path\"",
-            // Diff scoping consumes the runner-provided environment value as a
-            // quoted argument and fails closed to the full test path.
+            // Test selection consumes the runner-provided environment value as
+            // a quoted argument to one shared selector implementation.
+            // Manifests, unknown, empty, and unavailable diffs all take the
+            // full test path; only all-Markdown diffs may skip.
             "base_ref=\"${GITHUB_BASE_REF:-main}\"",
-            "git diff --name-only \"origin/${base_ref}...HEAD\"",
-            "_changed_rs=\"__diff_unavailable__\"",
+            "select-core-mode.sh \"origin/${base_ref}\"",
             // The shipped Bash arithmetic must produce the numeric elapsed TSV
             // field consumed by the closed-vocabulary evidence filter.
             "_now=$(date +%s)",
@@ -434,8 +435,7 @@ core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
 cargo run --locked -p xtask -- ci-test
 UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}"
 base_ref="${GITHUB_BASE_REF:-main}"
-git diff --name-only "origin/${base_ref}...HEAD"
-_changed_rs="__diff_unavailable__"
+core_mode="$(bash .github/scripts/select-core-mode.sh "origin/${base_ref}")"
 _now=$(date +%s)
 _elapsed=$((_now - _s))
 rm -f target/ci-core/core_exit "$core_exit_path"
@@ -1082,16 +1082,148 @@ clippy\t4\t0\tbare-secret-material\n";
     }
 
     #[test]
-    fn rejects_diff_scope_that_does_not_force_full_tests_on_failure() -> Result<(), String> {
-        let fail_open = FAILURE_EVIDENCE_FIXTURE.replace(
-            "_changed_rs=\"__diff_unavailable__\"\n",
-            "_changed_rs=\"\"\n",
+    fn rejects_inline_rs_grep_selector_without_shared_script() -> Result<(), String> {
+        // The old `.rs`-only grep skipped tests for manifest, lockfile, and
+        // toolchain changes. Only the shared selector may decide the mode.
+        let legacy = FAILURE_EVIDENCE_FIXTURE.replace(
+            "core_mode=\"$(bash .github/scripts/select-core-mode.sh \"origin/${base_ref}\")\"\n",
+            "_changed_rs=\"$(printf '%s\\n' \"$changed_paths\" | grep '\\.rs$' || true)\"\n",
         );
-        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &fail_open) else {
-            return Err("fail-open diff scope fixture unexpectedly passed".to_string());
+        if !legacy.contains("_changed_rs=") {
+            return Err("legacy selector substitution did not apply".to_string());
+        }
+        let Err(error) = check_core_failure_evidence_contract("fixture.yml", &legacy) else {
+            return Err("inline .rs-grep selector fixture unexpectedly passed".to_string());
         };
-        if !error.contains("_changed_rs=\"__diff_unavailable__\"") {
-            return Err(format!("unexpected diff fail-closed error: {error}"));
+        if !error.contains("select-core-mode.sh") {
+            return Err(format!("unexpected selector error: {error}"));
+        }
+        Ok(())
+    }
+
+    fn selector_script() -> std::path::PathBuf {
+        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../.github/scripts/select-core-mode.sh")
+    }
+
+    fn select_mode_stdin(paths: &[&str]) -> Result<String, String> {
+        let mut input = paths.join("\n");
+        if !paths.is_empty() {
+            input.push('\n');
+        }
+        let mut child = Command::new("bash")
+            .arg(selector_script())
+            .arg("--stdin")
+            .stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::null())
+            .spawn()
+            .map_err(|error| format!("failed to start shipped selector: {error}"))?;
+        child
+            .stdin
+            .take()
+            .ok_or_else(|| "selector stdin was not available".to_string())?
+            .write_all(input.as_bytes())
+            .map_err(|error| format!("failed to send selector input: {error}"))?;
+        let output = child
+            .wait_with_output()
+            .map_err(|error| format!("failed to execute shipped selector: {error}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "shipped selector failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(String::from_utf8(output.stdout)
+            .map_err(|error| format!("selector output was not UTF-8: {error}"))?
+            .trim_end()
+            .to_string())
+    }
+
+    #[test]
+    fn shipped_selector_runs_tests_for_build_inputs() -> Result<(), String> {
+        // Issue #2171: manifests, lockfiles, toolchain/config files, sources,
+        // and unknown paths must all select the full test path.
+        for paths in [
+            vec!["Cargo.lock"],
+            vec!["Cargo.toml"],
+            vec![".cargo/config.toml"],
+            vec!["rust-toolchain.toml"],
+            vec!["crates/unsafe-review-core/Cargo.toml"],
+            vec![
+                "Cargo.lock",
+                "Cargo.toml",
+                ".cargo/config.toml",
+                "rust-toolchain.toml",
+                "crates/unsafe-review-core/Cargo.toml",
+            ],
+            vec!["crates/unsafe-review-core/src/lib.rs"],
+            vec!["docs/guide.md", "xtask/src/main.rs"],
+            vec![".github/workflows/ci.yml"],
+            vec!["policy/workflow-allowlist.toml"],
+            vec!["notes.txt"],
+            vec!["README.MD"],
+            vec![],
+        ] {
+            let mode = select_mode_stdin(&paths)?;
+            if mode != "with-tests" {
+                return Err(format!("{paths:?} selected {mode:?}, expected with-tests"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shipped_selector_skips_only_all_markdown_diffs() -> Result<(), String> {
+        for paths in [
+            vec!["README.md"],
+            vec!["docs/guide.md", "README.md", "CHANGELOG.md"],
+            vec!["dir with spaces/notes.md"],
+        ] {
+            let mode = select_mode_stdin(&paths)?;
+            if mode != "without-tests" {
+                return Err(format!(
+                    "{paths:?} selected {mode:?}, expected without-tests"
+                ));
+            }
+        }
+        // A blank entry is never a real path: fail closed.
+        if select_mode_stdin(&["docs/guide.md", ""])? != "with-tests" {
+            return Err("blank path entry did not select with-tests".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shipped_selector_fails_closed_on_unavailable_diff() -> Result<(), String> {
+        // Outside a git checkout (or with an unresolvable base) the diff is
+        // unavailable, so the full test path is the only safe answer.
+        let dir = std::env::temp_dir().join(format!(
+            "unsafe-review-selector-{}",
+            std::time::SystemTime::now()
+                .duration_since(std::time::UNIX_EPOCH)
+                .map_err(|error| format!("clock: {error}"))?
+                .as_nanos()
+        ));
+        std::fs::create_dir_all(&dir).map_err(|error| format!("create temp fixture: {error}"))?;
+        let output = Command::new("bash")
+            .arg(selector_script())
+            .arg("origin/definitely-not-a-base")
+            .current_dir(&dir)
+            .output()
+            .map_err(|error| format!("failed to execute shipped selector: {error}"))?;
+        let _ = std::fs::remove_dir(&dir);
+        if !output.status.success() {
+            return Err("shipped selector must exit 0 with a mode word".to_string());
+        }
+        let mode = String::from_utf8(output.stdout)
+            .map_err(|error| format!("selector output was not UTF-8: {error}"))?
+            .trim_end()
+            .to_string();
+        if mode != "with-tests" {
+            return Err(format!(
+                "unavailable diff selected {mode:?}, expected with-tests"
+            ));
         }
         Ok(())
     }

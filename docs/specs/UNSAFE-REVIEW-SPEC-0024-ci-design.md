@@ -293,7 +293,10 @@ Step shape inside the one gate job:
    durable run record, and the core gate launched in the background sharing the
    workspace target dir (cargo's target-lock serialises overlap safely); diff
    scoping reads the quoted runner-provided `GITHUB_BASE_REF` with a `main`
-   default, and an unavailable base comparison forces the full test path
+   default, and an unavailable base comparison forces the full test path.
+   The test step is skipped only for an all-Markdown diff via the shared
+   `.github/scripts/select-core-mode.sh`; manifests, unknown, empty, and
+   unavailable diffs all run the full path
 3. final assert: wait for the current run/attempt's background core gate,
    surface its closed-vocabulary step-status summary, and fail the job iff its
    exit code != 0; stale `core_exit` files are removed before launch and cannot
