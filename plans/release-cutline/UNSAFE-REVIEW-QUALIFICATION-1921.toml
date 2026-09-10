@@ -3,6 +3,9 @@
 # PR 1 of issue #1921: a deterministic qualification contract. This manifest
 # records what a later candidate run must execute; it is not an execution
 # receipt and contains no candidate or publication claim.
+# Refreshed 2026-09-10 to swarm base 93c83e8a (MSRV 1.98, parser 0.0.350,
+# packages still 0.3.8): row commands re-verified against the current CLI
+# (init preview-only, baseline, pr-setup, repo timeout/max-cards all present).
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921"
 cutline_issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
@@ -10,8 +13,8 @@ status = "manifest_only"
 candidate_commit = "unset"
 candidate_version = "unset"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
-swarm_base = "94b5cd4a8d2200c9ba1abc666886eea5d51dcf5c"
-baseline_lockfile_sha256 = "6dd5b53fb3ff0bcfbf2913e1c5cf0f269b95b58c2a1583d3f3fe38057318a4e7"
+swarm_base = "93c83e8a1d349263ac03c94b3c242a8e29e471b1"
+baseline_lockfile_sha256 = "4afb189e3d56487a3d12b40117c90814ae4b9dfe"
 baseline_package_versions = ["unsafe-review-core@0.3.8", "unsafe-review@0.3.8", "unsafe-review-cli@0.3.8"]
 install_root = "task-owned temporary prefix; unset until candidate execution"
 target_dir = "task-owned temporary target; unset until candidate execution"
