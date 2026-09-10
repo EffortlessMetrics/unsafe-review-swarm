@@ -1,14 +1,16 @@
 # Release documentation and support matrix
 
-Audited 2026-09-07 against swarm `origin/main` at
-`a78770cfabe5daf631e5829133a0cae8db0210d7` and the public source-of-record
+Audited 2026-09-09 against swarm `origin/main` at
+`46afd7086a90a957f1fcdf08235e42721540253c` and the public source-of-record
 release `v0.3.8` (`2026-06-18`). This is a documentation inventory, not a
 candidate qualification or publication decision. The experimental/unavailable
-posture below is unchanged.
+posture below is unchanged; every surface row was re-checked and still holds
+(MSRV floor is now 1.98, parser 0.0.350, all link targets present, schema
+identities unchanged).
 
-The [dependency ledger](DEPENDENCY_FREEZE.md) remains a historical, inactive
-draft at `125de5f683286c4e8da04b76c6633a2a8e123f5a`. This audit does not refresh
-that ledger, activate a freeze, or rerun its receipts.
+The [dependency ledger](DEPENDENCY_FREEZE.md) remains an inactive draft,
+refreshed separately to the `b2d7bbff` snapshot. This audit does not activate
+a freeze or rerun its receipts.
 
 ## Availability vocabulary
 
@@ -19,7 +21,8 @@ that ledger, activate a freeze, or rerun its receipts.
 | Unavailable | Do not instruct users to acquire or depend on it. |
 | Deferred | Intentionally outside the current documented surface. |
 
-The next candidate has no frozen version or candidate SHA. The
+The next candidate has no frozen version; the draft cutline names candidate
+`46afd708` (refresh PR #2190, still draft). The
 [draft cutline](RELEASE_CUTLINE.md) and dependency ledger retain their own
 audited inputs; neither is repinned or frozen by this documentation snapshot.
 
