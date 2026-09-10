@@ -299,8 +299,10 @@ an external tool run (Miri, `cargo-careful`, a sanitizer, Loom, Shuttle, Kani,
 or Crux) that you ran yourself. `unsafe-review` does not run these tools by
 default and does not claim they ran unless a receipt is attached.
 
-To attach a receipt after running a witness tool externally, use
-`unsafe-review receipt import` (see `CLI.md` for the receipt format). Without
+To attach a receipt after running a witness tool externally, use the matching
+`unsafe-review receipt import-*` subcommand (`import-miri`,
+`import-careful`, `import-sanitizer`, or `import-concurrency`; see `CLI.md`
+for the receipt format). There is no bare `receipt import` command. Without
 an attached receipt, every card and every no-card result is advisory only — no
 Miri-clean or UB-free claim is warranted.
 
@@ -313,8 +315,8 @@ next steps are:
   [docs/ci/UB_RISK_REVIEW_CI.md](ci/UB_RISK_REVIEW_CI.md) for the cookbook,
   [docs/ci/PR_CI.md](ci/PR_CI.md) for the lane model and
   `.github/examples/unsafe-review-first-pr.yml` for a copy-paste workflow.
-- Read [CLI reference](CLI.md) for receipt import, policy report, and outcome
-  comparison commands.
+- Read [CLI reference](CLI.md) for receipt import subcommands, policy report,
+  and outcome comparison commands.
 - Use [Find and fix UB-risk review seams](FIND_AND_FIX_UB.md) when a card needs
   a bounded repair, external witness receipt, and outcome comparison.
 - Read [ReviewCard explanation](explanation/review-cards-and-trust-boundary.md)
