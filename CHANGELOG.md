@@ -51,8 +51,15 @@ comments, edit source, or block by default.
 - Extracted calibration snapshot sync from `xtask/src/main.rs` into
   `xtask/src/calibration_snapshot.rs`. No behavior change.
   ([#2105](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2105))
-- Bumped `ra_ap_syntax` `0.0.347` → `0.0.348`.
-  ([#2136](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2136))
+- Bumped `ra_ap_syntax` `0.0.347` → `0.0.350` (via `0.0.348`/`0.0.349`).
+  Parser proof (core tests, detector contracts, fixture parity, determinism)
+  and the hosted gate are green on the bump. Advisory; no new detection claim.
+  ([#2136](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2136),
+  [#2165](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2165),
+  [#2180](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2180))
+- Raised the minimum Rust toolchain from 1.95 to 1.98 (rust-version, CI pins,
+  clippy `msrv`), required by `ra_ap_syntax` 0.0.350.
+  ([#2188](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2188))
 - Bumped `github-actions` group (`Factory-AI/droid-action` `4e44f79` →
   `9547b0c`, `EffortlessMetrics/ub-review` `26b1094` → `3e51ec8`) and synced
   `policy/workflow-allowlist.toml`.
