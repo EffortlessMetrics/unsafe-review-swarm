@@ -4,6 +4,14 @@ Add `unsafe-review` PR coverage to any Rust repository in two steps.
 
 ## Adoption
 
+> The `EffortlessMetrics/unsafe-review@v1` reference below is the intended
+> published adoption surface. It does not resolve yet: the composite action
+> currently lives only as the development copy at
+> `.github/actions/unsafe-review-first-pr/action.yml`, and no `v1` tag exists
+> in the source repository. Promotion is an explicit owner decision (see
+> [Action Promotion Decision](../handoffs/2026-06-13-action-promotion-decision.md)).
+> Do not reference the swarm repository from external callers.
+
 ```yaml
 - uses: actions/checkout@v6
   with:
@@ -162,11 +170,13 @@ To upload the bundle as a workflow artifact, add `actions: write` (or use
 
 ## Published action vs. development copy
 
-The published action lives in `EffortlessMetrics/unsafe-review` and is
-referenced as `uses: EffortlessMetrics/unsafe-review@v1`. The development
-copy in `unsafe-review-swarm` at
-`.github/actions/unsafe-review-first-pr/action.yml` is not the published
-surface; do not reference the swarm repository from external callers.
+The intended published action lives in `EffortlessMetrics/unsafe-review` and
+will be referenced as `uses: EffortlessMetrics/unsafe-review@v1` once the
+owner promotes it and creates the tag. Until then, the development copy in
+`unsafe-review-swarm` at
+`.github/actions/unsafe-review-first-pr/action.yml` is the only copy and is
+not the published surface; do not reference the swarm repository from external
+callers.
 
 ## Spec reference
 

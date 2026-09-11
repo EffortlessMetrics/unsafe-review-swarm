@@ -17,8 +17,8 @@
 | CI | Current GitHub CI status. | Analyzer correctness proof. |
 | `unsafe-review` | Numeric open static review gap count. | Safety or unsafety status. |
 | `unsafe-review+` | Numeric evidence-quality count: missing-or-weak evidence findings. | Miri-clean or UB-free status. |
-| VS Code planned | Editor surface is planned. | Published VS Marketplace extension. |
-| Open VSX planned | Editor surface is planned. | Published Open VSX extension. |
+| VS Code planned | No published VS Marketplace listing yet (saved-bundle viewer MVP exists; publication pending). | Published VS Marketplace extension. |
+| Open VSX planned | No published Open VSX listing yet (saved-bundle viewer MVP exists; publication pending). | Published Open VSX extension. |
 | GitHub release | Latest published GitHub release tag. | crates.io availability or release quality proof. |
 | crates.io downloads | Public crates.io download count. | Adoption quality or safety proof. |
 | docs.rs | Current docs.rs build badge. | API stability guarantee. |
