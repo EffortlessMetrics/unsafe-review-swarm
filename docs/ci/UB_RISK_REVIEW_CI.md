@@ -71,7 +71,7 @@ jobs:
       BASE_REF: ${{ github.base_ref || github.event.repository.default_branch }}
       BUNDLE_DIR: target/unsafe-review
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 100
           persist-credentials: false
@@ -103,11 +103,16 @@ jobs:
             comment-plan.json \
             witness-plan.md \
             receipt-audit.md \
+            receipt-audit.json \
+            policy-report.json \
+            policy-report.md \
             manual-candidates.json \
             manual-repair-queue.json \
             tokmd-packets.json \
+            usefulness-telemetry.json \
             lsp.json \
-            repair-queue.json
+            repair-queue.json \
+            unsafe-review-gate.json
           do
             if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
               echo "::error::unsafe-review review kit is missing ${required}"

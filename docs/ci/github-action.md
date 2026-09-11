@@ -13,7 +13,7 @@ Add `unsafe-review` PR coverage to any Rust repository in two steps.
 > Do not reference the swarm repository from external callers.
 
 ```yaml
-- uses: actions/checkout@v6
+- uses: actions/checkout@v7
   with:
     fetch-depth: 100
     persist-credentials: false
@@ -38,7 +38,7 @@ jobs:
     permissions:
       contents: read
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 100
           persist-credentials: false
