@@ -33,16 +33,23 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         return Ok(Command::RepoHelp);
     }
     if command == "candidate"
-        && (rest.is_empty() || has_help_flag(&rest) || is_candidate_help_word(&rest))
+        && (rest.is_empty()
+            || is_candidate_help_word(&rest)
+            || (has_help_flag(&rest) && is_known_subcommand(command.as_str(), &rest)))
     {
         return Ok(Command::CandidateHelp);
     }
     if command == "baseline"
-        && (rest.is_empty() || has_help_flag(&rest) || is_exact_help_word(&rest))
+        && (rest.is_empty()
+            || is_exact_help_word(&rest)
+            || (has_help_flag(&rest) && is_known_subcommand(command.as_str(), &rest)))
     {
         return Ok(Command::BaselineHelp);
     }
-    if has_help_flag(&rest) && is_known_command(command.as_str()) {
+    if has_help_flag(&rest)
+        && is_known_command(command.as_str())
+        && is_known_subcommand(command.as_str(), &rest)
+    {
         return Ok(subcommand_help_for(&command));
     }
     match command.as_str() {
@@ -113,6 +120,46 @@ fn is_known_command(command: &str) -> bool {
             | "receipt-template"
             | "lsp"
     )
+}
+
+/// Commands with a fixed subcommand vocabulary only take the `--help`
+/// shortcut when the requested subcommand is known (or absent, or the bare
+/// `help` word). An unknown subcommand keeps failing as a usage error even
+/// with `--help`; `--help` excuses flag errors, not a wrong subcommand.
+/// Leaf commands take opaque positionals (card ids, paths), so they are not
+/// gated here.
+fn is_known_subcommand(command: &str, args: &[String]) -> bool {
+    let Some(positional) = args
+        .iter()
+        .find(|arg| !arg.starts_with('-'))
+        .map(String::as_str)
+    else {
+        return true;
+    };
+    if positional == "help" {
+        return true;
+    }
+    match command {
+        "receipt" => matches!(
+            positional,
+            "import-miri"
+                | "import-careful"
+                | "import-cargo-careful"
+                | "import-sanitizer"
+                | "import-concurrency"
+                | "import-proof"
+                | "template"
+                | "validate"
+                | "audit"
+        ),
+        "candidate" => matches!(
+            positional,
+            "new" | "import" | "lint" | "list" | "witness-plan"
+        ),
+        "baseline" => matches!(positional, "init" | "add" | "status" | "refresh"),
+        "policy" => matches!(positional, "report"),
+        _ => true,
+    }
 }
 
 fn has_explicit_pr_input(args: &[String]) -> bool {
