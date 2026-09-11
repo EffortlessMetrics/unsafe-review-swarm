@@ -35,7 +35,8 @@ projection coherence before any curated promotion to `unsafe-review`.
 - hover cards
 - code actions for copying packets and witness commands
 - copy-only bounded agent packets
-- live LSP remains deferred until saved artifacts and first-run UX are solid
+- live `unsafe-review lsp` server landed (SPEC-0018); extension client wiring
+  remains deferred until saved artifacts and first-run UX are solid
 
 ## 0.4.0 — Repo posture and policy
 

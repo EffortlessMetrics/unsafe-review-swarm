@@ -111,7 +111,7 @@ repairing stale instructions for a different unsafe seam.
 When a card is `ready_for_agent`, copy these fields into the agent task:
 
 - `card_id`
-- `operation_family`
+- `context.operation_family`
 - `source_context.unsafe_site`
 - `missing_evidence`
 - `allowed_repairs`
