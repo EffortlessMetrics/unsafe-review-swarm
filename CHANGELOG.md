@@ -71,6 +71,11 @@ comments, edit source, or block by default.
   command` usage error (exit 2) instead of printing top-level help and
   exiting 0. Bare `--help` and known-command `--help` behavior is unchanged.
   ([#2200](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2200))
+- Made an unknown `receipt`, `candidate`, `baseline`, or `policy` subcommand
+  with `--help` fail with the `unknown <command> subcommand` usage error
+  (exit 2) instead of printing parent help and exiting 0. Known-subcommand
+  `--help` behavior is unchanged.
+  ([#2205](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2205))
 - Normalized `first-pr` shell handoff roots
   (`crates/unsafe-review-cli/src/execute/first_pr.rs`) for shell-safe
   execution. Advisory.
