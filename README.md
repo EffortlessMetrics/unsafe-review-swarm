@@ -97,10 +97,12 @@ unsafe-review explain <card-id>
 unsafe-review support
 ```
 
-`first-pr` writes `cards.json`, `pr-summary.md`, `github-summary.md`,
-`cards.sarif`, `comment-plan.json`, `witness-plan.md`, and `lsp.json` under
-`target/unsafe-review/`. It is advisory-only: it does not run witnesses, post
-comments, edit source, or enforce blocking policy.
+`first-pr` writes the standard advisory bundle under `target/unsafe-review/`,
+including `cards.json`, `pr-summary.md`, `github-summary.md`, `cards.sarif`,
+`comment-plan.json`, `witness-plan.md`, and `lsp.json`. The full bundle is 18
+files indexed by `target/unsafe-review/review-kit.json`. It is advisory-only:
+it does not run witnesses, post comments, edit source, or enforce blocking
+policy.
 
 For the end-to-end maintainer path from first card to fix, witness receipt, and
 outcome comparison, see [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md).
@@ -122,8 +124,8 @@ Real output (trimmed):
 unsafe-review first-pr
 unsafe-review wrote an advisory PR bundle.
 - Artifact directory: target/unsafe-review
-- Review cards: 1
-- Open actionable gaps: 1
+- Scope: 1 ReviewCard, 1 changed file, 1 open actionable gap
+- Evidence movement: new 1, worsened 0, improved 0, resolved 0, inherited 0; scan status: complete
 Open:
   target/unsafe-review/pr-summary.md
 Top card:
@@ -134,13 +136,9 @@ Top card:
 Explain top card:
   unsafe-review explain --root fixtures/raw_pointer_alignment \
     UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1
-Artifacts:
-  target/unsafe-review/cards.json
-  target/unsafe-review/pr-summary.md
-  target/unsafe-review/cards.sarif
-  target/unsafe-review/comment-plan.json
-  target/unsafe-review/lsp.json
-  ... (full list in target/unsafe-review/)
+  ... (repair queue, reviewer comments, secondary handoffs, and manual
+  ... candidates follow; the full bundle is 18 files indexed by
+  ... target/unsafe-review/review-kit.json)
 Trust boundary:
   static unsafe contract review only; not memory-safety proof, not UB-free status,
   not Miri-clean status, and not a site-execution claim unless a matching witness

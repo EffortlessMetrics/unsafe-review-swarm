@@ -298,8 +298,10 @@ and Markdown surfaces.
 
 `lsp` writes saved JSON only. It includes a read-only status object,
 diagnostics, hovers, and command data for copying packets, copying witness
-commands, explaining routes, and opening statically related tests. There is no
-editor extension or live LSP server in this surface.
+commands, explaining routes, and opening statically related tests. This
+projection does not start the live `unsafe-review lsp` server (SPEC-0018) and
+does not install an editor extension; the saved-bundle viewer MVP is documented
+separately in [Saved LSP JSON workflow](editor/saved-lsp-json.md).
 
 `witness-plan` is a routing artifact. It groups existing `ReviewCard`s by
 witness family: Miri / `cargo-careful`, sanitizers, Loom / Shuttle, Kani /
