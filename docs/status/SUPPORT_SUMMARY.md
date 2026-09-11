@@ -46,8 +46,9 @@ calibration exists and support tiers are explicitly promoted.
 | Witness routes and saved-output receipt import | Experimental | Fixture-backed route table plus saved-output receipt adapters | Running Miri/cargo-careful/sanitizers/Loom/Kani, site reach, or witness success beyond imported receipt scope |
 | Manual candidate ledger | Experimental | Fixture-backed import, explain/context, witness-plan, receipt audit, saved-outcome projection, oracle-map, proof-mode, fix-boundary, and PR-aperture preservation for advisory manual candidates | Analyzer discovery, proof, witness execution, site execution, repository safety, or policy authority |
 | Repo posture, badge JSON, outcome comparison, and policy report | Experimental | Fixture-backed; outcome comparison has limited saved-snapshot dogfood | Safety badge, release-grade dashboard, default no-new-debt, or blocking policy |
-| Real-crate dogfood measurement | Experimental | Seven capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
-| MIR/nightly facts and live LSP/editor integration | Deferred or planned | Requires later ADR/spec and proof | Default dependency, support promise, or v0.x gate behavior |
+| Real-crate dogfood measurement | Experimental | Twenty-two capped repo snapshots and twenty-three selected PR diffs across real crates | Calibrated rates, full audits, uncapped performance guarantees, or ecosystem-wide coverage |
+| Live `unsafe-review lsp` server | Experimental | Unit- and smoke-covered read-only server (SPEC-0018); not packaged in the editor extension | Source edits, witness execution, comments, blocking policy, or editor client integration |
+| MIR/nightly facts and editor client integration | Deferred or planned | Requires later ADR/spec and proof | Default dependency, support promise, or v0.x gate behavior |
 
 ## Public and candidate posture
 
