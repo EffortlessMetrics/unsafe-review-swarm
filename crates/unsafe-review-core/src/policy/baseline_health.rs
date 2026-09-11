@@ -164,7 +164,7 @@ pub struct BaselineHealthReport {
     /// Set when the coverage snapshot file exists but failed to parse — explains why
     /// every ledger entry may have landed in `snapshot_missing_or_invalid`.
     pub snapshot_load_error: Option<String>,
-    /// Set by the caller (not by [`classify`]) when the repo-wide card scan could not
+    /// Set by the caller (not by `classify`) when the repo-wide card scan could not
     /// run because the baseline ledger itself failed the analyzer's own strict
     /// per-entry validation — exactly the condition `identity_unmatched` exists to
     /// diagnose (issue #1893 review finding). When set, `current_cards` was empty for
