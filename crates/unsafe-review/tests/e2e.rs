@@ -4348,6 +4348,42 @@ fn unknown_command_with_help_flag_fails_with_usage_error() -> Result<(), Box<dyn
 }
 
 #[test]
+fn unknown_subcommand_with_help_flag_fails_with_usage_error() -> Result<(), Box<dyn Error>> {
+    for (command, message) in [
+        ("receipt", "unknown receipt subcommand `frobnicate`"),
+        ("candidate", "unknown candidate subcommand `frobnicate`"),
+        ("baseline", "unknown baseline subcommand `frobnicate`"),
+        ("policy", "unknown policy subcommand `frobnicate`"),
+    ] {
+        let output = run_failure([os(command), os("frobnicate"), os("--help")])?;
+        assert_eq!(output.status.code(), Some(2), "{command}");
+        let text = String::from_utf8(output.stderr.clone())?;
+        assert!(text.contains(message), "{text}");
+    }
+
+    Ok(())
+}
+
+#[test]
+fn known_subcommand_with_help_flag_still_prints_help() -> Result<(), Box<dyn Error>> {
+    for args in [
+        vec![os("receipt"), os("--help")],
+        vec![os("receipt"), os("audit"), os("--help")],
+        vec![os("candidate"), os("--help")],
+        vec![os("candidate"), os("list"), os("--help")],
+        vec![os("baseline"), os("--help")],
+        vec![os("baseline"), os("status"), os("--help")],
+        vec![os("policy"), os("--help")],
+        vec![os("policy"), os("report"), os("--help")],
+    ] {
+        let output = run_success(args)?;
+        assert_eq!(output.status.code(), Some(0));
+    }
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;
