@@ -42,7 +42,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
     {
         return Ok(Command::BaselineHelp);
     }
-    if has_help_flag(&rest) {
+    if has_help_flag(&rest) && is_known_command(command.as_str()) {
         return Ok(subcommand_help_for(&command));
     }
     match command.as_str() {
@@ -84,6 +84,35 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             "unknown command `{other}`. Run `unsafe-review --help`."
         )),
     }
+}
+
+fn is_known_command(command: &str) -> bool {
+    matches!(
+        command,
+        "--version"
+            | "-V"
+            | "support"
+            | "doctor"
+            | "init"
+            | "check"
+            | "first-pr"
+            | "review"
+            | "pr-setup"
+            | "pr"
+            | "repo"
+            | "pilot"
+            | "badges"
+            | "explain"
+            | "context"
+            | "candidate"
+            | "baseline"
+            | "confirm"
+            | "outcome"
+            | "policy"
+            | "receipt"
+            | "receipt-template"
+            | "lsp"
+    )
 }
 
 fn has_explicit_pr_input(args: &[String]) -> bool {

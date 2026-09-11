@@ -4338,6 +4338,16 @@ fn candidate_witness_plan_reports_an_unknown_id_as_a_missing_candidate()
 }
 
 #[test]
+fn unknown_command_with_help_flag_fails_with_usage_error() -> Result<(), Box<dyn Error>> {
+    let output = run_failure([os("frobnicate"), os("--help")])?;
+    assert_eq!(output.status.code(), Some(2));
+    let text = String::from_utf8(output.stderr.clone())?;
+    assert!(text.contains("unknown command `frobnicate`"), "{text}");
+
+    Ok(())
+}
+
+#[test]
 fn help_reports_first_run_trust_boundary_without_overclaims() -> Result<(), Box<dyn Error>> {
     let output = run_success([os("--help")])?;
     let text = stdout_text(&output)?;
