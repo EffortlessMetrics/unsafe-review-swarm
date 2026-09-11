@@ -267,10 +267,10 @@ what unsafe-review is not claiming:
 unsafe-review explain <card-id>
 ```
 
-It also writes `receipt-audit.md` and prints the matching
-`unsafe-review receipt audit` command for checking saved witness receipt metadata
-against the current PR cards. That audit does not run Miri, cargo-careful,
-sanitizers, Loom, Shuttle, Kani, or Crux.
+The `pr` bundle also writes `receipt-audit.md`, and the terminal handoff prints
+the matching `unsafe-review receipt audit` command for checking saved witness
+receipt metadata against the current PR cards. That audit does not run Miri,
+cargo-careful, sanitizers, Loom, Shuttle, Kani, or Crux.
 
 Run the `context --json` command when handing the bounded card packet to an
 agent:

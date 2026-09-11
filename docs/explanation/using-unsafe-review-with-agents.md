@@ -76,8 +76,8 @@ carries:
 
 - **`card_id`** — stable identifier for this card; include it in every agent
   prompt so the agent cannot drift to a different card.
-- **`operation_family`** — the unsafe operation class (`raw_pointer_read`,
-  `vec_set_len`, `maybe_uninit_assume_init`, etc.).
+- **`context.operation_family`** — the unsafe operation class
+  (`raw_pointer_read`, `vec_set_len`, `maybe_uninit_assume_init`, etc.).
 - **`source_context`** — a bounded context window with the unsafe site, nearby
   contract/guard summaries, and related test mentions. Keep scope to this
   window; do not tell the agent to search the whole repository.
@@ -101,11 +101,11 @@ carries:
 - **`repair_queue`** — compact bucket labels (`repairable_by_guard`,
   `repairable_by_safety_docs`, `repairable_by_test`, `requires_witness_receipt`,
   `requires_human_review`, `do_not_auto_repair`) for sorting and routing.
-- **`agent_readiness`** including **`requires_witness_receipt`** — a flag that
-  signals whether the card needs external witness evidence before or alongside a
-  source edit. If `true`, do not route as a pure edit task.
-- **`baseline`** — the current card class and evidence state; the agent needs
-  this to understand what "improvement" means after rerun.
+- **`agent_readiness`** — route on `state`: `requires_witness_receipt` means
+  the card needs external witness evidence before or alongside a source edit,
+  so do not route it as a pure edit task.
+- **`coverage.baseline_state`** — the current card class and evidence state;
+  the agent needs this to understand what "improvement" means after rerun.
 
 ## Do-not-do rules (copy these into every agent prompt)
 
@@ -189,8 +189,8 @@ After the agent returns a patch:
 2. Rerun: `unsafe-review first-pr --base origin/main`
 3. Run: `unsafe-review outcome --before <before-snapshot> --after target/unsafe-review/cards.json`
 4. The card should show `improved` (reclassified to a less-severe class) or
-   `resolved` (if the site left scope). `new_gaps=0` and `worsened_gaps=0` are
-   also required.
+   `resolved` (if the site left scope). `new=0` and `regressed=0` are also
+   required.
 5. If the card did not improve, the repair did not address the named missing
    evidence — do not accept it.
 
@@ -225,8 +225,8 @@ Receipts must be imported through:
 
 ```bash
 unsafe-review receipt template <card-id> \
-  --tool <miri|loom|shuttle|asan|sanitizer|human> \
-  --strength <ran|reviewed|asserted> \
+  --tool <miri|cargo-careful|asan|loom|kani|human-deep-review|external-integration-test> \
+  --strength <ran|test_targeted|site_reached|reviewed> \
   --author <name> \
   --recorded-at <iso-timestamp> \
   --expires-at <iso-date> \

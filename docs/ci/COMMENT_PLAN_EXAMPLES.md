@@ -68,7 +68,7 @@ Representative fields:
       "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
       "selection_reason_code": "top_actionable_card",
-      "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
+      "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
       "agent_readiness": {
         "ready": true,
         "state": "ready_for_agent",
@@ -122,7 +122,7 @@ the call site. The plan keeps the comment specific:
       "relevance": "medium",
       "selection_reason": "actionable high-priority review card",
       "selection_reason_code": "top_actionable_card",
-      "next_action": "Add or expose the local guard that discharges the `copy_nonoverlapping` safety obligation."
+      "next_action": "Add or expose local guards for these `copy_nonoverlapping` safety obligations: (1) source and destination do not overlap, (2) both ranges are valid for count elements."
     }
   ]
 }
