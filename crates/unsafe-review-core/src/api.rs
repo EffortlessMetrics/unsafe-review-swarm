@@ -970,7 +970,7 @@ pub fn baseline_add(
 ///
 /// Degrades instead of failing outright when the baseline ledger itself fails the
 /// analyzer's strict per-entry validation (bad card_id shape, or missing
-/// owner/reason/evidence) — see [`baseline_status_with_date`]'s doc comment and
+/// owner/reason/evidence) — implemented in `baseline_status_with_date`; see also
 /// [`crate::policy::baseline_health::BaselineHealthReport::card_scan_error`].
 pub fn baseline_status(root: &Path) -> Result<BaselineHealthReport, String> {
     let today = policy_report::current_utc_date()?;
