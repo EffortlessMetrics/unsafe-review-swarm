@@ -70,6 +70,7 @@ outcome comparison, see
 `pr` writes a standard advisory bundle under `target/unsafe-review/`:
 
 ```text
+review-kit.json
 cards.json
 pr-summary.md
 github-summary.md
@@ -77,17 +78,23 @@ cards.sarif
 comment-plan.json
 witness-plan.md
 receipt-audit.md
+receipt-audit.json
+policy-report.json
+policy-report.md
 manual-candidates.json
 manual-repair-queue.json
 tokmd-packets.json
+usefulness-telemetry.json
 lsp.json
 repair-queue.json
+unsafe-review-gate.json
 ```
 
 The bundle is artifact-first:
 
 | Artifact | Use |
 |---|---|
+| `review-kit.json` | Review handoff packet with bounded card queue |
 | `cards.json` | Canonical ReviewCard data |
 | `pr-summary.md` | Reviewer first screen |
 | `github-summary.md` | Bounded GitHub job summary text |
@@ -95,11 +102,16 @@ The bundle is artifact-first:
 | `comment-plan.json` | Planned comments, not posted |
 | `witness-plan.md` | Suggested witness routes and limits |
 | `receipt-audit.md` | Saved receipt metadata audit; no witness was run |
+| `receipt-audit.json` | Machine-readable saved receipt metadata audit |
+| `policy-report.json` | Machine-readable advisory no-new-debt simulation |
+| `policy-report.md` | Reviewer-facing advisory no-new-debt simulation |
 | `manual-candidates.json` | Imported manual/advisory candidates, separate from ReviewCards |
 | `manual-repair-queue.json` | Copy-only manual candidate repair handoff; no agent was run |
 | `tokmd-packets.json` | Formatting input for Bun packet presets; tokmd was not run |
+| `usefulness-telemetry.json` | Operational diagnostic telemetry |
 | `lsp.json` | Saved read-only editor projection |
 | `repair-queue.json` | Copy-only agent repair queue; no agent was run |
+| `unsafe-review-gate.json` | Advisory gate manifest: coverage movement, gate status |
 
 ## Explain One Card
 
