@@ -67,6 +67,10 @@ comments, edit source, or block by default.
 
 ### Fixed
 
+- Made an unknown top-level command with `--help` fail with the `unknown
+  command` usage error (exit 2) instead of printing top-level help and
+  exiting 0. Bare `--help` and known-command `--help` behavior is unchanged.
+  ([#2200](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2200))
 - Normalized `first-pr` shell handoff roots
   (`crates/unsafe-review-cli/src/execute/first_pr.rs`) for shell-safe
   execution. Advisory.
