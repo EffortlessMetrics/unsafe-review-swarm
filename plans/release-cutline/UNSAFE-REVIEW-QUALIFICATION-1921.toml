@@ -9,8 +9,9 @@
 # (init preview-only, baseline, pr-setup, repo timeout/max-cards all present).
 # PR 2 2026-09-16: executed on source candidate fb955749 (0.4.0), Linux only.
 # Row results below are linux-ci passes; the EXECUTION file carries identity,
-# per-row evidence, and explicit limitations (Windows untested). PR 3 reruns
-# invalidated rows after the final candidate commit.
+# per-row evidence, and explicit limitations. PR 3 rebound the receipt to the
+# final candidate commit; Windows later executed green (hosted run 35132286041,
+# see the #1925 closeout windows_qualification record).
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921"
 cutline_issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"

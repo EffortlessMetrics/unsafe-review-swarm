@@ -30,8 +30,8 @@ audited inputs; neither is repinned or frozen by this documentation snapshot.
 
 | Surface | User-facing source | Current posture | Availability | Proof / limits |
 | --- | --- | --- | --- | --- |
-| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Top-level preview-only `init`, the bounded action-first `pr` front panel, `doctor`, `explain`, `context`, and saved artifacts are on unpublished Swarm main; public v0.3.8 has no top-level `init` | `check-pr` and CLI e2e; `first-pr` remains the detailed compatibility route; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
-| Review bundle | [`FIRST_USE.md`](../FIRST_USE.md), [`PR_CI.md`](../ci/PR_CI.md) | Experimental, fixture/workflow-backed | Current bundle is on unpublished Swarm main; public v0.3.8 remains the last released artifact path | `check-first-pr-artifacts` and surface parity; tokmd rendering is not claimed by the producer alone |
+| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Top-level preview-only `init`, the bounded action-first `pr` front panel, `doctor`, `explain`, `context`, and saved artifacts ship in public v0.4.0; newer Swarm main work stays unpublished until separately qualified | `check-pr` and CLI e2e; `first-pr` remains the detailed compatibility route; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
+| Review bundle | [`FIRST_USE.md`](../FIRST_USE.md), [`PR_CI.md`](../ci/PR_CI.md) | Experimental, fixture/workflow-backed | Current bundle ships in public v0.4.0; newer Swarm main work stays unpublished until separately qualified | `check-first-pr-artifacts` and surface parity; tokmd rendering is not claimed by the producer alone |
 | Saved LSP / agent packet | [`saved-lsp-json.md`](../editor/saved-lsp-json.md), [`agent-repair-workflow.md`](../explanation/agent-repair-workflow.md) | Experimental, read-only | Swarm main; no live-server or published-editor availability claim | Canonical ReviewCard projection; no source edits, witness execution, or repair success |
 | VS Code / Open VSX | [`editor-extension.md`](../deferred/editor-extension.md), [`extension-mvp.md`](../editor/extension-mvp.md) | Experimental saved-bundle MVP; live client deferred | Swarm main packaging only; marketplace listings unavailable | Packaging and extension smoke lanes; no Marketplace/Open VSX publication |
 | GitHub Action | [`github-action.md`](../ci/github-action.md) | Advisory integration surface | Candidate/source availability must be checked separately; public `v1` is unavailable | No automatic comments or default blocking; do not imply `@v1` resolves |
@@ -45,7 +45,7 @@ audited inputs; neither is repinned or frozen by this documentation snapshot.
 The public `v0.3.8` installation path remains:
 
 ```text
-install the public v0.3.8 CLI
+install the public v0.4.0 CLI
 → doctor
 → pr
 → open the public release's reviewer summary

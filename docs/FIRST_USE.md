@@ -1,6 +1,6 @@
 # First-use guide
 
-This guide is for a maintainer trying the public `v0.3.8` `unsafe-review` CLI
+This guide is for a maintainer trying the public `v0.4.0` `unsafe-review` CLI
 for the first time. Swarm main may contain newer unpublished candidate work;
 run `unsafe-review --version` and keep any local candidate checkout separate
 from the published install path.
@@ -13,13 +13,13 @@ blocking policy by default.
 ## Install
 
 ```bash
-cargo install unsafe-review --version 0.3.8 --locked
+cargo install unsafe-review --version 0.4.0 --locked
 unsafe-review --help
 ```
 
-The command above installs the last public release from crates.io. It does not
-install the unfrozen Swarm main candidate, and no `v1`, GitHub Release, or
-marketplace publication is implied by the current workbench docs.
+The command above installs the public 0.4.0 release from crates.io. It does not
+install the unfrozen Swarm main candidate. A `v0.4.0` GitHub Release exists on
+the source repository; no `v1` or marketplace publication is implied.
 
 If you are working from a local checkout, keep the installed command and the
 workspace command separate. The installed command is the user path; `cargo run`
@@ -27,13 +27,12 @@ is for development.
 
 ## Preview Repository Adoption
 
-Top-level `init` is available only in the unpublished swarm/candidate command
-surface; the public `v0.3.8` install above does not include it. Use an explicitly
-identified local checkout for this preview, or continue to
+Top-level `init` ships in the public `v0.4.0` install above: run
+`unsafe-review init` (preview-only by default) or continue to
 [Get A First Card](#get-a-first-card).
 
-From the root of that unpublished `unsafe-review-swarm` checkout, inspect a
-deterministic proposal with the workspace binary:
+From the root of an explicitly identified local checkout, the same proposal is
+available through the workspace binary (for development use):
 
 ```bash
 cargo run --locked -p unsafe-review-cli --bin cargo-unsafe-review -- init

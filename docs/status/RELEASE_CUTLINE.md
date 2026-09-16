@@ -1,5 +1,10 @@
 # Draft release cutline — issue #1915
 
+> Superseded 2026-09-16: the cutline froze at `785e032d` / version `0.4.0`
+> (amended by #2213), qualified under #1925, and published via #1879
+> (source merge `8f67aaa5`, crates 0.4.0, tag `v0.4.0`). What follows is the
+> preserved pre-freeze audit snapshot, not current state.
+
 This is a draft qualification contract, not a release, tag, source promotion,
 publication, or `v1` decision. Its machine-readable source is
 [`plans/release-cutline/UNSAFE-REVIEW-CUTLINE-1915.toml`](../../plans/release-cutline/UNSAFE-REVIEW-CUTLINE-1915.toml).
