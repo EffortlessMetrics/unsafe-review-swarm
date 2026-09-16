@@ -1,0 +1,153 @@
+name: windows-qual
+
+# Advisory manual-only Windows installed-product qualification for the 0.4.0
+# candidate (swarm #1921 WINDOWS-MATRIX blocker, #1925 repair lane).
+#
+# Runs the installed-product rows on windows-latest against an exact source
+# candidate SHA of EffortlessMetrics/unsafe-review#568: package listing,
+# install from the final packages, identity/help/doctor, preview-only init,
+# one representative first-pr bundle plus the swarm artifact verifier, and
+# failure-semantics exits. LSP and pinned-consumer (tokmd/ub-review) rows are
+# explicitly out of scope here and remain maintainer-host follow-up; the
+# uploaded receipt says so.
+#
+# MANUAL DISPATCH ONLY. Never on pull_request or push, never a required
+# check, never gates a merge. Spending hosted Windows minutes requires an
+# explicit owner dispatch. Diagnostic receipt only: not a safety proof,
+# UB-free/Miri-clean/site-execution evidence, or publication authorization.
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_sha:
+        description: "Source candidate SHA (unsafe-review#568 head)"
+        default: "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  qual:
+    name: windows installed qualification (advisory)
+    runs-on: windows-latest
+    timeout-minutes: 180
+    defaults:
+      run:
+        shell: bash
+
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+          fetch-depth: 1
+
+      - name: Check out source candidate
+        uses: actions/checkout@v7
+        with:
+          repository: EffortlessMetrics/unsafe-review
+          ref: ${{ inputs.source_sha }}
+          path: source-candidate
+          persist-credentials: false
+          fetch-depth: 1
+
+      - uses: dtolnay/rust-toolchain@1.98
+        with:
+          toolchain: 1.98.1
+
+      - name: Prove candidate identity
+        run: |
+          set -euo pipefail
+          cd source-candidate
+          git rev-parse HEAD | tee ../candidate-sha.txt
+          grep '^version' crates/unsafe-review/Cargo.toml | head -n 1
+          sha256sum Cargo.lock | tee ../lockfile-sha.txt
+          for p in unsafe-review-core unsafe-review-cli unsafe-review; do
+            cargo package --list -p "$p" | sort | tee "../pkg-list-$p.txt" | wc -l
+          done
+
+      - name: Install facade from final packages
+        run: |
+          set -euo pipefail
+          cd source-candidate
+          cargo install --path crates/unsafe-review --root "$GITHUB_WORKSPACE/qual-prefix" --locked
+          echo "$GITHUB_WORKSPACE/qual-prefix/bin" >> "$GITHUB_PATH"
+
+      - name: Run qualification rows
+        run: |
+          set -euo pipefail
+          B="$GITHUB_WORKSPACE/qual-prefix/bin/unsafe-review.exe"
+          : > rows.tsv
+          rec() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> rows.tsv; }
+          v=$("$B" --version); rec identity 0 "$v"
+          for c in doctor pr repo context lsp init pr-setup; do
+            if "$B" "$c" --help >/dev/null 2>&1; then rec "help:$c" 0 -; else rec "help:$c" 1 -; fi
+          done
+          if "$B" init --help >/dev/null 2>&1; then rec "help:init-top" 0 -; else rec "help:init-top" 1 -; fi
+          rm -rf scratch-init && mkdir scratch-init && cd scratch-init
+          git init -q . && mkdir -p .github/workflows && echo "# existing" > .github/workflows/keep.yml
+          before=$(sha256sum .github/workflows/keep.yml | cut -d' ' -f1)
+          if "$B" init --format json > init.json 2>init.err; then rec "init:exit" 0 -; else rec "init:exit" 1 -; fi
+          if python -c "import json; d=json.load(open('init.json')); print(sorted(d.keys()))" > init-keys.txt; then rec "init:json-parse" 0 -; else rec "init:json-parse" 1 -; fi
+          after=$(sha256sum .github/workflows/keep.yml | cut -d' ' -f1)
+          if [ "$before" = "$after" ]; then rec "init:no-mutation" 0 -; else rec "init:no-mutation" 1 -; fi
+          if [ -z "$(git status --porcelain --untracked-files=no)" ]; then rec "init:no-tracked-writes" 0 -; else rec "init:no-tracked-writes" 1 -; fi
+          cd ..
+          rm -rf scratch-pr && mkdir scratch-pr && cd scratch-pr
+          git init -q . && git config user.email t@t && git config user.name t
+          mkdir src && printf 'pub fn f() -> i32 { 1 }\n' > src/lib.rs
+          printf '[package]\nname="rebind"\nversion="0.0.0"\nedition="2021"\n' > Cargo.toml
+          git add -A && git commit -qm base
+          printf 'pub fn f() -> i32 { unsafe { core::mem::zeroed() } }\n' > src/lib.rs
+          git commit -qam change
+          BASE=$(git rev-parse HEAD~1)
+          if "$B" first-pr --base-sha "$BASE" --out-dir "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:exit" 0 -; else rec "bundle:exit" 1 -; fi
+          cd "$GITHUB_WORKSPACE"
+          if cargo run --locked -p xtask -- check-first-pr-artifacts "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:verifier" 0 -; else rec "bundle:verifier" 1 -; fi
+          "$B" --bogus-flag >/dev/null 2>&1 && code=0 || code=$?
+          if [ "$code" = 2 ]; then rec "fail:invalid-flag" 0 -; else rec "fail:invalid-flag" 1 "exit=$code"; fi
+          printf 'not a diff' > bad.diff
+          (cd scratch-pr && "$B" check --diff ../bad.diff >/dev/null 2>&1) && code=0 || code=$?
+          if [ "$code" = 2 ]; then rec "fail:malformed-diff" 0 -; else rec "fail:malformed-diff" 1 "exit=$code"; fi
+          cat rows.tsv
+
+      - name: Write bounded receipt
+        run: |
+          set -euo pipefail
+          python - <<'EOF'
+          import hashlib, json
+          rows = []
+          for line in open('rows.tsv'):
+            name, code, detail = line.rstrip('\n').split('\t')
+            rows.append({'row': name, 'exit': int(code), 'detail': detail[:160]})
+          exe = 'qual-prefix/bin/unsafe-review.exe'
+          h = hashlib.sha256(open(exe, 'rb').read()).hexdigest()
+          receipt = {
+            'candidate_sha': open('candidate-sha.txt').read().strip(),
+            'candidate_version': '0.4.0',
+            'lockfile_sha256': open('lockfile-sha.txt').read().split()[0],
+            'installed_binary_sha256': h,
+            'toolchain': 'rustc 1.98.1',
+            'platform': 'windows-latest (see run context for exact image)',
+            'rows': rows,
+            'out_of_scope': ['installed LSP session', 'pinned tokmd/ub-review consumer interop'],
+            'trust_boundary': 'Installed-path evidence only; no safety, UB-free, Miri-clean, site-execution, accuracy, or publication-authorization claim.',
+          }
+          json.dump(receipt, open('windows-qual-receipt.json', 'w'), indent=2)
+          print(json.dumps({'rows': len(rows), 'binary_sha256': h}, indent=2))
+          bad = [r for r in rows if r['exit'] != 0 and not r['row'].startswith('fail:')]
+          if bad or any(r['exit'] != 2 for r in rows if r['row'].startswith('fail:')):
+            raise SystemExit(f'QUALIFICATION FAILED: {bad}')
+          EOF
+
+      - name: Upload receipt
+        if: always()
+        uses: actions/upload-artifact@v7
+        with:
+          name: windows-qual-receipt
+          path: windows-qual-receipt.json
+          retention-days: 7
