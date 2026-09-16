@@ -530,7 +530,7 @@ id = "GATE-1916-FREEZE"
 cutline_disposition = "required"
 cutline_integration = "on_swarm_main"
 status = "pass"
-proof = ["swarm PR #2210 merged bf130d27", "cargo run --locked -p xtask -- source-divergence (new_source_commits=0)"]
+proof = ["swarm PR #2210 merged 57dea2a9 (freeze records; #2211 qual records merged bf130d27)", "cargo run --locked -p xtask -- source-divergence (new_source_commits=0)"]
 evidence = ["freeze record active at swarm 785e032d, lockfile dc244ce8, trio 0.0.350/0.4.33/0.4.4", "swarm #2207/#2208 deferred with keep-open dispositions", "source #515/#550/#551/#565 open, supersede-via-candidate"]
 reason = "Dependency set frozen for the candidate with exact SHAs, dispositions, and the post-freeze exception rule."
 invalidated_by = "any merged dependency change or new dependency PR requiring disposition"
