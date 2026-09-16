@@ -35,8 +35,9 @@ next_action: <one concrete reversible step or the smallest genuine owner decisio
 
 A running check is `in-progress`; a known automatic transition is `waiting`.
 `blocked-external-evidenced` is valid only after an attempted operation fails,
-no alternative advances the obligation, and no independent work remains. Do
-not classify independent exact-head review as human-only review.
+no alternative advances the obligation, and no independent work remains. One
+blocked substep does not block independent seams. Do not classify independent
+exact-head review as human-only review.
 
 Cite file:line or exact GitHub/command evidence for every claim you confirm or
 refute. Default to verification over trusting the issue text. If the premise is
