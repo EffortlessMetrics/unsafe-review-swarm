@@ -92,7 +92,7 @@ reason = "Swarm ra_ap_syntax 0.0.350 is integrated in the workbench at the audit
 
 [[deferred_input]]
 id = "SWARM-2180"
-reason = "Swarm ra_ap_syntax 0.0.350 bump merged as b2d7bbff (#2180) after the MSRV 1.98 floor (#2188); parser proof and hosted Rust gate green. Freeze still draft_not_active pending owner activation; #2135 retains its separate runner lane. Reviewed 2026-09-09."
+reason = "Swarm ra_ap_syntax 0.0.350 bump merged as b2d7bbff (#2180) after the MSRV 1.98 floor (#2188); parser proof and hosted Rust gate green. Freeze was draft_not_active at the 2026-09-09 audit; this record activates it. #2135 retains its separate runner lane."
 
 [[deferred_input]]
 id = "SWARM-1620"
@@ -100,11 +100,11 @@ reason = "RSS/self-unsafe telemetry is closed unmerged and remains outside the c
 
 [[deferred_input]]
 id = "SWARM-2207"
-reason = "Dependabot sha2 0.10.9 to 0.11.0 is deferred post-freeze. Red at audit 2026-09-16: required gate fails at the clippy step plus a policy-contracts failure, so not mergeable as-is. Keep-open disposition comment posted. Merging requires clippy triage against the 0.10 to 0.11 API changes plus a full green gate, and post-freeze the EXCEPTION-1/EXCEPTION-2 reset rules apply."
+reason = "Dependabot sha2 0.10.9 to 0.11.0 is deferred post-freeze. Red at audit 2026-09-16: required gate red (hosted failure-evidence names failed step clippy, run 34960418466) plus a policy-contracts failure, so not mergeable as-is. Keep-open disposition comment posted. Merging requires clippy triage against the 0.10 to 0.11 API changes plus a full green gate, and post-freeze the EXCEPTION-1/EXCEPTION-2 reset rules apply."
 
 [[deferred_input]]
 id = "SWARM-2208"
-reason = "Dependabot droid-action pin bump is deferred post-freeze. Bare pin with no paired policy/workflow-allowlist.toml update; red at audit 2026-09-16: required gate fails at the check-pr step plus a policy-contracts failure. Keep-open disposition comment posted. Merging requires recreation through the paired pin-plus-allowlist path with policy proof green."
+reason = "Dependabot droid-action pin bump is deferred post-freeze. Bare pin with no paired policy/workflow-allowlist.toml update; red at audit 2026-09-16: required gate red (hosted failure-evidence names failed step check-pr, run 34960431865) plus a policy-contracts failure. Keep-open disposition comment posted. Merging requires recreation through the paired pin-plus-allowlist path with policy proof green."
 
 [[deferred_input]]
 id = "SWARM-2135-SHA2-SUBTREE"

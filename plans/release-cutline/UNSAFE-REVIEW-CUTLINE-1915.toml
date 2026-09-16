@@ -258,7 +258,7 @@ id = "PR-1620"
 disposition = "deferred"
 integration = "not_on_swarm_main"
 integration_evidence = ["swarm #1620 is closed unmerged; no branch state remains on the candidate"]
-reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this draft cutline does not make."
+reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this frozen cutline does not make."
 proof = []
 
 [[item]]
@@ -472,7 +472,7 @@ proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask --
 id = "ISSUE-2100"
 disposition = "required"
 integration = "not_on_swarm_main"
-integration_evidence = ["issue open; no merged implementation; substrate PR-2135 merged 2026-09-16 as fc69a255 (row PR-2135); acceptance still unproven"]
+integration_evidence = ["issue open; no merged implementation; substrate PR-2135 merged 2026-09-10 as fc69a255 (row PR-2135); acceptance still unproven"]
 reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Required for diagnosable CI gates; path is the structured runner substrate."
 proof = []
 
@@ -480,7 +480,7 @@ proof = []
 id = "ISSUE-2133"
 disposition = "required"
 integration = "on_swarm_main"
-integration_evidence = ["substrate PR-2135 merged 2026-09-16 as fc69a255 (row PR-2135); hosted receipt via the required gate"]
+integration_evidence = ["substrate PR-2135 merged 2026-09-10 as fc69a255 (row PR-2135); hosted receipt via the required gate"]
 reason = "Structured runner substrate prerequisite for ISSUE-2100; needs hosted receipt. Covered by the PR-2135 path."
 proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask -- check-pr"]
 
