@@ -59,6 +59,10 @@ pub(super) fn try_apply_check_arg(
             options.format = Format::Json;
             Ok(Some(1))
         }
+        "--short" => {
+            options.short = true;
+            Ok(Some(1))
+        }
         "--markdown" => {
             options.format = Format::Markdown;
             Ok(Some(1))

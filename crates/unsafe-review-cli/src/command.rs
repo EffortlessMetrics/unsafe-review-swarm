@@ -43,6 +43,8 @@ pub(crate) struct CheckOptions {
     pub policy: PolicyMode,
     pub out: Option<PathBuf>,
     pub max_cards: Option<usize>,
+    /// One line per card, highest risk first. Human output only.
+    pub short: bool,
 }
 
 impl Default for CheckOptions {
@@ -55,6 +57,7 @@ impl Default for CheckOptions {
             policy: PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
         }
     }
 }

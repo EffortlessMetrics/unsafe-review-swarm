@@ -973,19 +973,20 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
                 "unknown first-pr argument `{arg}`; did you mean `--out-dir`?"
             ));
         }
-        // `--format`, `--policy`, `--json`, `--markdown` belong to `check`/`repo`.
-        // `first-pr` always writes a full advisory artifact bundle to `--out-dir`
-        // and is advisory-only; none of these flags are honored.
-        // Intercept before try_apply_check_arg silently consumes them.
+        // `--format`, `--policy`, `--json`, `--markdown`, `--short` belong to
+        // `check`/`repo`. `first-pr` always writes a full advisory artifact
+        // bundle to `--out-dir` and is advisory-only; none of these flags are
+        // honored. Intercept before try_apply_check_arg silently consumes them.
         if arg == "--format"
             || arg.starts_with("--format=")
             || arg == "--policy"
             || arg.starts_with("--policy=")
             || arg == "--json"
             || arg == "--markdown"
+            || arg == "--short"
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format` and `--policy` belong to the \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, and `--short` belong to the \
                  `check`/`repo` subcommands — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
@@ -1476,6 +1477,12 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
     if options.base.is_some() && options.diff.is_some() {
         return Err("choose only one of --base or --diff".to_string());
     }
+    if options.short && options.format != Format::Human {
+        return Err(
+            "--short applies to human output only; drop --format or use the default human format"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1655,6 +1662,54 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::PrSummary);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_short_for_check_and_repo() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "check", "--short"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(options.short);
+
+        let command = parse(args(["unsafe-review", "repo", "--short"]))?;
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.check.short);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_short_with_non_human_format() -> Result<(), String> {
+        let error = match parse(args([
+            "unsafe-review",
+            "check",
+            "--format",
+            "json",
+            "--short",
+        ])) {
+            Ok(_) => return Err("short with json format should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("--short"),
+            "error should name --short; got: `{error}`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_short_for_first_pr() -> Result<(), String> {
+        let error = match parse(args(["unsafe-review", "first-pr", "--short"])) {
+            Ok(_) => return Err("short for first-pr should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("--short"),
+            "error should name --short; got: `{error}`"
+        );
         Ok(())
     }
 

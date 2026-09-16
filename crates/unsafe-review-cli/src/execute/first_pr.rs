@@ -3073,6 +3073,7 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3160,6 +3161,7 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4174,6 +4176,7 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
         }
     }
 

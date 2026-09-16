@@ -2,9 +2,11 @@ mod card;
 mod header;
 
 use crate::api::AnalyzeOutput;
+use crate::domain::{Priority, ReviewCard, ReviewClass};
 use crate::output::{
     NO_CHANGED_GAPS_LIMITATION, NO_CHANGED_GAPS_MESSAGE, REVIEWCARD_TRUST_BOUNDARY,
 };
+use crate::util::path_display;
 
 pub(crate) fn render(output: &AnalyzeOutput) -> String {
     let mut out = String::new();
@@ -29,6 +31,73 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
 fn push_line(out: &mut String, line: &str) {
     out.push_str(line);
     out.push('\n');
+}
+
+/// One line per card, highest risk first (#2244).
+///
+/// The header (class counters plus slot gaps) is identical to the full
+/// rendering; each card then gets a single `file:line [priority class]
+/// family operation -- next step` line. Ranking is priority first, then a
+/// fixed class order, stable for equal ranks. Full output stays the default;
+/// JSON output is untouched.
+pub(crate) fn render_short(output: &AnalyzeOutput) -> String {
+    let mut out = String::new();
+    header::render_header(&mut out, output);
+
+    if output.cards.is_empty() {
+        push_line(&mut out, NO_CHANGED_GAPS_MESSAGE);
+        push_line(&mut out, NO_CHANGED_GAPS_LIMITATION);
+        return out;
+    }
+
+    let mut ranked: Vec<&ReviewCard> = output.cards.iter().collect();
+    ranked.sort_by_key(|card| short_rank(card));
+    for card in ranked {
+        push_line(&mut out, &short_line(card));
+    }
+    out
+}
+
+/// Sort key, lower sorts first: priority, then class severity, stable.
+fn short_rank(card: &ReviewCard) -> (u8, u8) {
+    let priority = match card.priority {
+        Priority::High => 0,
+        Priority::Medium => 1,
+        Priority::Low => 2,
+    };
+    let class = match card.class {
+        ReviewClass::ContractMissing | ReviewClass::GuardMissing => 0,
+        ReviewClass::RequiresLoom
+        | ReviewClass::RequiresSanitizer
+        | ReviewClass::RequiresKaniOrCrux
+        | ReviewClass::MiriUnsupported => 1,
+        ReviewClass::WitnessMismatch
+        | ReviewClass::ReachableUnwitnessed
+        | ReviewClass::UnsafeUnreached => 2,
+        ReviewClass::GuardedUnwitnessed => 3,
+        ReviewClass::StaticUnknown => 4,
+        ReviewClass::GuardedAndWitnessed | ReviewClass::BaselineKnown | ReviewClass::Suppressed => {
+            5
+        }
+    };
+    (priority, class)
+}
+
+fn one_line(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
+fn short_line(card: &ReviewCard) -> String {
+    format!(
+        "{}:{} [{} {}] {} {} -- {}",
+        path_display(&card.site.location.file),
+        card.site.location.line,
+        card.priority.as_str(),
+        card.class.as_str(),
+        card.operation.family.as_str(),
+        one_line(&card.operation.expression),
+        one_line(&card.next_action.summary)
+    )
 }
 
 #[cfg(test)]
@@ -216,6 +285,44 @@ mod tests {
             "witness gaps",
             output.summary.guarded_unwitnessed,
         )?;
+        Ok(())
+    }
+
+    #[test]
+    fn human_short_renders_one_risk_ranked_line_per_card() -> Result<(), String> {
+        // Drift-lock for #2244: short output is one line per card, highest
+        // risk first, carrying the single most important next step.
+        let output = fixture_output("pointer_arithmetic_unsafe_fn_offset")?;
+        let rendered = render_short(&output);
+        let card_lines: Vec<&str> = rendered
+            .lines()
+            .filter(|line| line.contains(".rs:"))
+            .collect();
+        expect_eq("short card line count", card_lines.len(), 2)?;
+        require(
+            card_lines[0].contains("guard_missing") && card_lines[0].contains(":6"),
+            format!(
+                "highest-risk card (guard_missing op) must sort first; got: `{}`",
+                card_lines[0]
+            ),
+        )?;
+        require(
+            card_lines[1].contains("unsafe_declaration") && card_lines[1].contains(":5"),
+            format!(
+                "declaration card must sort after the operation card; got: `{}`",
+                card_lines[1]
+            ),
+        )?;
+        for line in card_lines {
+            require(
+                line.contains(" -- "),
+                format!("short line must carry the next step; got: `{line}`"),
+            )?;
+            require(
+                !line.contains('\n'),
+                "short output must stay one line per card".to_string(),
+            )?;
+        }
         Ok(())
     }
 
