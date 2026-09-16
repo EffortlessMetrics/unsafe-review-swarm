@@ -1132,9 +1132,28 @@ clippy\t4\t0\tbare-secret-material\n";
         Ok(())
     }
 
-    fn selector_script() -> std::path::PathBuf {
-        std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../.github/scripts/select-core-mode.sh")
+    fn selector_command() -> Result<Command, String> {
+        let path = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../.github/scripts/select-core-mode.sh");
+        let script = std::fs::read_to_string(&path)
+            .map_err(|error| format!("read shipped selector {}: {error}", path.display()))?;
+        // Use Git Bash on Windows: WSL cannot reliably transport Windows paths
+        // or this fixture's stdin. Normalize checkout line endings, not the rule.
+        #[cfg(windows)]
+        let shell = std::env::var_os("PATH")
+            .into_iter()
+            .flat_map(|paths| std::env::split_paths(&paths).collect::<Vec<_>>())
+            .filter(|directory| directory.join("git.exe").is_file())
+            .map(|directory| directory.join("../bin/bash.exe"))
+            .find(|candidate| candidate.is_file())
+            .ok_or_else(|| {
+                "selector tests require Git for Windows on PATH (Git Bash, not WSL)".to_string()
+            })?;
+        #[cfg(not(windows))]
+        let shell = std::path::PathBuf::from("bash");
+        let mut command = Command::new(shell);
+        command.args(["-c", &script.replace("\r\n", "\n"), "select-core-mode.sh"]);
+        Ok(command)
     }
 
     fn select_mode_stdin(paths: &[&str]) -> Result<String, String> {
@@ -1142,12 +1161,11 @@ clippy\t4\t0\tbare-secret-material\n";
         if !paths.is_empty() {
             input.push('\n');
         }
-        let mut child = Command::new("bash")
-            .arg(selector_script())
+        let mut child = selector_command()?
             .arg("--stdin")
             .stdin(Stdio::piped())
             .stdout(Stdio::piped())
-            .stderr(Stdio::null())
+            .stderr(Stdio::piped())
             .spawn()
             .map_err(|error| format!("failed to start shipped selector: {error}"))?;
         child
@@ -1237,15 +1255,18 @@ clippy\t4\t0\tbare-secret-material\n";
                 .as_nanos()
         ));
         std::fs::create_dir_all(&dir).map_err(|error| format!("create temp fixture: {error}"))?;
-        let output = Command::new("bash")
-            .arg(selector_script())
+        let output = selector_command()?
             .arg("origin/definitely-not-a-base")
             .current_dir(&dir)
             .output()
             .map_err(|error| format!("failed to execute shipped selector: {error}"))?;
         let _ = std::fs::remove_dir(&dir);
         if !output.status.success() {
-            return Err("shipped selector must exit 0 with a mode word".to_string());
+            return Err(format!(
+                "shipped selector must exit 0 with a mode word ({}): {}",
+                output.status,
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
         let mode = String::from_utf8(output.stdout)
             .map_err(|error| format!("selector output was not UTF-8: {error}"))?
