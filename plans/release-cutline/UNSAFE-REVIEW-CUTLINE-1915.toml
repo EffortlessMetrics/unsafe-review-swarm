@@ -46,6 +46,12 @@ rollback = "Supersede this cutline with a dated cutline artifact and retain it a
 # version 0.4.0. Integration below is read against main 785e032d. Only the
 # header, the PR-2209 item, and the ISSUE-2100/ISSUE-2133 substrate notes
 # changed; all other rows stand as the 2026-09-09/10 audit records.
+#
+# Amendment 2026-09-16 (owner deferral, issue #1915 PR3): ISSUE-2100 moved
+# required -> deferred. The #2135 structured-runner substrate is merged
+# (fc69a255); bounded failure-identity retention remains post-0.4.0 CI
+# diagnosability work. All release gates were green throughout, so this is
+# not a shipped-product defect and does not gate the 0.4.0 candidate.
 
 [[item]]
 id = "PR-1939"
@@ -470,10 +476,10 @@ proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask --
 
 [[item]]
 id = "ISSUE-2100"
-disposition = "required"
+disposition = "deferred"
 integration = "not_on_swarm_main"
 integration_evidence = ["issue open; no merged implementation; substrate PR-2135 merged 2026-09-10 as fc69a255 (row PR-2135); acceptance still unproven"]
-reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Required for diagnosable CI gates; path is the structured runner substrate."
+reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Deferred per owner decision 2026-09-16 as post-0.4.0 CI-diagnosability work: the #2135 structured-runner substrate is merged and all release gates were green throughout, so this is not a shipped-product defect and does not gate the 0.4.0 candidate."
 proof = []
 
 [[item]]
