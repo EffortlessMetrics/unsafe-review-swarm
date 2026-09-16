@@ -1,7 +1,7 @@
 # Legacy goals archive
 
 This directory is a read-only parity snapshot retained for the `.rails` to
-cargo-allow migration. It is **not** a current execution front door, scheduler,
+cargo-allow migration. It is not a current execution front door, scheduler,
 portfolio, controller goal, or source of task state.
 
 Do not begin work by reading `.rails/goals/active.toml`. Current work starts
