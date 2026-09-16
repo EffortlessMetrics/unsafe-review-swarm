@@ -78,3 +78,6 @@ pub use domain::{
     UnsafeOperation, UnsafeSite, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind,
     WitnessReceipt, WitnessRoute,
 };
+
+/// TEMPORARY negative proof for #2203 (will be reverted): [nonexistent_symbol_xyz_2203].
+pub fn __2203_negative_proof() {}
