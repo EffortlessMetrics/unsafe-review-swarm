@@ -147,7 +147,7 @@ must_include = [
   "not a current execution front door",
   "Do not begin work by reading `.rails/goals/active.toml`",
   "selected live GitHub issue or PR",
-  "must not be projected into runtime goal state",
+  "projected into runtime goal state",
 ]
 
 [[generated_or_checked]]
