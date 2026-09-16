@@ -54,7 +54,8 @@ must_include = [
   "cargo-allow worklist",
   "neither selects, blocks, or schedules the task",
   "user-carried or explicitly adopted workplan",
-  "current GitHub issue/PR/check state",
+  "current GitHub issue/PR/check",
+  "Runtime goal state is descriptive only.",
 ]
 
 [[generated_or_checked]]
