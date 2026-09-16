@@ -66,6 +66,7 @@ jobs:
           git rev-parse HEAD | tee ../candidate-sha.txt
           grep '^version' crates/unsafe-review/Cargo.toml | head -n 1
           sha256sum Cargo.lock | tee ../lockfile-sha.txt
+          git show HEAD:Cargo.lock | sha256sum | tee ../lockfile-git-sha.txt
           for p in unsafe-review-core unsafe-review-cli unsafe-review; do
             cargo package --list -p "$p" | sort | tee "../pkg-list-$p.txt" | wc -l
           done
@@ -131,6 +132,7 @@ jobs:
             'candidate_sha': open('candidate-sha.txt').read().strip(),
             'candidate_version': '0.4.0',
             'lockfile_sha256': open('lockfile-sha.txt').read().split()[0],
+            'lockfile_git_content_sha256': open('lockfile-git-sha.txt').read().split()[0],
             'installed_binary_sha256': h,
             'toolchain': 'rustc 1.98.1',
             'platform': 'windows-latest (see run context for exact image)',
@@ -140,8 +142,10 @@ jobs:
           }
           json.dump(receipt, open('windows-qual-receipt.json', 'w'), indent=2)
           print(json.dumps({'rows': len(rows), 'binary_sha256': h}, indent=2))
-          bad = [r for r in rows if r['exit'] != 0 and not r['row'].startswith('fail:')]
-          if bad or any(r['exit'] != 2 for r in rows if r['row'].startswith('fail:')):
+          # Every row records its assertion result (0 = pass), including the
+          # fail: rows, which assert the binary exits 2. Any nonzero is a failure.
+          bad = [r for r in rows if r['exit'] != 0]
+          if bad:
             raise SystemExit(f'QUALIFICATION FAILED: {bad}')
           EOF
 
