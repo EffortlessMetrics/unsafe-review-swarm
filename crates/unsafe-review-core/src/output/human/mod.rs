@@ -192,6 +192,34 @@ mod tests {
     }
 
     #[test]
+    fn human_header_adds_slot_level_missing_counts() -> Result<(), String> {
+        // Drift-lock for #2242: the class counters can read as though no
+        // guard or witness work remains while the cards list those slots
+        // under `missing`. The slot line counts cards carrying each missing
+        // kind so the header reconciles with the cards.
+        let output = fixture_output("raw_pointer_alignment_is_aligned_guard")?;
+        let rendered = render(&output);
+        let slot_line = rendered
+            .lines()
+            .find(|line| line.starts_with("slot gaps: "))
+            .ok_or_else(|| format!("human output is missing its slot-gaps line:\n{rendered}"))?;
+        expect_eq(
+            "slot gaps line",
+            slot_line,
+            "slot gaps: contract: 0, guard: 1, reach: 1, witness: 1",
+        )?;
+        // The five class counters keep their exact shape.
+        let parsed = parse_human(&rendered, &[])?;
+        expect_header_count(&parsed.header, "cards", output.summary.cards)?;
+        expect_header_count(
+            &parsed.header,
+            "witness gaps",
+            output.summary.guarded_unwitnessed,
+        )?;
+        Ok(())
+    }
+
+    #[test]
     fn human_parser_rejects_duplicate_structural_headers_and_header_keys() -> Result<(), String> {
         let output = fixture_output("safe_code_no_cards")?;
         let rendered = format!("{}cards: 0\n", render(&output));
