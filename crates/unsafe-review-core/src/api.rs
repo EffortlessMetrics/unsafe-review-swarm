@@ -529,6 +529,10 @@ pub fn render_human(output: &AnalyzeOutput) -> String {
     human::render(output)
 }
 
+pub fn render_human_short(output: &AnalyzeOutput) -> String {
+    human::render_short(output)
+}
+
 pub fn render_markdown(output: &AnalyzeOutput) -> String {
     markdown::render(output)
 }
