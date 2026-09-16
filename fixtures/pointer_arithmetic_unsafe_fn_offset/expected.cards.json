@@ -178,7 +178,7 @@
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose the local guard that discharges the `pointer_arithmetic` safety obligation.",
+    "next_action": "Review the callers of `advance` against its documented safety contract; this site inherits the enclosing `unsafe fn` contract. Add a guard at this site only for obligations the caller contract cannot cover.",
     "verify_commands": [
       "cargo +nightly miri test advance",
       "cargo +nightly careful test advance"

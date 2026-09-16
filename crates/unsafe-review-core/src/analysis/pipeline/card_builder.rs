@@ -131,6 +131,9 @@ pub(super) fn build_card(
             &scanned_site.site.visibility,
             &routes,
             &obligation_evidence,
+            contract_for_classification.present,
+            scanned_site.site.owner.as_deref(),
+            &scanned_site.context_before,
         )
     };
     let next_action = NextAction {

@@ -1055,8 +1055,17 @@ mod tests {
             (ReviewClass::WitnessMismatch, "matching receipt"),
             (ReviewClass::StaticUnknown, "witness route"),
         ] {
-            let summary =
-                next_action_summary(&class, "raw_pointer_read", false, "private", &[], &[]);
+            let summary = next_action_summary(
+                &class,
+                "raw_pointer_read",
+                false,
+                "private",
+                &[],
+                &[],
+                false,
+                None,
+                &[],
+            );
             assert!(
                 summary.contains(expected),
                 "`{}` next action `{summary}` should mention `{expected}`",
@@ -1074,6 +1083,9 @@ mod tests {
             false,
             "private",
             &human_route,
+            &[],
+            false,
+            None,
             &[],
         );
         assert!(
@@ -1093,6 +1105,9 @@ mod tests {
             "private",
             &miri_careful_routes,
             &[],
+            false,
+            None,
+            &[],
         );
         assert!(miri_supported.contains("Miri"));
         assert!(miri_supported.contains("cargo-careful"));
@@ -1109,6 +1124,9 @@ mod tests {
             false,
             "private",
             &human_route,
+            &[],
+            false,
+            None,
             &[],
         );
 
@@ -1129,6 +1147,9 @@ mod tests {
             "private",
             &human_route,
             &[],
+            false,
+            None,
+            &[],
         );
 
         assert!(summary.contains("pin_unchecked"));
@@ -1148,6 +1169,9 @@ mod tests {
             false,
             "private",
             &human_route,
+            &[],
+            false,
+            None,
             &[],
         );
 
@@ -1526,6 +1550,74 @@ pub fn read_raw(ptr: *const u8) -> u8 {
                 OperationFamily::RawPointerDeref
             )),
             "genuine raw deref `*ptr` must still card, got: {owned:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn guard_missing_inside_documented_unsafe_fn_routes_to_caller_contract() -> Result<(), String> {
+        // Drift-lock for #2236: an unguarded operation inside a documented
+        // `unsafe fn` is GuardMissing (comment != guard), but the repair
+        // direction must be caller-contract review of the named owner, not
+        // local-guard construction.
+        let output = temp_source_output(
+            "unsafe-review-caller-contract-next-action",
+            r#"/// Reads one byte.
+///
+/// # Safety
+///
+/// `ptr` must be valid for reads of one byte.
+pub unsafe fn read_one(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+/// Reads one byte through a safe wrapper.
+pub fn read_wrapped(ptr: *const u8) -> u8 {
+    // SAFETY: ptr is live for this test fixture.
+    unsafe { *ptr }
+}
+"#,
+        )?;
+        let Some(card) = output.cards.iter().find(|card| {
+            card.operation.family == OperationFamily::RawPointerDeref
+                && card.site.owner.as_deref() == Some("read_one")
+        }) else {
+            return Err(format!(
+                "expected deref card owned by read_one: {:#?}",
+                output.cards
+            ));
+        };
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(
+            card.contract.present,
+            "test pre-condition: enclosing # Safety docs should be inherited"
+        );
+        let na = &card.next_action.summary;
+        assert!(
+            na.contains("read_one") && na.contains("caller"),
+            "inner-site next_action must route to caller-contract review of the owner; got: `{na}`"
+        );
+        assert!(
+            !na.contains("local guard"),
+            "inner-site next_action must not ask for a local guard; got: `{na}`"
+        );
+
+        // Safe-fn interior site with only a local rationale keeps the
+        // local-guard repair direction.
+        let Some(wrapped) = output.cards.iter().find(|card| {
+            card.operation.family == OperationFamily::RawPointerDeref
+                && card.site.owner.as_deref() == Some("read_wrapped")
+        }) else {
+            return Err(format!(
+                "expected deref card owned by read_wrapped: {:#?}",
+                output.cards
+            ));
+        };
+        assert_eq!(wrapped.class, ReviewClass::GuardMissing);
+        assert!(
+            wrapped.next_action.summary.contains("local guard"),
+            "safe-fn site must keep the local-guard repair direction; got: `{}`",
+            wrapped.next_action.summary
         );
         Ok(())
     }
