@@ -84,7 +84,7 @@
         "kind": "verify_command",
         "command": "cargo test SharedCell_loom -- --nocapture",
         "route_kind": "loom",
-        "summary": "Build/run `cargo test SharedCell_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `SharedCell` yet; write or identify a focused test for `SharedCell` first, then build/run `cargo test SharedCell_loom -- --nocapture` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -92,12 +92,12 @@
         "route_kind": "loom",
         "steps": [
           "Confirm ReviewCard `UR-unsafe-impl-send-owner-substring-not-reached-src-lib-rs-sharedcell-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-e915d3491163-send_sync_invariant-c1` still maps to `unsafe impl Send for SharedCell {}` at `src/lib.rs:8:1` before upgrading confidence.",
-          "Build/run `cargo test SharedCell_loom -- --nocapture` as the smallest available command for this card.",
+          "Write or identify a focused test for `SharedCell` first (no test reaches it yet), then build/run `cargo test SharedCell_loom -- --nocapture` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo test SharedCell_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `SharedCell` first (no test reaches it yet), then build/run `cargo test SharedCell_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

@@ -293,7 +293,7 @@
         "kind": "verify_command",
         "command": "cargo +nightly miri test write_one",
         "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test write_one` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `write_one` yet; write or identify a focused test for `write_one` first, then build/run `cargo +nightly miri test write_one` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -301,12 +301,12 @@
         "route_kind": "miri",
         "steps": [
           "Confirm ReviewCard `UR-attributed-unsafe-fn-no-duplicate-fixture-src-lib-rs-write-one-operation-raw_pointer_write-write-33236ed5e716-pointer_validity-c1` still maps to `core::ptr::write(ptr, byte);` at `src/lib.rs:4:9` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test write_one` as the smallest available command for this card.",
+          "Write or identify a focused test for `write_one` first (no test reaches it yet), then build/run `cargo +nightly miri test write_one` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo +nightly miri test write_one` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `write_one` first (no test reaches it yet), then build/run `cargo +nightly miri test write_one` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

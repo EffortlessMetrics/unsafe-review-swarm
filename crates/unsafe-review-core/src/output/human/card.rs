@@ -68,6 +68,11 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
     out.push_str(&format!("  next: {}\n", card.next_action.summary));
     if !card.next_action.verify_commands.is_empty() {
         out.push_str("  verify:\n");
+        if let Some(owner) = crate::output::confirmation::unreached_command_owner(card) {
+            out.push_str(&format!(
+                "    write or identify a focused test for `{owner}` first (no test reaches it yet), then:\n"
+            ));
+        }
         for cmd in &card.next_action.verify_commands {
             out.push_str(&format!("    {}\n", cmd));
         }
