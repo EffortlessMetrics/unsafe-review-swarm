@@ -13,7 +13,7 @@ Run and interpret:
 2. `git fetch origin && git log --oneline origin/main -5` — has main moved past the named basis?
 3. `cargo run --locked -p xtask -- source-divergence` — is the source/swarm sync acknowledged (`new_source_commits` must be 0 for routine work unless the accepted contract records an exception)?
 4. `gh pr list --limit 20` and `gh issue view <n>` / `gh pr view <n>` for the selected work — is it already landed, in an open PR, superseded, or actively owned?
-5. Read the selected issue/PR, its accepted issue/work-spec contract, and the linked plan/spec/ADR/proposal. `.allow/goals/active.toml` and `cargo-allow worklist --profile spec-system --format json` are durable charter/graph context only; they never select or control the task.
+5. Read the selected issue/PR, its accepted issue/work-spec contract, and the linked plan/spec/ADR/proposal. `.allow/goals/active.toml` and `cargo-allow worklist --profile spec-system --format json` are neutral charter/graph context only; they never select or control the task.
 6. For any claimed environment or permission boundary, discover and attempt the smallest safe read-only capability probe. Record the exact rejection; do not infer “no runner,” “needs admin,” “cannot merge,” or equivalent from missing pre-existing configuration.
 
 Classify state precisely:
