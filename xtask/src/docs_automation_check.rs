@@ -237,9 +237,9 @@ fn check_agent_guidance_text(
     required: &[&str],
     forbidden: &[&str],
 ) -> Result<(), String> {
-    let normalized_text = normalize_agent_guidance(text);
+    let normalized_text = normalize_checked_text(text);
     for needle in required {
-        let normalized_needle = normalize_agent_guidance(needle);
+        let normalized_needle = normalize_checked_text(needle);
         if !normalized_text.contains(&normalized_needle) {
             return Err(format!(
                 "committed agent guidance `{path}` is missing required text `{needle}`"
@@ -247,7 +247,7 @@ fn check_agent_guidance_text(
         }
     }
     for needle in forbidden {
-        let normalized_needle = normalize_agent_guidance(needle);
+        let normalized_needle = normalize_checked_text(needle);
         if normalized_text.contains(&normalized_needle) {
             return Err(format!(
                 "committed agent guidance `{path}` retains forbidden singleton-goal routing `{needle}`"
@@ -257,7 +257,7 @@ fn check_agent_guidance_text(
     Ok(())
 }
 
-fn normalize_agent_guidance(value: &str) -> String {
+fn normalize_checked_text(value: &str) -> String {
     value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
@@ -380,10 +380,14 @@ fn require_docs_automation_text(
 ) -> Result<(), String> {
     let mut documents = Vec::new();
     for path in paths {
-        documents.push((path, read_to_string(path)?));
+        documents.push((path, normalize_checked_text(&read_to_string(path)?)));
     }
     for needle in required_text {
-        if !documents.iter().any(|(_, text)| text.contains(needle)) {
+        let normalized_needle = normalize_checked_text(needle);
+        if !documents
+            .iter()
+            .any(|(_, text)| text.contains(&normalized_needle))
+        {
             let paths = paths
                 .iter()
                 .map(|path| path.display().to_string())
