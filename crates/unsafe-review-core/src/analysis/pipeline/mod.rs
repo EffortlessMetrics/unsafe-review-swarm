@@ -1482,6 +1482,55 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
     }
 
     #[test]
+    fn deref_of_get_unchecked_emits_only_the_get_unchecked_card() -> Result<(), String> {
+        // Drift-lock for #2238: dereferencing the `&T`/`&mut T` returned by
+        // `get_unchecked` cannot be UB by itself, so the deref arm must not
+        // emit a second card for the same expression.
+        let output = temp_source_output(
+            "unsafe-review-deref-get-unchecked-dedup",
+            r#"pub fn read_at(slice: &[u8], i: usize) -> u8 {
+    assert!(i < slice.len());
+    unsafe { *slice.get_unchecked(i) }
+}
+
+pub fn write_at(slice: &mut [u8], i: usize, v: u8) {
+    assert!(i < slice.len());
+    unsafe { *slice.get_unchecked_mut(i) = v; }
+}
+
+pub fn read_raw(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+"#,
+        )?;
+        let owned: Vec<(Option<String>, OperationFamily)> = output
+            .cards
+            .iter()
+            .map(|card| (card.site.owner.clone(), card.operation.family.clone()))
+            .collect();
+        for owner in ["read_at", "write_at"] {
+            let owner_families: Vec<OperationFamily> = owned
+                .iter()
+                .filter(|(name, _)| name.as_deref() == Some(owner))
+                .map(|(_, family)| family.clone())
+                .collect();
+            assert_eq!(
+                owner_families,
+                vec![OperationFamily::GetUnchecked],
+                "`{owner}` should emit only its get_unchecked card, got: {owner_families:?}"
+            );
+        }
+        assert!(
+            owned.contains(&(
+                Some("read_raw".to_string()),
+                OperationFamily::RawPointerDeref
+            )),
+            "genuine raw deref `*ptr` must still card, got: {owned:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn public_unsafe_api_contract_evidence_requires_safety_docs() -> Result<(), String> {
         for fixture in [
             "public_unsafe_fn_missing_safety",

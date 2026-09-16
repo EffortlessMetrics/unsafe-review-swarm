@@ -819,7 +819,9 @@ fn detect_syntax_site(
             Some((UnsafeSiteKind::UnsafeBlock, OperationFamily::Unknown))
         }
         "PREFIX_EXPR"
-            if is_raw_pointer_deref(&compact) && is_inside_range(fact, unsafe_block_ranges) =>
+            if is_raw_pointer_deref(&compact)
+                && !deref_operand_is_get_unchecked_call(&compact)
+                && is_inside_range(fact, unsafe_block_ranges) =>
         {
             let family = if prefix_deref_is_assignment_target(fact, source) {
                 OperationFamily::RawPointerWrite
@@ -968,6 +970,92 @@ fn is_raw_pointer_deref(compact: &str) -> bool {
         }
     };
     inner.starts_with('*') && !inner.starts_with("**")
+}
+
+/// Returns true when `compact` is a dereference applied directly to a
+/// `get_unchecked` / `get_unchecked_mut` call result (`*slice.get_unchecked(i)`).
+/// Dereferencing the `&T` / `&mut T` those calls return cannot be UB by itself;
+/// the bounds obligation belongs to the `get_unchecked` card, so the deref arm
+/// must not emit a second card for the same expression.
+///
+/// Only a top-level call counts: `*foo(bar.get_unchecked(i))` dereferences
+/// whatever `foo` returns, so it still cards. One wrapping paren pair and the
+/// `&` / `&mut` borrow prefixes are transparent. Detection runs on the
+/// string/comment-masked projection so a marker inside a literal cannot
+/// suppress a genuine deref card.
+fn deref_operand_is_get_unchecked_call(compact: &str) -> bool {
+    let masked = syntax_detection_text(compact);
+    let after_borrow = masked
+        .strip_prefix("&mut ")
+        .or_else(|| masked.strip_prefix("& mut "))
+        .or_else(|| masked.strip_prefix("& "))
+        .map_or_else(|| masked.strip_prefix('&').unwrap_or(&masked), |rest| rest);
+    let Some(operand) = after_borrow.strip_prefix('*') else {
+        return false;
+    };
+    let mut operand = operand.trim_start();
+    if let Some(inner) = strip_one_wrapping_paren_pair(operand) {
+        operand = inner;
+    }
+    [".get_unchecked_mut(", ".get_unchecked("]
+        .iter()
+        .any(|marker| is_top_level_trailing_call(operand, marker))
+}
+
+/// Strip one paren pair that wraps the whole expression (`(expr)` -> `expr`).
+/// Returns None when the outer parens do not enclose the full text.
+fn strip_one_wrapping_paren_pair(text: &str) -> Option<&str> {
+    let inner = text.strip_prefix('(')?;
+    let mut depth = 0usize;
+    for (idx, ch) in inner.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' if depth == 0 => {
+                return (idx + 1 == inner.len()).then(|| &inner[..idx]);
+            }
+            ')' => depth -= 1,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whether `marker` names a call whose argument list runs to the end of
+/// `text` at paren-depth zero, i.e. the call is the outermost expression.
+fn is_top_level_trailing_call(text: &str, marker: &str) -> bool {
+    let Some(pos) = text.find(marker) else {
+        return false;
+    };
+    if paren_depth(&text[..pos]) != 0 {
+        return false;
+    }
+    let mut depth = 0usize;
+    let call = &text[pos + marker.len() - 1..];
+    for (idx, ch) in call.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return idx + 1 == call.len();
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn paren_depth(text: &str) -> usize {
+    let mut depth = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth
 }
 
 fn prefix_deref_is_assignment_target(fact: &SyntaxNodeFact, source: &str) -> bool {
@@ -1260,6 +1348,41 @@ mod tests {
 
         assert_eq!(sites.len(), 1);
         assert_eq!(sites[0].card_snippet, "ptr.read()");
+    }
+
+    #[test]
+    fn deref_of_get_unchecked_call_is_recognized() {
+        for compact in [
+            "*slice.get_unchecked(i)",
+            "*slice.get_unchecked_mut(i)",
+            "*(slice.get_unchecked(i))",
+            "&mut *slice.get_unchecked_mut(i)",
+            "*slice.get_unchecked(i + 1)",
+        ] {
+            assert!(
+                deref_operand_is_get_unchecked_call(compact),
+                "`{compact}` should count as deref-of-get_unchecked"
+            );
+        }
+    }
+
+    #[test]
+    fn deref_of_other_expressions_is_not_get_unchecked() {
+        for compact in [
+            // Genuine raw deref: no get_unchecked call at all.
+            "*ptr",
+            // Nested call: the dereferenced value is whatever `foo` returns.
+            "*foo(bar.get_unchecked(i))",
+            // Marker inside a string literal must not suppress the card.
+            "*ptr /* .get_unchecked(i) */",
+            // get_unchecked with trailing tokens is not a bare deref of the call.
+            "*slice.get_unchecked(i).field",
+        ] {
+            assert!(
+                !deref_operand_is_get_unchecked_call(compact),
+                "`{compact}` must still card as a deref"
+            );
+        }
     }
 
     #[test]
