@@ -3,6 +3,7 @@ schema_version = "1.0"
 [scope]
 owned_roots = [
   ".rails",
+  ".opencode",
   "docs",
   "policy",
   "plans",
@@ -47,11 +48,13 @@ sources = [
   "docs/specs",
 ]
 must_include = [
+  "The selected GitHub issue or PR",
+  "linked issue-work specification",
   ".allow/goals/active.toml",
   "cargo-allow worklist",
-  "linked plan",
-  "linked spec",
-  "linked proposal",
+  "neither selects, blocks, or schedules the task",
+  "user-carried or explicitly adopted workplan",
+  "current GitHub issue/PR/check state",
 ]
 
 [[generated_or_checked]]
@@ -63,6 +66,7 @@ sources = [
   "docs/contributing/SWARM_TO_MAIN.md",
   "docs/contributing/spec-rails.md",
   "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md",
+  "docs/contributing/AGENT-ORCHESTRATION.md",
 ]
 must_include = [
   "unsafe-review-swarm develops.",
@@ -78,6 +82,71 @@ must_include = [
   "Spec rails are meant to make routine progress easier, not ceremonial.",
   "Do not reject a useful generated PR just because it references missing but",
   "Do not stop at \"human merge required\"",
+  "Coordination is execution",
+  "A user-carried workplan is actionable direction",
+  "Runtime goal and progress state is descriptive, never authority",
+  "A running check is `in_progress`, not `blocked`",
+  "Capability claims require an attempted operation and concrete failure evidence",
+  "Independent review does not mean human review",
+  "Authority boundaries retain object identity",
+  "Stop for the owner decision",
+  "Progress measures the full user-defined outcome",
+]
+
+[[generated_or_checked]]
+id = "agent-orchestration-protocol"
+kind = "agent_operating_contract"
+path = "docs/contributing/AGENT-ORCHESTRATION.md"
+mode = "check"
+sources = [
+  "AGENTS.md",
+  "docs/contributing/LIFECYCLE_SURFACE_MAP.md",
+  "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md",
+]
+must_include = [
+  "Coordination is execution",
+  "Runtime goal, status, and progress surfaces are descriptive only",
+  "A pending or running hosted check is in progress, not blocked",
+  "Capability claims require receipts",
+  "Independent review does not mean human review",
+  "Authority boundaries retain object identity",
+  "Stop for the owner decision",
+  "do not invent a human-only merge requirement",
+]
+
+[[generated_or_checked]]
+id = "opencode-coordinator-adapter"
+kind = "agent_operating_contract"
+path = ".opencode/agents/coordinator.md"
+mode = "check"
+sources = [
+  "AGENTS.md",
+  "docs/contributing/AGENT-ORCHESTRATION.md",
+]
+must_include = [
+  "Coordination is execution",
+  "Runtime goal/progress state is descriptive only",
+  "Use `blocked` only after a required operation was attempted",
+  "Independent review may be agentic or human",
+  "Authority remains object-specific",
+  "Stop for the owner decision",
+]
+
+[[generated_or_checked]]
+id = "legacy-goals-archive"
+kind = "operator_front_door"
+path = ".rails/goals/README.md"
+mode = "check"
+sources = [
+  ".rails/README.md",
+  "AGENTS.md",
+]
+must_include = [
+  "Legacy goals archive",
+  "not a current execution front door",
+  "Do not begin work by reading `.rails/goals/active.toml`",
+  "selected live GitHub issue or PR",
+  "must not be projected into runtime goal state",
 ]
 
 [[generated_or_checked]]
