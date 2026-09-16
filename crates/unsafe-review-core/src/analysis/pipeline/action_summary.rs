@@ -1,5 +1,9 @@
 use crate::domain::{ObligationEvidence, ReviewClass, WitnessKind, WitnessRoute};
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "caller-contract routing needs site context alongside the class inputs; a params struct would churn every unit call site without clarity gain"
+)]
 pub(super) fn next_action_summary(
     class: &ReviewClass,
     operation: &str,
@@ -7,6 +11,9 @@ pub(super) fn next_action_summary(
     visibility: &str,
     routes: &[WitnessRoute],
     obligation_evidence: &[ObligationEvidence],
+    contract_present: bool,
+    owner: Option<&str>,
+    context_before: &[String],
 ) -> String {
     match class {
         ReviewClass::ContractMissing if public_api_surface => {
@@ -27,6 +34,17 @@ pub(super) fn next_action_summary(
         ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
         ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         ReviewClass::GuardMissing if operation == "pin_unchecked" => "Review the `pin_unchecked` move-prevention and projection invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
+        ReviewClass::GuardMissing
+            if operation != "unsafe_declaration"
+                && contract_present
+                && let Some(owner) = owner
+                && !owner.is_empty()
+                && enclosing_unsafe_fn_owner(context_before, owner) =>
+        {
+            format!(
+                "Review the callers of `{owner}` against its documented safety contract; this site inherits the enclosing `unsafe fn` contract. Add a guard at this site only for obligations the caller contract cannot cover."
+            )
+        }
         ReviewClass::GuardMissing => {
             let missing_obligations: Vec<&ObligationEvidence> = obligation_evidence
                 .iter()
@@ -81,4 +99,29 @@ pub(super) fn next_action_summary(
 
 fn has_witness_route(routes: &[WitnessRoute], kind: WitnessKind) -> bool {
     routes.iter().any(|route| route.kind == kind)
+}
+
+/// Whether the before-context contains the declaration of `owner` as an
+/// `unsafe fn`. Comment lines are skipped so a prose mention of the owner
+/// cannot fabricate an enclosing-contract relationship; only the routing of
+/// the next action depends on this, never the evidence state or class.
+fn enclosing_unsafe_fn_owner(context_before: &[String], owner: &str) -> bool {
+    context_before.iter().any(|line| {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+            return false;
+        }
+        let mut saw_unsafe = false;
+        let mut saw_fn = false;
+        let mut saw_owner = false;
+        for token in trimmed.split(|ch: char| !ch.is_alphanumeric() && ch != '_') {
+            match token {
+                _ if token == "unsafe" => saw_unsafe = true,
+                _ if token == "fn" => saw_fn = true,
+                _ if token == owner => saw_owner = true,
+                _ => {}
+            }
+        }
+        saw_unsafe && saw_fn && saw_owner
+    })
 }
