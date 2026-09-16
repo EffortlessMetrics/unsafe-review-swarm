@@ -81,8 +81,9 @@ jobs:
         run: |
           set -euo pipefail
           B="$GITHUB_WORKSPACE/qual-prefix/bin/unsafe-review.exe"
-          : > rows.tsv
-          rec() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> rows.tsv; }
+          ROWS="$GITHUB_WORKSPACE/rows.tsv"
+          : > "$ROWS"
+          rec() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$ROWS"; }
           v=$("$B" --version); rec identity 0 "$v"
           for c in doctor pr repo context lsp init pr-setup; do
             if "$B" "$c" --help >/dev/null 2>&1; then rec "help:$c" 0 -; else rec "help:$c" 1 -; fi
@@ -113,15 +114,15 @@ jobs:
           printf 'not a diff' > bad.diff
           (cd scratch-pr && "$B" check --diff ../bad.diff >/dev/null 2>&1) && code=0 || code=$?
           if [ "$code" = 2 ]; then rec "fail:malformed-diff" 0 -; else rec "fail:malformed-diff" 1 "exit=$code"; fi
-          cat rows.tsv
+          cat "$ROWS"
 
       - name: Write bounded receipt
         run: |
           set -euo pipefail
           python - <<'EOF'
-          import hashlib, json
+          import hashlib, json, os
           rows = []
-          for line in open('rows.tsv'):
+          for line in open(os.path.join(os.environ['GITHUB_WORKSPACE'], 'rows.tsv')):
             name, code, detail = line.rstrip('\n').split('\t')
             rows.append({'row': name, 'exit': int(code), 'detail': detail[:160]})
           exe = 'qual-prefix/bin/unsafe-review.exe'
