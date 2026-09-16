@@ -2,6 +2,7 @@ schema_version = "1.0"
 
 [scope]
 owned_roots = [
+  ".claude/agents",
   ".rails",
   ".opencode",
   "docs",
@@ -14,7 +15,6 @@ owned_roots = [
 external_awareness_only = [
   ".codex",
   ".spec",
-  ".claude",
   ".jules",
 ]
 
@@ -113,6 +113,59 @@ must_include = [
   "Authority boundaries retain object identity",
   "Stop for the owner decision",
   "do not invent a human-only merge requirement",
+]
+
+[[generated_or_checked]]
+id = "claude-repo-preflight-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/repo-preflight.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "neutral charter/graph context only",
+  "A pending hosted check is `in-progress`, not blocked.",
+  "attempt the smallest safe read-only capability probe",
+  "controlling_contract:",
+]
+
+[[generated_or_checked]]
+id = "claude-issue-factcheck-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/issue-factcheck.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Separate a real stance decision from an operational unknown",
+  "blocked-external-evidenced",
+  "capability_receipt:",
+  "One blocked substep does not block independent seams.",
+]
+
+[[generated_or_checked]]
+id = "claude-plan-refuter-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/plan-refuter.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "neutral charter",
+  "False terminal states",
+  "Boundary-object drift",
+  "Review externalization",
+  "Wrong stop semantics",
+]
+
+[[generated_or_checked]]
+id = "claude-implementer-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/implementer.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "selected live GitHub issue or PR",
+  "blocked-evidenced",
+  "A running command, workflow, review, or hosted check is `in-progress`",
+  "capability_receipts:",
 ]
 
 [[generated_or_checked]]
