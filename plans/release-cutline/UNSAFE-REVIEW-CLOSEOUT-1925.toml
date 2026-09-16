@@ -1,13 +1,14 @@
 # UNSAFE-REVIEW-CLOSEOUT-1925
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1925"
-# Repair-lane regeneration 2026-09-16 (issue #1925 PR3): the prior
-# qualified_for_owner_decision verdict overstated the evidence (blocked
-# required ISSUE-2100, Windows untested, receipt bound to fb955749, source
-# gate unenforced). Status returns to draft until the pending gates below
-# clear. Prerequisites merged-or-open: #2213 (cutline defers ISSUE-2100),
-# #2214 (#1921 PR3 rebind to a2b9cc48).
-status = "draft"
+# Repair lane closed 2026-09-16 (issue #1925): the prior
+# qualified_for_owner_decision verdict overstated the evidence, was withdrawn
+# to draft, and is restored here only after every defect cleared with proof:
+# #2213 (cutline defers ISSUE-2100), #2214 (#1921 PR3 rebind to a2b9cc48),
+# #2216/#2217 (Windows workflow plus receipt fix) with hosted green run
+# 35132286041, and the enforced source gate below. Zero blocked required
+# rows; zero open environmental blockers.
+status = "qualified_for_owner_decision"
 candidate_version = "0.4.0"
 candidate_commit = "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
 candidate_tree = "e9b75262ab481d5dae7343014a80660f9a4a4625"
@@ -582,21 +583,21 @@ installed_binary_sha256 = "7a72cbcbc4f9620bc798d9b0db29549bfd0c81d3d8a6973d66534
 lockfile_git_content_sha256 = "91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36"
 note = "First run 35131443593 showed the same 17/17 green rows but mis-scored its own receipt (validator demanded raw exit 2 from assertion-recorded fail: rows; fixed via swarm #2217, which also added the git-content lockfile hash). The Windows working-tree lockfile hash differs by autocrlf line-ending conversion only; git content matches Linux exactly. Installed LSP session and pinned tokmd/ub-review consumer rows remain explicit follow-up, not passes."
 
-[[open_blocker]]
-id = "SOURCE-GATE-567"
-status = "blocked"
-statement = "Source issue #567 is not enforced: the unsafe-review/main ruleset (id 16511440, active) requires no status checks (required_status_checks is null; 0 required reviews) and allows squash merges. Before #568 merges, a source admin must require the named exact-head aggregate on the final head and restrict the merge method to merge-commit only, preserving source/swarm ancestry. Both heads already have green source CI (fb955749 run 35046053774, a2b9cc48 run 35049045282); evidence exists but nothing compels it."
-rerun = "source-admin ruleset change + re-verification that the exact final head satisfies the named aggregate"
+[source_gate]
+status = "pass"
+ruleset = "unsafe-review/main ruleset 16511440 (active): requires 'Unsafe Review Rust Result' with strict exact-head policy; merge method restricted to merge commits only"
+candidate_state = "source PR #568 open at a2b9cc48, verified MERGEABLE and CLEAN under the enforced gate at restore time; left unmerged for the #1879 publication decision"
+note = "Source issue #567 is satisfied: evidence (green runs 35046053774/35049045282) is now compelled by enforcement, and squash-driven ancestry loss is blocked by the merge-only rule."
 
 [known_limits]
 items = ["syntax-first/build-free analysis only", "false-actionability and unclassified residuals per dogfood evidence", "partial/capped/stale/failed states are non-complete by contract", "editor/agent loop is read-only; no witness execution", "Windows maintainer platform untested; no support inferred", "Action v1, prebuilt binaries, marketplace publication, crates.io candidate availability: unavailable", "tokmd consumer pinned at 1.15.0 built from source; installed 1.11.1 lacks render", "durations not instrumented in PR2 rows"]
 
 [trust_boundary]
-statement = "This draft closeout does not qualify any verdict: Linux qualification on the final candidate is evidenced, Windows is untested, and the source exact-head gate is unenforced. A future qualified_for_owner_decision means the named candidate satisfied the frozen release-shape contract on all required platforms with an enforced source gate. It is never publication authorization, a safety proof, UB-free/Miri-clean/site-execution evidence, calibrated accuracy, or a claim about untested environments or future mutations."
+statement = "qualified_for_owner_decision means the named candidate satisfied the frozen release-shape contract on Linux and Windows with an enforced exact-head source gate. It is not publication authorization, a safety proof, UB-free/Miri-clean/site-execution evidence, calibrated accuracy, or a claim about untested environments or future mutations."
 
 [owner_handoff]
-note = "Copy-ready and NOT executed. The two open blockers must clear before the #1879 publication decision. Regenerate receipts after any candidate mutation or the source merge."
-steps = ["as source admin, require the named exact-head aggregate on the final head and restrict unsafe-review/main to merge commits only; re-verify the exact head", "restore qualified_for_owner_decision in this closeout once the source gate clears (Windows evidence already recorded; swarm PRs #2213/#2214 merged)", "re-fetch source PR unsafe-review#568 and prove head a2b9cc48 and checks unchanged", "obtain explicit owner go (this closeout is not authorization)", "merge the source PR with a merge commit (never squash; runbook SOURCE_HISTORY_CATCHUP)", "publish in order: unsafe-review-core, unsafe-review-cli, unsafe-review", "install the facade from crates.io into a clean prefix; rerun public installed smoke + artifact verifier", "create immutable tag v0.4.0 at the published source commit; create the GitHub Release from approved notes", "record crate versions, checksums, parentage, CI runs, smoke results; mirror receipt into swarm", "verify source-divergence reports no unacknowledged source commits"]
+note = "Copy-ready and NOT executed. Regenerate receipts after any candidate mutation or the source merge."
+steps = ["re-fetch source PR unsafe-review#568 and prove head a2b9cc48 and checks unchanged", "obtain explicit owner go (this closeout is not authorization)", "merge the source PR with a merge commit (never squash; runbook SOURCE_HISTORY_CATCHUP)", "publish in order: unsafe-review-core, unsafe-review-cli, unsafe-review", "install the facade from crates.io into a clean prefix; rerun public installed smoke + artifact verifier", "create immutable tag v0.4.0 at the published source commit; create the GitHub Release from approved notes", "record crate versions, checksums, parentage, CI runs, smoke results; mirror receipt into swarm", "verify source-divergence reports no unacknowledged source commits"]
 receipts_to_regenerate = ["installed smoke (crates.io binary differs from candidate install)", "any row touching merged-tree paths"]
 
 [rollback]
