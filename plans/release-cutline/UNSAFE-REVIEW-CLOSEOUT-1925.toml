@@ -8,7 +8,7 @@ issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1925"
 # #2216/#2217 (Windows workflow plus receipt fix) with hosted green run
 # 35132286041, and the enforced source gate below. Zero blocked required
 # rows; zero open environmental blockers.
-status = "qualified_for_owner_decision"
+status = "released"
 candidate_version = "0.4.0"
 candidate_commit = "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
 candidate_tree = "e9b75262ab481d5dae7343014a80660f9a4a4625"
@@ -593,10 +593,18 @@ note = "Source issue #567 is satisfied: evidence (green runs 35046053774/3504904
 items = ["syntax-first/build-free analysis only", "false-actionability and unclassified residuals per dogfood evidence", "partial/capped/stale/failed states are non-complete by contract", "editor/agent loop is read-only; no witness execution", "Windows maintainer platform untested; no support inferred", "Action v1, prebuilt binaries, marketplace publication, crates.io candidate availability: unavailable", "tokmd consumer pinned at 1.15.0 built from source; installed 1.11.1 lacks render", "durations not instrumented in PR2 rows"]
 
 [trust_boundary]
-statement = "qualified_for_owner_decision means the named candidate satisfied the frozen release-shape contract on Linux and Windows with an enforced exact-head source gate. It is not publication authorization, a safety proof, UB-free/Miri-clean/site-execution evidence, calibrated accuracy, or a claim about untested environments or future mutations."
+statement = "released means the named candidate satisfied the frozen release-shape contract on Linux and Windows with an enforced exact-head source gate, and the #1879 lane published it. It is never a safety proof, UB-free/Miri-clean/site-execution evidence, calibrated accuracy, or a claim about untested environments or future mutations."
+
+[publication]
+status = "published"
+source_merge = "8f67aaa5114ccad7b10c568353d95ae0c46f750e"
+tag = "v0.4.0"
+release = "https://github.com/EffortlessMetrics/unsafe-review/releases/tag/v0.4.0"
+crates = ["unsafe-review-core 0.4.0", "unsafe-review-cli 0.4.0", "unsafe-review 0.4.0"]
+swarm_mirror = "docs/handoffs/2026-09-16-0.4.0-publication.md"
 
 [owner_handoff]
-note = "Copy-ready and NOT executed. Regenerate receipts after any candidate mutation or the source merge."
+note = "Executed 2026-09-16 under #1879; the steps below are the executed record. Regenerate receipts after any post-release candidate mutation."
 steps = ["re-fetch source PR unsafe-review#568 and prove head a2b9cc48 and checks unchanged", "obtain explicit owner go (this closeout is not authorization)", "merge the source PR with a merge commit (never squash; runbook SOURCE_HISTORY_CATCHUP)", "publish in order: unsafe-review-core, unsafe-review-cli, unsafe-review", "install the facade from crates.io into a clean prefix; rerun public installed smoke + artifact verifier", "create immutable tag v0.4.0 at the published source commit; create the GitHub Release from approved notes", "record crate versions, checksums, parentage, CI runs, smoke results; mirror receipt into swarm", "verify source-divergence reports no unacknowledged source commits"]
 receipts_to_regenerate = ["installed smoke (crates.io binary differs from candidate install)", "any row touching merged-tree paths"]
 

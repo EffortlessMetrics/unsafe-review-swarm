@@ -50,19 +50,18 @@ retain their original producer and consumer identities.
 
 ## CLI and distribution posture
 
-- On unpublished swarm main, `pr` is the preferred first-use entrypoint and
+- In public `v0.4.0`, `pr` is the preferred first-use entrypoint and
   presents the bounded action-first front panel; `first-pr` and `review` remain
   compatibility names for the same advisory bundle and detailed route.
-- `doctor`, `explain`, `context`, saved artifacts, and `baseline init` are
-  present in the current tree. Top-level `init` is also integrated on
-  unpublished swarm main: it previews an adoption proposal and applies no
-  workflow or configuration. Explicit `--out` writes only the proposal JSON
-  in the selected directory. Baseline creation remains a separate command.
-- Public `v0.3.8` has `baseline init` but no top-level `init`, as recorded by
-  its [command parser](https://github.com/EffortlessMetrics/unsafe-review/blob/9751f9567c21a64e830f2a64217fba04eb49b976/crates/unsafe-review-cli/src/parse.rs).
-  Keep the public install path separate from the unpublished preview command.
-- Workspace MSRV is Rust `1.98`; the three published packages remain `0.3.8`
-  until a candidate version is explicitly frozen.
+- `doctor`, `explain`, `context`, saved artifacts, `baseline init`, and
+  top-level preview-only `init` ship in public `v0.4.0`: `init` previews an
+  adoption proposal and applies no workflow or configuration. Explicit `--out`
+  writes only the proposal JSON in the selected directory. Baseline creation
+  remains a separate command. The public install path is
+  `cargo install unsafe-review --version 0.4.0 --locked`.
+- Workspace MSRV is Rust `1.98`; the three published packages are `0.4.0`
+  (2026-09-16). Newer Swarm main work stays unpublished until separately
+  qualified and released.
 - The VS Code/Open VSX surface is a saved-bundle MVP. Marketplace listings,
   prebuilt binaries, crates.io candidate publication, GitHub Release, and
   public Action `v1` are unavailable until separately receipted.

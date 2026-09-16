@@ -1,7 +1,8 @@
 # Installed-product qualification — issue #1921
 
 This is PR 2 of the release qualification sequence: the human-readable record
-of the installed-product execution on the exact unpublished 0.4.0 candidate.
+of the installed-product execution on the exact 0.4.0 candidate (executed
+pre-publication; the candidate has since published as 0.4.0).
 Machine-readable execution receipt:
 [`UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml`](../../plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml).
 
@@ -61,8 +62,8 @@ rows; the next execution PR must rerun them or record an explicit skip reason.
 
 ## Execution order
 
-1. #1917 names the exact unpublished candidate and freezes its package/lockfile
-   identity.
+1. #1917 names the exact candidate and freezes its package/lockfile
+   identity (executed pre-publication; published since).
 2. Install/package that candidate into clean task-owned locations; prove the
    installed binary does not resolve workspace path leakage.
 3. Confirm the owner decision for additive/unknown consumer fields in #1918
