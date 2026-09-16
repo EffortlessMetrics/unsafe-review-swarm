@@ -52,7 +52,7 @@ is blocked.
 8. Keep GitHub checks and live merge policy authoritative. Once independent
    exact-head challenge and required policy checks are satisfied, the
    coordinator may merge an ordinary internal PR when the selected lane
-   authorizes it. Do not invent a human sign-off requirement merely because the
+   authorizes it; do not invent a human sign-off requirement merely because the
    branch author cannot self-certify independence.
 
 ## Result shape
