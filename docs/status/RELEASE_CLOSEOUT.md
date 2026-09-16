@@ -1,8 +1,8 @@
 # 0.4.0 release closeout — issue #1925
 
-Status: `draft` — repair lane in progress (not qualified, not released,
-published, or public). The prior `qualified_for_owner_decision` verdict
-overstated the evidence and is withdrawn pending the gates below.
+Status: `qualified_for_owner_decision` (not released, published, or public).
+The repair lane is closed: every defect from the withdrawn verdict cleared
+with proof (see machine-readable closeout).
 
 Machine-readable source:
 [`UNSAFE-REVIEW-CLOSEOUT-1925.toml`](../../plans/release-cutline/UNSAFE-REVIEW-CLOSEOUT-1925.toml)
@@ -29,14 +29,14 @@ substrate merged, all gates green throughout — CI-diagnosability gap, not a
 shipped-product defect). The installed receipt is rebound to final candidate
 `a2b9cc48` via PR #2214 (byte-identical packaged inputs and executable).
 
-Windows is now executed: hosted run `35132286041` went 17/17 rows green on
+Windows is executed: hosted run `35132286041` went 17/17 rows green on
 `windows-latest` against the final `a2b9cc48` packages (rustc 1.98.1; receipt
 bounds the evidence; installed LSP and pinned-consumer rows remain explicit
-follow-up). One environmental blocker remains open: **source gate #567**
-(the `unsafe-review/main` ruleset requires no status checks and allows squash
-merges; both candidate heads are green but nothing compels the exact head).
-It must clear before any qualification verdict or the #1879 publication
-decision.
+follow-up). The source gate is enforced: `unsafe-review/main` ruleset
+`16511440` requires `Unsafe Review Rust Result` strict on the exact head with
+merge commits only, and source PR `#568` verifies mergeable and clean at
+`a2b9cc48`, left unmerged for the #1879 decision. Zero blocked required rows;
+zero open environmental blockers.
 
 Included: hosted rustdoc gate (#2203/#2209), active freeze (#1916/#2210),
 frozen cutline (#1915/#2210), source candidate (#1917/#568), final docs
@@ -64,16 +64,12 @@ status, accuracy, or authorization to publish.
 
 ## Owner publish handoff (copy-ready, NOT executed)
 
-1. As source admin, require the named exact-head aggregate on the final head
-   and restrict `unsafe-review/main` to merge commits only; re-verify.
-   (Windows evidence already recorded: run `35132286041`, 17/17 green.)
-2. Restore `qualified_for_owner_decision` once the source gate clears.
-3. Re-fetch source PR `#568`; prove head `a2b9cc48` and checks unchanged.
-4. Obtain explicit owner go — this closeout is not authorization.
-5. Merge with a merge commit (never squash).
-6. Publish core → CLI → facade; install from crates.io; rerun public smoke.
-7. Tag `v0.4.0`, create the GitHub Release, record receipts, mirror to swarm.
-8. Verify `source-divergence` shows no unacknowledged source commits.
+1. Re-fetch source PR `#568`; prove head `a2b9cc48` and checks unchanged.
+2. Obtain explicit owner go — this closeout is not authorization.
+3. Merge with a merge commit (never squash).
+4. Publish core → CLI → facade; install from crates.io; rerun public smoke.
+5. Tag `v0.4.0`, create the GitHub Release, record receipts, mirror to swarm.
+6. Verify `source-divergence` shows no unacknowledged source commits.
 
 ## Rollback
 
