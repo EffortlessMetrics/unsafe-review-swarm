@@ -56,10 +56,12 @@ cargo run --locked -p xtask -- check-pr
 ```
 
 This lane protects repository correctness: formatting, build, lint, tests,
-rustdoc, and repo policy checks. The live swarm workflow may route a cheaper
-Rust Small lane through `cargo run --locked -p xtask -- check-pr`; broader
-workspace checks remain local, release, or future full-lane proof until a live
-workflow explicitly promotes them.
+rustdoc, and repo policy checks. The live swarm workflow runs the required
+`Unsafe Review Rust Result` aggregate as fmt + clippy + test + rustdoc
+(`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked`) +
+`check-pr`; broader workspace checks such as `cargo check` and the full
+`cargo test --workspace --all-targets` remain local, release, or future
+full-lane proof until a live workflow explicitly promotes them.
 
 It must not run:
 
