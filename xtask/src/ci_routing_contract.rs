@@ -109,7 +109,8 @@ fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), St
             "_elapsed=$((_now - _s))",
             // Only closed-vocabulary step status reaches the bounded artifact.
             "step_id\\telapsed_seconds\\texit_status",
-            "$1 ~ /^(fmt|clippy|test|check-pr)$/",
+            "$1 ~ /^(fmt|clippy|test|doc|check-pr)$/",
+            "_step doc env RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked",
             "case \"$core_mode\" in",
             "head -n 80",
             "head -c 16384",
@@ -194,8 +195,9 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     // `route` job (not a required check) picks the gate runner — an idle trusted
     // self-hosted em-ci runner when the owned fleet has capacity, else
     // `ubuntu-latest` overflow (bursts, capacity gaps, fork PRs). The gate stays a
-    // SINGLE job whose mandatory deterministic core floor (`xtask check-pr` plus the
-    // full suite) is the only hard blocker and the only required status check. The
+    // SINGLE job whose mandatory deterministic core floor (fmt + clippy + test +
+    // rustdoc + `xtask check-pr`) is the only hard blocker and the only required
+    // status check. The
     // advisory ub-review LLM lane runs as its own standalone non-blocking workflow
     // (validated below). The router never blocks the merge and never size-routes.
     //
@@ -231,6 +233,10 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
             // final assert decides the merge on the core verdict.
             "Fast precontext and launch core gate",
             "cargo run --locked -p xtask -- check-pr",
+            // Hosted rustdoc gate (#2203): the documented rustdoc baseline
+            // step must stay inside the required aggregate.
+            "_step doc env RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked",
+            "cargo doc --workspace --no-deps --locked",
             "df -h",
             "core_exit",
             "Assert core gate verdict",
@@ -445,13 +451,14 @@ while [ ! -f "$core_exit_path" ]; do
 done
 test "${core_exit}" = "0"
 printf 'step_id\telapsed_seconds\texit_status\n'
-$1 ~ /^(fmt|clippy|test|check-pr)$/
+$1 ~ /^(fmt|clippy|test|doc|check-pr)$/
 case "$core_mode" in
   without-tests|with-tests) ;;
 esac
 head -n 80
 head -c 16384
 _step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test \
+_step doc env RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked \
   ) > target/ci-core/core.log 2>&1 &
 - name: Assert core gate verdict
   id: core-verdict
@@ -518,7 +525,7 @@ fi
                 continue;
             };
             if fields.next().is_some()
-                || !matches!(step_id, "fmt" | "clippy" | "test" | "check-pr")
+                || !matches!(step_id, "fmt" | "clippy" | "test" | "doc" | "check-pr")
                 || elapsed.is_empty()
                 || elapsed.len() > 10
                 || !elapsed.bytes().all(|byte| byte.is_ascii_digit())
@@ -783,6 +790,30 @@ fi
     #[test]
     fn accepts_bounded_failure_evidence_with_required_verdict() -> Result<(), String> {
         check_core_failure_evidence_contract("fixture.yml", FAILURE_EVIDENCE_FIXTURE)
+    }
+
+    /// Hosted rustdoc gate (#2203): the required aggregate must keep the
+    /// documented rustdoc baseline step in both core chains, and dropping it
+    /// must fail the maintained gate.
+    #[test]
+    fn required_gate_keeps_hosted_rustdoc_step() -> Result<(), String> {
+        const DOC_STEP: &str =
+            "_step doc env RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked";
+        let text = include_str!("../../.github/workflows/ci.yml");
+        super::check_core_failure_evidence_contract("ci.yml", text)?;
+        if text.matches(DOC_STEP).count() < 2 {
+            return Err(
+                "ci.yml must run the rustdoc baseline step in both core chains".to_string(),
+            );
+        }
+        let stripped = text.replace(DOC_STEP, "");
+        let Err(error) = super::check_core_failure_evidence_contract("ci.yml", &stripped) else {
+            return Err("maintained gate accepted a workflow without the rustdoc step".to_string());
+        };
+        if !error.contains("cargo doc") {
+            return Err(format!("unexpected rustdoc rejection: {error}"));
+        }
+        Ok(())
     }
 
     #[test]
