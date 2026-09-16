@@ -1,40 +1,38 @@
 # Installed-product qualification — issue #1921
 
-This is PR 1 of the release qualification sequence: a human-readable matrix
-and receipt contract. It defines the work that a later execution PR must run
-on one exact unpublished candidate. It is not an execution receipt.
+This is PR 2 of the release qualification sequence: the human-readable record
+of the installed-product execution on the exact unpublished 0.4.0 candidate.
+Machine-readable execution receipt:
+[`UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml`](../../plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml).
 
 Machine-readable source: [`UNSAFE-REVIEW-QUALIFICATION-1921.toml`](../../plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921.toml).
 
 ## Current status
 
-| Field | Manifest value |
+| Field | Value |
 | --- | --- |
 | Qualification issue | [#1921](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921) |
-| Sequence | PR 1 — manifest only |
-| Candidate commit/version | unset; #1917 must produce the candidate |
-| Current swarm baseline | `93c83e8a1d349263ac03c94b3c242a8e29e471b1` (refreshed 2026-09-10; MSRV 1.98, parser 0.0.350) |
-| Current source baseline | `c25d65272c760c3630eb9528b7efaae2234d9e19` |
-| Baseline lockfile SHA-256 | `4afb189e3d56487a3d12b40117c90814ae4b9dfe` |
-| Baseline package versions | `unsafe-review-core`, `unsafe-review`, `unsafe-review-cli` — `0.3.8` |
-| Installed result | not run |
-
-The baseline values make the manifest reviewable today. They do not substitute
-for the candidate identity: the execution receipt must replace them or carry
-them as parent-baseline fields alongside the exact candidate values.
+| Sequence | PR 2 — executed on Linux; PR 3 reruns invalidated rows after the final candidate commit |
+| Candidate commit/version | source `fb955749` (`unsafe-review#568` draft) / `0.4.0` |
+| Swarm cutline / source base | `785e032d` / `c25d6527` |
+| Candidate lockfile SHA-256 | `91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36` |
+| Candidate package versions | `unsafe-review-core`, `unsafe-review-cli`, `unsafe-review` — `0.4.0` |
+| Installed binary SHA-256 | `e56afd30ff8c45aa4773ef01606a649a74acb33c0d9c49dbc10bc5b628e9d73a` |
+| Environment | Linux x86_64, rustc 1.98.1; Windows explicitly untested |
+| Installed result | pass on linux-ci; Windows rows are limitations, not passes |
 
 ## Matrix
 
 | Lane | Required evidence | Status |
 | --- | --- | --- |
-| First use | Installed version, help, doctor, and shipped command discovery, including `baseline init` | not run |
-| Preview adoption | Deterministic JSON/human preview, conflict reporting, non-mutation | not run; only if top-level init is shipped |
-| PR/front panel | Quiet, new, worsened, improved, inherited-only, and human-only fixture bundles | not run |
-| Failure semantics | Complete, capped, partial, malformed, invalid-flag, and IO-failure distinctions | not run |
-| Editor/agent | #1887 diagnostic → explanation → packet/route → identity → verification → refresh loop | not run |
-| Consumers | Tokmd presets, unsafe-review → ub-review ingestion, saved-consumer compatibility | not run |
-| Proof floor | Format, clippy, workspace tests, `check-pr`, artifact verifier, cargo-allow audit, diff check | not run |
-| Platform boundary | Named OS/architecture/toolchain and explicit skipped/unavailable limitations | not run |
+| First use | Installed version, help, doctor, and shipped command discovery, including `baseline init` | pass (linux-ci) |
+| Preview adoption | Deterministic JSON/human preview, conflict reporting, non-mutation | pass (linux-ci); top-level init shipped and proven |
+| PR/front panel | Quiet, new, worsened, improved, inherited-only, and human-only fixture bundles | pass (linux-ci); six bundles discriminate, verifier green on all |
+| Failure semantics | Complete, capped, partial, malformed, invalid-flag, and IO-failure distinctions | pass (linux-ci); genuine 1s timeout exits 2 with `completed: false` sidecars |
+| Editor/agent | #1887 diagnostic → explanation → packet/route → identity → verification → refresh loop | pass (linux-ci); repo smoke plus installed-facade 9/9 session |
+| Consumers | Tokmd presets, unsafe-review → ub-review ingestion, saved-consumer compatibility | pass (linux-ci); pinned tokmd 1.15.0 five presets, pinned ub-review parser ingests candidate bundle, additive field accepted |
+| Proof floor | Format, clippy, workspace tests, `check-pr`, artifact verifier, cargo-allow audit, diff check | pass (linux-ci); source CI green on the exact candidate (run 35046053774) |
+| Platform boundary | Named OS/architecture/toolchain and explicit skipped/unavailable limitations | pass (linux-ci); Windows named as untested, no support inferred |
 
 The matrix is intentionally row-based. A failed or incomplete row is not a
 qualified run, and a skipped row must state why. A capped scan is not a
