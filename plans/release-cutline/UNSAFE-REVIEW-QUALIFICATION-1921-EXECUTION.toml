@@ -1,0 +1,78 @@
+# UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION
+#
+# PR 2 of issue #1921: installed-product execution on the exact unpublished
+# source candidate. Bounded summary only: no secrets, no full logs, no source
+# snapshots. Full command transcripts live in task-owned scratch (/tmp files
+# qual1921.sh, lsp_installed.py) and are not committed.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921"
+manifest = "plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921.toml"
+executed_at = "2026-09-16"
+status = "executed_linux_ci_only"
+
+[identity]
+candidate_commit = "fb955749f4bd7f6f2efb5953af4e58e3107149b6"
+candidate_source_pr = "EffortlessMetrics/unsafe-review#568 (draft, unmerged)"
+candidate_version = "0.4.0"
+swarm_cutline = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
+source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
+lockfile_sha256 = "91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36"
+package_versions = ["unsafe-review-core@0.4.0", "unsafe-review-cli@0.4.0", "unsafe-review@0.4.0"]
+installed_binary_sha256 = "e56afd30ff8c45aa4773ef01606a649a74acb33c0d9c49dbc10bc5b628e9d73a"
+install_method = "cargo install --path crates/unsafe-review --root target/qualification-1921 --locked (from the candidate checkout; cargo reports the candidate path, --version reports 0.4.0)"
+
+[environment.linux_ci]
+os = "Linux x86_64 (6.6.87.2-microsoft-standard-WSL2)"
+toolchain = "rustc 1.98.1"
+result = "executed"
+
+[environment.maintainer_primary]
+platform = "Windows (primary maintainer platform)"
+result = "not_executed"
+reason = "No Windows runner available in this environment. Rows below pass on linux-ci only; Windows remains an explicit limitation, not an implied pass."
+
+[[row]]
+id = "identity-and-help"
+result = "pass"
+evidence = "--version reports 0.4.0 from the candidate path install; all nine manifest help commands plus top-level init --help exit 0"
+
+[[row]]
+id = "preview-only-adoption"
+result = "pass"
+evidence = "baseline init --dry-run prints preview JSON to stdout and writes nothing; top-level init prints parseable JSON to stdout (human notice on stderr), --out directory receives only unsafe-review-init.json, scratch repo with an existing workflow keeps its file byte-identical (sha256 match before/after), candidate worktree stays clean"
+
+[[row]]
+id = "pr-front-panel-and-artifacts"
+result = "pass"
+evidence = "six bundles discriminate (quiet all-zero, new-gap, worsened, resolved, improved+inherited, inherited-only); human panel movement matches JSON gate summary; check-first-pr-artifacts passes on all six"
+
+[[row]]
+id = "repo-failure-truthfulness"
+result = "pass"
+evidence = "complete scan exit 0; --max-cards 1 output declares capped; 1s timeout on a 190-file scope exits 2 with completed=false, stop_reason, files_remaining, and .status.json/.partial.json sidecars; malformed diff exits 2 with no whole-repo fallback; unknown flag and missing root exit 2"
+
+[[row]]
+id = "editor-agent-loop"
+result = "pass"
+evidence = "repo lsp-smoke passes on the candidate tree; installed-facade LSP session passes 9/9 (capabilities, canonical diagnostic, hover identity+boundary, command-only code action, parseable bounded packet, witness route, witness command, clean shutdown, exit 0) with the exact expected card identity"
+
+[[row]]
+id = "consumer-interoperability"
+result = "pass"
+evidence = "pinned tokmd 1.15.0 (built from tokmd-swarm 3d278c56) accepts the candidate tokmd-packets/v1 bundle and renders all five presets exit 0 with limitations preserved (analyzer bundle carries no manual-candidate preset_inputs); pinned ub-review parser (55e4fba) ingests the actual candidate bundle (new_gaps=1, advisory) via the real entrypoint; additive unknown field accepted by the bundle verifier per the recorded compatibility contract"
+
+[[row]]
+id = "repository-proof-floor"
+result = "pass"
+evidence = "fmt clean, clippy clean, workspace tests green, check-pr ok, rustdoc green, cargo-allow spec-system audit no findings, git diff --check clean, source hosted CI green on the exact candidate (run 35046053774)"
+
+[[row]]
+id = "platform-limitations"
+result = "pass"
+evidence = "Windows (maintainer-primary) explicitly untested; durations not instrumented; human/JSON parity spot-checked on one fixture; tokmd consumer built from pinned source (installed 1.11.1 lacks render); ub-review parser exercised via scratch copy with the pinned commit intact"
+
+[trust_boundary]
+statement = "These rows prove the listed installed paths on candidate fb955749 under Linux only. They do not prove memory safety, UB-free status, Miri cleanliness, site execution, calibrated accuracy, Windows support, broad platform support, or publication authorization."
+
+[invalidation]
+rule = "Any candidate, package, lockfile, docs, source, or owning-behavior change invalidates affected rows; #1921 PR3 reruns them after the final candidate commit."

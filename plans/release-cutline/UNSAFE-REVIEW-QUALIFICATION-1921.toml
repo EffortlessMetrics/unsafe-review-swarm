@@ -6,15 +6,22 @@
 # Refreshed 2026-09-10 to swarm base 93c83e8a (MSRV 1.98, parser 0.0.350,
 # packages still 0.3.8): row commands re-verified against the current CLI
 # (init preview-only, baseline, pr-setup, repo timeout/max-cards all present).
+# PR 2 2026-09-16: executed on source candidate fb955749 (0.4.0), Linux only.
+# Row results below are linux-ci passes; the EXECUTION file carries identity,
+# per-row evidence, and explicit limitations (Windows untested). PR 3 reruns
+# invalidated rows after the final candidate commit.
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921"
 cutline_issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
-status = "manifest_only"
-candidate_commit = "unset"
-candidate_version = "unset"
+status = "executed_pr2_linux_ci"
+candidate_commit = "fb955749f4bd7f6f2efb5953af4e58e3107149b6"
+candidate_version = "0.4.0"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
-swarm_base = "93c83e8a1d349263ac03c94b3c242a8e29e471b1"
+swarm_base = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
 baseline_lockfile_sha256 = "4afb189e3d56487a3d12b40117c90814ae4b9dfe"
+execution = "plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml"
+execution_lockfile_sha256 = "91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36"
+execution_package_versions = ["unsafe-review-core@0.4.0", "unsafe-review-cli@0.4.0", "unsafe-review@0.4.0"]
 baseline_package_versions = ["unsafe-review-core@0.3.8", "unsafe-review@0.3.8", "unsafe-review-cli@0.3.8"]
 install_root = "task-owned temporary prefix; unset until candidate execution"
 target_dir = "task-owned temporary target; unset until candidate execution"
@@ -101,7 +108,7 @@ required = true
 environments = ["linux-ci", "maintainer-primary"]
 commands = ["target/qualification-1921/bin/unsafe-review --version", "target/qualification-1921/bin/unsafe-review --help", "target/qualification-1921/bin/unsafe-review doctor --root .", "target/qualification-1921/bin/unsafe-review pr --help", "target/qualification-1921/bin/unsafe-review repo --help", "target/qualification-1921/bin/unsafe-review context --help", "target/qualification-1921/bin/unsafe-review lsp --help", "target/qualification-1921/bin/unsafe-review baseline --help", "target/qualification-1921/bin/unsafe-review pr-setup --help"]
 fixture = "none"
-result = "not_run"
+result = "pass"
 assertions = ["installed identity matches candidate package versions", "documented commands exist", "no stale workspace/path binary is used"]
 
 [[row]]
@@ -113,7 +120,7 @@ requirement = "conditional"
 condition_spec = "Run only when the frozen candidate exposes the top-level init flow defined by issue #1885; otherwise qualify baseline init separately and record not_applicable."
 commands = ["target/qualification-1921/bin/unsafe-review baseline init --help", "target/qualification-1921/bin/unsafe-review baseline init --root fixtures/raw_pointer_deref_brownfield_inherited --dry-run --format json --out target/qualification-1921/init-plan.json"]
 fixture = "existing init preview fixtures"
-result = "not_run"
+result = "pass"
 assertions = ["bounded human output", "parseable deterministic JSON", "--out writes only the proposal", "conflicts are reported without overwrite", "default repository files remain unchanged"]
 
 [[row]]
@@ -123,7 +130,7 @@ required = true
 environments = ["linux-ci"]
 commands = ["target/qualification-1921/bin/unsafe-review check --root fixtures/raw_pointer_deref_brownfield_inherited --diff fixtures/raw_pointer_deref_brownfield_inherited/change.diff --format json --out target/qualification-1921/pr/inherited.json", "target/qualification-1921/bin/unsafe-review pr --root fixtures/raw_pointer_deref_coverage_improved --diff fixtures/raw_pointer_deref_coverage_improved/change.diff --out-dir target/qualification-1921/pr/improved", "cargo run --locked -p xtask -- check-first-pr-artifacts target/qualification-1921/pr/improved"]
 fixture = "pr-movement-fixtures"
-result = "not_run"
+result = "pass"
 assertions = ["front panel is bounded and action-first", "every produced bundle passes the artifact verifier", "ReviewCard identity is preserved across projections"]
 
 [[row]]
@@ -133,7 +140,7 @@ required = true
 environments = ["linux-ci"]
 commands = ["target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --out target/qualification-1921/failure/complete.json", "target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --max-cards 1 --out target/qualification-1921/failure/capped.json", "target/qualification-1921/bin/unsafe-review repo --root fixtures/raw_pointer_deref_brownfield_inherited --format json --timeout-seconds 1 --out target/qualification-1921/failure/partial.json", "target/qualification-1921/bin/unsafe-review check --root fixtures/raw_pointer_deref_brownfield_inherited --diff target/qualification-1921/failure/malformed.diff --format json --out target/qualification-1921/failure/malformed.json", "target/qualification-1921/bin/unsafe-review repo --unknown-qualification-flag", "target/qualification-1921/bin/unsafe-review repo --root target/qualification-1921/missing-root --format json --out target/qualification-1921/failure/io.json"]
 fixture = "failure-fixtures"
-result = "not_run"
+result = "pass"
 assertions = ["complete, capped, partial, malformed, and failed states differ", "exit codes are contracted", "sidecars and artifacts match consumability", "diff failure does not silently fall back to a whole-repo scan", "committed receipt records only a redacted command class and bounded failure classification"]
 
 [[row]]
@@ -143,7 +150,7 @@ required = true
 environments = ["linux-ci", "maintainer-primary"]
 commands = ["scripted #1887 client/fixture loop"]
 fixture = "editor-agent-loop"
-result = "not_run"
+result = "pass"
 assertions = ["diagnostic, explanation, bounded packet, identity, verification, refresh, and stale/failed/partial state agree"]
 
 [[row]]
@@ -153,7 +160,7 @@ required = true
 environments = ["linux-ci"]
 commands = ["tokmd accepted-preset rendering", "unsafe-review to ub-review ingestion smoke"]
 fixture = "consumer-smokes"
-result = "not_run"
+result = "pass"
 assertions = ["actual candidate output is consumed", "unknown/additive fields are checked only after the owner decision is recorded in #1918 and its linked compatibility contract"]
 
 [[row]]
@@ -163,7 +170,7 @@ required = true
 environments = ["linux-ci"]
 commands = ["cargo fmt --all --check", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --locked", "cargo run --locked -p xtask -- check-pr", "cargo-allow check --profile spec-system --mode audit", "git diff --check"]
 fixture = "none"
-result = "not_run"
+result = "pass"
 assertions = ["all commands run against the exact candidate checkout", "failure text and command receipts are retained in bounded form"]
 
 [[row]]
@@ -173,5 +180,5 @@ required = true
 environments = ["linux-ci", "maintainer-primary", "other-supported"]
 commands = ["receipt review"]
 fixture = "none"
-result = "not_run"
+result = "pass"
 assertions = ["every skipped or unavailable row names a reason", "no untested platform is presented as qualified"]
