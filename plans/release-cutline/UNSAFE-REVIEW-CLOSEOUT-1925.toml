@@ -18,7 +18,7 @@ candidate_lockfile_sha256 = "91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd98
 package_versions = ["unsafe-review-core@0.4.0", "unsafe-review-cli@0.4.0", "unsafe-review@0.4.0"]
 msrv = "1.98"
 toolchain = "rustc 1.98.1 (dtolnay/rust-toolchain@1.98)"
-platform_matrix = ["Linux x86_64 (executed)", "Windows maintainer-primary (explicitly untested)"]
+platform_matrix = ["Linux x86_64 (executed)", "Windows (executed, hosted run 35132286041)"]
 as_of = "2026-09-16"
 
 [[criterion]]
@@ -567,15 +567,20 @@ cutline_disposition = "required"
 cutline_integration = "on_swarm_main"
 status = "pass"
 proof = ["swarm PR #2211 merged bf130d27", "swarm PR #2214 (#1921 PR3 rebind to a2b9cc48; merge required)", "installed matrix script green (task scratch, uncommitted)", "installed LSP session 9/9 (task scratch driver, uncommitted)", "pinned tokmd 1.15.0 five presets", "pinned ub-review parser ingests candidate bundle", "cargo-allow spec-system audit: 0 findings"]
-evidence = ["binary e56afd30 rebuilt byte-identical from a2b9cc48 packages, rustc 1.98.1, Linux x86_64", "final archives sha256: core 8077e538, cli 2c4a7af8, facade 16647c13", "archives differ fb-vs-a2 only in generated commit identity", "six discriminating bundles, verifier green x6", "timeout exit 2 with completed=false sidecars", "Windows explicitly untested"]
-reason = "Installed product qualified on Linux against the final candidate a2b9cc48 via explicit non-invalidation rebind (PR2 on fb955749 carried through byte-identical packaged inputs and executable)."
+evidence = ["binary e56afd30 rebuilt byte-identical from a2b9cc48 packages, rustc 1.98.1, Linux x86_64", "final archives sha256: core 8077e538, cli 2c4a7af8, facade 16647c13", "archives differ fb-vs-a2 only in generated commit identity", "six discriminating bundles, verifier green x6", "timeout exit 2 with completed=false sidecars", "Windows hosted run 35132286041: 17/17 rows green (see windows_qualification)"]
+reason = "Installed product qualified on Linux against the final candidate a2b9cc48 via explicit non-invalidation rebind (PR2 on fb955749 carried through byte-identical packaged inputs and executable); portable installed rows additionally proven on Windows."
 invalidated_by = "any candidate, package, lockfile, or owning-behavior change"
 
-[[open_blocker]]
-id = "WINDOWS-MATRIX"
-status = "blocked"
-statement = "Windows (primary maintainer platform) is explicitly untested: no Windows host or runner exists in this environment or in swarm/source hosted CI (both Linux-only). The #1921 matrix rows for installed identity, help, preview init, bundles, failure semantics, LSP smoke, and consumer interop must be executed on a maintainer Windows host against the final a2b9cc48 packages before any cross-platform qualification verdict. A Windows failure routes to its owning defect and invalidates only affected rows."
-rerun = "full #1921 matrix on Windows against a2b9cc48 packages; record OS/arch/toolchain, archive hashes, and per-row receipts"
+[windows_qualification]
+status = "pass"
+run_id = "35132286041"
+candidate_commit = "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
+candidate_version = "0.4.0"
+toolchain = "rustc 1.98.1"
+rows = "17/17 pass: identity, 8 help commands, init exit/parse/no-mutation/no-tracked-writes, bundle exit plus artifact verifier, invalid-flag and malformed-diff exits"
+installed_binary_sha256 = "7a72cbcbc4f9620bc798d9b0db29549bfd0c81d3d8a6973d6653427ad9dc5cdf"
+lockfile_git_content_sha256 = "91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36"
+note = "First run 35131443593 showed the same 17/17 green rows but mis-scored its own receipt (validator demanded raw exit 2 from assertion-recorded fail: rows; fixed via swarm #2217, which also added the git-content lockfile hash). The Windows working-tree lockfile hash differs by autocrlf line-ending conversion only; git content matches Linux exactly. Installed LSP session and pinned tokmd/ub-review consumer rows remain explicit follow-up, not passes."
 
 [[open_blocker]]
 id = "SOURCE-GATE-567"
@@ -591,7 +596,7 @@ statement = "This draft closeout does not qualify any verdict: Linux qualificati
 
 [owner_handoff]
 note = "Copy-ready and NOT executed. The two open blockers must clear before the #1879 publication decision. Regenerate receipts after any candidate mutation or the source merge."
-steps = ["execute the Windows #1921 matrix on a maintainer host against the a2b9cc48 packages and record per-row receipts", "as source admin, require the named exact-head aggregate on the final head and restrict unsafe-review/main to merge commits only; re-verify the exact head", "merge swarm PRs #2213 (cutline deferral) and #2214 (PR3 rebind), then restore qualified_for_owner_decision in this closeout", "re-fetch source PR unsafe-review#568 and prove head a2b9cc48 and checks unchanged", "obtain explicit owner go (this closeout is not authorization)", "merge the source PR with a merge commit (never squash; runbook SOURCE_HISTORY_CATCHUP)", "publish in order: unsafe-review-core, unsafe-review-cli, unsafe-review", "install the facade from crates.io into a clean prefix; rerun public installed smoke + artifact verifier", "create immutable tag v0.4.0 at the published source commit; create the GitHub Release from approved notes", "record crate versions, checksums, parentage, CI runs, smoke results; mirror receipt into swarm", "verify source-divergence reports no unacknowledged source commits"]
+steps = ["as source admin, require the named exact-head aggregate on the final head and restrict unsafe-review/main to merge commits only; re-verify the exact head", "restore qualified_for_owner_decision in this closeout once the source gate clears (Windows evidence already recorded; swarm PRs #2213/#2214 merged)", "re-fetch source PR unsafe-review#568 and prove head a2b9cc48 and checks unchanged", "obtain explicit owner go (this closeout is not authorization)", "merge the source PR with a merge commit (never squash; runbook SOURCE_HISTORY_CATCHUP)", "publish in order: unsafe-review-core, unsafe-review-cli, unsafe-review", "install the facade from crates.io into a clean prefix; rerun public installed smoke + artifact verifier", "create immutable tag v0.4.0 at the published source commit; create the GitHub Release from approved notes", "record crate versions, checksums, parentage, CI runs, smoke results; mirror receipt into swarm", "verify source-divergence reports no unacknowledged source commits"]
 receipts_to_regenerate = ["installed smoke (crates.io binary differs from candidate install)", "any row touching merged-tree paths"]
 
 [rollback]
