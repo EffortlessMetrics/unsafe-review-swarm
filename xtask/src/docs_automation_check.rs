@@ -237,21 +237,28 @@ fn check_agent_guidance_text(
     required: &[&str],
     forbidden: &[&str],
 ) -> Result<(), String> {
+    let normalized_text = normalize_agent_guidance(text);
     for needle in required {
-        if !text.contains(needle) {
+        let normalized_needle = normalize_agent_guidance(needle);
+        if !normalized_text.contains(&normalized_needle) {
             return Err(format!(
                 "committed agent guidance `{path}` is missing required text `{needle}`"
             ));
         }
     }
     for needle in forbidden {
-        if text.contains(needle) {
+        let normalized_needle = normalize_agent_guidance(needle);
+        if normalized_text.contains(&normalized_needle) {
             return Err(format!(
                 "committed agent guidance `{path}` retains forbidden singleton-goal routing `{needle}`"
             ));
         }
     }
     Ok(())
+}
+
+fn normalize_agent_guidance(value: &str) -> String {
+    value.split_whitespace().collect::<Vec<_>>().join(" ")
 }
 
 fn require_scope_paths(
@@ -477,33 +484,33 @@ mod tests {
     }
 
     #[test]
-    fn agent_guidance_rejects_singleton_goal_routing() -> Result<(), String> {
+    fn agent_guidance_rejects_singleton_goal_routing_across_line_breaks() -> Result<(), String> {
         let required = ["selected live GitHub issue or PR"];
-        let forbidden = ["controlling_lane:"];
-        let text = "selected live GitHub issue or PR\ncontrolling_lane: active";
+        let forbidden = ["Read the controlling stack before editing: `.allow/goals/active.toml`"];
+        let text = "selected live GitHub issue or PR\nRead the controlling stack before\nediting: `.allow/goals/active.toml`";
 
         let Err(err) = check_agent_guidance_text(
-            ".claude/agents/repo-preflight.md",
+            ".claude/agents/implementer.md",
             text,
             &required,
             &forbidden,
         ) else {
-            return Err("singleton goal routing should fail".to_string());
+            return Err("wrapped singleton goal routing should fail".to_string());
         };
 
         assert!(err.contains("forbidden singleton-goal routing"));
-        assert!(err.contains("controlling_lane:"));
+        assert!(err.contains(".allow/goals/active.toml"));
         Ok(())
     }
 
     #[test]
-    fn agent_guidance_accepts_forward_progress_contract() -> Result<(), String> {
+    fn agent_guidance_accepts_forward_progress_contract_across_line_breaks() -> Result<(), String> {
         let required = [
             "selected live GitHub issue or PR",
             "A pending hosted check is `in-progress`, not blocked.",
         ];
         let forbidden = ["which work item / lane plan controls this task?"];
-        let text = "selected live GitHub issue or PR\nA pending hosted check is `in-progress`, not blocked.";
+        let text = "selected live GitHub issue or PR\nA pending hosted check is `in-progress`,\nnot blocked.";
 
         check_agent_guidance_text(
             ".claude/agents/repo-preflight.md",
