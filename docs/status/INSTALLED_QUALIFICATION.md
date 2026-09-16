@@ -13,7 +13,7 @@ Machine-readable source: [`UNSAFE-REVIEW-QUALIFICATION-1921.toml`](../../plans/r
 | --- | --- |
 | Qualification issue | [#1921](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1921) |
 | Sequence | PR 2 — executed on Linux; PR 3 reruns invalidated rows after the final candidate commit |
-| Candidate commit/version | source `fb955749` (`unsafe-review#568` draft) / `0.4.0` |
+| Candidate commit/version | source `a2b9cc48` (`unsafe-review#568` draft) / `0.4.0` (PR2 executed on `fb955749`; PR3 rebind proves byte-identical packaged inputs and executable — see execution receipt `rebind_pr3`) |
 | Swarm cutline / source base | `785e032d` / `c25d6527` |
 | Candidate lockfile SHA-256 | `91f407bdfd16abc45d26c83ee640fc72963216836d7150bbd9888a6d6ec87d36` |
 | Candidate package versions | `unsafe-review-core`, `unsafe-review-cli`, `unsafe-review` — `0.4.0` |

@@ -71,8 +71,26 @@ id = "platform-limitations"
 result = "pass"
 evidence = "Windows (maintainer-primary) explicitly untested; durations not instrumented; human/JSON parity spot-checked on one fixture; tokmd consumer built from pinned source (installed 1.11.1 lacks render); ub-review parser exercised via scratch copy with the pinned commit intact"
 
+[rebind_pr3]
+# PR3 of issue #1921: rebind the installed receipt from fb955749 to the final
+# candidate a2b9cc48 (one commit ahead; docs/status + release-cutline records
+# only). Proved 2026-09-16 on Linux x86_64, rustc 1.98.1, from scratch
+# checkouts of EffortlessMetrics/unsafe-review#568 (draft, unmerged).
+prior_commit = "fb955749f4bd7f6f2efb5953af4e58e3107149b6"
+final_commit = "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
+delta_files = ["docs/status/DEPENDENCY_FREEZE.md", "docs/status/RELEASE_COMPATIBILITY.md", "docs/status/RELEASE_CUTLINE.md", "docs/status/RELEASE_DOCS_MATRIX.md", "plans/release-cutline/UNSAFE-REVIEW-CUTLINE-1915.toml", "plans/release-cutline/UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml", "plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921-EXECUTION.toml", "plans/release-cutline/UNSAFE-REVIEW-QUALIFICATION-1921.toml"]
+package_listing = "identical at both commits: unsafe-review-core 164 files, unsafe-review-cli 33 files, unsafe-review 9 files (cargo package --list)"
+package_archives_final = ["unsafe-review-core-0.4.0.crate sha256 8077e538fb52467a8d430cca66c2fbc5e27126c922335e40952e4a7ffeffc305", "unsafe-review-cli-0.4.0.crate sha256 2c4a7af833a91c7a49dff8c889d15b130e48e0c5e2baf3421df8bad250736108", "unsafe-review-0.4.0.crate sha256 16647c134485d8ab84d644350d0f6c930f8884a41a0a8323924d9202734fa915"]
+archive_content_compare = "extracted fb vs a2 archives differ only in .cargo_vcs_info.json sha1 (packaging-generated commit identity) and the self-referential sibling-checksum lines of the packaged Cargo.lock copies; every tracked packaged input is byte-identical"
+install_method = "cargo install --path crates/unsafe-review --root target/qualification-1921-rebind --locked (from the a2b9cc48 candidate checkout into a clean task-owned prefix; cargo reports the candidate path, --version reports 0.4.0)"
+installed_binary_sha256 = "e56afd30ff8c45aa4773ef01606a649a74acb33c0d9c49dbc10bc5b628e9d73a"
+binary_identity_note = "byte-identical to the PR2 fb955749 install (same sha, same rustc 1.98.1): same packaged inputs reproduce the same executable"
+rerun_rows = ["--version reports 0.4.0", "nine manifest help commands plus top-level init --help exit 0", "doctor exit 0 on scratch repo", "init --format json parseable, no writes, existing workflow byte-identical", "representative new-gap first-pr bundle written, check-first-pr-artifacts ok", "unknown flag exits 2, malformed diff exits 2"]
+carry_over = "PR2 rows not touching packaged or documented content (editor-agent LSP session, tokmd/ub-review consumer interop, proof floor) carry over via the byte-identical binary and unchanged packaged inputs; source hosted CI is independently green on a2b9cc48 (run 35049045282)"
+result = "rebound_to_final_commit_linux_ci_only"
+
 [trust_boundary]
-statement = "These rows prove the listed installed paths on candidate fb955749 under Linux only. They do not prove memory safety, UB-free status, Miri cleanliness, site execution, calibrated accuracy, Windows support, broad platform support, or publication authorization."
+statement = "These rows prove the listed installed paths on candidate fb955749 under Linux only, rebound to final candidate a2b9cc48 by byte-identical packaged inputs and a byte-identical installed executable (see rebind_pr3). They do not prove memory safety, UB-free status, Miri cleanliness, site execution, calibrated accuracy, Windows support, broad platform support, or publication authorization."
 
 [invalidation]
 rule = "Any candidate, package, lockfile, docs, source, or owning-behavior change invalidates affected rows; #1921 PR3 reruns them after the final candidate commit."
