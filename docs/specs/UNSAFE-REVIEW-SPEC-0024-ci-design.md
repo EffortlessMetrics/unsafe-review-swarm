@@ -1324,9 +1324,9 @@ jobs:
 ```
 
 The live swarm `ci.yml` instead uses the single tight gate of section 4.1: one
-gate job whose mandatory deterministic floor is
-`cargo run --locked -p xtask -- check-pr` (the only required check, named
-"Unsafe Review Rust Result"). Its shape is:
+gate job whose mandatory deterministic floor is the fmt + clippy + test +
+rustdoc + `cargo run --locked -p xtask -- check-pr` chain (the only required
+check, named "Unsafe Review Rust Result"). Its shape is:
 
 ```yaml
 jobs:

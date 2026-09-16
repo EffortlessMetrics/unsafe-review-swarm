@@ -1,17 +1,17 @@
 # UNSAFE-REVIEW-CUTLINE-1915
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1915"
-candidate = "46afd7086a90a957f1fcdf08235e42721540253c"
-status = "draft"
-swarm_base = "46afd7086a90a957f1fcdf08235e42721540253c"
+candidate = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
+status = "frozen"
+swarm_base = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
 source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
-candidate_commit = "46afd7086a90a957f1fcdf08235e42721540253c"
-candidate_commit_rationale = "Candidate refreshed to 46afd7086a90a957f1fcdf08235e42721540253c (docs(1916): refresh dependency records #2189) at audit 2026-09-09; prior draft base ed345b71f84e3cc4344fba52c21322f8fd4efbf6 and withdrawn 7649bff733b7f4cf1676b9b4b4fb40226c5744b5 remain audit records. Since ed345b71: MSRV 1.98 floor (#2188), ra_ap_syntax 0.0.350 (#2180), badge-projection dedup (#2187), disposition refresh (#2189), and #2095 merged; #1620 closed unmerged; #2135 open draft. Advisory refresh only; no safety, UB-free, or qualification claim follows from the refresh alone."
-audited_at = "2026-08-29"
+candidate_commit = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
+candidate_commit_rationale = "Candidate frozen at 785e032d40a6c06f142ca7138d1a71a4a4a7f28d (ci(2203): hosted rustdoc gate #2209) at audit 2026-09-16; prior candidate 46afd708 and bases ed345b71/7649bff remain audit records. Since 46afd708: hosted rustdoc gate (#2209, required aggregate red/green proven), CLI unknown-command help-exit fixes (#2200/#2205), rustdoc de-links (#2202), first-hour/README wording (#2198/#2199), release docs matrix (#2191), disposition sweep (#2195), structured runner substrate (#2135/fc69a255), workspace-test selector (#2171/c542d2fd), qual-manifest refresh (#2192). No dependency version changes; lockfile delta is the additive #2135 sha2-0.10.9 subtree only. Freeze amendment only; no safety, UB-free, or qualification claim follows from the freeze alone."
+audited_at = "2026-09-16"
 owner = "repo-infra"
-semver_rationale = "No version is frozen in the draft. The candidate must be derived from integrated public-surface changes after the required editor/agent and installed-product evidence is complete; historical 0.3.9 and 0.4.0 names are not authoritative."
-dependency_freeze = "not_active; freeze only in the follow-up cutline PR after prerequisites are dispositioned"
-rollback = "Supersede this draft with a dated cutline artifact and retain it as an audit record; do not alter source history, tags, publication state, or public v1."
+semver_rationale = "Candidate version is 0.4.0: since public 0.3.8 the tree adds a top-level preview-only init, a live read-only LSP server, the eighteen-artifact producer/verifier contract, stricter saved-LSP handling, new CLI failure semantics, and an MSRV increase from 1.95 to 1.98. That is a new product/support contract, not a patch."
+dependency_freeze = "active (UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916.toml status=active, swarm 785e032d, lockfile dc244ce8eca81289fe917666b7c3c38905823c1f96d40a02ad458d918a38dc9e)"
+rollback = "Supersede this cutline with a dated cutline artifact and retain it as an audit record; do not alter source history, tags, publication state, or public v1."
 
 # `disposition` answers "is this required to qualify the candidate?" and is an
 # owner decision. `integration` answers the separate factual question "is this
@@ -41,6 +41,17 @@ rollback = "Supersede this draft with a dated cutline artifact and retain it as 
 # the nine pending-review governance/pilot issues are now dispositioned from
 # their issue bodies with live verification where stated (1877 seam, 1878
 # absence).
+#
+# Amendment 2026-09-16 (freeze): candidate is 785e032d, status frozen,
+# version 0.4.0. Integration below is read against main 785e032d. Only the
+# header, the PR-2209 item, and the ISSUE-2100/ISSUE-2133 substrate notes
+# changed; all other rows stand as the 2026-09-09/10 audit records.
+#
+# Amendment 2026-09-16 (owner deferral, issue #1915 PR3): ISSUE-2100 moved
+# required -> deferred. The #2135 structured-runner substrate is merged
+# (fc69a255); bounded failure-identity retention remains post-0.4.0 CI
+# diagnosability work. All release gates were green throughout, so this is
+# not a shipped-product defect and does not gate the 0.4.0 candidate.
 
 [[item]]
 id = "PR-1939"
@@ -253,7 +264,7 @@ id = "PR-1620"
 disposition = "deferred"
 integration = "not_on_swarm_main"
 integration_evidence = ["swarm #1620 is closed unmerged; no branch state remains on the candidate"]
-reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this draft cutline does not make."
+reason = "RSS telemetry is not a release blocker for the current candidate and remains parked. Its proposed workspace self-unsafe posture is a product decision that this frozen cutline does not make."
 proof = []
 
 [[item]]
@@ -465,19 +476,19 @@ proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask --
 
 [[item]]
 id = "ISSUE-2100"
-disposition = "required"
+disposition = "deferred"
 integration = "not_on_swarm_main"
-integration_evidence = ["issue open; no merged implementation; substrate PR-2135 open draft"]
-reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Required for diagnosable CI gates; path is the structured runner substrate."
+integration_evidence = ["issue open; no merged implementation; substrate PR-2135 merged 2026-09-10 as fc69a255 (row PR-2135); acceptance still unproven"]
+reason = "Bounded failing-test identities for workspace failures remain unproven (stable libtest output is spoofable). Deferred per owner decision 2026-09-16 as post-0.4.0 CI-diagnosability work: the #2135 structured-runner substrate is merged and all release gates were green throughout, so this is not a shipped-product defect and does not gate the 0.4.0 candidate."
 proof = []
 
 [[item]]
 id = "ISSUE-2133"
 disposition = "required"
-integration = "not_on_swarm_main"
-integration_evidence = ["issue open; substrate PR-2135 open draft"]
+integration = "on_swarm_main"
+integration_evidence = ["substrate PR-2135 merged 2026-09-10 as fc69a255 (row PR-2135); hosted receipt via the required gate"]
 reason = "Structured runner substrate prerequisite for ISSUE-2100; needs hosted receipt. Covered by the PR-2135 path."
-proof = []
+proof = ["cargo test --locked -p xtask ci_test", "cargo run --locked -p xtask -- check-pr"]
 
 [[item]]
 id = "ISSUE-2171"
@@ -510,3 +521,11 @@ integration = "not_on_swarm_main"
 integration_evidence = []
 reason = "Source promotion, publication, tags, GitHub Release, and public v1 remain explicitly owner-gated after qualification."
 proof = []
+
+[[item]]
+id = "PR-2209"
+disposition = "required"
+integration = "on_swarm_main"
+integration_evidence = ["785e032d ci(2203): run documented rustdoc baseline in required hosted gate (#2209)", "independent read-only review verdict clear at head 2b19cc4d across chain correctness, verdict-plumbing consistency, test grip, and claim boundary", "hosted red proof: broken intra-doc link fails Unsafe Review Rust Result with failed step doc (run 35041331115)", "hosted green proof: final head passes the required check (run 35042113454)"]
+reason = "The documented rustdoc baseline must run inside the required hosted aggregate; without it hosted CI stays green while the baseline fails. Last pre-freeze product-control mutation."
+proof = ["cargo test --locked -p xtask ci_routing_contract", "RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked", "cargo run --locked -p xtask -- check-pr"]

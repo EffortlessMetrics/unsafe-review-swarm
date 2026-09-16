@@ -1,22 +1,25 @@
 # UNSAFE-REVIEW-DEPENDENCY-FREEZE-1916
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1916"
-status = "draft_not_active"
-activation = "requires_owner_decision_after_targeted_dependency_proof"
+status = "active"
+activation = "owner_activated_2026_09_16_for_candidate_0.4.0"
 freeze_scope = "candidate_dependency_inputs_only"
-audited_at = "2026-09-09"
-audit_swarm_base = "b2d7bbff4001b7465fe7c516625147d9c0400c8e"
+audited_at = "2026-09-16"
+audit_swarm_base = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
 audit_source_base = "c25d65272c760c3630eb9528b7efaae2234d9e19"
+prior_audit = "2026-09-09 draft at swarm b2d7bbff retained as audit record; lockfile hash 4afb189e from that draft does not reproduce against b2d7bbff Cargo.lock bytes (actual 56c0c021322549823b231f2fbcc68362bfe67ab4e0b9cc0f11c0adf76d5098bc), so the hashing method is now pinned below and every hash re-verified from git content."
 security_exception = "allowed_with_focused_issue_and_pr"
 publication = "owner_gated_out_of_scope"
-rollback = "Supersede this draft with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
+rollback = "Supersede this record with a refreshed lockfile snapshot; accepted dependency changes invalidate only their affected qualification receipts."
+lockfile_method = "sha256sum of the exact Cargo.lock bytes at the recorded commit (git show <commit>:Cargo.lock | sha256sum)"
 
 [swarm]
-commit = "b2d7bbff4001b7465fe7c516625147d9c0400c8e"
-lockfile_sha256 = "4afb189e3d56487a3d12b40117c90814ae4b9dfe"
+commit = "785e032d40a6c06f142ca7138d1a71a4a4a7f28d"
+lockfile_sha256 = "dc244ce8eca81289fe917666b7c3c38905823c1f96d40a02ad458d918a38dc9e"
 ra_ap_syntax = "0.0.350"
 ignore = "0.4.33"
 signal_hook = "0.4.4"
+lockfile_delta_since_b2d7bbff = "additive only: sha2 0.10.9 subtree (block-buffer, cpufeatures, crypto-common, digest, generic-array, typenum, version_check) via merged #2135 structured-runner substrate; no version change to any existing package"
 
 [source]
 commit = "c25d65272c760c3630eb9528b7efaae2234d9e19"
@@ -24,6 +27,7 @@ lockfile_sha256 = "aba7bae758bba26e835a01b5b6d45858b658cab1dc12b456c713cc4551203
 ra_ap_syntax = "0.0.341"
 ignore = "0.4.27"
 signal_hook = "0.3.18"
+source_reverified = "2026-09-16 source-divergence new_source_commits=0; source snapshot stands"
 
 [[candidate_input]]
 id = "SOURCE-548"
@@ -88,11 +92,23 @@ reason = "Swarm ra_ap_syntax 0.0.350 is integrated in the workbench at the audit
 
 [[deferred_input]]
 id = "SWARM-2180"
-reason = "Swarm ra_ap_syntax 0.0.350 bump merged as b2d7bbff (#2180) after the MSRV 1.98 floor (#2188); parser proof and hosted Rust gate green. Freeze still draft_not_active pending owner activation; #2135 retains its separate runner lane. Reviewed 2026-09-09."
+reason = "Swarm ra_ap_syntax 0.0.350 bump merged as b2d7bbff (#2180) after the MSRV 1.98 floor (#2188); parser proof and hosted Rust gate green. Freeze was draft_not_active at the 2026-09-09 audit; this record activates it. #2135 retains its separate runner lane."
 
 [[deferred_input]]
 id = "SWARM-1620"
 reason = "RSS/self-unsafe telemetry is closed unmerged and remains outside the candidate absent its separate owner decision. Reviewed 2026-09-09."
+
+[[deferred_input]]
+id = "SWARM-2207"
+reason = "Dependabot sha2 0.10.9 to 0.11.0 is deferred post-freeze. Red at audit 2026-09-16: required gate red (hosted failure-evidence names failed step clippy, run 34960418466) plus a policy-contracts failure, so not mergeable as-is. Keep-open disposition comment posted. Merging requires clippy triage against the 0.10 to 0.11 API changes plus a full green gate, and post-freeze the EXCEPTION-1/EXCEPTION-2 reset rules apply."
+
+[[deferred_input]]
+id = "SWARM-2208"
+reason = "Dependabot droid-action pin bump is deferred post-freeze. Bare pin with no paired policy/workflow-allowlist.toml update; red at audit 2026-09-16: required gate red (hosted failure-evidence names failed step check-pr, run 34960431865) plus a policy-contracts failure. Keep-open disposition comment posted. Merging requires recreation through the paired pin-plus-allowlist path with policy proof green."
+
+[[deferred_input]]
+id = "SWARM-2135-SHA2-SUBTREE"
+reason = "The sha2 0.10.9 dependency subtree integrated via merged #2135 (structured runner diagnostics substrate, required gate green) is part of the frozen set, not a separate bump. It does not authorize the 0.11.0 bump in SWARM-2207."
 
 [[rule]]
 id = "EXCEPTION-1"
@@ -104,4 +120,8 @@ text = "Any accepted dependency change resets the affected qualification receipt
 
 [[rule]]
 id = "BOUNDARY-1"
-text = "This draft records reproducibility inputs; it does not claim dependency safety, release readiness, source promotion, publication, tag movement, or public v1."
+text = "This record fixes reproducibility inputs; it does not claim dependency safety, release readiness, source promotion, publication, tag movement, or public v1."
+
+[[rule]]
+id = "FROZEN-0.4.0"
+text = "From activation through the #1925 closeout, non-security dependency PRs are deferred; a security or MSRV exception amends the cutline, refreshes the lockfile SHA, and reruns every invalidated #1921 qualification row before closeout."
