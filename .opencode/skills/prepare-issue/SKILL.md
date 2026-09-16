@@ -45,8 +45,8 @@ already makes the proof unambiguous.
    another external blocker, attempt the smallest safe capability probe and
    record the exact result.
 6. If a material premise remains unsettled, isolate the affected mutation and
-   state what would settle it. Continue every independent reversible seam. Do
-   not convert a pending check, unattempted operation, or one blocked substep
+   state what would settle it, then continue every independent reversible seam.
+   Do not convert a pending check, unattempted operation, or one blocked substep
    into a global stop.
 7. When the contract is settled, hand directly to `compile-work-spec` or the
    proportional build path in the same work cycle. Preparation is not a
