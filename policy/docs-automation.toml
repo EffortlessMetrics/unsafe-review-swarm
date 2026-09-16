@@ -134,6 +134,78 @@ must_include = [
 ]
 
 [[generated_or_checked]]
+id = "prepare-issue-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/prepare-issue/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "A plan, checklist, or quoted workplan supplied or adopted by the user is active direction",
+  "Preparation is not a mandatory pause or authorization ceremony",
+  "continue every independent reversible seam",
+]
+
+[[generated_or_checked]]
+id = "build-from-work-spec-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/build-from-work-spec/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Once admission is settled, this skill moves into execution",
+  "attempt the smallest safe operation",
+  "`blocked-evidenced` is valid only",
+]
+
+[[generated_or_checked]]
+id = "review-current-head-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/review-current-head/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Independent review does not mean human review",
+  "the coordinator may merge an ordinary internal PR",
+  "do not invent a human sign-off requirement",
+]
+
+[[generated_or_checked]]
+id = "publish-pr-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/publish-pr/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "classify them as `in-progress` or `waiting`, not blocked",
+  "Do not manufacture a new owner approval requirement",
+  "return control to the coordinator for ordinary internal merge",
+]
+
+[[generated_or_checked]]
+id = "respond-to-feedback-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/respond-to-feedback/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Do not externalize that work to the user",
+  "Use `blocked` only after an attempted failure",
+  "ordinary internal merge and reconciliation",
+]
+
+[[generated_or_checked]]
+id = "reconcile-merge-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/reconcile-merge/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "stop for the owner decision",
+  "The absent decision is not a blocker",
+  "mark that lane complete",
+]
+
+[[generated_or_checked]]
 id = "legacy-goals-archive"
 kind = "operator_front_door"
 path = ".rails/goals/README.md"
