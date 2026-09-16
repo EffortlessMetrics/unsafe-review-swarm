@@ -1623,6 +1623,64 @@ pub fn read_wrapped(ptr: *const u8) -> u8 {
     }
 
     #[test]
+    fn unreached_card_cues_gate_commands_behind_test_first() -> Result<(), String> {
+        // Drift-lock for #2240: a `miri test <owner>` command cannot work when
+        // no test reaches the owner, so the confirmation cue must lead with
+        // the test-first precondition instead of presenting the command as
+        // directly runnable.
+        let output = temp_source_output(
+            "unsafe-review-unreached-test-first-cue",
+            r#"pub fn lonely(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+pub fn accompanied(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reaches_accompanied() {
+        let value = 7u8;
+        assert_eq!(accompanied(&value as *const u8), 7);
+    }
+}
+"#,
+        )?;
+        let cue_for = |owner: &str| -> Result<String, String> {
+            let card = output
+                .cards
+                .iter()
+                .find(|card| {
+                    card.operation.family == OperationFamily::RawPointerDeref
+                        && card.site.owner.as_deref() == Some(owner)
+                })
+                .ok_or_else(|| format!("expected deref card owned by {owner}"))?;
+            Ok(crate::output::confirmation::build_this_first(card)
+                .summary()
+                .to_string())
+        };
+        let lonely_cue = cue_for("lonely")?;
+        assert!(
+            lonely_cue.contains("lonely") && lonely_cue.contains("test"),
+            "unreached cue must gate behind a test-first step naming the owner; got: `{lonely_cue}`"
+        );
+        assert!(
+            !lonely_cue.starts_with("Build/run"),
+            "unreached cue must not present the command as directly runnable; got: `{lonely_cue}`"
+        );
+        let accompanied_cue = cue_for("accompanied")?;
+        assert!(
+            accompanied_cue.starts_with("Build/run"),
+            "reached cue must keep the direct command; got: `{accompanied_cue}`"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn public_unsafe_api_contract_evidence_requires_safety_docs() -> Result<(), String> {
         for fixture in [
             "public_unsafe_fn_missing_safety",

@@ -3,6 +3,7 @@ use crate::api::Scope;
 use crate::domain::{OperationFamily, ReviewCard};
 use crate::output::confirmation::{
     build_this_first, confirmation_step, hypothesis_to_confirm, minimal_repro,
+    unreached_command_owner,
 };
 use crate::output::declaration_summary::{self, DeclarationGroup};
 use crate::output::target_feature_summary::{self, TargetFeatureGroup};
@@ -38,6 +39,11 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
         out.push_str(&card.next_action.summary);
         out.push_str("\n\n");
         if let Some(cmd) = card.next_action.verify_commands.first() {
+            if let Some(owner) = unreached_command_owner(card) {
+                out.push_str(&format!(
+                    "No test reaches `{owner}` yet; write or identify a focused test for `{owner}` first, then:\n\n"
+                ));
+            }
             push_bash_block(&mut out, cmd);
             out.push('\n');
         }
@@ -799,7 +805,9 @@ fn top_card_build_this_first(card: &ReviewCard) -> String {
 }
 
 fn top_card_confirmation_step(card: &ReviewCard) -> String {
-    if let Some(command) = card.next_action.verify_commands.first() {
+    if let Some(command) = card.next_action.verify_commands.first()
+        && unreached_command_owner(card).is_none()
+    {
         return format!(
             "build/run `{}` first for this card, then attach a matching receipt if it confirms the route",
             command
