@@ -35,7 +35,7 @@ merge readiness.
    percentages, and orchestration telemetry. Link bounded overflow evidence by
    reference rather than pasting it.
 5. Keep the lane active while hosted checks and independent exact-head review
-   run. Classify them as `in-progress` or `waiting`, not blocked. Continue any
+   run; classify them as `in-progress` or `waiting`, not blocked. Continue any
    independent work and resume the known transition when the result arrives.
 6. Distinguish author evidence from independent challenge. A separate agentic
    or human reviewer may supply the exact-head review. Independent does not mean
