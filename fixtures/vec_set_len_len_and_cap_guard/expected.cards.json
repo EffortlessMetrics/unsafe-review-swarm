@@ -42,7 +42,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `shrink_len_and_cap`"
+          "summary": "1 related test file mentions owner `shrink_len_and_cap`"
         },
         "witness": {
           "present": false,
@@ -66,7 +66,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `shrink_len_and_cap`"
+          "summary": "1 related test file mentions owner `shrink_len_and_cap`"
         },
         "witness": {
           "present": false,
@@ -77,7 +77,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `shrink_len_and_cap`",
+    "reach": "1 related test file mentions owner `shrink_len_and_cap`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -134,7 +134,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "ready"
+      "agent_lsp_readiness": "requires_witness_receipt"
     }
   }
 ]

@@ -43,7 +43,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool_both_guards`"
+          "summary": "1 related test file mentions owner `byte_to_bool_both_guards`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool_both_guards`"
+          "summary": "1 related test file mentions owner `byte_to_bool_both_guards`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `byte_to_bool_both_guards`",
+    "reach": "1 related test file mentions owner `byte_to_bool_both_guards`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -135,7 +135,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "ready"
+      "agent_lsp_readiness": "requires_witness_receipt"
     }
   }
 ]

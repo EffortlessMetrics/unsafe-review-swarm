@@ -43,7 +43,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_with_size_guard`"
+          "summary": "1 related test file mentions owner `copy_byte_to_bool_with_size_guard`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool_with_size_guard`"
+          "summary": "1 related test file mentions owner `copy_byte_to_bool_with_size_guard`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `copy_byte_to_bool_with_size_guard`",
+    "reach": "1 related test file mentions owner `copy_byte_to_bool_with_size_guard`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

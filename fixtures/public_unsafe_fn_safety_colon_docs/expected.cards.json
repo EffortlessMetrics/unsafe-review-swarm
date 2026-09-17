@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `caller_contract`"
+          "summary": "1 related test file mentions owner `caller_contract`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `Safety:` documentation was detected",
     "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
-    "reach": "1 related test file(s) mention owner `caller_contract`",
+    "reach": "1 related test file mentions owner `caller_contract`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

@@ -45,9 +45,9 @@
           "summary": "No nullability guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_two`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_two` was found"
         },
         "witness": {
           "present": false,
@@ -69,9 +69,9 @@
           "summary": "No length or bounds guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_two`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_two` was found"
         },
         "witness": {
           "present": false,
@@ -93,9 +93,9 @@
           "summary": "No alignment guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_two`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_two` was found"
         },
         "witness": {
           "present": false,
@@ -117,9 +117,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_two`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_two` was found"
         },
         "witness": {
           "present": false,
@@ -141,9 +141,9 @@
           "summary": "No obligation-specific guard code was detected"
         },
         "reach": {
-          "present": true,
-          "state": "present",
-          "summary": "1 related test file(s) mention owner `read_two`"
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_two` was found"
         },
         "witness": {
           "present": false,
@@ -154,7 +154,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `read_two`",
+    "reach": "No static test mention of owner `read_two` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -172,6 +172,7 @@
     ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
@@ -185,7 +186,7 @@
         "kind": "verify_command",
         "command": "cargo +nightly miri test read_two",
         "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test read_two` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `read_two` yet; write or identify a focused test for `read_two` first, then build/run `cargo +nightly miri test read_two` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -193,12 +194,12 @@
         "route_kind": "miri",
         "steps": [
           "Confirm ReviewCard `UR-raw-pointer-read-unrelated-is-null-not-guard-fixture-src-lib-rs-read-two-operation-raw_pointer_read-read-f6a77825a186-pointer_validity-c1` still maps to `unsafe { a.read() }` at `src/lib.rs:5:5` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test read_two` as the smallest available command for this card.",
+          "Write or identify a focused test for `read_two` first (no test reaches it yet), then build/run `cargo +nightly miri test read_two` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo +nightly miri test read_two` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `read_two` first (no test reaches it yet), then build/run `cargo +nightly miri test read_two` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
@@ -211,7 +212,7 @@
       "manual_context": "absent",
       "baseline_state": "new",
       "outcome_movement": "regressed",
-      "comment_plan_status": "not_eligible",
+      "comment_plan_status": "selected",
       "agent_lsp_readiness": "ready"
     }
   }

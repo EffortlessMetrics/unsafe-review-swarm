@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `pick_after_shadowed_get_probe_return_receiver`"
+          "summary": "1 related test file mentions owner `pick_after_shadowed_get_probe_return_receiver`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `pick_after_shadowed_get_probe_return_receiver`",
+    "reach": "1 related test file mentions owner `pick_after_shadowed_get_probe_return_receiver`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

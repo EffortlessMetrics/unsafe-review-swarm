@@ -43,7 +43,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool_disjunct_return`"
+          "summary": "1 related test file mentions owner `byte_to_bool_disjunct_return`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool_disjunct_return`"
+          "summary": "1 related test file mentions owner `byte_to_bool_disjunct_return`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `byte_to_bool_disjunct_return`",
+    "reach": "1 related test file mentions owner `byte_to_bool_disjunct_return`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

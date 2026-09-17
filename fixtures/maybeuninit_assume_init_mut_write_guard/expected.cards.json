@@ -41,7 +41,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `mutate_written`"
+          "summary": "1 related test file mentions owner `mutate_written`"
         },
         "witness": {
           "present": false,
@@ -52,7 +52,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `mutate_written`",
+    "reach": "1 related test file mentions owner `mutate_written`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

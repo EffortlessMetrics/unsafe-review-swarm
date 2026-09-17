@@ -45,7 +45,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -69,7 +69,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -93,7 +93,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -117,7 +117,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -128,7 +128,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "Some inferred safety obligations are missing local guard evidence",
-    "reach": "1 related test file(s) mention owner `write_unaligned_header`",
+    "reach": "1 related test file mentions owner `write_unaligned_header`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
