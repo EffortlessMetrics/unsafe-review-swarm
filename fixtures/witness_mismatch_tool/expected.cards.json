@@ -42,7 +42,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `round_trip`"
+          "summary": "1 related test file mentions owner `round_trip`"
         },
         "witness": {
           "present": false,
@@ -53,7 +53,7 @@
     ],
     "contract": "Nearby `# Safety` documentation was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `round_trip`",
+    "reach": "1 related test file mentions owner `round_trip`",
     "witness": "Saved `kani` receipt for this card does not match routed witness tools: miri, cargo-careful",
     "witness_routes": [
       {
@@ -110,7 +110,7 @@
       "baseline_state": "new",
       "outcome_movement": "regressed",
       "comment_plan_status": "not_eligible",
-      "agent_lsp_readiness": "ready"
+      "agent_lsp_readiness": "requires_witness_receipt"
     }
   }
 ]

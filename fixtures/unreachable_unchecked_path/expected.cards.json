@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `only_ok`"
+          "summary": "1 related test file mentions owner `only_ok`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `only_ok`",
+    "reach": "1 related test file mentions owner `only_ok`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

@@ -43,7 +43,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool`"
+          "summary": "1 related test file mentions owner `byte_to_bool`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `byte_to_bool`"
+          "summary": "1 related test file mentions owner `byte_to_bool`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `byte_to_bool`",
+    "reach": "1 related test file mentions owner `byte_to_bool`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {

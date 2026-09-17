@@ -6721,12 +6721,22 @@ fn parse_fixture_reach_claim(summary: &str) -> Option<FixtureReachClaim<'_>> {
 }
 
 fn parse_related_test_reach(summary: &str) -> Option<(usize, &str)> {
-    let (count, rest) = summary.split_once(" related test file(s) mention owner `")?;
-    let owner = rest.strip_suffix('`')?;
-    if owner.trim().is_empty() {
-        return None;
+    // Accept the current singular/plural summaries. The legacy
+    // "N related test file(s) mention owner" shape is retired: goldens no
+    // longer contain it.
+    for infix in [
+        " related test file mentions owner `",
+        " related test files mention owner `",
+    ] {
+        if let Some((count, rest)) = summary.split_once(infix) {
+            let owner = rest.strip_suffix('`')?;
+            if owner.trim().is_empty() {
+                return None;
+            }
+            return Some((count.parse().ok()?, owner));
+        }
     }
-    Some((count.parse().ok()?, owner))
+    None
 }
 
 fn reject_fixture_reach_overclaim(
@@ -10108,7 +10118,7 @@ jobs:
             "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
         )?;
         card["reach"] =
-            serde_json::Value::String("1 related test file(s) mention owner `other_owner`".into());
+            serde_json::Value::String("1 related test file mentions owner `other_owner`".into());
 
         let Err(err) = check_fixture_card_identity(
             "fixtures/raw_pointer_alignment/expected.cards.json",
@@ -11063,7 +11073,7 @@ jobs:
       "reach": {{
         "present": true,
         "state": "present",
-        "summary": "1 related test file(s) mention owner `read_header`"
+        "summary": "1 related test file mentions owner `read_header`"
       }},
       "witness": {{
         "present": false,
@@ -11078,7 +11088,7 @@ jobs:
   ],
   "contract": "Nearby `SAFETY:` comment was detected",
   "discharge": "No visible local guard detected",
-  "reach": "1 related test file(s) mention owner `read_header`",
+  "reach": "1 related test file mentions owner `read_header`",
   "witness": "No imported witness receipt was found",
   "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
   "witness_routes": [

@@ -323,13 +323,15 @@ pub(crate) fn reach_evidence(
             tests,
         )
     } else {
+        let summary = if tests.len() == 1 {
+            format!("1 related test file mentions owner `{owner}`")
+        } else {
+            format!("{} related test files mention owner `{owner}`", tests.len())
+        };
         (
             ReachEvidence {
                 state: "owner_reached".to_string(),
-                summary: format!(
-                    "{} related test file(s) mention owner `{owner}`",
-                    tests.len()
-                ),
+                summary,
             },
             tests,
         )
@@ -567,6 +569,44 @@ mod tests {
         let _ = fs::remove_dir_all(&root);
         assert_eq!(evidence.state, "unreached");
         assert!(related.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn reach_summary_pluralizes_test_file_count() -> Result<(), String> {
+        let root = write_temp_source(
+            "unsafe-review-reach-plural",
+            &[
+                (
+                    "tests/a.rs",
+                    "#[test]\nfn checks_target() {\n    target();\n}\n",
+                ),
+                (
+                    "tests/b.rs",
+                    "#[test]\nfn also_checks() {\n    target();\n}\n",
+                ),
+            ],
+        )?;
+        let (evidence, _) = reach_evidence(&root, Some(&"target".to_string()));
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(
+            evidence.summary,
+            "2 related test files mention owner `target`"
+        );
+
+        let single = write_temp_source(
+            "unsafe-review-reach-singular",
+            &[(
+                "tests/a.rs",
+                "#[test]\nfn checks_target() {\n    target();\n}\n",
+            )],
+        )?;
+        let (single_evidence, _) = reach_evidence(&single, Some(&"target".to_string()));
+        let _ = fs::remove_dir_all(&single);
+        assert_eq!(
+            single_evidence.summary,
+            "1 related test file mentions owner `target`"
+        );
         Ok(())
     }
 

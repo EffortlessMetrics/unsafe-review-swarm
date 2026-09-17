@@ -47,7 +47,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_first`"
+          "summary": "1 related test file mentions owner `write_first`"
         },
         "witness": {
           "present": false,
@@ -71,7 +71,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_first`"
+          "summary": "1 related test file mentions owner `write_first`"
         },
         "witness": {
           "present": false,
@@ -95,7 +95,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_first`"
+          "summary": "1 related test file mentions owner `write_first`"
         },
         "witness": {
           "present": false,
@@ -119,7 +119,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_first`"
+          "summary": "1 related test file mentions owner `write_first`"
         },
         "witness": {
           "present": false,
@@ -143,7 +143,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_first`"
+          "summary": "1 related test file mentions owner `write_first`"
         },
         "witness": {
           "present": false,
@@ -154,7 +154,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `write_first`",
+    "reach": "1 related test file mentions owner `write_first`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
