@@ -1354,6 +1354,16 @@ fn repo_incomplete_error(
 }
 
 #[cfg(debug_assertions)]
+fn touch_repo_interrupt_ready_file() {
+    // Lets kill-based e2e tests wait for the pause instead of guessing with a
+    // fixed sleep: the test polls for this file, then delivers the signal
+    // while the child is deterministically parked.
+    if let Ok(path) = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE") {
+        let _ = std::fs::write(path, "paused\n");
+    }
+}
+
+#[cfg(debug_assertions)]
 fn maybe_pause_for_repo_interrupt_test() {
     let Ok(raw) = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS") else {
         return;
@@ -1361,6 +1371,7 @@ fn maybe_pause_for_repo_interrupt_test() {
     let Ok(ms) = raw.parse::<u64>() else {
         return;
     };
+    touch_repo_interrupt_ready_file();
     std::thread::sleep(Duration::from_millis(ms));
 }
 
@@ -1388,6 +1399,7 @@ fn maybe_pause_for_repo_interrupt_after_scan(status: &RepoScanStatus) {
         .ok()
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(5_000);
+    touch_repo_interrupt_ready_file();
     std::thread::sleep(Duration::from_millis(ms));
 }
 
