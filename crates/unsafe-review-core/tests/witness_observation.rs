@@ -211,7 +211,7 @@ fn adverse_observations_remain_in_outcome_work() -> Result<(), String> {
     if failures.is_empty() {
         Ok(())
     } else {
-        Err(failures.join("; ")))
+        Err(failures.join("; "))
     }
 }
 
