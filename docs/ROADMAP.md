@@ -46,17 +46,48 @@ projection coherence before any curated promotion to `unsafe-review`.
 - badge output hardening
 - outcome comparison
 
-## 0.5.0 — Witness receipts
+## Versioning: staying on 0.x.y
 
-- receipt import for Miri, cargo-careful, sanitizers, Loom, Kani, and Crux
-- witness-plan artifacts
+No 1.0 is planned. Minor bumps mark usefulness arcs; patch bumps mark fixes.
+A 1.0 would require stability promises this tool does not make: API stability,
+default blocking policy, and calibrated precision/recall. Until those exist as
+proven claims, every release stays advisory-only under `0.x.y`.
 
-## 0.6.0 — Calibration and promotion
+## 0.4.0 — Repo posture and policy (shipped 2026-09-16)
 
+- baseline and suppression matching
+- no-new-debt mode
+- repo inventory hardening
+- badge output hardening
+- outcome comparison
+
+## 0.5.0 — Usefulness arc (shipped 2026-09-17, crates.io)
+
+- live-pointer-discharge guard probe for use-after-free / use-after-realloc
+  shapes, with named-guard evidence separated from non-null checks
+- negative guard controls (`unreachable!` discharge scoping for infallible
+  error paths)
+- vendored-copy and non-code-shape masking so scratch worktrees and vendored
+  copies do not inflate the scan
+- rerunnable `first-pr` advisory bundle (rerun without cap + checks flow)
+- CLI copy hardening for empty and no-card states, confidence wording
+- receipt import for Miri, cargo-careful, sanitizers, Loom, Kani, and Crux;
+  witness-plan artifacts; confirmation-cue execution stays opt-in
+  (`confirm <card-id> --allow-heavy`)
+
+## 0.6.x — Path forward (planned, still 0.x.y)
+
+- precision measurement on the evidence corpus
+  ([swarm #2223](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2223))
+- remaining analyzer acceptance: shadowed/reassigned bindings, after-op and
+  non-dominating guards, debug/test-reference exclusion, cross-function span
+  flow
+  ([swarm #2226](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2226))
+- agent forward-progress governance
+  ([swarm #2221](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2221))
 - fixture-backed calibration corpus
 - false-positive tracking
 - dogfood-calibrated evidence loop
-- real-crate dogfood corpus manifest and validation
 - saved-snapshot outcome reasons and receipt movement
 - non-blocking advisory policy reports
 - support-tier promotion rules
