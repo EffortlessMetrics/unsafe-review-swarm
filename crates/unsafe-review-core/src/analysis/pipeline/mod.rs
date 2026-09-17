@@ -7133,7 +7133,7 @@ evidence = "test fixture"
     fn mixed_source_roles_inventory_retains_every_seam() -> Result<(), String> {
         let root = fixture_root("mixed_source_roles");
         let output = analyze(AnalyzeInput {
-            root: root.clone(),
+            root,
             scope: Scope::Repo,
             diff: DiffSource::NoneRepoScan,
             mode: AnalysisMode::Repo,
@@ -7148,7 +7148,7 @@ evidence = "test fixture"
             .map(|card| {
                 format!(
                     "{} :: {}",
-                    card.site.location.file.display(),
+                    card.site.location.file.to_string_lossy().replace('\\', "/"),
                     card.operation.family.as_str()
                 )
             })
