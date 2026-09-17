@@ -1963,6 +1963,68 @@ mod tests {
     }
 
     #[test]
+    fn nullability_keeps_pointer_live_open() -> Result<(), String> {
+        // A same-receiver null check is genuine non-nullness evidence, but it
+        // must not discharge the pointer-live obligation: the allocation may
+        // still be dead, small, misaligned, or invalid to access.
+        let output = fixture_output("raw_pointer_read_same_receiver_is_null_guard")?;
+        let card = single_card("raw_pointer_read_same_receiver_is_null_guard", &output)?;
+
+        assert!(
+            !obligation_discharge_present(card, "pointer-live"),
+            "null-only guard must leave pointer-live open"
+        );
+        let live = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "pointer-live")
+            .ok_or_else(|| "card must carry a pointer-live obligation".to_string())?;
+        assert!(
+            live.discharge
+                .summary
+                .contains("Nullability guard code was detected"),
+            "the observed null check must be retained as a true fact: {}",
+            live.discharge.summary
+        );
+        assert!(
+            live.discharge
+                .summary
+                .contains("liveness remains unresolved"),
+            "the residual obligation must stay visible: {}",
+            live.discharge.summary
+        );
+        assert!(
+            card.next_action.summary.contains("pointer is live"),
+            "next action must still require liveness evidence: {}",
+            card.next_action.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn same_origin_keeps_pointer_live_present() -> Result<(), String> {
+        // Genuine same-origin evidence still discharges pointer-live with
+        // unchanged wording.
+        let output = fixture_output("vec_from_raw_parts_manuallydrop_origin")?;
+        let card = single_card("vec_from_raw_parts_manuallydrop_origin", &output)?;
+
+        assert!(
+            obligation_discharge_present(card, "pointer-live"),
+            "same-origin evidence must keep pointer-live present"
+        );
+        let live = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "pointer-live")
+            .ok_or_else(|| "card must carry a pointer-live obligation".to_string())?;
+        assert_eq!(
+            live.discharge.summary,
+            "Vec::from_raw_parts same-origin pointer/capacity evidence was detected"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn nonnull_new_guard_for_other_pointer_is_not_evidence() -> Result<(), String> {
         let output = fixture_output("nonnull_other_guard_not_evidence")?;
         let card = single_card("nonnull_other_guard_not_evidence", &output)?;
@@ -4097,8 +4159,8 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
 
     #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
-        let output = fixture_output("vec_from_raw_parts")?;
-        let card = single_card("vec_from_raw_parts", &output)?;
+        let output = fixture_output("vec_from_raw_parts_manuallydrop_origin")?;
+        let card = single_card("vec_from_raw_parts_manuallydrop_origin", &output)?;
 
         assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
         assert_eq!(card.operation.family, OperationFamily::VecFromRawParts);

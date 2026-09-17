@@ -47,10 +47,10 @@ expected_class = "guard_missing"
 expected_operation_family = "raw_pointer_write"
 expected_hazard = "pointer_validity"
 expected_obligation_key = "pointer-live"
-expected_discharge_state = "present"
+expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "A raw pointer assignment should stay classified as raw_pointer_write instead of a generic unsafe block."
+rationale = "A raw pointer assignment should stay classified as raw_pointer_write instead of a generic unsafe block. Since #2226-PR1 the null-only guard no longer discharges pointer-live; the family classification control is unchanged."
 
 [[samples]]
 id = "raw-pointer-write-unaligned-family"

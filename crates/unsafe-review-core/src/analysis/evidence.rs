@@ -93,7 +93,7 @@ use self::operation_scope::code_before_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_pointer_arithmetic_bounds_guard;
-use self::pointer_live_discharge::pointer_live_discharge_state;
+use self::pointer_live_discharge::{nullability_discharge_state, pointer_live_discharge_state};
 use self::raw_pointer_bounds::{
     has_raw_pointer_read_bounds_evidence, has_raw_pointer_write_bounds_evidence,
 };
@@ -154,7 +154,8 @@ fn discharge_state_for(
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => capacity_discharge_state(site, lower),
         "initialized" => initialized_discharge_state(site, lower),
-        "non-null" | "pointer-live" => pointer_live_discharge_state(site, lower),
+        "non-null" => nullability_discharge_state(site, lower),
+        "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
             callee_contract_discharge_state(family, &site.operation.expression, lower)

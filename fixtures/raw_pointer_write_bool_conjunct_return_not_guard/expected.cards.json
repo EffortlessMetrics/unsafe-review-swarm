@@ -42,7 +42,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No nullability guard code was detected"
+          "summary": "No pointer-liveness evidence was detected"
         },
         "reach": {
           "present": true,
