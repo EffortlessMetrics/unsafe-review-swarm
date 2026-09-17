@@ -231,6 +231,7 @@ posture live in the status docs.
 
 | Area | Status source |
 |---|---|
+| Current release | [Changelog](CHANGELOG.md) (0.5.0, advisory-only, 0.x.y) |
 | Support posture | [Support summary](docs/status/SUPPORT_SUMMARY.md) |
 | Claim-to-proof ledger | [Support tiers](docs/status/SUPPORT_TIERS.md) |
 | Find/fix workflow | [Find and fix UB-risk review seams](docs/FIND_AND_FIX_UB.md) |
