@@ -7119,4 +7119,69 @@ evidence = "test fixture"
         assert!(events_checked > 0, "at least one event must be checked");
         Ok(())
     }
+
+    /// Mixed-repository inventory baseline (#2227 step 1). The
+    /// `mixed_source_roles` fixture holds production, `#[cfg(test)]`,
+    /// fixture-input, generated, shared/ambiguous, and example seams.
+    /// Complete inventory retains every correctly detected card; role
+    /// classification (step 2) changes the selected view, never evidence
+    /// or detected counts. Vocabulary: production (`src/lib.rs`,
+    /// `src/generated.rs`, `shared/span.rs` via `#[path]`), test-only
+    /// (`src/tested.rs` under `#[cfg(test)]`), fixture input
+    /// (`tests/fixtures/`), example (`examples/`).
+    #[test]
+    fn mixed_source_roles_inventory_retains_every_seam() -> Result<(), String> {
+        let root = fixture_root("mixed_source_roles");
+        let output = analyze(AnalyzeInput {
+            root: root.clone(),
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+
+        let mut rows: Vec<String> = output
+            .cards
+            .iter()
+            .map(|card| {
+                format!(
+                    "{} :: {}",
+                    card.site.location.file.display(),
+                    card.operation.family.as_str()
+                )
+            })
+            .collect();
+        rows.sort();
+        assert_eq!(
+            rows,
+            vec![
+                "examples/demo.rs :: raw_pointer_write".to_string(),
+                "shared/span.rs :: pointer_arithmetic".to_string(),
+                "src/generated.rs :: get_unchecked".to_string(),
+                "src/lib.rs :: nonnull_unchecked".to_string(),
+                "src/lib.rs :: raw_pointer_deref".to_string(),
+                "src/tested.rs :: raw_pointer_deref".to_string(),
+                "tests/fixtures/byte_input.rs :: raw_pointer_deref".to_string(),
+            ]
+        );
+        // The `#[cfg(test)]` helper seam stays visible: test-only does not
+        // mean suppressed.
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|card| card.site.location.file.ends_with("src/tested.rs"))
+        );
+        // The `#[path]`-included shared file is inventoried at its real
+        // location, not hidden by its directory name.
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|card| card.site.location.file.ends_with("shared/span.rs"))
+        );
+        Ok(())
+    }
 }
