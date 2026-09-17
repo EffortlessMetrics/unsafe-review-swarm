@@ -48,6 +48,16 @@ const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 const FIRST_RUN_TRUST_BOUNDARY: &str = "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.";
+
+/// Shared exit-code contract footer for the top-level and review-command helps.
+/// Exit codes are part of the scripting contract: agents branch on 0/1/2.
+fn print_exit_code_footer() {
+    println!("Exit codes:");
+    println!("  0  ran to completion: clean, or advisory findings (advisory policy default)");
+    println!("  1  ran to completion: no-new-debt policy found new or worsened coverage gaps");
+    println!("  2  tool did not complete a review: usage, input/IO, or internal error");
+    println!();
+}
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
@@ -3244,6 +3254,7 @@ fn print_check_help() {
     println!("  unsafe-review check --diff - --format sarif < patch.diff");
     println!("  unsafe-review check --base origin/main --policy no-new-debt");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
@@ -3298,6 +3309,7 @@ fn print_first_pr_help() {
         "  mkdir -p /path/to && git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha> && unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit"
     );
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
         "unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
@@ -3367,6 +3379,7 @@ fn print_pilot_help() {
     println!("  unsafe-review pilot --diff change.diff --format json");
     println!("  unsafe-review pilot --base origin/main --max-cards 10");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
@@ -3764,11 +3777,7 @@ fn print_help() {
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!("Exit codes:");
-    println!("  0  ran to completion: clean, or advisory findings (advisory policy default)");
-    println!("  1  ran to completion: no-new-debt policy found new or worsened coverage gaps");
-    println!("  2  tool did not complete a review: usage, input/IO, or internal error");
-    println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
         "unsafe-review does not run witnesses, post comments, edit source, or block by default."
@@ -3853,6 +3862,7 @@ fn print_repo_help() {
     );
     println!("- Without --out, Unix SIGTERM/SIGINT prints an interruption diagnostic to stderr.");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary:");
     println!("- ReviewCards are advisory static findings: {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
