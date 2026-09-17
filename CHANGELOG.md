@@ -85,48 +85,70 @@ comments, edit source, or block by default.
   The review-kit manifest remains schema `0.1`. Advisory; no new detection.
   ([#2131](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2131))
 
+## Unreleased (current main after the 0.5.0 cutline)
+
+The following landed on swarm main after the immutable 0.5.0 cutline
+(`f281130e`, pre-publish #2250) and are **not** in the published 0.5.0
+crates. Latest crates.io version is 0.5.0; latest GitHub Release is v0.4.0.
+
+- Witness actionability: adverse-verdict cards stay open with verdict-aware
+  next actions.
+  ([#2254](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2254))
+- Witness acceptance: executable adverse-receipt acceptance staged for
+  [#2248](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2248).
+  ([#2251](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2251))
+- Reach scope: non-code shapes masked from reach scope; attribute test scope
+  handled structurally.
+  ([#2255](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2255))
+- Reach wording: grammatical test-file counts in reach summaries.
+  ([#2256](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2256))
+- Evidence model: non-null guard evidence separated from pointer-live
+  discharge (delivers
+  [#2226](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2226)).
+  ([#2257](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2257))
+- Test harness: repo-signal pause wait instead of a fixed sleep.
+  ([#2253](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2253))
+
 ## 0.5.0 - 2026-09-17
 
 Published to crates.io (`unsafe-review`, `unsafe-review-cli`,
-`unsafe-review-core`). Advisory static review evidence only; no new safety,
-UB-free, Miri-clean, site-execution, calibrated, or policy-readiness claims.
+`unsafe-review-core`) from swarm cutline `f281130e` (pre-publish #2250),
+promoted through source #570/#571 with the publication receipt in source
+#572. Advisory static review evidence only; no new safety, UB-free,
+Miri-clean, site-execution, calibrated, or policy-readiness claims.
 
 ### Added
 
 - Analyzer evidence: `SAFETY:` doc comments count as contract evidence;
   inner unsafe-fn sites route to caller-contract review; deref-of-`get_unchecked`
-  folds into the single `get_unchecked` card; non-null guard evidence is
-  separated from pointer-live discharge.
+  folds into the single `get_unchecked` card.
   ([#2235](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2235),
   [#2237](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2237),
-  [#2239](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2239),
-  [#2257](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2257))
-- Witness flow: unreached witness commands stay behind a test-first cue;
-  adverse-verdict cards stay open with verdict-aware next actions; executable
-  adverse-receipt acceptance staged for
-  [#2248](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2248).
-  ([#2241](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2241),
-  [#2254](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2254),
-  [#2251](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2251))
+  [#2239](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2239))
+- Witness flow: unreached witness commands stay behind a test-first cue.
+  ([#2241](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2241))
 - Reach and output UX: `--short` risk-ranked one-line-per-card output;
-  slot-level missing counts in headers; grammatical reach summaries; non-code
-  shapes masked from reach scope.
+  slot-level missing counts in headers.
   ([#2245](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2245),
-  [#2243](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2243),
-  [#2256](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2256),
-  [#2255](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2255))
+  [#2243](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2243))
 - Pre-publish cleanup, docs, tests, and UX bundle plus the 0.5.0 publication
-  receipt mirror and a repo-signal pause wait in tests.
+  receipt mirror. `--short` is rejected for the policy report; the shipped
+  selector runs through Git Bash on Windows.
   ([#2250](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2250),
   [#2252](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2252),
-  [#2253](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2253))
+  [#2249](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2249),
+  [#2246](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2246))
 - Receipt import for Miri, cargo-careful, sanitizers, Loom, Kani, and Crux;
   witness-plan artifacts; opt-in `confirm <card-id> --allow-heavy` execution
   recorded only as saved witness receipts.
 
 ## 0.4.0 - 2026-09-16
 
-Published to crates.io. Advisory static review evidence only.
+Published to crates.io. Advisory static review evidence only. Qualified under
+[#1925](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1925);
+publication mirrored in
+[#1879](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1879)
+(see `docs/handoffs/2026-09-16-0.4.0-publication.md`).
 
 ### Added
 
