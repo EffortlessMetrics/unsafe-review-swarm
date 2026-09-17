@@ -446,12 +446,17 @@ fn execute_with_timeout(
             }
         }
     }
+    // Joining here can stall past the timeout when the killed child left
+    // grandchildren holding the pipes: read_to_end only sees EOF once every
+    // writer exits. A timed-out run therefore finishes promptly only when
+    // the child has no surviving offspring. Killing the process group
+    // instead is future work, not this slice.
     let mut output = join_pipe_reader(stdout_reader)?;
     output.push_str(&join_pipe_reader(stderr_reader)?);
     let terminal = TerminalStatus {
         exit_code,
         signaled,
-        captured_complete: true,
+        captured_complete: !timed_out,
     };
     Ok(CommandRun {
         output,
@@ -912,6 +917,44 @@ mod tests {
         assert!(!run.timed_out);
         assert!(run.terminal.signaled);
         assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_marks_killed_capture_incomplete() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "exec sleep 30".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(1),
+        )?;
+
+        assert!(run.timed_out);
+        assert!(!run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn execute_with_timeout_marks_killed_capture_incomplete() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "cmd".to_string(),
+                "/C".to_string(),
+                "timeout /T 30 /NOBREAK > NUL".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(1),
+        )?;
+
+        assert!(run.timed_out);
+        assert!(!run.terminal.captured_complete);
         Ok(())
     }
 
