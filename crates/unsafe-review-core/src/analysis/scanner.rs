@@ -2081,6 +2081,34 @@ mod tests {
     }
 
     #[test]
+    fn syntax_first_nested_homonym_keeps_outer_card_only() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "use core::ptr::NonNull;\n\npub fn nested(p: *mut u8) -> NonNull<u8> {\n    unsafe { NonNull::new_unchecked(\n    my_NonNull::new_unchecked(p)\n) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let result = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let nonnull: Vec<_> = result
+            .sites
+            .iter()
+            .filter(|site| site.operation.family == OperationFamily::NonNullUnchecked)
+            .collect();
+        assert_eq!(nonnull.len(), 1, "sites: {:#?}", result.sites);
+        assert!(
+            !nonnull[0].operation.expression.contains("my_NonNull"),
+            "homonym kept instead of the real call: {:#?}",
+            nonnull[0]
+        );
+        Ok(())
+    }
+
+    #[test]
     fn syntax_first_real_nonnull_call_stays_detected_with_entry() -> Result<(), String> {
         let root = unique_temp_dir()?;
         fs::create_dir_all(root.join("src"))

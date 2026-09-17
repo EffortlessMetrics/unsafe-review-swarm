@@ -40,7 +40,7 @@ pub(super) fn sites(
         // text hit records whether fallback entered and why.
         let (kind, family) = match (kind, family) {
             (UnsafeSiteKind::Operation, OperationFamily::NonNullUnchecked)
-                if nonnull.clean_miss_covers_line(line_no) =>
+                if nonnull.clean_miss_redetects_line(line_no) =>
             {
                 dispatch.entries.push(disposition::FallbackEntry {
                     family: OperationFamily::NonNullUnchecked,

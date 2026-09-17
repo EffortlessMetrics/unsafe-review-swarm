@@ -60,10 +60,41 @@ impl NonNullDecisions {
             .map(|decision| decision.disposition)
     }
 
-    pub(crate) fn clean_miss_covers_line(&self, line: usize) -> bool {
-        self.decision_covers_line(line, |disposition| {
-            matches!(disposition, FamilyDisposition::CleanMiss { .. })
-        })
+    /// Whether a `NonNullUnchecked` text hit on this line redetects without
+    /// the `NonNull` rule instead of emitting. True when a clean miss covers
+    /// the line, except when a covering clean miss merely overlaps a
+    /// detection without being nested inside it (a wrapping call such as
+    /// `Some(unsafe { NonNull::new_unchecked(p) })`): there the fallback hit
+    /// is the genuine outer-span card. A clean miss strictly nested inside a
+    /// detection (a homonym argument) redetects, so the rejected hit is
+    /// never re-added; disjoint same-line siblings redetect as before.
+    pub(crate) fn clean_miss_redetects_line(&self, line: usize) -> bool {
+        let detected: Vec<(usize, usize)> = self
+            .decisions
+            .iter()
+            .filter(|decision| matches!(decision.disposition, FamilyDisposition::Detected))
+            .map(|decision| (decision.start, decision.end))
+            .collect();
+        let mut any_covering = false;
+        for decision in &self.decisions {
+            if !matches!(decision.disposition, FamilyDisposition::CleanMiss { .. }) {
+                continue;
+            }
+            if !(decision.line <= line && line <= decision.end_line) {
+                continue;
+            }
+            any_covering = true;
+            let overlaps_detection = detected
+                .iter()
+                .any(|(start, end)| decision.start < *end && *start < decision.end);
+            let nested_in_detection = detected
+                .iter()
+                .any(|(start, end)| *start < decision.start && decision.end < *end);
+            if overlaps_detection && !nested_in_detection {
+                return false;
+            }
+        }
+        any_covering
     }
 
     pub(crate) fn unsupported_covers_line(&self, line: usize) -> bool {
@@ -178,32 +209,9 @@ pub(crate) fn nonnull_call_decisions(
         }
     }
     NonNullDecisions {
-        decisions: authoritative_clean_misses(decisions),
+        decisions,
         parse_failed,
     }
-}
-
-/// A clean miss is local to the question actually decided: it is
-/// authoritative only when its node range neither contains nor overlaps a
-/// structurally detected `NonNull::new_unchecked` call. A rejected outer
-/// call (or an unrelated same-line call) must never suppress the fallback
-/// hit that belongs to a genuine inner (or sibling) detection, and nested
-/// operations stay distinct.
-fn authoritative_clean_misses(decisions: Vec<NonNullDecision>) -> Vec<NonNullDecision> {
-    let detected: Vec<(usize, usize)> = decisions
-        .iter()
-        .filter(|decision| matches!(decision.disposition, FamilyDisposition::Detected))
-        .map(|decision| (decision.start, decision.end))
-        .collect();
-    decisions
-        .into_iter()
-        .filter(|decision| {
-            !matches!(decision.disposition, FamilyDisposition::CleanMiss { .. })
-                || !detected
-                    .iter()
-                    .any(|(start, end)| decision.start < *end && *start < decision.end)
-        })
-        .collect()
 }
 
 fn snippet_mentions_new_unchecked(snippet: &str) -> bool {
@@ -305,8 +313,7 @@ mod tests {
             ),
             fact("CALL_EXPR", 78, 103, "NonNull::new_unchecked(p)"),
         ];
-        let decisions =
-            super::nonnull_call_decisions(&nodes, &[(0, usize::MAX)], &[], false);
+        let decisions = super::nonnull_call_decisions(&nodes, &[(0, usize::MAX)], &[], false);
         assert!(decisions.disposition_for_node(78, 112).is_none());
         assert!(decisions.disposition_for_node(78, 103).is_some());
     }
