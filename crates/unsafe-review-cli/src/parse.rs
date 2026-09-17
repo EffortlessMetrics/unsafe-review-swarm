@@ -1701,6 +1701,61 @@ mod tests {
     }
 
     #[test]
+    fn rejects_short_for_policy_report_with_and_without_format() -> Result<(), String> {
+        // Follow-up review on #2245: `policy report` normalizes the shared
+        // parser's human default into a report format with no short
+        // rendering, so the flag must be rejected at that entry point.
+        for argv in [
+            ["unsafe-review", "policy", "report", "--short", "", ""],
+            [
+                "unsafe-review",
+                "policy",
+                "report",
+                "--short",
+                "--format",
+                "json",
+            ],
+            [
+                "unsafe-review",
+                "policy",
+                "report",
+                "--short",
+                "--format",
+                "markdown",
+            ],
+        ] {
+            let argv: Vec<String> = argv
+                .into_iter()
+                .filter(|arg| !arg.is_empty())
+                .map(str::to_string)
+                .collect();
+            let error = match parse(argv) {
+                Ok(_) => {
+                    return Err("policy report --short should fail".to_string());
+                }
+                Err(error) => error,
+            };
+            assert!(
+                error.contains("--short"),
+                "error should name --short; got: `{error}`"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pilot_keeps_shared_short_support() -> Result<(), String> {
+        // `pilot` deliberately aliases the check renderer, so `--short`
+        // works there; pin the intentional alias instead of rejecting it.
+        let command = parse(args(["unsafe-review", "pilot", "--short"]))?;
+        let Command::Pilot(options) = command else {
+            return Err("expected pilot command".to_string());
+        };
+        assert!(options.short);
+        Ok(())
+    }
+
+    #[test]
     fn rejects_short_for_first_pr() -> Result<(), String> {
         let error = match parse(args(["unsafe-review", "first-pr", "--short"])) {
             Ok(_) => return Err("short for first-pr should fail".to_string()),
