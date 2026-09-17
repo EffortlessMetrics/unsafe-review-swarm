@@ -493,12 +493,9 @@ mod tests {
         let forbidden = ["Read the controlling stack before editing: `.allow/goals/active.toml`"];
         let text = "selected live GitHub issue or PR\nRead the controlling stack before\nediting: `.allow/goals/active.toml`";
 
-        let Err(err) = check_agent_guidance_text(
-            ".claude/agents/implementer.md",
-            text,
-            &required,
-            &forbidden,
-        ) else {
+        let Err(err) =
+            check_agent_guidance_text(".claude/agents/implementer.md", text, &required, &forbidden)
+        else {
             return Err("wrapped singleton goal routing should fail".to_string());
         };
 
