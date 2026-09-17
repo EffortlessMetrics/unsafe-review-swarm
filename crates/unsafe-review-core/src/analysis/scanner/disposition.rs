@@ -120,7 +120,13 @@ pub(crate) fn nonnull_call_decisions(
             });
             continue;
         }
-        let is_call = fact.kind == "CALL_EXPR" || fact.kind == "METHOD_CALL_EXPR";
+        // Only `CALL_EXPR` can be the associated-function call itself: a
+        // `METHOD_CALL_EXPR` whose snippet mentions `new_unchecked` is a
+        // method chained on the constructed value (e.g.
+        // `NonNull::new_unchecked(p).as_ptr()`), and classifying it as the
+        // `NonNull` call records a duplicate, wrong decision for the outer
+        // call. The inner `CALL_EXPR` fact already carries the detection.
+        let is_call = fact.kind == "CALL_EXPR";
         let is_macro = fact.kind == "MACRO_EXPR";
         if !is_call && !is_macro {
             continue;
@@ -274,6 +280,35 @@ mod tests {
         assert!(callee_is_nonnull_new_unchecked(
             "core::ptr::NonNull::new_unchecked(p)"
         ));
+    }
+
+    #[test]
+    fn chained_method_call_gets_no_nonnull_decision() {
+        use crate::analysis::syntax::SyntaxNodeFact;
+
+        fn fact(kind: &str, start: usize, end: usize, snippet: &str) -> SyntaxNodeFact {
+            SyntaxNodeFact {
+                kind: kind.to_string(),
+                start,
+                end,
+                line: 4,
+                column: 1,
+                snippet: snippet.to_string(),
+            }
+        }
+        let nodes = vec![
+            fact(
+                "METHOD_CALL_EXPR",
+                78,
+                112,
+                "NonNull::new_unchecked(p).as_ptr()",
+            ),
+            fact("CALL_EXPR", 78, 103, "NonNull::new_unchecked(p)"),
+        ];
+        let decisions =
+            super::nonnull_call_decisions(&nodes, &[(0, usize::MAX)], &[], false);
+        assert!(decisions.disposition_for_node(78, 112).is_none());
+        assert!(decisions.disposition_for_node(78, 103).is_some());
     }
 
     #[test]
