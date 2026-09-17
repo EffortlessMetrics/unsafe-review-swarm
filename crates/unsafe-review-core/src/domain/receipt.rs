@@ -189,7 +189,7 @@ pub enum ExecutedReceiptInput {
 }
 
 impl ExecutedReceiptInput {
-    fn terminal_status(self: &ExecutedReceiptInput) -> Option<TerminalStatus> {
+    fn terminal_status(&self) -> Option<TerminalStatus> {
         match self {
             Self::Miri(input) => input.terminal_status,
             Self::CargoCareful(input) => input.terminal_status,
