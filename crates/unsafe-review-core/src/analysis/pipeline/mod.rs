@@ -1367,8 +1367,11 @@ mod tests {
 
     /// Declared aperture: one line contains `NonNull::new_unchecked(ident)`
     /// with a plain identifier argument and no turbofish. Returns the pointer
-    /// identifier. Everything else (multiline, turbofish, UFCS, macros,
-    /// non-ident arguments) is outside the aperture by construction.
+    /// identifier lowercased, matching the discharge summary convention
+    /// (`nullability_guard_pointer` lowercases before summarizing), so the
+    /// same-pointer substring check is case-stable. Everything else
+    /// (multiline, turbofish, UFCS, macros, non-ident arguments) is outside
+    /// the aperture by construction.
     fn aperture_pointer(line: &str) -> Option<String> {
         let marker = "NonNull::new_unchecked(";
         let start = line.find(marker)? + marker.len();
@@ -1383,7 +1386,7 @@ mod tests {
         {
             return None;
         }
-        Some(arg.to_string())
+        Some(arg.to_ascii_lowercase())
     }
 
     #[test]

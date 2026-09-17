@@ -23,12 +23,15 @@ pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
 /// the guard matched a same-pointer (or same-receiver) shape. `None` means
 /// no such guard was found.
 pub(super) fn nullability_guard_pointer(site: &ScannedSite, lower: &str) -> Option<String> {
-    if let Some(arg) = nonnull_new_unchecked_argument(&site.operation.expression) {
-        let arg = compact_code(&arg.to_ascii_lowercase());
+    let guard_compact = || {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
-        let context = NonNullPointerContext::new(&guard_compact, arg.clone());
+        compact_code(&strip_block_comments_and_literals(&guard_scope))
+    };
+    if let Some(arg) = nonnull_new_unchecked_argument(&site.operation.expression) {
+        let arg = compact_code(&arg.to_ascii_lowercase());
+        let guard_text = guard_compact();
+        let context = NonNullPointerContext::new(&guard_text, arg.clone());
         if context.has_nullability_guard() {
             return Some(arg);
         }
@@ -40,10 +43,8 @@ pub(super) fn nullability_guard_pointer(site: &ScannedSite, lower: &str) -> Opti
     // `b.is_null()` near `a.read()` must not discharge `a`'s pointer-live
     // obligation.
     if let Some(receiver) = raw_pointer_deref_receiver(&site.operation.expression) {
-        let guard_scope = code_before_operation(lower, &site.operation.expression)
-            .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
-        if RawPointerNullContext::new(&guard_compact, receiver.clone()).has_null_guard() {
+        let guard_text = guard_compact();
+        if RawPointerNullContext::new(&guard_text, receiver.clone()).has_null_guard() {
             return Some(receiver);
         }
         return None;
