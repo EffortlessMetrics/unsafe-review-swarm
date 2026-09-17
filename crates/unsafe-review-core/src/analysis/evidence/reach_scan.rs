@@ -1,3 +1,4 @@
+use crate::analysis::scanner::text_detection::{LineCommentState, split_code_and_comment};
 use crate::domain::{ReachEvidence, RelatedTest};
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -141,41 +142,64 @@ fn is_pure_test_file(rel: &Path) -> bool {
 /// `#[test]`-gated scope.  Returns the `(test_name, line_number)` of the first
 /// such mention, or `None` if no mention is found inside a test scope.
 ///
-/// Scope tracking uses syntactic brace counting:
+/// Every line is first reduced to its code portion with
+/// [`split_code_and_comment`], so call shapes, attributes, and braces inside
+/// comments and string/char literals cannot open test scope, close it, or
+/// supply evidence.  Scope tracking then uses brace counting on that code:
 /// - A line containing `#[cfg(test)]` or `#[test]` starts a "pending test
 ///   attribute" state.
 /// - The first `{` found while the attribute is pending opens the test scope
 ///   (depth = 1).  Subsequent `{` / `}` increment / decrement the depth.
 /// - When depth returns to 0 the scope ends.
+/// - A line that both opens a scope and carries a call (a one-line test
+///   function) credits reach: entering the scope on the line counts.
 /// - An owner mention inside an open scope (depth > 0) credits test reach.
 ///
-/// This is a source-text heuristic only.  It does not handle nested attributes,
-/// string literals containing braces, or proc-macro-generated code.
+/// Test naming only trusts `#[test]`-attributed functions: a nested ordinary
+/// helper cannot overwrite the enclosing test's name, and definitions outside
+/// test scope never become names.
+///
+/// This is a source-text heuristic only.  It does not handle proc-macro
+/// generated code.
 fn reach_in_mixed_file(text: &str, owner: &str) -> Option<(String, usize)> {
     let mut last_test: Option<(String, usize)> = None;
     // True once we have seen a `#[cfg(test)]` / `#[test]` line but have not yet
     // entered the opening brace of the corresponding block.
     let mut pending_test_attr = false;
+    // True once we have seen a `#[test]` line whose function name has not been
+    // attributed yet.  Only a function parsed while a test scope is open (or
+    // being entered) consumes it.
+    let mut pending_test_name = false;
     // Nesting depth inside the current `#[cfg(test)]` / `#[test]` block.
     // 0 = outside any test scope.
     let mut test_depth: u32 = 0;
+    let mut mask_state = LineCommentState::default();
 
     for (idx, line) in text.lines().enumerate() {
         let line_no = idx + 1;
+        // Code portion only: comments and literal contents are gone, so they
+        // can neither match a call shape nor move scope tracking.
+        let code = split_code_and_comment(line, &mut mask_state).0;
 
         // Detect a test-gating attribute.
-        if line.contains("#[cfg(test)]") || line.contains("#[test]") {
+        if code.contains("#[cfg(test)]") || code.contains("#[test]") {
             pending_test_attr = true;
         }
+        if code.contains("#[test]") {
+            pending_test_name = true;
+        }
 
-        // Track brace depth.
-        for ch in line.chars() {
+        // Track brace depth.  A line that opens the scope below also counts
+        // as inside it, so one-line test functions are not missed.
+        let mut entered_scope_this_line = false;
+        for ch in code.chars() {
             match ch {
                 '{' => {
                     if pending_test_attr {
                         // This brace opens the test scope.
                         test_depth += 1;
                         pending_test_attr = false;
+                        entered_scope_this_line = true;
                     } else if test_depth > 0 {
                         test_depth += 1;
                     }
@@ -188,16 +212,24 @@ fn reach_in_mixed_file(text: &str, owner: &str) -> Option<(String, usize)> {
         }
 
         // Update the "last test seen" tracker (for naming the RelatedTest).
-        if line.contains("#[test]") {
-            last_test = Some(("test".to_string(), line_no));
-        }
-        if let Some(name) = parse_test_name(line) {
-            last_test = Some((name, line_no));
+        // Only `#[test]`-attributed functions establish the name; a nested
+        // helper fills it in only when no test name is known, and definitions
+        // outside test scope never do.
+        if let Some(name) = test_fn_name(&code) {
+            if pending_test_name && (test_depth > 0 || entered_scope_this_line) {
+                last_test = Some((name, line_no));
+                pending_test_name = false;
+            } else {
+                pending_test_name = false;
+                if last_test.is_none() && test_depth > 0 {
+                    last_test = Some((name, line_no));
+                }
+            }
         }
 
         // Credit reach only when we are inside a test scope AND the line has a
         // call/use shape (not a bare mention or a comment).
-        if test_depth > 0 && line_has_owner_call_shape(line, owner) {
+        if (test_depth > 0 || entered_scope_this_line) && line_has_owner_call_shape(&code, owner) {
             let (name, ln) = last_test
                 .clone()
                 .unwrap_or_else(|| (format!("calls {owner}"), line_no));
@@ -205,6 +237,18 @@ fn reach_in_mixed_file(text: &str, owner: &str) -> Option<(String, usize)> {
         }
     }
     None
+}
+
+/// Parse a test function name from a masked code line, including the
+/// `#[test] fn name() { ... }` one-line shape.  Returns `None` for
+/// non-function lines.
+fn test_fn_name(code: &str) -> Option<String> {
+    if let Some(name) = parse_test_name(code) {
+        return Some(name);
+    }
+    // Attribute-prefixed definition on one line: parse past the attribute.
+    let after_attr = code.find(']')?;
+    parse_test_name(code[after_attr + 1..].trim_start())
 }
 
 pub(crate) fn reach_evidence(
@@ -236,17 +280,18 @@ pub(crate) fn reach_evidence(
             // Pure test file (lives under a `tests/` directory): the entire file
             // is test code.  Any owner mention anywhere counts as test reach.
             // Preserve the existing per-line scan so we can capture a test name.
+            // Lines are masked first so comment/string call shapes cannot supply
+            // evidence and `#[test]` text in prose cannot fabricate a name.
+            let mut mask_state = LineCommentState::default();
             let mut last_test: Option<(String, usize)> = None;
             let mut result = None;
             for (idx, line) in text.lines().enumerate() {
                 let line_no = idx + 1;
-                if line.contains("#[test]") {
-                    last_test = Some(("test".to_string(), line_no));
-                }
-                if let Some(name) = parse_test_name(line) {
+                let code = split_code_and_comment(line, &mut mask_state).0;
+                if let Some(name) = test_fn_name(&code) {
                     last_test = Some((name, line_no));
                 }
-                if line_has_owner_call_shape(line, owner) {
+                if line_has_owner_call_shape(&code, owner) {
                     let (name, ln) = last_test
                         .clone()
                         .unwrap_or_else(|| (format!("calls {owner}"), line_no));
@@ -343,4 +388,202 @@ fn visit(root: &Path, dir: &Path, out: &mut Vec<PathBuf>) -> Result<(), String> 
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    fn mixed_case(body: &str) -> String {
+        format!("#[cfg(test)]\nmod tests {{\n{body}\n}}\n")
+    }
+
+    #[test]
+    fn multiline_and_one_line_test_calls_are_equivalent() {
+        let multiline =
+            mixed_case("    #[test]\n    fn checks_target() {\n        target();\n    }\n");
+        let one_line = mixed_case("    #[test] fn checks_target() { target() }\n");
+        let multi = reach_in_mixed_file(&multiline, "target");
+        let single = reach_in_mixed_file(&one_line, "target");
+        assert_eq!(
+            multi.as_ref().map(|(name, _)| name.as_str()),
+            Some("checks_target")
+        );
+        assert_eq!(
+            single.as_ref().map(|(name, _)| name.as_str()),
+            Some("checks_target"),
+            "one-line test must attribute the same test name"
+        );
+        assert_eq!(
+            multi.is_some(),
+            single.is_some(),
+            "one-line and multiline calls must agree on evidence"
+        );
+    }
+
+    #[test]
+    fn raw_call_shape_matches_comments_so_masking_is_required() {
+        // The bare predicate still matches comment/string shapes on raw
+        // lines; every caller must feed it masked code. If this ever goes
+        // false, the masking call sites deserve a second look, not applause.
+        assert!(line_has_owner_call_shape("// target()", "target"));
+        assert!(line_has_owner_call_shape("let _ = \"target()\";", "target"));
+    }
+
+    #[test]
+    fn comment_only_call_shape_supplies_no_evidence() {
+        let text = mixed_case(
+            "    #[test]\n    fn checks_target() {\n        // target()\n        let _ = 1;\n    }\n",
+        );
+        assert_eq!(
+            reach_in_mixed_file(&text, "target"),
+            None,
+            "comment-only call shape must not count"
+        );
+    }
+
+    #[test]
+    fn string_only_call_shapes_supply_no_evidence() {
+        let text = mixed_case(
+            "    #[test]\n    fn checks_target() {\n        let _ = \"target()\";\n        let _ = r#\"target()\"#;\n        let _ = 'x';\n    }\n",
+        );
+        assert_eq!(
+            reach_in_mixed_file(&text, "target"),
+            None,
+            "string/char call shapes must not count"
+        );
+    }
+
+    #[test]
+    fn real_call_with_string_decoy_still_counts() {
+        let text = mixed_case(
+            "    #[test]\n    fn checks_target() {\n        let _ = \"target()\"; target(); // trailing\n    }\n",
+        );
+        let found = reach_in_mixed_file(&text, "target");
+        assert_eq!(
+            found.as_ref().map(|(name, _)| name.as_str()),
+            Some("checks_target")
+        );
+    }
+
+    #[test]
+    fn attribute_text_in_comment_opens_no_scope() {
+        let text = "fn production() {\n    // #[test]\n    target();\n}\n";
+        assert_eq!(
+            reach_in_mixed_file(text, "target"),
+            None,
+            "commented attribute must not open test scope"
+        );
+    }
+
+    #[test]
+    fn braces_in_strings_do_not_move_scope() {
+        // The `}` inside the string must not close the test scope before the
+        // real call; the `{` must not open one in production code.
+        let text = mixed_case(
+            "    #[test]\n    fn checks_target() {\n        let _ = \"}\";\n        target();\n    }\n",
+        );
+        assert_eq!(
+            reach_in_mixed_file(&text, "target")
+                .as_ref()
+                .map(|(name, _)| name.as_str()),
+            Some("checks_target")
+        );
+        let production = "fn production() {\n    let _ = \"{\";\n    target();\n}\n";
+        assert_eq!(
+            reach_in_mixed_file(production, "target"),
+            None,
+            "string brace must not open scope in production code"
+        );
+    }
+
+    #[test]
+    fn production_call_outside_test_scope_is_not_reach() {
+        let text = "fn production() {\n    target();\n}\n#[cfg(test)]\nmod tests {\n}\n";
+        assert_eq!(
+            reach_in_mixed_file(text, "target"),
+            None,
+            "production call must not count even with a test module present"
+        );
+    }
+
+    #[test]
+    fn definition_and_unrelated_text_are_not_calls() {
+        // The `fn target` definition must not count as a call site, and a
+        // bare mention without a call shape must not either.
+        let text = mixed_case(
+            "    fn target() {}\n    #[test]\n    fn mentions() {\n        let _ = target;\n    }\n",
+        );
+        assert_eq!(
+            reach_in_mixed_file(&text, "target"),
+            None,
+            "definitions and bare mentions are not calls"
+        );
+    }
+
+    #[test]
+    fn nested_helper_cannot_overwrite_enclosing_test_name() {
+        let text = mixed_case(
+            "    #[test]\n    fn checks_target() {\n        target();\n        fn helper() {}\n    }\n",
+        );
+        assert_eq!(
+            reach_in_mixed_file(&text, "target")
+                .as_ref()
+                .map(|(name, _)| name.as_str()),
+            Some("checks_target"),
+            "nested helper must not overwrite the enclosing test name"
+        );
+    }
+
+    fn write_temp_source(prefix: &str, files: &[(&str, &str)]) -> Result<PathBuf, String> {
+        let nanos = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| format!("system clock before UNIX_EPOCH: {err}"))?
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!("{prefix}-{nanos}"));
+        for (rel, contents) in files {
+            let path = root.join(rel);
+            let parent = path
+                .parent()
+                .ok_or_else(|| format!("no parent for {}", path.display()))?;
+            fs::create_dir_all(parent)
+                .map_err(|err| format!("create temp parent failed: {err}"))?;
+            fs::write(&path, contents).map_err(|err| format!("write temp source failed: {err}"))?;
+        }
+        Ok(root)
+    }
+
+    #[test]
+    fn pipeline_comment_only_fixture_is_unreached() -> Result<(), String> {
+        let root = write_temp_source(
+            "unsafe-review-reach-comment-only",
+            &[(
+                "tests/target.rs",
+                "#[test]\nfn checks_target() {\n    // target()\n}\n",
+            )],
+        )?;
+        let (evidence, related) = reach_evidence(&root, Some(&"target".to_string()));
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(evidence.state, "unreached");
+        assert!(related.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn pipeline_real_call_names_the_test() -> Result<(), String> {
+        let root = write_temp_source(
+            "unsafe-review-reach-real-call",
+            &[(
+                "tests/target.rs",
+                "#[test]\nfn checks_target() {\n    target();\n}\n",
+            )],
+        )?;
+        let (evidence, related) = reach_evidence(&root, Some(&"target".to_string()));
+        let _ = fs::remove_dir_all(&root);
+        assert_eq!(evidence.state, "owner_reached");
+        assert_eq!(related.len(), 1);
+        assert_eq!(related[0].name, "checks_target");
+        Ok(())
+    }
 }
