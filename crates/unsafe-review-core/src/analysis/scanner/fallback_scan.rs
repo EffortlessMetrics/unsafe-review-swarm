@@ -1,7 +1,8 @@
 use super::{
-    ScannedSite, detect_site, is_incomplete_multiline_copy, is_incomplete_multiline_transmute,
-    is_incomplete_multiline_transmute_copy, line_for_text_detection, scan_site, site_key,
-    syntax_operation_covers_fallback, syntax_scan::SyntaxSiteIndex, syntax_site_covers_fallback,
+    ScannedSite, detect_site, detect_site_with_nonnull, disposition, is_incomplete_multiline_copy,
+    is_incomplete_multiline_transmute, is_incomplete_multiline_transmute_copy,
+    line_for_text_detection, scan_site, site_key, syntax_operation_covers_fallback,
+    syntax_scan::SyntaxSiteIndex, syntax_site_covers_fallback,
 };
 use crate::domain::{OperationFamily, UnsafeSiteKind};
 use crate::input::diff::DiffIndex;
@@ -13,10 +14,12 @@ pub(super) fn sites(
     diff: Option<&DiffIndex>,
     repo_mode: bool,
     lines: &[&str],
-    syntax_sites: &[super::DetectedSyntaxSite],
-    syntax_index: &SyntaxSiteIndex,
+    dispatch: &mut super::disposition::FallbackDispatch<'_>,
     seen: &mut BTreeSet<(usize, String, String)>,
 ) -> Vec<ScannedSite> {
+    let syntax_sites: &[_] = dispatch.syntax_sites;
+    let syntax_index = dispatch.syntax_index;
+    let nonnull: &super::disposition::NonNullDecisions = dispatch.nonnull;
     let in_unsafe_block = unsafe_block_scope_per_line(lines);
     let mut out = Vec::new();
     let mut line_comment_state = super::LineCommentState::default();
@@ -30,6 +33,47 @@ pub(super) fn sites(
         }
         let Some((kind, family)) = detect_site(detection_trimmed) else {
             continue;
+        };
+        // Syntax-first dispatch for `NonNullUnchecked`: a structural clean
+        // miss is authoritative, so the text path re-detects without the
+        // rejected family instead of resurrecting it. Every `NonNullUnchecked`
+        // text hit records whether fallback entered and why.
+        let (kind, family) = match (kind, family) {
+            (UnsafeSiteKind::Operation, OperationFamily::NonNullUnchecked)
+                if nonnull.clean_miss_covers_line(line_no) =>
+            {
+                dispatch.entries.push(disposition::FallbackEntry {
+                    family: OperationFamily::NonNullUnchecked,
+                    line: line_no,
+                    entered: false,
+                    reason: "structural clean miss",
+                });
+                let Some(redetected) = detect_site_with_nonnull(detection_trimmed, false) else {
+                    continue;
+                };
+                redetected
+            }
+            (kind, family) => {
+                if family == OperationFamily::NonNullUnchecked {
+                    let reason = if syntax_operation_covers_fallback(syntax_sites, line_no, &family)
+                    {
+                        "fallback entered; syntax detection covers this line (dedup downstream)"
+                    } else if nonnull.parse_failed_covers_line(line_no) || nonnull.parse_failed {
+                        "fallback entered; parse-failed aperture"
+                    } else if nonnull.unsupported_covers_line(line_no) {
+                        "fallback entered; unsupported macro aperture"
+                    } else {
+                        "fallback entered; structural detection aperture"
+                    };
+                    dispatch.entries.push(disposition::FallbackEntry {
+                        family: OperationFamily::NonNullUnchecked,
+                        line: line_no,
+                        entered: true,
+                        reason,
+                    });
+                }
+                (kind, family)
+            }
         };
         // Gate bare-name call-site families on syntactic unsafe scope.
         // These operations are only legal inside `unsafe { }` blocks or `unsafe fn`

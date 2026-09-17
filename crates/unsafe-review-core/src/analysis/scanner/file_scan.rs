@@ -1,7 +1,7 @@
 use super::{
-    ScannedSite, detect_syntax_sites, extern_fn_names, fallback_scan, js_buffer_reentry,
-    js_native_ffi_byte_source, js_shared_byte_source, local_module_names, panic_from_safe_js,
-    syntax_scan,
+    ScannedSite, detect_syntax_sites, disposition, extern_fn_names, fallback_scan,
+    js_buffer_reentry, js_native_ffi_byte_source, js_shared_byte_source, local_module_names,
+    panic_from_safe_js, syntax_scan,
 };
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -17,6 +17,12 @@ pub(crate) struct FileScanResult {
     /// Wall-clock milliseconds for parse + all detection passes on this file.
     /// Diagnostic only — not a proof, coverage claim, or performance guarantee.
     pub(crate) scan_ms: u64,
+    /// Per-line record of whether text fallback entered for the
+    /// syntax-first `NonNullUnchecked` slice and why. Proves a structural
+    /// clean miss was not resurrected by the text path. Read by focused
+    /// tests in PR1; canonical card/coverage projection follows in PR3.
+    #[allow(dead_code, reason = "read by focused tests in PR1; projected in PR3")]
+    pub(crate) fallback_entries: Vec<disposition::FallbackEntry>,
 }
 
 pub(crate) fn scan_file(
@@ -33,19 +39,18 @@ pub(crate) fn scan_file(
     let parsed = super::super::syntax::parse_source(text.as_str());
     let extern_names = extern_fn_names(&lines);
     let local_modules = local_module_names(&lines);
-    let syntax_sites = detect_syntax_sites(&parsed, &extern_names, &local_modules);
+    let (syntax_sites, nonnull) = detect_syntax_sites(&parsed, &extern_names, &local_modules);
     let syntax_index = syntax_scan::SyntaxSiteIndex::new(&parsed, &syntax_sites);
     let mut seen = BTreeSet::new();
 
-    let mut out = fallback_scan::sites(
-        rel,
-        diff,
-        repo_mode,
-        &lines,
-        &syntax_sites,
-        &syntax_index,
-        &mut seen,
-    );
+    let mut dispatch = disposition::FallbackDispatch {
+        syntax_sites: &syntax_sites,
+        syntax_index: &syntax_index,
+        nonnull: &nonnull,
+        entries: Vec::new(),
+    };
+    let mut out = fallback_scan::sites(rel, diff, repo_mode, &lines, &mut dispatch, &mut seen);
+    let fallback_entries = dispatch.entries;
     out.extend(syntax_scan::backfill_sites(
         rel,
         diff,
@@ -82,5 +87,6 @@ pub(crate) fn scan_file(
     Ok(FileScanResult {
         sites: out,
         scan_ms,
+        fallback_entries,
     })
 }
