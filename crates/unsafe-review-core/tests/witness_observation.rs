@@ -7,8 +7,8 @@ use std::path::{Path, PathBuf};
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewCard, Scope,
-    analyze, compare_outcome_json, render_json,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewCard, Scope, analyze,
+    compare_outcome_json, render_json,
 };
 
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
@@ -31,8 +31,8 @@ impl FixtureRoot {
         let owned = Self(root);
         fs::create_dir(owned.0.join("src"))
             .map_err(|error| format!("create fixture source directory: {error}"))?;
-        let source = Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../../fixtures/box_from_raw_box_origin");
+        let manifest_dir = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let source = manifest_dir.join("../../fixtures/box_from_raw_box_origin");
         for relative in ["Cargo.toml", "change.diff", "src/lib.rs"] {
             fs::copy(source.join(relative), owned.0.join(relative))
                 .map_err(|error| format!("copy fixture {relative}: {error}"))?;
@@ -107,8 +107,7 @@ fn observe(tool: &str, verdict: Option<&str>) -> Result<Observation, String> {
     // contaminate the pre-import snapshot.
     let before_json = render_json(&before);
     let directory = root.0.join(".unsafe-review/receipts");
-    fs::create_dir_all(&directory)
-        .map_err(|error| format!("create receipt directory: {error}"))?;
+    fs::create_dir_all(&directory).map_err(|error| format!("create receipts: {error}"))?;
     let mut receipt = serde_json::json!({
         "schema_version": "0.1",
         "card_id": id,
@@ -123,8 +122,7 @@ fn observe(tool: &str, verdict: Option<&str>) -> Result<Observation, String> {
     if let Some(value) = verdict {
         receipt["verdict"] = serde_json::Value::String(value.to_string());
     }
-    let bytes = serde_json::to_vec_pretty(&receipt)
-        .map_err(|error| format!("serialize receipt: {error}"))?;
+    let bytes = serde_json::to_vec_pretty(&receipt).map_err(|e| format!("receipt JSON: {e}"))?;
     fs::write(directory.join("observation.json"), bytes)
         .map_err(|error| format!("write receipt: {error}"))?;
     let after = analyze_root(&root.0)?;
@@ -160,9 +158,9 @@ fn require_outstanding_work(verdict: &str) -> Result<(), String> {
     ) {
         failures.push("adverse/uncertain receipt lowered the review priority".to_string());
     }
-    if observation.after.summary.open_actionable_gaps
-        < observation.before.summary.open_actionable_gaps
-    {
+    let before_open = observation.before.summary.open_actionable_gaps;
+    let after_open = observation.after.summary.open_actionable_gaps;
+    if after_open < before_open {
         failures.push("the open-action count fell without repairing the source".to_string());
     }
     if failures.is_empty() {
@@ -213,7 +211,7 @@ fn adverse_observations_remain_in_outcome_work() -> Result<(), String> {
     if failures.is_empty() {
         Ok(())
     } else {
-        Err(failures.join("; "))
+        Err(failures.join("; ")))
     }
 }
 
