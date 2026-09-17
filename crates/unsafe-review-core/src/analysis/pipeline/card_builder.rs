@@ -72,18 +72,18 @@ pub(super) fn build_card(
         for evidence in &mut obligation_evidence {
             evidence.witness = crate::domain::EvidenceState::present(&witness_evidence.summary);
         }
-        if class == ReviewClass::GuardedUnwitnessed {
+        // A structured verdict (`confirmed` / `not_reproduced` /
+        // `inconclusive`) is an observation about one run, not a discharge of
+        // the witness obligation: a reproduced failure still requires
+        // attention, an inconclusive run leaves adequacy unresolved, and a
+        // single non-reproduction is not a safety claim. Keep the witness
+        // work open (and the hazard-derived priority intact) while retaining
+        // the receipt evidence and its limitations in the slots. Only a
+        // verdict-less receipt (legacy/human `executed` / `receipt_imported`
+        // provenance) closes the card as before.
+        if class == ReviewClass::GuardedUnwitnessed && witness_evidence.verdict.is_none() {
             class = ReviewClass::GuardedAndWitnessed;
-            // A `confirmed` verdict means the runtime witness observed a
-            // failure at the site. That preserves the safety obligation and
-            // increases urgency: do NOT lower priority. The site was
-            // witnessed (hence `GuardedAndWitnessed`), but the observed
-            // failure is evidence the unsafe code triggered the hazard — not
-            // that it is safe. All other verdicts (absent / `not_reproduced`
-            // / `inconclusive`) lower priority to Low as before.
-            if witness_evidence.verdict.as_deref() != Some("confirmed") {
-                priority = Priority::Low;
-            }
+            priority = Priority::Low;
         }
     } else if class == ReviewClass::GuardedUnwitnessed
         && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
@@ -134,6 +134,7 @@ pub(super) fn build_card(
             contract_for_classification.present,
             scanned_site.site.owner.as_deref(),
             &scanned_site.context_before,
+            witness_evidence.confirmation_state(),
         )
     };
     let next_action = NextAction {

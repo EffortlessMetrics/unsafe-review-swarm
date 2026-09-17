@@ -1065,6 +1065,7 @@ mod tests {
                 false,
                 None,
                 &[],
+                "pending",
             );
             assert!(
                 summary.contains(expected),
@@ -1087,6 +1088,7 @@ mod tests {
             false,
             None,
             &[],
+            "pending",
         );
         assert!(
             summary.contains("human deep-review witness receipt"),
@@ -1108,6 +1110,7 @@ mod tests {
             false,
             None,
             &[],
+            "pending",
         );
         assert!(miri_supported.contains("Miri"));
         assert!(miri_supported.contains("cargo-careful"));
@@ -1128,6 +1131,7 @@ mod tests {
             false,
             None,
             &[],
+            "pending",
         );
 
         assert!(summary.contains("inline_asm"));
@@ -1150,6 +1154,7 @@ mod tests {
             false,
             None,
             &[],
+            "pending",
         );
 
         assert!(summary.contains("pin_unchecked"));
@@ -1173,6 +1178,7 @@ mod tests {
             false,
             None,
             &[],
+            "pending",
         );
 
         assert!(summary.contains("unsafe_fn_call"));

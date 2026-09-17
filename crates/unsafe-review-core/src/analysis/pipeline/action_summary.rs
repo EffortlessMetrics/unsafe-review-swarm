@@ -14,6 +14,7 @@ pub(super) fn next_action_summary(
     contract_present: bool,
     owner: Option<&str>,
     context_before: &[String],
+    witness_confirmation: &str,
 ) -> String {
     match class {
         ReviewClass::ContractMissing if public_api_surface => {
@@ -65,6 +66,21 @@ pub(super) fn next_action_summary(
                     "Add or expose the local guard that discharges the `{operation}` safety obligation."
                 )
             }
+        }
+        // A verdict-bearing receipt is already imported: the next action must
+        // say what the observation requires, never ask for another receipt
+        // as if none existed.
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "confirmed" => {
+            "The witness run reproduced the hazard at this site; fix the unsafe code or add a discharging guard and re-verify with a focused run. The receipt records the observation, not a resolution."
+                .to_string()
+        }
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "inconclusive" => {
+            "The witness run was inconclusive; re-run the focused witness command and attach a receipt with a recorded verdict, or mark the static limitation explicitly."
+                .to_string()
+        }
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "not_reproduced" => {
+            "One witness run did not reproduce the hazard; that single observation is not a safety claim. Expand coverage or attach a confirming receipt, or mark the static limitation explicitly."
+                .to_string()
         }
         ReviewClass::GuardedUnwitnessed if has_witness_route(routes, WitnessKind::HumanDeepReview) => {
             "Attach a human deep-review witness receipt or mark the static limitation explicitly."
