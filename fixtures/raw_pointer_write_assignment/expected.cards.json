@@ -40,9 +40,9 @@
           "summary": "Nearby `SAFETY:` comment was detected"
         },
         "discharge": {
-          "present": true,
-          "state": "present",
-          "summary": "Nullability guard code was detected"
+          "present": false,
+          "state": "missing",
+          "summary": "Nullability guard code was detected, but it supports non-nullness only; pointer liveness remains unresolved"
         },
         "reach": {
           "present": true,
@@ -153,7 +153,7 @@
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file mentions owner `write_header`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
@@ -174,7 +174,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose local guards for these `raw_pointer_write` safety obligations: (1) buffer has enough bytes for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+    "next_action": "Add or expose local guards for these `raw_pointer_write` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
     "verify_commands": [
       "cargo +nightly miri test write_header",
       "cargo +nightly careful test write_header"

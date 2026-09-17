@@ -37,9 +37,9 @@
           "summary": "Nearby `SAFETY:` comment was detected"
         },
         "discharge": {
-          "present": true,
-          "state": "present",
-          "summary": "Nullability guard code was detected"
+          "present": false,
+          "state": "missing",
+          "summary": "Nullability guard code was detected, but it supports non-nullness only; pointer liveness remains unresolved"
         },
         "reach": {
           "present": true,
@@ -102,7 +102,7 @@
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "discharge": "No visible local guard detected",
     "reach": "1 related test file mentions owner `drop_one`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
@@ -123,7 +123,7 @@
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Add or expose local guards for these `drop_in_place` safety obligations: (1) pointed-to value is initialized, (2) value will not be dropped again or observed after drop.",
+    "next_action": "Add or expose local guards for these `drop_in_place` safety obligations: (1) pointer is valid for dropping one value, (2) pointed-to value is initialized, (3) value will not be dropped again or observed after drop.",
     "verify_commands": [
       "cargo +nightly miri test drop_one",
       "cargo +nightly careful test drop_one"
