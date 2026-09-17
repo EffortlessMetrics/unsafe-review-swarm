@@ -207,7 +207,7 @@ sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "Once admission is settled, this skill moves into execution",
   "attempt the smallest safe operation",
-  "`blocked-evidenced` is valid only",
+  "Use `blocked-evidenced` only after an attempted",
 ]
 
 [[generated_or_checked]]
