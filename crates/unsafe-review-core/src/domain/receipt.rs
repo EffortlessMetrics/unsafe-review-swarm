@@ -25,6 +25,63 @@ pub struct WitnessReceipt {
     /// an ambiguous or partial run. Absent on older receipts.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub verdict: Option<String>,
+    /// Exit code of the executed child process. Present only on receipts
+    /// built from an executed command; absent means the terminal status is
+    /// unknown (all saved-output imports and older receipts).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub exit_code: Option<i32>,
+    /// Whether the executed child process was terminated by a signal.
+    /// Absent means unknown, never assumed clean.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub terminated_by_signal: Option<bool>,
+}
+
+/// Terminal facts for a witness child process, retained by the opt-in
+/// executor and consumed by executed-output classification so that
+/// success-looking text can never hide a failed process.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct TerminalStatus {
+    pub exit_code: Option<i32>,
+    pub signaled: bool,
+    pub captured_complete: bool,
+}
+
+impl TerminalStatus {
+    pub fn exited(exit_code: i32) -> Self {
+        Self {
+            exit_code: Some(exit_code),
+            signaled: false,
+            captured_complete: true,
+        }
+    }
+
+    pub fn signaled() -> Self {
+        Self {
+            exit_code: None,
+            signaled: true,
+            captured_complete: true,
+        }
+    }
+
+    pub fn unknown() -> Self {
+        Self {
+            exit_code: None,
+            signaled: false,
+            captured_complete: false,
+        }
+    }
+
+    fn describe(self) -> &'static str {
+        if self.signaled {
+            "process was terminated by a signal"
+        } else {
+            match self.exit_code {
+                Some(0) => "process exited 0",
+                Some(_) => "process exited nonzero",
+                None => "process exit code unavailable",
+            }
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +99,10 @@ pub struct MiriReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// Terminal facts for the executed child. `None` means unknown: all
+    /// saved-output imports and older receipts predate status retention and
+    /// must never be read as exit 0.
+    pub terminal_status: Option<TerminalStatus>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -53,6 +114,10 @@ pub struct CargoCarefulReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// Terminal facts for the executed child. `None` means unknown: all
+    /// saved-output imports and older receipts predate status retention and
+    /// must never be read as exit 0.
+    pub terminal_status: Option<TerminalStatus>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -65,6 +130,10 @@ pub struct SanitizerReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// Terminal facts for the executed child. `None` means unknown: all
+    /// saved-output imports and older receipts predate status retention and
+    /// must never be read as exit 0.
+    pub terminal_status: Option<TerminalStatus>,
     /// When `true`, accept output from a runtime/program-level sanitizer run
     /// that is not a `cargo test` harness. A clean run (no sanitizer markers)
     /// records `not_reproduced`; a run with sanitizer markers records
@@ -82,6 +151,10 @@ pub struct ConcurrencyReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// Terminal facts for the executed child. `None` means unknown: all
+    /// saved-output imports and older receipts predate status retention and
+    /// must never be read as exit 0.
+    pub terminal_status: Option<TerminalStatus>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -94,6 +167,10 @@ pub struct ProofReceiptInput {
     pub expires_at: String,
     pub command: String,
     pub limitations: Vec<String>,
+    /// Terminal facts for the executed child. `None` means unknown: all
+    /// saved-output imports and older receipts predate status retention and
+    /// must never be read as exit 0.
+    pub terminal_status: Option<TerminalStatus>,
 }
 
 /// Typed output captured by an explicit unsafe-review witness execution.
@@ -109,6 +186,18 @@ pub enum ExecutedReceiptInput {
     Sanitizer(SanitizerReceiptInput),
     Concurrency(ConcurrencyReceiptInput),
     Proof(ProofReceiptInput),
+}
+
+impl ExecutedReceiptInput {
+    fn terminal_status(self: &ExecutedReceiptInput) -> Option<TerminalStatus> {
+        match self {
+            Self::Miri(input) => input.terminal_status,
+            Self::CargoCareful(input) => input.terminal_status,
+            Self::Sanitizer(input) => input.terminal_status,
+            Self::Concurrency(input) => input.terminal_status,
+            Self::Proof(input) => input.terminal_status,
+        }
+    }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -260,8 +349,24 @@ impl WitnessReceipt {
         provenance: OutputProvenance,
         input: ExecutedReceiptInput,
     ) -> Result<Self, String> {
-        let classified = classify_output(provenance, input)?;
-        finalize_output_receipt(provenance, classified)
+        let terminal = match provenance {
+            OutputProvenance::ExecutedCommand => {
+                let status = input.terminal_status().ok_or_else(|| {
+                    "executed output requires terminal process status; unknown status is never assumed exit 0"
+                        .to_string()
+                })?;
+                if !status.captured_complete {
+                    return Err(
+                        "executed output capture is incomplete; partial output cannot qualify as evidence"
+                            .to_string(),
+                    );
+                }
+                Some(status)
+            }
+            OutputProvenance::SavedOutput => None,
+        };
+        let classified = classify_output(provenance, input, terminal)?;
+        finalize_output_receipt(provenance, classified, terminal)
     }
 
     fn validate_command_hash(&self) -> Result<(), String> {
@@ -280,6 +385,41 @@ impl WitnessReceipt {
 }
 
 fn classify_output(
+    provenance: OutputProvenance,
+    input: ExecutedReceiptInput,
+    terminal: Option<TerminalStatus>,
+) -> Result<ClassifiedOutput, String> {
+    let classified = classify_output_text(provenance, input)?;
+    Ok(apply_terminal_gate(classified, terminal))
+}
+
+/// A clean exit is required for an unqualified successful run. A failed or
+/// signaled process behind success-looking output downgrades the verdict to
+/// `inconclusive` with the contradiction surfaced in the summary; observed
+/// failure markers (`confirmed`) are preserved as negative evidence.
+fn apply_terminal_gate(
+    mut classified: ClassifiedOutput,
+    terminal: Option<TerminalStatus>,
+) -> ClassifiedOutput {
+    let Some(status) = terminal else {
+        return classified;
+    };
+    if classified.verdict != "not_reproduced" {
+        return classified;
+    }
+    if !status.signaled && status.exit_code == Some(0) {
+        return classified;
+    }
+    classified.verdict = "inconclusive".to_string();
+    classified.summary = format!("{}; {}", classified.summary, status.describe());
+    classified.extra_limitations.push(
+        "executed process did not report a clean exit; success-looking output is not an unqualified pass"
+            .to_string(),
+    );
+    classified
+}
+
+fn classify_output_text(
     provenance: OutputProvenance,
     input: ExecutedReceiptInput,
 ) -> Result<ClassifiedOutput, String> {
@@ -417,6 +557,7 @@ fn classify_output(
 fn finalize_output_receipt(
     provenance: OutputProvenance,
     classified: ClassifiedOutput,
+    terminal: Option<TerminalStatus>,
 ) -> Result<WitnessReceipt, String> {
     let command_hash = WitnessReceipt::command_hash(&classified.command);
     let mut limitations = vec![
@@ -438,6 +579,8 @@ fn finalize_output_receipt(
         command_hash: Some(command_hash),
         limitations: Some(limitations),
         verdict: Some(classified.verdict),
+        exit_code: terminal.and_then(|status| status.exit_code),
+        terminated_by_signal: terminal.map(|status| status.signaled),
     };
     receipt.validate()?;
     Ok(receipt)
@@ -1020,6 +1163,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
         assert_eq!(miri.verdict.as_deref(), Some("not_reproduced"));
 
@@ -1032,6 +1176,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
         assert_eq!(proof.verdict.as_deref(), Some("not_reproduced"));
         Ok(())
@@ -1188,6 +1333,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
 
         assert_eq!(receipt.tool, "miri");
@@ -1224,6 +1370,7 @@ mod tests {
                 expires_at: "2026-08-18".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
                 limitations: vec!["single explicit run".to_string()],
+                terminal_status: Some(TerminalStatus::exited(0)),
             },
         ))?;
 
@@ -1258,10 +1405,141 @@ mod tests {
             "command_hash",
             "limitations",
             "verdict",
+            "exit_code",
+            "terminated_by_signal",
         ] {
             assert!(object.contains_key(key), "missing receipt field `{key}`");
         }
-        assert_eq!(object.len(), 12);
+        assert_eq!(object.len(), 14);
+        assert_eq!(receipt.exit_code, Some(0));
+        assert_eq!(receipt.terminated_by_signal, Some(false));
+        Ok(())
+    }
+
+    fn executed_miri_input(output: &str, terminal: Option<TerminalStatus>) -> ExecutedReceiptInput {
+        ExecutedReceiptInput::Miri(MiriReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly miri test read_header".to_string(),
+            limitations: Vec::new(),
+            terminal_status: terminal,
+        })
+    }
+
+    const OK_OUTPUT: &str = "test result: ok. 1 passed; 0 failed; finished in 0.01s\n";
+
+    #[test]
+    fn executed_nonzero_exit_behind_success_output_is_inconclusive() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_executed_output(executed_miri_input(
+            OK_OUTPUT,
+            Some(TerminalStatus::exited(7)),
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("inconclusive"));
+        assert_eq!(receipt.exit_code, Some(7));
+        assert_eq!(receipt.terminated_by_signal, Some(false));
+        let summary = receipt.summary.as_deref().ok_or("missing summary")?;
+        assert!(summary.contains("exited nonzero"), "summary: {summary}");
+        let limitations = receipt.limitations.as_ref().ok_or("missing limitations")?;
+        assert!(
+            limitations
+                .iter()
+                .any(|item| item.contains("not an unqualified pass")),
+            "limitations: {limitations:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn executed_signal_termination_behind_success_output_is_inconclusive() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_executed_output(executed_miri_input(
+            OK_OUTPUT,
+            Some(TerminalStatus::signaled()),
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("inconclusive"));
+        assert_eq!(receipt.exit_code, None);
+        assert_eq!(receipt.terminated_by_signal, Some(true));
+        let summary = receipt.summary.as_deref().ok_or("missing summary")?;
+        assert!(
+            summary.contains("terminated by a signal"),
+            "summary: {summary}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn executed_unknown_terminal_status_is_rejected_never_assumed_clean() {
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(OK_OUTPUT, None));
+
+        assert_eq!(
+            result,
+            Err("executed output requires terminal process status; unknown status is never assumed exit 0"
+                .to_string())
+        );
+    }
+
+    #[test]
+    fn executed_incomplete_capture_is_rejected() {
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(
+            OK_OUTPUT,
+            Some(TerminalStatus::unknown()),
+        ));
+
+        assert_eq!(
+            result,
+            Err(
+                "executed output capture is incomplete; partial output cannot qualify as evidence"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn saved_output_ignores_terminal_status_for_legacy_compatibility() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_miri_output(MiriReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            output: OK_OUTPUT.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly miri test read_header".to_string(),
+            limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(7)),
+        })?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        assert_eq!(receipt.exit_code, None);
+        assert_eq!(receipt.terminated_by_signal, None);
+        Ok(())
+    }
+
+    #[test]
+    fn executed_sanitizer_markers_stay_confirmed_on_nonzero_exit() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(
+            SanitizerReceiptInput {
+                card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                    .to_string(),
+                tool: "asan".to_string(),
+                output: "AddressSanitizer: use-after-free\n".to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                expires_at: "2026-08-18".to_string(),
+                command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header"
+                    .to_string(),
+                limitations: Vec::new(),
+                terminal_status: Some(TerminalStatus::exited(1)),
+                allow_runtime: true,
+            },
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("confirmed"));
+        assert_eq!(receipt.exit_code, Some(1));
         Ok(())
     }
 
@@ -1279,6 +1557,7 @@ mod tests {
                 expires_at: "2026-08-18".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
                 limitations: Vec::new(),
+                terminal_status: Some(TerminalStatus::exited(0)),
             }))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::CargoCareful(
                 CargoCarefulReceiptInput {
@@ -1289,6 +1568,7 @@ mod tests {
                     expires_at: "2026-08-18".to_string(),
                     command: "cargo +nightly careful test read_header".to_string(),
                     limitations: Vec::new(),
+                    terminal_status: Some(TerminalStatus::exited(0)),
                 },
             ))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(
@@ -1302,6 +1582,7 @@ mod tests {
                     command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header"
                         .to_string(),
                     limitations: Vec::new(),
+                    terminal_status: Some(TerminalStatus::exited(0)),
                     allow_runtime: false,
                 },
             ))?,
@@ -1315,6 +1596,7 @@ mod tests {
                     expires_at: "2026-08-18".to_string(),
                     command: "cargo test --features loom read_header".to_string(),
                     limitations: Vec::new(),
+                    terminal_status: Some(TerminalStatus::exited(0)),
                 },
             ))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::Proof(ProofReceiptInput {
@@ -1326,6 +1608,7 @@ mod tests {
                 expires_at: "2026-08-18".to_string(),
                 command: "cargo kani --harness read_header".to_string(),
                 limitations: Vec::new(),
+                terminal_status: Some(TerminalStatus::exited(0)),
             }))?,
         ];
 
@@ -1360,6 +1643,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         };
         assert_eq!(
             WitnessReceipt::from_miri_output(miri("warning: nothing ran\n")),
@@ -1380,6 +1664,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         };
         assert_eq!(
             WitnessReceipt::from_cargo_careful_output(careful("")),
@@ -1399,6 +1684,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test --features loom read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         };
         assert_eq!(
             WitnessReceipt::from_concurrency_output(concurrency("error: scheduler failed\n")),
@@ -1420,6 +1706,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime,
         };
         let sanitizer_output = "test result: ok\nAddressSanitizer: use-after-free\n";
@@ -1460,6 +1747,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo kani --harness read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         };
         assert_eq!(
             WitnessReceipt::from_proof_output(proof("verification failed\n")),
@@ -1489,6 +1777,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1505,6 +1794,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -1528,6 +1818,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
 
         assert_eq!(receipt.tool, "cargo-careful");
@@ -1562,6 +1853,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1578,6 +1870,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -1602,6 +1895,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: false,
         })?;
 
@@ -1638,6 +1932,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: false,
         });
 
@@ -1661,6 +1956,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: false,
         });
 
@@ -1679,6 +1975,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: false,
         });
 
@@ -1704,6 +2001,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
 
         assert_eq!(receipt.tool, "loom");
@@ -1739,6 +2037,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -1762,6 +2061,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1779,6 +2079,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test shared_cell -- --nocapture".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -1805,6 +2106,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
 
         assert_eq!(receipt.tool, "kani");
@@ -1846,6 +2148,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "crux prove byte_to_bool".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         })?;
 
         assert_eq!(receipt.tool, "crux");
@@ -1869,6 +2172,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -1892,6 +2196,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1910,6 +2215,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "cargo test byte_to_bool".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
         });
 
         assert!(
@@ -2028,6 +2334,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/debug/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: true,
         })?;
 
@@ -2076,6 +2383,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "RUSTFLAGS='-Z sanitizer=thread' cargo +nightly test my_test".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: false,
         })?;
 
@@ -2106,6 +2414,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: true,
         })?;
 
@@ -2140,6 +2449,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: true,
         })?;
 
@@ -2164,6 +2474,7 @@ mod tests {
             expires_at: "2026-08-18".to_string(),
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
             allow_runtime: true,
         });
 
@@ -2187,6 +2498,8 @@ mod tests {
             )),
             limitations: Some(vec!["fixture only".to_string()]),
             verdict: None,
+            exit_code: None,
+            terminated_by_signal: None,
         }
     }
 }

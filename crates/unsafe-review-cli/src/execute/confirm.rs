@@ -8,7 +8,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
     ExecutedReceiptInput, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
-    SanitizerReceiptInput, Scope, WitnessKind, WitnessReceipt, WitnessRoute, analyze,
+    SanitizerReceiptInput, Scope, TerminalStatus, WitnessKind, WitnessReceipt, WitnessRoute,
+    analyze,
 };
 
 use crate::command::{CheckOptions, ConfirmOptions};
@@ -83,6 +84,7 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
             recorded_at,
             expires_at,
             command: command_text.clone(),
+            terminal: execution.terminal,
         },
     ) {
         Ok(receipt) => receipt,
@@ -102,6 +104,7 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     println!("card: {}", card.id.0);
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
+    println!("exit: {}", describe_terminal(execution.terminal));
     println!("tool: {}", receipt.tool);
     println!("strength recorded: {}", receipt.strength);
     println!("receipt: {}", receipt_path.display());
@@ -240,6 +243,7 @@ struct ReceiptFields {
     recorded_at: String,
     expires_at: String,
     command: String,
+    terminal: TerminalStatus,
 }
 
 fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessReceipt, String> {
@@ -253,6 +257,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
         }),
         ConfirmLane::CargoCareful => ExecutedReceiptInput::CargoCareful(CargoCarefulReceiptInput {
             card_id: fields.card_id,
@@ -262,6 +267,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
         }),
         ConfirmLane::Sanitizer(tool) => ExecutedReceiptInput::Sanitizer(SanitizerReceiptInput {
             card_id: fields.card_id,
@@ -272,6 +278,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
             allow_runtime: false,
         }),
         ConfirmLane::Concurrency(tool) => {
@@ -284,6 +291,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
                 expires_at: fields.expires_at,
                 command: fields.command,
                 limitations,
+                terminal_status: Some(fields.terminal),
             })
         }
         ConfirmLane::Proof(tool) => ExecutedReceiptInput::Proof(ProofReceiptInput {
@@ -295,6 +303,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
         }),
     };
     WitnessReceipt::from_executed_output(input)
@@ -368,9 +377,20 @@ fn strip_single_quotes(value: &str) -> String {
         .map_or_else(|| value.to_string(), str::to_string)
 }
 
+fn describe_terminal(terminal: TerminalStatus) -> String {
+    if terminal.signaled {
+        return "signaled".to_string();
+    }
+    match terminal.exit_code {
+        Some(code) => format!("exit {code}"),
+        None => "exit unknown".to_string(),
+    }
+}
+
 struct CommandRun {
     output: String,
     timed_out: bool,
+    terminal: TerminalStatus,
 }
 
 fn execute_with_timeout(
@@ -401,9 +421,15 @@ fn execute_with_timeout(
     let stderr_reader = spawn_pipe_reader(child.stderr.take());
     let started = Instant::now();
     let mut timed_out = false;
+    let mut exit_code: Option<i32> = None;
+    let mut signaled = false;
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => break,
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                signaled = exit_signaled(&status);
+                break;
+            }
             Ok(None) => {
                 if started.elapsed() >= timeout {
                     timed_out = true;
@@ -422,7 +448,27 @@ fn execute_with_timeout(
     }
     let mut output = join_pipe_reader(stdout_reader)?;
     output.push_str(&join_pipe_reader(stderr_reader)?);
-    Ok(CommandRun { output, timed_out })
+    let terminal = TerminalStatus {
+        exit_code,
+        signaled,
+        captured_complete: true,
+    };
+    Ok(CommandRun {
+        output,
+        timed_out,
+        terminal,
+    })
+}
+
+#[cfg(unix)]
+fn exit_signaled(status: &std::process::ExitStatus) -> bool {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal().is_some()
+}
+
+#[cfg(not(unix))]
+fn exit_signaled(_status: &std::process::ExitStatus) -> bool {
+    false
 }
 
 fn spawn_pipe_reader<R: Read + Send + 'static>(
@@ -748,6 +794,7 @@ mod tests {
                 recorded_at: "2026-06-06T00:00:00Z".to_string(),
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
             },
         )?;
 
@@ -777,10 +824,118 @@ mod tests {
                 recorded_at: "2026-06-06T00:00:00Z".to_string(),
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
             },
         );
 
         assert!(result.err().unwrap_or_default().contains("test result: ok"));
+    }
+
+    #[test]
+    fn describe_terminal_reports_exit_and_signal() {
+        assert_eq!(
+            describe_terminal(TerminalStatus::exited(0)),
+            "exit 0".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::exited(7)),
+            "exit 7".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::signaled()),
+            "signaled".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::unknown()),
+            "exit unknown".to_string()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_retains_nonzero_exit_behind_success_output() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "printf 'test result: ok. 1 passed; 0 failed;\\n'; exit 7".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.output.contains("test result: ok"));
+        assert_eq!(run.terminal.exit_code, Some(7));
+        assert!(!run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn execute_with_timeout_retains_nonzero_exit_behind_success_output() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "cmd".to_string(),
+                "/C".to_string(),
+                "echo test result: ok & exit 7".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.output.contains("test result: ok"));
+        assert_eq!(run.terminal.exit_code, Some(7));
+        assert!(!run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_retains_signal_termination() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "kill -TERM $$".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[test]
+    fn build_receipt_downgrades_success_output_on_nonzero_exit() -> Result<(), String> {
+        let receipt = build_receipt(
+            ConfirmLane::Miri,
+            ReceiptFields {
+                card_id:
+                    "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                        .to_string(),
+                output: "running 1 test\ntest read_header ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; finished in 0.01s\n"
+                    .to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-06-06T00:00:00Z".to_string(),
+                expires_at: "2026-07-06".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(7),
+            },
+        )?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("inconclusive"));
+        assert_eq!(receipt.exit_code, Some(7));
+        Ok(())
     }
 
     #[test]
