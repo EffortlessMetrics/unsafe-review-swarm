@@ -195,7 +195,9 @@ fn adverse_observations_remain_in_outcome_work() -> Result<(), String> {
             .iter()
             .any(|gap| gap.card_id == observation.id)
         {
-            failures.push(format!("{verdict}: selected action absent from remaining work"));
+            failures.push(format!(
+                "{verdict}: selected action absent from remaining work"
+            ));
         }
         if report
             .cards
