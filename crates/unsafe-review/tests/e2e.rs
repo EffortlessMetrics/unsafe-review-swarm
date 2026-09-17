@@ -6277,6 +6277,7 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
     let report_path = temp.path().join("repo.json");
     let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
+    let ready_path = temp.path().join("paused.ready");
 
     let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
         .args([
@@ -6289,11 +6290,15 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
             report_path.as_os_str().to_os_string(),
         ])
         .env("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS", "5000")
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE",
+            ready_path.as_os_str(),
+        )
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    wait_for_pause_ready(&ready_path)?;
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -6353,6 +6358,7 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
     let report_path = temp.path().join("repo.json");
     let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
+    let ready_path = temp.path().join("paused.ready");
 
     let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
         .args([
@@ -6368,11 +6374,15 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
             "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
             "1",
         )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE",
+            ready_path.as_os_str(),
+        )
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    wait_for_pause_ready(&ready_path)?;
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -8977,6 +8987,26 @@ fn manual_candidate_examples_dir() -> PathBuf {
 
 fn os(value: &str) -> OsString {
     OsString::from(value)
+}
+
+/// Wait for a child process to signal it reached its test pause, instead of
+/// guessing with a fixed sleep. A fixed sleep flakes under parallel load when
+/// the child starts slowly: the signal then lands during startup and the
+/// assertions observe a different state.
+#[cfg(unix)]
+fn wait_for_pause_ready(ready_path: &Path) -> Result<(), Box<dyn Error>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while !ready_path.exists() {
+        if std::time::Instant::now() >= deadline {
+            return Err(format!(
+                "timed out waiting for paused child signal at {}",
+                ready_path.display()
+            )
+            .into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    Ok(())
 }
 
 fn current_confirm_card_id(root: &Path) -> Result<String, Box<dyn Error>> {
