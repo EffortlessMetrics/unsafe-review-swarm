@@ -130,15 +130,21 @@ runs:
         # Exit 1: policy result (new/worsened gaps). Only fail the job when
         #         fail_on_new_debt is true; otherwise advisory, pass through.
         # Exit 2: tool error (malformed input, internal failure) — always fail.
+        # Any other non-zero exit (missing binary, OOM-kill, runner fault)
+        # is unexpected: fail loudly with the original code, never pass.
         if [ "${exit_code}" -eq 2 ]; then
           echo "::error::unsafe-review first-pr encountered a tool error (exit 2)"
           exit 2
+        elif [ "${exit_code}" -eq 1 ]; then
+          if [ "${FAIL_ON_NEW_DEBT}" = "true" ]; then
+            echo "::warning::unsafe-review first-pr found new or worsened coverage gaps (exit 1, fail_on_new_debt=true)"
+            exit 1
+          fi
+        elif [ "${exit_code}" -ne 0 ]; then
+          echo "::error::unsafe-review first-pr failed with unexpected exit code ${exit_code}"
+          exit "${exit_code}"
         fi
-        if [ "${exit_code}" -eq 1 ] && [ "${FAIL_ON_NEW_DEBT}" = "true" ]; then
-          echo "::warning::unsafe-review first-pr found new or worsened coverage gaps (exit 1, fail_on_new_debt=true)"
-          exit 1
-        fi
-        # Exit 1 with fail_on_new_debt=false (default): advisory, do not fail.
+        # Exit 0, or exit 1 with fail_on_new_debt=false (default): advisory.
         exit 0
 
     - name: Verify bundle file shape
