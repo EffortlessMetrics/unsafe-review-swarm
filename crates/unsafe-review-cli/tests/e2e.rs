@@ -764,6 +764,36 @@ fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> 
 }
 
 #[test]
+fn review_command_helps_document_exit_code_contract() -> Result<(), Box<dyn Error>> {
+    // Agents script on exit codes, and they read per-command help, not just the
+    // top-level overview. Every review-command help must restate the 0/1/2
+    // contract next to its trust boundary.
+    for command in ["check", "first-pr", "pilot", "repo"] {
+        let output = checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .arg("unsafe-review")
+                .arg(command)
+                .arg("--help"),
+        )?;
+        let stdout = String::from_utf8(output.stdout)?;
+
+        for line in [
+            "Exit codes:",
+            "0  ran to completion: clean, or advisory findings (advisory policy default)",
+            "1  ran to completion: no-new-debt policy found new or worsened coverage gaps",
+            "2  tool did not complete a review: usage, input/IO, or internal error",
+        ] {
+            assert!(
+                stdout.contains(line),
+                "`{command} --help` must document `{line}`\nstdout:\n{stdout}"
+            );
+        }
+    }
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_artifact_write_failure_prints_recovery() -> Result<(), Box<dyn Error>> {
     let fixture = fixture_root("raw_pointer_alignment");
     let temp = TempDir::new("unsafe-review-pr-artifact-write-failure")?;
