@@ -150,6 +150,11 @@ The current fixture-pinned slices are:
   early-return guards, match-arm guards, and early-return guards discharge the
   valid-value obligation, while rejecting bare observations, wrong receivers,
   post-checks, comment-only early-return text, and stale guards.
+- First real-PR seam batch (#2224 PR1): five pinned external PRs plus a quiet
+  control with source-first expected seams, frozen first-run outputs,
+  card-to-seam mapping, and a recomputing evaluator (`check-seam-batch`).
+  Agent-drafted labels; not human adjudication, not calibration. See
+  [batches/2224-pr1/report.md](batches/2224-pr1/report.md).
 
 This remains experimental/advisory until human-adjudicated calibration and
 report checks are landed.

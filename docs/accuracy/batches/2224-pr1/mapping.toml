@@ -1,0 +1,308 @@
+# #2224 PR1 card-to-seam mapping.
+#
+# Mapped 2026-09-18T03:24Z from the frozen outputs, after the source-first
+# inventory was committed. This file never edits seams.toml; disagreements
+# surface as missing / wrongly-surfaced rows, inventory challenges, and
+# visible unresolved judgments. Counts in [tally] are recomputed by
+# check-seam-batch from these rows; the check fails on any disagreement.
+schema_version = "seam-batch-mapping/v1"
+batch = "2224-pr1"
+mapped_at = "2026-09-18T03:24:38Z"
+
+[mapper]
+type = "agent-drafted"
+identity = "muse-code session sunny-zaniah"
+provenance = "card-by-card judgment against head source after frozen outputs; draft evidence, not human adjudication"
+
+# Frozen first-run outputs. Re-running the analyzer is acquisition, not
+# checking: the checker verifies these bytes, it does not need network.
+[[outputs]]
+case = "arrayvec-138"
+file = "outputs/arrayvec-138.json"
+sha256 = "6406c916d0ac062cbfa53dc7cc9b3fb8a03a0af1a2f12cd52d8e917f6c1380c9"
+
+[[outputs]]
+case = "arrayvec-143"
+file = "outputs/arrayvec-143.json"
+sha256 = "bd9f3e099a9bd412f8b0e935b19ef40ce6ed9899d3fad3a5563f4f0eec19143b"
+
+[[outputs]]
+case = "hashbrown-692"
+file = "outputs/hashbrown-692.json"
+sha256 = "d4b6831be56f3e7ad858ff23d203c0d03b662d4091bfa904db05762fb31f1687"
+
+[[outputs]]
+case = "memchr-226"
+file = "outputs/memchr-226.json"
+sha256 = "2de5e8c8f39e292ccdb4aa111b16fc566f285ec525b26acb914b0bf724b1b4ae"
+
+[[outputs]]
+case = "getrandom-811"
+file = "outputs/getrandom-811.json"
+sha256 = "8e5c1996a16ff6f3d29843a7a7923d4dd351da9884e8ca31a59b0d9f92a6aa92"
+
+# ---- Seam results: one row per seams.toml row. ----
+
+[[seam_results]]
+seam = "hashbrown-692-S1"
+outcome = "match"
+found_family = "slice_from_raw_parts"
+family_correct = true
+obligations_correct = true
+over_credited = false
+useful = true
+action_correct = true
+action_specific = true
+action_feasible = true
+cards = ["UR-hashbrown-src-raw-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-95e90194eb92-pointer_validity-c1"]
+notes = "Right site, right family. Lists initialized-memory with missing discharge but the next action drops init, consistent with the MaybeUninit return type carrying init structurally. No over-credit of the SAFETY comment. Minor card inconsistency (init obligation listed but not actioned) with no review effect."
+
+[[seam_results]]
+seam = "memchr-226-S1"
+outcome = "match"
+found_family = "pointer_arithmetic"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = true
+action_feasible = true
+cards = ["UR-memchr-src-arch-generic-packedpair-rs-find-in-chunk-operation-pointer_arithmetic-add-7882f1560166-same_allocation-c1"]
+notes = "Card sits on cur.add(offset), one line from the changed distance line, same hunk and data flow; a line-exact anchor reading would call this missing, recorded here as the visible alternative. Same-allocation obligation is right but the card claims no visible local guard while the dominating end.distance(cur) < needle.len() early-return guards the later raw read: missed guard credit, the same blindness class as the state-bitflag finding."
+
+[[seam_results]]
+seam = "getrandom-811-S1"
+outcome = "match"
+found_family = "ffi"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-getrandom-src-backends-windows-rs-fill-inner-ffi_call-ffi-ffi-a892343a792c-ffi_abi-c1"]
+notes = "Label used the non-canonical family name ffi_call; the tool canonical family is ffi, so no tool penalty. The card names ABI and ownership obligations but never names return-value validation, the exact obligation this PR fixes, and claims no visible guard while the added result == TRUE check dominates. Next action is generic FFI fallback with no mention of the return check."
+
+[[seam_results]]
+seam = "arrayvec-138-S1"
+outcome = "match"
+found_family = "raw_pointer_write"
+family_correct = true
+obligations_correct = true
+over_credited = false
+useful = true
+action_correct = true
+action_specific = true
+action_feasible = true
+cards = ["UR-arrayvec-src-char-rs-write-operation-raw_pointer_write-write-23c68a62c4ed-pointer_validity-c1"]
+notes = "New unsafe helper with missing contract flagged exactly as expected. Two further cards on the same anchor (declaration view, arithmetic sub-operation) are duplicates below: real granularity noise, three cards for one helper."
+
+[[seam_results]]
+seam = "arrayvec-138-S2"
+outcome = "match"
+found_family = "unsafe_declaration"
+family_correct = false
+obligations_correct = true
+over_credited = false
+useful = false
+action_correct = true
+action_specific = true
+action_feasible = true
+cards = ["UR-arrayvec-src-char-rs-encode-utf8-unsafe_fn-unsafe_declaration-encode-utf8-00e4bfb1356e-unknown-c1"]
+notes = "Derived view: wrong-family (expected raw_pointer_write, found declaration view), still found for recall. The guarded body writes stay correctly silent and the declaration card reports contract and discharge present, so the len-guard credit the inventory expected is honored in effect. Not a useful selection: asks for a witness receipt on a documented, guarded helper with nothing change-specific to review."
+
+[[seam_results]]
+seam = "arrayvec-138-S3"
+outcome = "match"
+found_family = "pointer_arithmetic"
+family_correct = true
+obligations_correct = true
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-arrayvec-src-array-string-rs-try-push-operation-pointer_arithmetic-ptr-mut-d2cc791d131d-same_allocation-c1"]
+notes = "Unchecked add(len) plus unsafe call flagged with missing guard exactly as expected. Next action asks for Safety docs at a call site inside a safe fn; a bounds assertion or a SAFETY comment justifying len <= capacity would be the specific ask."
+
+[[seam_results]]
+seam = "arrayvec-138-S4"
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = false
+action_correct = true
+action_specific = false
+action_feasible = false
+cards = ["UR-arrayvec-src-char-rs-test-encode-utf8-operation-unsafe_fn_call-let-res-encode-utf8-6586da39e6e1-unknown-c1"]
+notes = "Label used the non-canonical family name unsafe_call; canonical is unsafe_fn_call, no tool penalty. Genuine test-harness seam, correctly found, but the card does not credit the in-test 16-byte stack buffer setup as discharge evidence and asks for Safety docs at a test call site: found but noise."
+
+[[seam_results]]
+seam = "arrayvec-138-S5"
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = false
+action_correct = true
+action_specific = false
+action_feasible = false
+cards = ["UR-arrayvec-src-char-rs-test-encode-utf8-oob-operation-unsafe_fn_call-assert-c08145a0530e-unknown-c1"]
+notes = "Same vocabulary note as S4. The deliberately short-len call must return Err without writing; the card neither recognizes the Err arm as making the call sound nor credits it. Found but noise."
+
+# ---- Card results: one row per emitted card in the frozen outputs. ----
+
+[[card_results]]
+card = "UR-hashbrown-src-control-tag-rs-fill-tag-operation-raw_pointer_write-as-mut-ptr-d9812818e769-pointer_validity-c1"
+case = "hashbrown-692"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = true
+action_feasible = true
+inventory_challenge = true
+reason = "Genuine seam the source-first inventory missed: unsafe write_bytes in fill_tag whose element type the PR retargets to MaybeUninit. The 3-line diff context hid the operation line while showing the contract line, a real diff-scoped labeling limit. Counts toward the challenge-adjusted tally, not the frozen tally."
+
+[[card_results]]
+card = "UR-hashbrown-src-raw-rs-ctrl-operation-pointer_arithmetic-as-ptr-c61949e0546b-same_allocation-c1"
+case = "hashbrown-692"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing as_ptr().add(index) on a context line outside the changed contract. No change-specific signal for the reviewer."
+
+[[card_results]]
+card = "UR-hashbrown-src-raw-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-95e90194eb92-pointer_validity-c1"
+case = "hashbrown-692"
+disposition = "matched"
+of_seam = "hashbrown-692-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for hashbrown-692-S1."
+
+[[card_results]]
+card = "UR-memchr-src-arch-generic-packedpair-rs-find-in-chunk-operation-pointer_arithmetic-add-7882f1560166-same_allocation-c1"
+case = "memchr-226"
+disposition = "matched"
+of_seam = "memchr-226-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for memchr-226-S1; see seam note on anchor precision."
+
+[[card_results]]
+card = "UR-getrandom-src-backends-windows-rs-fill-inner-ffi_call-ffi-ffi-a892343a792c-ffi_abi-c1"
+case = "getrandom-811"
+disposition = "matched"
+of_seam = "getrandom-811-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for getrandom-811-S1."
+
+[[card_results]]
+card = "UR-arrayvec-src-array-string-rs-try-push-operation-pointer_arithmetic-ptr-mut-d2cc791d131d-same_allocation-c1"
+case = "arrayvec-138"
+disposition = "matched"
+of_seam = "arrayvec-138-S3"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for arrayvec-138-S3."
+
+[[card_results]]
+card = "UR-arrayvec-src-array-string-rs-try-push-operation-vec_set_len-set-len-c3e5d17de212-initialized_memory-c1"
+case = "arrayvec-138"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = true
+action_feasible = true
+inventory_challenge = true
+reason = "Genuine seam the inventory missed: ArrayString::set_len is a pub unsafe fn and this added call extends the initialized length. The tool even finds capacity discharge evidence. Counts toward the challenge-adjusted tally, not the frozen tally."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-write-unsafe_fn-unsafe_declaration-write-7bc17eac51e0-unknown-c1"
+case = "arrayvec-138"
+disposition = "duplicate"
+of_seam = "arrayvec-138-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Declaration-level view of the already-matched write helper; no new review information."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-write-operation-raw_pointer_write-write-23c68a62c4ed-pointer_validity-c1"
+case = "arrayvec-138"
+disposition = "matched"
+of_seam = "arrayvec-138-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for arrayvec-138-S1."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-write-operation-pointer_arithmetic-add-cf3f2c9479b4-same_allocation-c1"
+case = "arrayvec-138"
+disposition = "duplicate"
+of_seam = "arrayvec-138-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Arithmetic sub-operation of the already-matched write; same anchor, no new review information."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-encode-utf8-unsafe_fn-unsafe_declaration-encode-utf8-00e4bfb1356e-unknown-c1"
+case = "arrayvec-138"
+disposition = "matched"
+of_seam = "arrayvec-138-S2"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Match with wrong family (see seam note); guarded writes correctly silent."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-test-encode-utf8-operation-unsafe_fn_call-let-res-encode-utf8-6586da39e6e1-unknown-c1"
+case = "arrayvec-138"
+disposition = "matched"
+of_seam = "arrayvec-138-S4"
+useful = false
+action_feasible = false
+reason = "Primary match for arrayvec-138-S4; found but noise."
+
+[[card_results]]
+card = "UR-arrayvec-src-char-rs-test-encode-utf8-oob-operation-unsafe_fn_call-assert-c08145a0530e-unknown-c1"
+case = "arrayvec-138"
+disposition = "matched"
+of_seam = "arrayvec-138-S5"
+useful = false
+action_feasible = false
+reason = "Primary match for arrayvec-138-S5; found but noise."
+
+# Stated tallies. check-seam-batch recomputes every value from the rows above
+# and fails on any disagreement. Frozen tally uses only the committed seam
+# inventory; challenge-adjusted adds the two inventory-challenge cards as
+# found seams to show the effect of the inventory misses.
+[tally]
+expected_seams = 8
+matched = 8
+missing = 0
+unknown = 0
+family_correct = 7
+family_total = 8
+over_credited = 0
+obligations_correct = 4
+obligations_total = 8
+emitted_cards = 13
+duplicates = 2
+wrongly_surfaced = 3
+useful = 7
+quiet_cards = 0
+challenge_seams = 2
+challenge_found = 2
