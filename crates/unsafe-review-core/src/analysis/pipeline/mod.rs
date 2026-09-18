@@ -1912,6 +1912,43 @@ pub fn read_raw(ptr: *const u8) -> u8 {
     }
 
     #[test]
+    fn extern_static_uses_card_with_static_mut_and_ffi_families() -> Result<(), String> {
+        // Drift-lock for #2289: the safety reasoning lives at the use, not
+        // the declaration. Uses of extern statics inside unsafe blocks must
+        // name their hazard family instead of falling to unknown/unknown.
+        let output = temp_source_output(
+            "unsafe-review-extern-static-uses",
+            r#"unsafe extern "C" {
+    static CONFIG_FLAG: u32;
+    static mut COUNTER: u64;
+}
+
+pub fn flag() -> u32 {
+    unsafe { CONFIG_FLAG }
+}
+
+pub fn bump() {
+    unsafe { COUNTER += 1; }
+}
+"#,
+        )?;
+        let owned: Vec<(Option<String>, OperationFamily)> = output
+            .cards
+            .iter()
+            .map(|card| (card.site.owner.clone(), card.operation.family.clone()))
+            .collect();
+        assert!(
+            owned.contains(&(Some("flag".to_string()), OperationFamily::Ffi)),
+            "extern static read must card as Ffi, got: {owned:?}"
+        );
+        assert!(
+            owned.contains(&(Some("bump".to_string()), OperationFamily::StaticMut)),
+            "extern static mut write must card as StaticMut, got: {owned:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn guard_missing_inside_documented_unsafe_fn_routes_to_caller_contract() -> Result<(), String> {
         // Drift-lock for #2236: an unguarded operation inside a documented
         // `unsafe fn` is GuardMissing (comment != guard), but the repair
