@@ -51,15 +51,28 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
         CommandSource::AnalyzerRoute
     };
     let command_text = options.command.clone().unwrap_or(routed_command);
+    let invocation = parse_command_line(&command_text)?;
     if options.dry_run {
-        print_dry_run(&options, &card, kind, lane, &command_text, command_source);
+        print_dry_run(
+            &options,
+            &card,
+            kind,
+            lane,
+            &command_text,
+            command_source,
+            &invocation,
+        );
         return Ok(());
     }
     println!("command provenance: {}", command_source.label());
-    let (envs, argv) = parse_command_line(&command_text)?;
+    println!("parsed program: {}", invocation.program);
+    println!("parsed argv: {}", invocation.describe_argv());
+    if !invocation.env.is_empty() {
+        println!("parsed env: {}", invocation.describe_env());
+    }
     let execution = execute_with_timeout(
-        &envs,
-        &argv,
+        &invocation.env,
+        &invocation.exec_argv(),
         &options.root,
         Duration::from_secs(options.timeout_seconds),
     )?;
@@ -123,6 +136,7 @@ fn print_dry_run(
     lane: ConfirmLane,
     command_text: &str,
     command_source: CommandSource,
+    invocation: &Invocation,
 ) {
     println!("unsafe-review confirm (dry run)");
     println!("card: {}", card.id.0);
@@ -130,6 +144,11 @@ fn print_dry_run(
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
     println!("command provenance: {}", command_source.label());
+    println!("parsed program: {}", invocation.program);
+    println!("parsed argv: {}", invocation.describe_argv());
+    if !invocation.env.is_empty() {
+        println!("parsed env: {}", invocation.describe_env());
+    }
     println!("working directory: {}", options.root.display());
     println!("timeout: {}s", options.timeout_seconds);
     println!(
@@ -311,47 +330,145 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
 
 type EnvAssignments = Vec<(String, String)>;
 
-fn parse_command_line(command: &str) -> Result<(EnvAssignments, Vec<String>), String> {
-    let mut env = Vec::new();
-    let mut rest = command.trim_start();
-    while let Some((token, remainder)) = next_token(rest)? {
-        let Some(assignment) = env_assignment(&token) else {
-            break;
-        };
-        env.push(assignment);
-        rest = remainder.trim_start();
+/// One parsed witness invocation: program, arguments, environment
+/// overrides, and provenance. This single value feeds the dry-run preview,
+/// the process spawner, and the receipt identity, so the previewed command
+/// is the executed command.
+///
+/// Grammar (no shell involved): whitespace separates words; single quotes
+/// preserve bytes literally; double quotes preserve literally except that
+/// backslash escapes only `"` and `\` (so Windows paths survive); a
+/// backslash outside quotes escapes the next character; shell
+/// metacharacters (`| & ; < > ( ) $` and backtick) are rejected explicitly
+/// instead of being reinterpreted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Invocation {
+    program: String,
+    args: Vec<String>,
+    env: EnvAssignments,
+}
+
+impl Invocation {
+    fn exec_argv(&self) -> Vec<String> {
+        let mut argv = Vec::with_capacity(self.args.len() + 1);
+        argv.push(self.program.clone());
+        argv.extend(self.args.iter().cloned());
+        argv
     }
-    let argv = rest
-        .split_whitespace()
-        .map(str::to_string)
-        .collect::<Vec<_>>();
-    if argv.is_empty() {
+
+    fn describe_argv(&self) -> String {
+        format!("{:?}", self.exec_argv())
+    }
+
+    fn describe_env(&self) -> String {
+        let masked = self
+            .env
+            .iter()
+            .map(|(key, _)| (key.clone(), "<redacted>".to_string()))
+            .collect::<Vec<_>>();
+        format!("{masked:?}")
+    }
+}
+
+fn parse_command_line(command: &str) -> Result<Invocation, String> {
+    let words = split_command_words(command)?;
+    let mut env = Vec::new();
+    let mut words = words.into_iter();
+    let mut program = None;
+    for word in words.by_ref() {
+        if program.is_none()
+            && let Some(assignment) = env_assignment(&word)
+        {
+            env.push(assignment);
+            continue;
+        }
+        program = Some(word);
+        break;
+    }
+    let Some(program) = program else {
         return Err(
             "witness command has no executable to run after environment assignments".to_string(),
         );
-    }
-    Ok((env, argv))
+    };
+    Ok(Invocation {
+        program,
+        args: words.collect(),
+        env,
+    })
 }
 
-fn next_token(text: &str) -> Result<Option<(String, &str)>, String> {
-    let text = text.trim_start();
-    if text.is_empty() {
-        return Ok(None);
-    }
-    let mut in_quote = false;
-    for (idx, ch) in text.char_indices() {
+fn split_command_words(command: &str) -> Result<Vec<String>, String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut started = false;
+    let mut chars = command.chars().peekable();
+    while let Some(ch) = chars.next() {
         match ch {
-            '\'' => in_quote = !in_quote,
-            ch if ch.is_whitespace() && !in_quote => {
-                return Ok(Some((text[..idx].to_string(), &text[idx..])));
+            ch if ch.is_whitespace() => {
+                if started {
+                    words.push(std::mem::take(&mut current));
+                    started = false;
+                }
             }
-            _ => {}
+            '\'' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        None => {
+                            return Err(
+                                "witness command has an unterminated single quote".to_string()
+                            );
+                        }
+                        Some('\'') => break,
+                        Some(next) => current.push(next),
+                    }
+                }
+            }
+            '"' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        None => {
+                            return Err(
+                                "witness command has an unterminated double quote".to_string()
+                            );
+                        }
+                        Some('"') => break,
+                        // Inside double quotes only `"` and `\` are escapable,
+                        // so Windows paths like `"C:\tools\runner"` survive
+                        // unchanged. Every other backslash stays literal.
+                        Some('\\') => match chars.peek() {
+                            Some('"') | Some('\\') => {
+                                current.push(chars.next().unwrap_or('\\'));
+                            }
+                            _ => current.push('\\'),
+                        },
+                        Some(next) => current.push(next),
+                    }
+                }
+            }
+            '\\' => {
+                let Some(escaped) = chars.next() else {
+                    return Err("witness command has a trailing backslash".to_string());
+                };
+                started = true;
+                current.push(escaped);
+            }
+            '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' => {
+                return Err(format!(
+                    "witness command contains unsupported shell syntax `{ch}`; quote it to pass it literally or run the pipeline manually and import a receipt"
+                ));
+            }
+            _ => {
+                started = true;
+                current.push(ch);
+            }
         }
     }
-    if in_quote {
-        return Err("witness command has an unterminated single quote".to_string());
+    if started {
+        words.push(current);
     }
-    Ok(Some((text.to_string(), "")))
+    Ok(words)
 }
 
 fn env_assignment(token: &str) -> Option<(String, String)> {
@@ -367,14 +484,7 @@ fn env_assignment(token: &str) -> Option<(String, String)> {
     {
         return None;
     }
-    Some((name.to_string(), strip_single_quotes(value)))
-}
-
-fn strip_single_quotes(value: &str) -> String {
-    value
-        .strip_prefix('\'')
-        .and_then(|stripped| stripped.strip_suffix('\''))
-        .map_or_else(|| value.to_string(), str::to_string)
+    Some((name.to_string(), value.to_string()))
 }
 
 fn describe_terminal(terminal: TerminalStatus) -> String {
@@ -590,25 +700,30 @@ mod tests {
 
     #[test]
     fn parse_command_line_splits_env_assignments_and_argv() -> Result<(), String> {
-        let (envs, argv) =
+        let invocation =
             parse_command_line("RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header")?;
 
         assert_eq!(
-            envs,
+            invocation.env,
             vec![("RUSTFLAGS".to_string(), "-Z sanitizer=address".to_string())]
         );
-        assert_eq!(argv, vec!["cargo", "+nightly", "test", "read_header"]);
+        assert_eq!(invocation.program, "cargo".to_string());
+        assert_eq!(invocation.args, vec!["+nightly", "test", "read_header"]);
+        assert_eq!(
+            invocation.exec_argv(),
+            vec!["cargo", "+nightly", "test", "read_header"]
+        );
         Ok(())
     }
 
     #[test]
     fn parse_command_line_accepts_multiple_unquoted_env_assignments() -> Result<(), String> {
-        let (envs, argv) = parse_command_line(
+        let invocation = parse_command_line(
             "MIRIFLAGS=-Zmiri-strict-provenance RUST_BACKTRACE=1 cargo +nightly miri test read_header",
         )?;
 
         assert_eq!(
-            envs,
+            invocation.env,
             vec![
                 (
                     "MIRIFLAGS".to_string(),
@@ -617,9 +732,10 @@ mod tests {
                 ("RUST_BACKTRACE".to_string(), "1".to_string()),
             ]
         );
+        assert_eq!(invocation.program, "cargo".to_string());
         assert_eq!(
-            argv,
-            vec!["cargo", "+nightly", "miri", "test", "read_header"]
+            invocation.args,
+            vec!["+nightly", "miri", "test", "read_header"]
         );
         Ok(())
     }
@@ -627,12 +743,13 @@ mod tests {
     #[test]
     fn parse_command_line_does_not_treat_flag_equals_values_as_env_assignments()
     -> Result<(), String> {
-        let (envs, argv) = parse_command_line("cargo kani --harness=byte_to_bool_harness")?;
+        let invocation = parse_command_line("cargo kani --harness=byte_to_bool_harness")?;
 
-        assert!(envs.is_empty());
+        assert!(invocation.env.is_empty());
+        assert_eq!(invocation.program, "cargo".to_string());
         assert_eq!(
-            argv,
-            vec!["cargo", "kani", "--harness=byte_to_bool_harness"]
+            invocation.args,
+            vec!["kani", "--harness=byte_to_bool_harness"]
         );
         Ok(())
     }
@@ -653,6 +770,108 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn parse_command_line_preserves_quoted_paths_and_empty_arguments() -> Result<(), String> {
+        let invocation = parse_command_line(r#""/opt/my tools/runner" --filter "a b" ''"#)?;
+
+        assert_eq!(invocation.program, "/opt/my tools/runner".to_string());
+        assert_eq!(invocation.args, vec!["--filter", "a b", ""]);
+        assert_eq!(
+            invocation.exec_argv(),
+            vec!["/opt/my tools/runner", "--filter", "a b", ""]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_supports_escapes_and_double_quotes() -> Result<(), String> {
+        let invocation = parse_command_line(r#"prog a\ b "c\"d" e"#)?;
+
+        assert_eq!(invocation.program, "prog".to_string());
+        assert_eq!(invocation.args, vec!["a b", "c\"d", "e"]);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_rejects_shell_syntax_explicitly() {
+        for command in [
+            "cargo test foo | grep bar",
+            "cargo test foo; cargo test bar",
+            "cargo test foo && cargo test bar",
+            "cargo test > out.txt",
+            "echo $(uname)",
+            "echo `uname`",
+            "FOO=$HOME cargo test",
+        ] {
+            let err = parse_command_line(command).err().unwrap_or_default();
+            assert!(
+                err.contains("unsupported shell syntax"),
+                "command `{command}` must fail explicitly, got `{err}`"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn quoted_program_path_with_spaces_reaches_child_intact() -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir =
+            std::env::temp_dir().join(format!("unsafe-review spaced dir {}", std::process::id()));
+        fs::create_dir_all(&dir).map_err(|err| format!("create spaced temp dir failed: {err}"))?;
+        let program = dir.join("echo child");
+        fs::write(&program, "#!/bin/sh\nprintf 'got:[%s]\\n' \"$@\"\n")
+            .map_err(|err| format!("write probe child failed: {err}"))?;
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755))
+            .map_err(|err| format!("chmod probe child failed: {err}"))?;
+
+        let command = format!("\"{}\" 'a b' c", program.display());
+        let invocation = parse_command_line(&command)?;
+        assert_eq!(invocation.program, program.to_string_lossy());
+        assert_eq!(invocation.args, vec!["a b".to_string(), "c".to_string()]);
+
+        let run = execute_with_timeout(
+            &invocation.env,
+            &invocation.exec_argv(),
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+        let _ = fs::remove_dir_all(&dir);
+
+        assert!(!run.timed_out);
+        assert_eq!(run.terminal.exit_code, Some(0));
+        assert!(run.output.contains("got:[a b]"), "output: {}", run.output);
+        assert!(run.output.contains("got:[c]"), "output: {}", run.output);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn spaced_argument_reaches_windows_child_intact() -> Result<(), String> {
+        let invocation = parse_command_line("cmd /C echo \"hello world\"")?;
+        assert_eq!(invocation.program, "cmd".to_string());
+        assert_eq!(invocation.args, vec!["/C", "echo", "hello world"]);
+
+        let run = execute_with_timeout(
+            &invocation.env,
+            &invocation.exec_argv(),
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert_eq!(run.terminal.exit_code, Some(0));
+        assert!(run.output.contains("hello world"), "output: {}", run.output);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_rejects_trailing_backslash() {
+        let err = parse_command_line("cargo test foo\\")
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("trailing backslash"), "got `{err}`");
     }
 
     #[cfg(unix)]
@@ -993,5 +1212,87 @@ mod tests {
         );
         assert!(rendered.ends_with("-output.log"));
         assert!(rendered.contains("UR-crate-src-lib-rs-owner"));
+    }
+
+    const DRY_RUN_FIXTURE_ROOT: &str = "../../fixtures/copy_nonoverlapping";
+    const DRY_RUN_CARD_ID: &str = "UR-copy-nonoverlapping-src-lib-rs-copy-bytes-operation-copy_nonoverlapping-copy-nonoverlapping-a02b5acd2c90-pointer_validity-c1";
+
+    fn dry_run_options(command: &str) -> ConfirmOptions {
+        ConfirmOptions {
+            card_id: DRY_RUN_CARD_ID.to_string(),
+            root: PathBuf::from(DRY_RUN_FIXTURE_ROOT),
+            base: None,
+            diff: None,
+            dry_run: true,
+            author: String::new(),
+            expires_at: None,
+            timeout_seconds: 600,
+            command: Some(command.to_string()),
+            out: None,
+        }
+    }
+
+    fn assert_no_confirm_sidecars() {
+        let root = Path::new(DRY_RUN_FIXTURE_ROOT);
+        assert!(
+            !root.join(".unsafe-review").exists(),
+            "dry run must not write receipts"
+        );
+        assert!(
+            !root.join("target").exists(),
+            "dry run must not write raw output logs"
+        );
+    }
+
+    #[test]
+    fn dry_run_rejects_unterminated_quote_override() {
+        let options = dry_run_options("RUSTFLAGS='-Z sanitizer=address cargo test");
+        let err = run(options).err().unwrap_or_default();
+        assert!(
+            err.contains("unterminated single quote"),
+            "dry run must surface the parse failure, got `{err}`"
+        );
+        assert_no_confirm_sidecars();
+    }
+
+    #[test]
+    fn dry_run_rejects_unsupported_shell_syntax_override() {
+        let options = dry_run_options("cargo test foo | grep bar");
+        let err = run(options).err().unwrap_or_default();
+        assert!(
+            err.contains("unsupported shell syntax"),
+            "dry run must surface the parse failure, got `{err}`"
+        );
+        assert_no_confirm_sidecars();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dry_run_spawns_no_child_process() -> Result<(), String> {
+        let probe = std::env::temp_dir().join("unsafe-review-confirm-dry-run-probe");
+        let _ = std::fs::remove_file(&probe);
+        run(dry_run_options(&format!("touch {}", probe.display())))?;
+        assert!(
+            !probe.exists(),
+            "dry run must preview without executing the parsed invocation"
+        );
+        let _ = std::fs::remove_file(&probe);
+        assert_no_confirm_sidecars();
+        Ok(())
+    }
+
+    #[test]
+    fn describe_env_masks_assignment_values() -> Result<(), String> {
+        let invocation = parse_command_line("SECRET=topsecret cargo test")?;
+        let rendered = invocation.describe_env();
+        assert!(
+            rendered.contains("SECRET"),
+            "assignment key must stay visible: {rendered}"
+        );
+        assert!(
+            !rendered.contains("topsecret"),
+            "assignment value must be redacted: {rendered}"
+        );
+        Ok(())
     }
 }
