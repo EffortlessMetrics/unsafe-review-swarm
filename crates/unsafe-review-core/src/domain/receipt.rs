@@ -646,8 +646,11 @@ fn classify_output_text(
             let (summary, verdict, extra_limitations) = if input.allow_runtime {
                 sanitizer_runtime_classify(provenance, &input.output, &input.tool)?
             } else {
-                validate_success_output(provenance, &input.output, &input.tool)?;
+                // Tool-specific failure markers report before generic
+                // validation: a run that failed is failing regardless of how
+                // many tests it ran.
                 validate_sanitizer_success_output(provenance, &input.output, &input.tool)?;
+                validate_success_output(provenance, &input.output, &input.tool)?;
                 (
                     format!(
                         "{} {} output reported `test result: ok`",
@@ -953,7 +956,70 @@ fn validate_success_output(
     if !lower.contains("test result: ok") {
         return Err(format!("{captured_output} must contain `test result: ok`"));
     }
+    let (passes, unparseable) = executed_pass_summary(&lower);
+    if passes == 0 && unparseable == 0 {
+        return Err(format!(
+            "{captured_output} reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence"
+        ));
+    }
+    if passes == 0 {
+        return Err(format!(
+            "{captured_output} reports `test result: ok` with no parseable `N passed` summary: the pass count cannot be established, so the run cannot qualify as witness evidence"
+        ));
+    }
     Ok(())
+}
+
+/// Executed passes across libtest result summaries in `output`.
+///
+/// Returns `(total, unparseable)`: the summed `N passed` counts plus the
+/// number of `test result` lines with no parseable count.
+///
+/// `cargo test` prints one `test result: ok. N passed; ...` summary per
+/// target, and an owner filter matching nothing still exits 0 with every
+/// summary at zero. Evidence requires at least one executed pass somewhere;
+/// per-target zeros (e.g. an empty bin target next to a tested lib) stay
+/// acceptable. Counts are read only from `test result` lines so prose
+/// mentioning passes (e.g. a build log line) can never stand in for an
+/// executed summary; a summary line with no parseable count fails closed.
+fn executed_pass_summary(lower: &str) -> (u64, u64) {
+    let mut total = 0u64;
+    let mut unparseable = 0u64;
+    for line in lower.lines() {
+        if !line.contains("test result") {
+            continue;
+        }
+        match pass_counts_on_line(line) {
+            Some(count) => total = total.saturating_add(count),
+            None => unparseable += 1,
+        }
+    }
+    (total, unparseable)
+}
+
+/// Summed `N passed` counts on one `test result` line, or `None` when the
+/// line carries no parseable count.
+fn pass_counts_on_line(line: &str) -> Option<u64> {
+    let mut total = 0u64;
+    let mut saw_parseable = false;
+    let mut search_from = 0usize;
+    while let Some(pos) = line[search_from..].find(" passed") {
+        let abs_pos = search_from + pos;
+        let digits: String = line[..abs_pos]
+            .chars()
+            .rev()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        if let Ok(count) = digits.parse::<u64>() {
+            total = total.saturating_add(count);
+            saw_parseable = true;
+        }
+        search_from = abs_pos + " passed".len();
+    }
+    if saw_parseable { Some(total) } else { None }
 }
 
 fn validate_proof_success_output(
@@ -1659,6 +1725,178 @@ mod tests {
             Err("executed output requires terminal process status; unknown status is never assumed exit 0"
                 .to_string())
         );
+    }
+
+    #[test]
+    fn executed_zero_passed_success_output_is_rejected_as_vacuous() {
+        // A filter matching zero tests still prints `test result: ok` with
+        // exit 0. Recording that as a receipt would let a run that executed
+        // nothing upgrade witness evidence.
+        let vacuous = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s\n";
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(
+            vacuous,
+            Some(TerminalStatus::exited(0)),
+        ));
+
+        assert_eq!(
+            result,
+            Err("executed Miri output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence"
+                .to_string())
+        );
+    }
+
+    #[test]
+    fn executed_multi_target_run_with_one_passing_target_is_accepted() -> Result<(), String> {
+        // `cargo test` prints one summary per target; an empty bin target
+        // reports 0 passed next to a lib target that ran. Evidence requires
+        // at least one executed pass, not every summary nonzero.
+        let mixed = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; finished in 0.01s\n\nrunning 2 tests\ntest ok_case ... ok\ntest second ... ok\n\ntest result: ok. 2 passed; 0 failed; finished in 0.02s\n";
+        let receipt = WitnessReceipt::from_executed_output(executed_miri_input(
+            mixed,
+            Some(TerminalStatus::exited(0)),
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        Ok(())
+    }
+
+    const VACUOUS_OUTPUT: &str = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s\n";
+
+    fn executed_careful_input(output: &str) -> ExecutedReceiptInput {
+        ExecutedReceiptInput::CargoCareful(CargoCarefulReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly careful test read_header".to_string(),
+            limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
+        })
+    }
+
+    fn executed_asan_input(output: &str, allow_runtime: bool) -> ExecutedReceiptInput {
+        ExecutedReceiptInput::Sanitizer(SanitizerReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "asan".to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header"
+                .to_string(),
+            limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
+            allow_runtime,
+        })
+    }
+
+    fn executed_loom_input(output: &str) -> ExecutedReceiptInput {
+        ExecutedReceiptInput::Concurrency(ConcurrencyReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            tool: "loom".to_string(),
+            output: output.to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo test --features loom read_header".to_string(),
+            limitations: Vec::new(),
+            terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
+        })
+    }
+
+    #[test]
+    fn executed_zero_passed_rejected_across_harness_lanes() -> Result<(), String> {
+        // Every harness lane shares `validate_success_output`: a vacuous run
+        // must be refused and a run with at least one pass accepted,
+        // regardless of lane.
+        let cases = [
+            (
+                executed_careful_input(VACUOUS_OUTPUT),
+                "executed cargo-careful output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence",
+            ),
+            (
+                executed_asan_input(VACUOUS_OUTPUT, false),
+                "executed asan output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence",
+            ),
+            (
+                executed_loom_input(VACUOUS_OUTPUT),
+                "executed loom output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence",
+            ),
+        ];
+        for (input, expected) in cases {
+            assert_eq!(
+                WitnessReceipt::from_executed_output(input),
+                Err(expected.to_string())
+            );
+        }
+
+        for input in [
+            executed_careful_input(OK_OUTPUT),
+            executed_asan_input(OK_OUTPUT, false),
+            executed_loom_input(OK_OUTPUT),
+        ] {
+            let receipt = WitnessReceipt::from_executed_output(input)?;
+            assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn executed_unparseable_pass_summary_fails_closed() {
+        // A `test result: ok` marker with no parseable `N passed` summary
+        // (e.g. a custom harness) is refused with an explicit message rather
+        // than counted as zero or accepted.
+        let custom_harness = "custom harness summary\ntest result: ok\nno counts emitted\n";
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(
+            custom_harness,
+            Some(TerminalStatus::exited(0)),
+        ));
+
+        assert_eq!(
+            result,
+            Err("executed Miri output reports `test result: ok` with no parseable `N passed` summary: the pass count cannot be established, so the run cannot qualify as witness evidence"
+                .to_string())
+        );
+    }
+
+    #[test]
+    fn executed_prose_pass_mentions_do_not_count_as_evidence() {
+        // Pass counts are read only from `test result` lines: a prose line
+        // mentioning passes must not rescue a summary that executed nothing.
+        let prose = "build log: all 3 passed checks cached\nrunning 0 tests\n\ntest result: ok. 0 passed; 0 failed; 3 filtered out; finished in 0.01s\n";
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(
+            prose,
+            Some(TerminalStatus::exited(0)),
+        ));
+
+        assert_eq!(
+            result,
+            Err("executed Miri output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence"
+                .to_string())
+        );
+    }
+
+    #[test]
+    fn executed_sanitizer_runtime_mode_needs_no_pass_counts() -> Result<(), String> {
+        // Runtime mode classifies a program run, not a test harness: a clean
+        // run with no `test result` summaries is accepted and stays
+        // `not_reproduced`, explicitly marked as a runtime run.
+        let receipt = WitnessReceipt::from_executed_output(executed_asan_input(
+            "run finished, no sanitizer signal observed\n",
+            true,
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        let summary = receipt.summary.as_deref().ok_or("missing summary")?;
+        assert!(summary.contains("runtime run"), "summary: {summary}");
+        Ok(())
     }
 
     #[test]
