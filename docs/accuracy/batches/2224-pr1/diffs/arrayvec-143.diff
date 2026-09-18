@@ -1,0 +1,38 @@
+diff --git a/src/array_string.rs b/src/array_string.rs
+index 30aea4a4..46f46756 100644
+--- a/src/array_string.rs
++++ b/src/array_string.rs
+@@ -71,6 +71,10 @@ impl<A> ArrayString<A>
+     #[inline]
+     pub fn len(&self) -> usize { self.len.to_usize() }
+ 
++    /// Returns whether the string is empty.
++    #[inline]
++    pub fn is_empty(&self) -> bool { self.len() == 0 }
++
+     /// Create a new `ArrayString` from a `str`.
+     ///
+     /// Capacity is inferred from the type parameter.
+diff --git a/src/lib.rs b/src/lib.rs
+index 0fea03fa..a12594cb 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -126,6 +126,18 @@ impl<A: Array> ArrayVec<A> {
+     #[inline]
+     pub fn len(&self) -> usize { self.len.to_usize() }
+ 
++    /// Returns whether the `ArrayVec` is empty.
++    ///
++    /// ```
++    /// use arrayvec::ArrayVec;
++    ///
++    /// let mut array = ArrayVec::from([1]);
++    /// array.pop();
++    /// assert_eq!(array.is_empty(), true);
++    /// ```
++    #[inline]
++    pub fn is_empty(&self) -> bool { self.len() == 0 }
++
+     /// Return the capacity of the `ArrayVec`.
+     ///
+     /// ```
