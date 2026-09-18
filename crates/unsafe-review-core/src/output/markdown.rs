@@ -640,6 +640,33 @@ fn render_diff_scope_bullet(out: &mut String, output: &AnalyzeOutput) {
         output.summary.changed_rust_files,
         output.summary.changed_non_rust_files,
     ));
+    // Changed files the run could not resolve under the analysis root were
+    // not scanned at all. Name them adjacent to the scope counts so a quiet
+    // review is never mistaken for a fully-scoped one.
+    if !output.unresolved_diff_files.is_empty() {
+        let names = output
+            .unresolved_diff_files
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "- Unresolved changed files (not scanned; check `--root`): {}\n",
+            names
+        ));
+    }
+    if !output.rejected_diff_files.is_empty() {
+        let names = output
+            .rejected_diff_files
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "- Refused changed files (never resolved by design): {}\n",
+            names
+        ));
+    }
 }
 
 fn file_word(count: usize) -> &'static str {
