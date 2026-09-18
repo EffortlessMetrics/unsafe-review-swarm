@@ -1,4 +1,5 @@
 mod alignment_discharge;
+mod asm_options;
 mod assignment_syntax;
 mod boolean_condition;
 mod bounds_discharge;
@@ -52,6 +53,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
+use self::asm_options::asm_options_discharge_state;
 pub(crate) use self::assignment_syntax::{
     contains_assignment_to_target, contains_simple_assignment_to,
 };
@@ -164,6 +166,7 @@ fn discharge_state_for(
         "valid-value" => valid_value_discharge_state(site, lower),
         "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
+        "asm" => asm_options_discharge_state(family, &site.operation.expression, site, lower),
         "return-value" => return_value_discharge_state(site),
         "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(family, lower),
@@ -5079,6 +5082,82 @@ mod tests {
         assert!(!evidence[0].discharge.present);
         assert!(!line_comment_evidence[0].discharge.present);
         assert!(!string_literal_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn asm_options_contradiction_names_the_defect() {
+        // Drift-lock for #2291: an asm template that touches memory while
+        // declaring nomem/readonly is definite UB. The card must name the
+        // contradiction instead of the generic missing-guard note; sound
+        // declarations keep the generic note.
+        let obligations = vec![SafetyObligation::new(
+            "asm",
+            "inline assembly obeys register, memory, and target invariants",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Multiline macros truncate the operation expression to the macro
+        // head, so the contradiction must be re-extracted from context.
+        let multiline = site_with_family(
+            OperationFamily::InlineAsm,
+            vec!["pub fn bad(ptr: *mut u64) {", "unsafe {"],
+            "asm!(",
+            vec![
+                r#""mov qword ptr [{0}], 1","#,
+                "in(reg) ptr,",
+                "options(nostack, nomem),",
+                ");",
+                "}",
+            ],
+        );
+        let evidence = obligation_evidence(&multiline, &obligations, &contract, &reach);
+        assert!(!evidence[0].discharge.present);
+        assert!(
+            evidence[0].discharge.summary.contains("nomem"),
+            "multiline contradiction must be named, got: {}",
+            evidence[0].discharge.summary
+        );
+        for snippet in [
+            r#"unsafe { asm!("mov qword ptr [{0}], 1", in(reg) ptr, options(nostack, nomem)) }"#,
+            r#"unsafe { asm!("mov qword ptr [{0}], 1", in(reg) ptr, options(nostack, readonly)) }"#,
+        ] {
+            let site = site_with_family(
+                OperationFamily::InlineAsm,
+                vec!["pub fn bad(ptr: *mut u64) {"],
+                snippet,
+                vec![],
+            );
+            let evidence = obligation_evidence(&site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+            assert!(
+                evidence[0].discharge.summary.contains("nomem")
+                    || evidence[0].discharge.summary.contains("readonly"),
+                "contradictory options must be named, got: {}",
+                evidence[0].discharge.summary
+            );
+        }
+        for snippet in [
+            r#"unsafe { asm!("mov qword ptr [{0}], 1", in(reg) ptr, out("rax") _, options(nostack)) }"#,
+            r#"unsafe { asm!("mov {0}, 42", out(reg) x, options(nostack, nomem)) }"#,
+            r#"unsafe { asm!("mov rax, [rbx]", in(reg) ptr, options(nostack, readonly)) }"#,
+        ] {
+            let site = site_with_family(
+                OperationFamily::InlineAsm,
+                vec!["pub fn good(ptr: *mut u64) {"],
+                snippet,
+                vec![],
+            );
+            let evidence = obligation_evidence(&site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+            assert_eq!(
+                evidence[0].discharge.summary, "No obligation-specific guard code was detected",
+                "consistent asm keeps the generic note, got: {}",
+                evidence[0].discharge.summary
+            );
+        }
     }
 
     #[test]
