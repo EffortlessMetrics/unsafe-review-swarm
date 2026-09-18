@@ -1,0 +1,54 @@
+# Issue-linked work specification for the new-gap scope slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2230"
+kind = "correctness"
+objective = "Count new_gaps only for actionable cards whose site range intersects the diff's exact added-line set, instead of the current six-line proximity window, so review headlines report what the PR introduced rather than nearby pre-existing findings."
+user_outcome = "A PR that touches 9 unsafe lines among 27 carded lines reports 9 new gaps with the remaining 18 still visible as open actionable findings, not 27 new. Adjacent pre-existing findings stop masquerading as introduced defects."
+claim_boundary = "This slice changes only the new_gaps classification rule and its tests; it does not change scanning scope, card identity, card contents, baseline matching, worsened/improved comparison, resolved/inherited accounting, calibration, safety, execution, or policy readiness. Multiline site ranges are approximated from snippet line counts and documented as such."
+
+[scope]
+included = [
+    "DiffIndex exact-membership query contains_added_line over the recorded added-line sets (range overlap already exists as contains_in_range)",
+    "scan_site.rs gate/flag split: scan inclusion keeps the six-line proximity window while the site.changed flag becomes exact added-line membership on diff-scoped runs (range overlap for exact-range kinds, line membership otherwise)",
+    "summary.rs new_gaps definition sharpened to exact added lines; the counting rule itself is unchanged and policy_status stays identity-axis by design",
+    "One movement fixture with a proximity-context card asserting cards=1, new_gaps=0, open_actionable_gaps=1, plus a positive added-line control",
+    "Re-bless of only affected goldens with explained before/after",
+]
+excluded = [
+    "Changes to scanning scope or inclusion proximity (inventory completeness is preserved)",
+    "Card identity, obligation, discharge, class, or policy_status changes (policy_status is identity-axis: unmatched-to-baseline, not introduced-by-diff)",
+    "Baseline, worsened/improved, resolved, and inherited accounting changes",
+    "SourceLocation end-line tracking (exact-range kinds already carry end_line at scan)",
+    "Calibration, accuracy, safety, execution, blocking, or policy claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Complete inventory is preserved: proximity-context sites are still scanned and carded and still count as open actionable gaps; only the changed flag and hence the new classification narrow."
+
+[[invariant]]
+id = "INV-2"
+text = "Repo-mode, diff-less, and no-diff-index runs keep the current flag behavior exactly; the exact-added rule applies only on diff-scoped runs with an index."
+
+[[invariant]]
+id = "INV-3"
+text = "Exact-range kinds keep their existing range-overlap rule; only proximity-gated kinds move from window to exact membership."
+
+[[acceptance]]
+id = "AC-2230-NEW-1"
+text = "A proximity-context card (site on an unchanged line within the review window of added lines) emits a card but counts zero new gaps while remaining open actionable."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- movement_context_card_is_not_new"]
+
+[[acceptance]]
+id = "AC-2230-NEW-2"
+text = "An added-line unsafe site still counts exactly one new gap."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- movement_added_site_is_new"]
+
+[[acceptance]]
+id = "AC-2230-NEW-3"
+text = "Full workspace proof stays green with only reviewed, explained golden changes."
+proof = ["cargo fmt --check", "cargo check --workspace --all-targets --locked", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2230-new-gap-scope"
+notes = "Companion to the #2224-PR1 movement narrative: with new honest, baseline snapshots can show improved instead. Follow-up seeds: exact end-line tracking, worsened/improved coverage without saved snapshots, and the #2227 role-aware surfacing of the remaining open-actionable context findings."

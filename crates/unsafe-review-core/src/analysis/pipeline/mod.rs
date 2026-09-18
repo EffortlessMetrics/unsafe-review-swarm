@@ -6348,6 +6348,22 @@ unsafe extern "C" {
     }
 
     #[test]
+    fn movement_context_card_is_not_new() -> Result<(), String> {
+        let output = fixture_output("movement_context_card_not_new")?;
+        let card = single_card("movement_context_card_not_new", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            !card.site.changed,
+            "a card on an unchanged line near added lines is context, not introduced"
+        );
+        assert_eq!(output.summary.cards, 1);
+        assert_eq!(output.summary.new_gaps, 0);
+        assert_eq!(output.summary.open_actionable_gaps, 1);
+        Ok(())
+    }
+
+    #[test]
     fn ffi_bound_return_without_check_reports_missing_discharge() -> Result<(), String> {
         for fixture in [
             "ffi_return_value_unchecked_not_guard",
@@ -6388,6 +6404,17 @@ unsafe extern "C" {
                 "{fixture}: an ignored or discarded FFI return must not gain the obligation"
             );
         }
+        Ok(())
+    }
+
+    #[test]
+    fn movement_added_site_is_new() -> Result<(), String> {
+        let output = fixture_output("ffi_call_sanitizer_route")?;
+        let card = single_card("ffi_call_sanitizer_route", &output)?;
+
+        assert!(card.site.changed, "a card on an added line is introduced");
+        assert_eq!(output.summary.new_gaps, 1);
+        assert_eq!(output.summary.open_actionable_gaps, 1);
         Ok(())
     }
 

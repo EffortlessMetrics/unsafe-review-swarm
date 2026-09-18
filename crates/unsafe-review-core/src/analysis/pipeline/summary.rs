@@ -15,7 +15,9 @@ use std::path::PathBuf;
 ///
 /// **Movement definitions (SPEC-0030)**:
 /// - `new_gaps`: open actionable cards not in the baseline ledger, constrained to
-///   changed-line sites on a diff-scoped run.
+///   exact added-line sites on a diff-scoped run. Proximity-context findings are
+///   still emitted and still count as open actionable gaps, but they are not
+///   introduced by the diff and must not inflate the new count.
 /// - `worsened_gaps`: baseline cards whose coverage regressed since the snapshot.
 /// - `improved_gaps`: baseline cards whose evidence coverage improved (pure improvement:
 ///   at least one slot advanced, no slot regressed).  Requires a saved coverage snapshot.
