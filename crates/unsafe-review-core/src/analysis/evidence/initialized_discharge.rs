@@ -14,7 +14,7 @@ pub(super) fn initialized_discharge_state(site: &ScannedSite, lower: &str) -> Ev
     if let Some(state) = set_len::set_len_initialized_discharge_state(site) {
         state
     } else if let Some(state) =
-        maybeuninit_assume_init_discharge_state(family, &site.operation.expression, lower)
+        maybeuninit_assume_init_discharge_state(site, family, &site.operation.expression, lower)
     {
         state
     } else if family == &OperationFamily::SliceFromRawParts && has_maybeuninit_slice_context(lower)
