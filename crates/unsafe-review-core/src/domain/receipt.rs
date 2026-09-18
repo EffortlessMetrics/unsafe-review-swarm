@@ -646,8 +646,11 @@ fn classify_output_text(
             let (summary, verdict, extra_limitations) = if input.allow_runtime {
                 sanitizer_runtime_classify(provenance, &input.output, &input.tool)?
             } else {
-                validate_success_output(provenance, &input.output, &input.tool)?;
+                // Tool-specific failure markers report before generic
+                // validation: a run that failed is failing regardless of how
+                // many tests it ran.
                 validate_sanitizer_success_output(provenance, &input.output, &input.tool)?;
+                validate_success_output(provenance, &input.output, &input.tool)?;
                 (
                     format!(
                         "{} {} output reported `test result: ok`",
@@ -953,7 +956,40 @@ fn validate_success_output(
     if !lower.contains("test result: ok") {
         return Err(format!("{captured_output} must contain `test result: ok`"));
     }
+    if executed_pass_count(&lower) == 0 {
+        return Err(format!(
+            "{captured_output} reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence"
+        ));
+    }
     Ok(())
+}
+
+/// Number of executed passes across libtest result summaries in `output`.
+///
+/// `cargo test` prints one `test result: ok. N passed; ...` summary per
+/// target, and an owner filter matching nothing still exits 0 with every
+/// summary at zero. Evidence requires at least one executed pass somewhere;
+/// per-target zeros (e.g. an empty bin target next to a tested lib) stay
+/// acceptable.
+fn executed_pass_count(lower: &str) -> u64 {
+    let mut total = 0u64;
+    let mut search_from = 0usize;
+    while let Some(pos) = lower[search_from..].find(" passed") {
+        let abs_pos = search_from + pos;
+        let digits: String = lower[..abs_pos]
+            .chars()
+            .rev()
+            .take_while(|ch| ch.is_ascii_digit())
+            .collect::<Vec<_>>()
+            .into_iter()
+            .rev()
+            .collect();
+        if let Ok(count) = digits.parse::<u64>() {
+            total = total.saturating_add(count);
+        }
+        search_from = abs_pos + " passed".len();
+    }
+    total
 }
 
 fn validate_proof_success_output(
@@ -1659,6 +1695,39 @@ mod tests {
             Err("executed output requires terminal process status; unknown status is never assumed exit 0"
                 .to_string())
         );
+    }
+
+    #[test]
+    fn executed_zero_passed_success_output_is_rejected_as_vacuous() {
+        // A filter matching zero tests still prints `test result: ok` with
+        // exit 0. Recording that as a receipt would let a run that executed
+        // nothing upgrade witness evidence.
+        let vacuous = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; 0 ignored; 0 measured; 3 filtered out; finished in 0.01s\n";
+        let result = WitnessReceipt::from_executed_output(executed_miri_input(
+            vacuous,
+            Some(TerminalStatus::exited(0)),
+        ));
+
+        assert_eq!(
+            result,
+            Err("executed Miri output reports `test result: ok` with 0 passed: no test executed, so the run cannot qualify as witness evidence"
+                .to_string())
+        );
+    }
+
+    #[test]
+    fn executed_multi_target_run_with_one_passing_target_is_accepted() -> Result<(), String> {
+        // `cargo test` prints one summary per target; an empty bin target
+        // reports 0 passed next to a lib target that ran. Evidence requires
+        // at least one executed pass, not every summary nonzero.
+        let mixed = "running 0 tests\n\ntest result: ok. 0 passed; 0 failed; finished in 0.01s\n\nrunning 2 tests\ntest ok_case ... ok\ntest second ... ok\n\ntest result: ok. 2 passed; 0 failed; finished in 0.02s\n";
+        let receipt = WitnessReceipt::from_executed_output(executed_miri_input(
+            mixed,
+            Some(TerminalStatus::exited(0)),
+        ))?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+        Ok(())
     }
 
     #[test]
