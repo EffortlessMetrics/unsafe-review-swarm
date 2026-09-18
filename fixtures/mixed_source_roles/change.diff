@@ -1,0 +1,22 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,15 @@
++use core::ptr::NonNull;
++
++pub mod tested;
++pub mod generated;
++#[path = "../../shared/span.rs"]
++pub mod span;
++
++/// Production seam: explicit unsafe read with no visible guard or contract.
++/// This is the one production action in the mixed repository.
++pub fn read_production(ptr: *const u8) -> u8 {
++    unsafe { *ptr }
++}
++
++/// Production seam with a contract but no local guard.
++pub fn build_production(ptr: *mut u8) -> NonNull<u8> {
++    // SAFETY: caller guarantees ptr is non-null.
++    unsafe { NonNull::new_unchecked(ptr) }
++}
