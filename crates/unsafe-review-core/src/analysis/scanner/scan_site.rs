@@ -130,7 +130,18 @@ pub(super) struct FallbackSiteInput<'a> {
 
 pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite> {
     let line_no = input.idx + 1;
-    let changed = site_changed(
+    if !site_in_scope(
+        input.diff,
+        input.repo_mode,
+        input.rel,
+        line_no,
+        line_no,
+        &input.kind,
+    ) && !input.repo_mode
+    {
+        return None;
+    }
+    let changed = site_on_added_lines(
         input.diff,
         input.repo_mode,
         input.rel,
@@ -138,9 +149,6 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
         line_no,
         &input.kind,
     );
-    if !changed && !input.repo_mode {
-        return None;
-    }
 
     let owner = fallback_owner(
         input.lines,
@@ -187,7 +195,18 @@ pub(super) fn syntax_site(
     lines: &[&str],
     detected: DetectedSyntaxSite,
 ) -> Option<ScannedSite> {
-    let changed = site_changed(
+    if !site_in_scope(
+        diff,
+        repo_mode,
+        rel,
+        detected.line,
+        detected.end_line,
+        &detected.kind,
+    ) && !repo_mode
+    {
+        return None;
+    }
+    let changed = site_on_added_lines(
         diff,
         repo_mode,
         rel,
@@ -195,9 +214,6 @@ pub(super) fn syntax_site(
         detected.end_line,
         &detected.kind,
     );
-    if !changed && !repo_mode {
-        return None;
-    }
 
     let idx = detected.line.saturating_sub(1);
     let owner = syntax_owner(&detected, lines, idx);
@@ -232,7 +248,9 @@ pub(super) fn syntax_site(
     })
 }
 
-fn site_changed(
+/// Scan-inclusion gate. The six-line proximity window is preserved so nearby
+/// context findings stay in the inventory; only the `changed` flag narrows.
+fn site_in_scope(
     diff: Option<&DiffIndex>,
     repo_mode: bool,
     rel: &PathBuf,
@@ -248,6 +266,31 @@ fn site_changed(
                 d.contains_near(rel, line)
             }
     })
+}
+
+/// The `changed` flag: exact added-line membership on diff-scoped runs.
+/// `new_gaps` and the `changed_line` projection derive from this flag, so
+/// only sites the diff added count as introduced. Repo-mode and diff-less
+/// runs keep the historical always-true behavior.
+fn site_on_added_lines(
+    diff: Option<&DiffIndex>,
+    repo_mode: bool,
+    rel: &PathBuf,
+    line: usize,
+    end_line: usize,
+    kind: &UnsafeSiteKind,
+) -> bool {
+    match diff {
+        None => true,
+        Some(_) if repo_mode => true,
+        Some(d) => {
+            if syntax_site_uses_exact_range(kind) {
+                d.contains_in_range(rel, line, end_line)
+            } else {
+                d.contains_added_line(rel, line)
+            }
+        }
+    }
 }
 
 fn fallback_owner(
