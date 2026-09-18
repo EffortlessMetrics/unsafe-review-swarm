@@ -306,6 +306,8 @@ mod tests {
                     file: "src/lib.rs".into(),
                     line: 12,
                     column: 4,
+                    end_line: 12,
+                    end_column: 4,
                 },
                 kind: UnsafeSiteKind::Operation,
                 owner: Some("owner".to_string()),

@@ -461,6 +461,21 @@ fn present_label(present: bool) -> &'static str {
 
 pub(crate) fn range_for(card: &ReviewCard) -> EditorRange {
     let start = position_for(card);
+    // Multi-line sites carry the true parsed end position: pointing the range
+    // at the real source extent keeps editor underlines on the unsafe code
+    // instead of fabricating an end from the one-line display snippet (whose
+    // compacted width can overshoot the actual start line).
+    // Single-line sites keep the legacy snippet-width end so existing
+    // single-line ranges are byte-identical.
+    if card.site.location.end_line > card.site.location.line {
+        return EditorRange {
+            start,
+            end: EditorPosition {
+                line: card.site.location.end_line.saturating_sub(1),
+                character: card.site.location.end_column.saturating_sub(1),
+            },
+        };
+    }
     let end = EditorPosition {
         line: start.line,
         character: start

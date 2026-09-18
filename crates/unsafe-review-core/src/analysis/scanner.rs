@@ -514,6 +514,7 @@ pub(super) struct DetectedSyntaxSite {
     line: usize,
     end_line: usize,
     column: usize,
+    end_column: usize,
     start: usize,
     end: usize,
     kind: UnsafeSiteKind,
@@ -554,8 +555,9 @@ fn detect_syntax_sites(
         let card_snippet = card_snippet_for(fact, &kind, &family, &parsed.text);
         sites.push(DetectedSyntaxSite {
             line: fact.line,
-            end_line: fact.line + fact.snippet.lines().count().saturating_sub(1),
+            end_line: fact.end_line,
             column: fact.column,
+            end_column: fact.end_column,
             start: fact.start,
             end: fact.end,
             kind,
@@ -1367,6 +1369,7 @@ mod tests {
             line: 1,
             end_line: 1,
             column: 1,
+            end_column: 22,
             start: 10,
             end: 100,
             kind: UnsafeSiteKind::Operation,
@@ -1378,6 +1381,7 @@ mod tests {
             line: 1,
             end_line: 1,
             column: 10,
+            end_column: 20,
             start: 25,
             end: 45,
             kind: UnsafeSiteKind::Operation,
@@ -1515,6 +1519,32 @@ mod tests {
         assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
         assert_eq!(sites[0].site.owner, Some("len".to_string()));
         assert_eq!(sites[0].site.snippet, "unsafe { strlen(ptr) }");
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_site_records_true_multiline_end_position() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub unsafe fn vuln(\n    ptr: *const u8,\n    len: usize,\n) -> u8 {\n    *ptr\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, None, false)?.sites;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let decl = sites
+            .iter()
+            .find(|site| site.site.kind == UnsafeSiteKind::UnsafeFn)
+            .ok_or_else(|| format!("expected unsafe-fn site: {sites:#?}"))?;
+        assert_eq!(decl.site.location.line, 1);
+        assert_eq!(decl.site.location.column, 1);
+        assert_eq!(decl.site.location.end_line, 6);
+        assert_eq!(decl.site.location.end_column, 2);
         Ok(())
     }
 
@@ -1732,6 +1762,7 @@ mod tests {
             line: 5,
             end_line: 5,
             column: 1,
+            end_column: 35,
             kind: UnsafeSiteKind::Operation,
             family: OperationFamily::TargetFeature,
             source_snippet: "#[target_feature(enable = \"sse2\")]".to_string(),

@@ -555,6 +555,34 @@ fn editor_range_width_uses_utf16_code_units() {
     assert_eq!(super::projection::utf16_width("a😀b"), 4);
 }
 
+#[test]
+fn editor_range_uses_true_end_for_multiline_sites() -> Result<(), String> {
+    let mut output = fixture_output("raw_pointer_alignment")?;
+    let card = &mut output.cards[0];
+    assert_eq!(card.site.location.end_line, card.site.location.line);
+    card.site.location.end_line = card.site.location.line + 2;
+    card.site.location.end_column = 7;
+    let range = super::projection::range_for(card);
+    assert_eq!(range.start.line, card.site.location.line - 1);
+    assert_eq!(range.end.line, card.site.location.end_line - 1);
+    assert_eq!(range.end.character, 6);
+    Ok(())
+}
+
+#[test]
+fn editor_range_keeps_snippet_width_for_single_line_sites() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let card = &output.cards[0];
+    assert_eq!(card.site.location.end_line, card.site.location.line);
+    let range = super::projection::range_for(card);
+    assert_eq!(range.end.line, range.start.line);
+    assert_eq!(
+        range.end.character,
+        range.start.character + super::projection::utf16_width(&card.site.snippet).max(1)
+    );
+    Ok(())
+}
+
 fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
     let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
         .join("../../fixtures")

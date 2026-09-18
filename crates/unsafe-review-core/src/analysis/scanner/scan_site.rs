@@ -214,7 +214,13 @@ pub(super) fn syntax_site(
 
     Some(ScannedSite {
         site: UnsafeSite {
-            location: SourceLocation::new(rel.clone(), detected.line, detected.column),
+            location: SourceLocation::new_with_end(
+                rel.clone(),
+                detected.line,
+                detected.column,
+                detected.end_line,
+                detected.end_column,
+            ),
             kind: detected.kind,
             owner,
             visibility,

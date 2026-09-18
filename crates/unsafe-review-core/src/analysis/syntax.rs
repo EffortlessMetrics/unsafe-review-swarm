@@ -14,6 +14,8 @@ pub(crate) struct SyntaxNodeFact {
     pub(crate) end: usize,
     pub(crate) line: usize,
     pub(crate) column: usize,
+    pub(crate) end_line: usize,
+    pub(crate) end_column: usize,
     pub(crate) snippet: String,
 }
 
@@ -35,12 +37,15 @@ pub(crate) fn parse_source(text: impl Into<String>) -> ParsedSource {
             let start = text_size_to_usize(range.start());
             let end = text_size_to_usize(range.end());
             let position = line_column(&text, start, &line_starts);
+            let end_position = line_column(&text, end, &line_starts);
             SyntaxNodeFact {
                 kind: format!("{:?}", node.kind()),
                 start,
                 end,
                 line: position.line,
                 column: position.column,
+                end_line: end_position.line,
+                end_column: end_position.column,
                 snippet: snippet(&text, start, end),
             }
         })

@@ -406,6 +406,8 @@ mod tests {
                     file: file.into(),
                     line,
                     column: 1,
+                    end_line: line,
+                    end_column: 1,
                 },
                 kind: UnsafeSiteKind::Operation,
                 owner: Some(format!("sum_{feature}")),

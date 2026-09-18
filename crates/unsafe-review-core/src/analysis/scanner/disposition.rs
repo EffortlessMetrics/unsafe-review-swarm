@@ -301,6 +301,8 @@ mod tests {
                 end,
                 line: 4,
                 column: 1,
+                end_line: 4,
+                end_column: 1,
                 snippet: snippet.to_string(),
             }
         }
