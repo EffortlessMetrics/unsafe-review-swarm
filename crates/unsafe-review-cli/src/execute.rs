@@ -2734,6 +2734,8 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
         // never an assumed clean exit.
         exit_code: None,
         terminated_by_signal: None,
+        // A template records no observation; it stays unbound.
+        subject: None,
     };
     receipt.validate()?;
     let rendered = receipt.to_pretty_json()?;
@@ -2859,6 +2861,7 @@ fn receipt_import_miri(options: SavedOutputReceiptOptions) -> Result<(), String>
         command: options.command,
         limitations: options.limitations,
         terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2883,6 +2886,7 @@ fn receipt_import_careful(options: SavedOutputReceiptOptions) -> Result<(), Stri
         command: options.command,
         limitations: options.limitations,
         terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2910,6 +2914,7 @@ fn receipt_import_sanitizer(options: SavedOutputReceiptOptions) -> Result<(), St
         command: options.command,
         limitations: options.limitations,
         terminal_status: None,
+        subject: None,
         allow_runtime: options.allow_runtime,
     })?;
     let rendered = receipt.to_pretty_json()?;
@@ -2938,6 +2943,7 @@ fn receipt_import_concurrency(options: SavedOutputReceiptOptions) -> Result<(), 
         command: options.command,
         limitations: options.limitations,
         terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2965,6 +2971,7 @@ fn receipt_import_proof(options: SavedOutputReceiptOptions) -> Result<(), String
         command: options.command,
         limitations: options.limitations,
         terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {

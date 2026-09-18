@@ -4490,8 +4490,6 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4553,6 +4551,34 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
     assert!(limitations.iter().all(|item| !item.contains("did not run")));
     assert!(!root.join(".unsafe-review/receipts").exists());
     assert!(!root.join("target/unsafe-review-confirm").exists());
+
+    let diff_out = temp.path().join("diff execution rejected.json");
+    let diff_execution = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--command"),
+            OsString::from(&command_text),
+            os("--out"),
+            diff_out.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(
+        &diff_execution,
+        "cannot execute a witness for a card resolved from a saved --diff patch",
+    );
+    assert!(
+        !diff_out.exists(),
+        "rejected diff execution must not write a receipt"
+    );
     Ok(())
 }
 
@@ -4643,8 +4669,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4665,8 +4689,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4691,8 +4713,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),

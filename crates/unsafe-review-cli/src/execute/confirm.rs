@@ -8,8 +8,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
     ExecutedReceiptInput, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
-    SanitizerReceiptInput, Scope, TerminalStatus, WitnessKind, WitnessReceipt, WitnessRoute,
-    analyze,
+    SanitizerReceiptInput, Scope, SubjectBinding, TerminalStatus, WitnessKind, WitnessReceipt,
+    WitnessRoute, analyze,
 };
 
 use crate::command::{CheckOptions, ConfirmOptions};
@@ -42,7 +42,7 @@ impl CommandSource {
 }
 
 pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
-    let card = resolve_card(&options)?;
+    let (card, scope, tool_version) = resolve_card(&options)?;
     let (kind, routed_command) = select_route(&card.id.0, &card.routes)?;
     let lane = confirm_lane(kind, &card.id.0)?;
     let command_source = if options.command.is_some() {
@@ -64,6 +64,7 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
         );
         return Ok(());
     }
+    reject_diff_execution(&options)?;
     println!("command provenance: {}", command_source.label());
     println!("parsed program: {}", invocation.program);
     println!("parsed argv: {}", invocation.describe_argv());
@@ -88,6 +89,15 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
         Some(value) => value.clone(),
         None => default_expires_at()?,
     };
+    let binding = subject_binding(
+        &options.root,
+        &card,
+        &scope,
+        &tool_version,
+        &execution.output,
+        execution.terminal,
+        &invocation,
+    );
     let receipt = match build_receipt(
         lane,
         ReceiptFields {
@@ -98,6 +108,7 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
             expires_at,
             command: command_text.clone(),
             terminal: execution.terminal,
+            binding: Some(binding),
         },
     ) {
         Ok(receipt) => receipt,
@@ -118,6 +129,9 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
     println!("exit: {}", describe_terminal(execution.terminal));
+    if let Some(subject) = &receipt.subject {
+        println!("subject: {}", subject.subject_digest);
+    }
     println!("tool: {}", receipt.tool);
     println!("strength recorded: {}", receipt.strength);
     println!("receipt: {}", receipt_path.display());
@@ -162,7 +176,96 @@ fn print_dry_run(
     println!("trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
-fn resolve_card(options: &ConfirmOptions) -> Result<ReviewCard, String> {
+/// Best-effort source revision probe. Returns `None` outside a git checkout
+/// or when git cannot answer; only the revision string and dirty bit travel
+/// into the receipt, never file contents or paths.
+fn git_head(root: &Path) -> Option<String> {
+    let run = execute_with_timeout(
+        &[],
+        &[
+            "git".to_string(),
+            "-C".to_string(),
+            root.to_string_lossy().into_owned(),
+            "rev-parse".to_string(),
+            "HEAD".to_string(),
+        ],
+        root,
+        Duration::from_secs(10),
+    )
+    .ok()?;
+    if run.timed_out || run.terminal.exit_code != Some(0) {
+        return None;
+    }
+    let head = run.output.trim().to_string();
+    (!head.is_empty()).then_some(head)
+}
+
+fn git_dirty(root: &Path) -> Option<bool> {
+    let run = execute_with_timeout(
+        &[],
+        &[
+            "git".to_string(),
+            "-C".to_string(),
+            root.to_string_lossy().into_owned(),
+            "status".to_string(),
+            "--porcelain=v1".to_string(),
+        ],
+        root,
+        Duration::from_secs(10),
+    )
+    .ok()?;
+    if run.timed_out || run.terminal.exit_code != Some(0) {
+        return None;
+    }
+    Some(!run.output.trim().is_empty())
+}
+
+fn subject_binding(
+    root: &Path,
+    card: &ReviewCard,
+    scope: &str,
+    tool_version: &str,
+    output: &str,
+    terminal: TerminalStatus,
+    invocation: &Invocation,
+) -> SubjectBinding {
+    let owner = card.site.owner.as_deref().unwrap_or("");
+    SubjectBinding {
+        subject_digest: SubjectBinding::digest_subject(&[
+            &card.id.0,
+            card.operation.family.as_str(),
+            owner,
+            &card.site.location.file.to_string_lossy(),
+            &card.site.snippet,
+        ]),
+        invocation_digest: Some(SubjectBinding::digest_invocation(
+            &invocation.program,
+            &invocation.args,
+            &invocation.env,
+        )),
+        scope: Some(scope.to_string()),
+        head_commit: git_head(root),
+        repo_dirty: git_dirty(root),
+        workdir: Some(".".to_string()),
+        output_digest: Some(SubjectBinding::digest_output(output)),
+        captured_complete: Some(terminal.captured_complete),
+        tool_version: Some(tool_version.to_string()),
+    }
+}
+
+/// A card resolved from a saved `--diff` patch cannot be executed: the
+/// witness would run in `--root`, but nothing establishes that checkout is
+/// the diff's tree, so the receipt would bind execution evidence to a
+/// subject it never observed. Check out the diff's tree and confirm without
+/// `--diff` instead. Dry-run previews never execute and stay allowed.
+fn reject_diff_execution(options: &ConfirmOptions) -> Result<(), String> {
+    if options.diff.is_some() {
+        return Err("cannot execute a witness for a card resolved from a saved --diff patch: the execution tree cannot be shown to be the reviewed tree; check out the diff and confirm without --diff".to_string());
+    }
+    Ok(())
+}
+
+fn resolve_card(options: &ConfirmOptions) -> Result<(ReviewCard, String, String), String> {
     let output = if options.base.is_some() || options.diff.is_some() {
         let check = CheckOptions {
             root: options.root.clone(),
@@ -188,7 +291,11 @@ fn resolve_card(options: &ConfirmOptions) -> Result<ReviewCard, String> {
         .iter()
         .find(|card| card.id.0 == options.card_id)
     {
-        return Ok(card.clone());
+        return Ok((
+            card.clone(),
+            output.analysis_identity.scope.clone(),
+            output.analysis_identity.tool_version.clone(),
+        ));
     }
     if card_lookup::manual_candidate_explain(&options.root, &options.card_id)?.is_some() {
         return Err(format!(
@@ -263,6 +370,7 @@ struct ReceiptFields {
     expires_at: String,
     command: String,
     terminal: TerminalStatus,
+    binding: Option<SubjectBinding>,
 }
 
 fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessReceipt, String> {
@@ -277,6 +385,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
             terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
         ConfirmLane::CargoCareful => ExecutedReceiptInput::CargoCareful(CargoCarefulReceiptInput {
             card_id: fields.card_id,
@@ -287,6 +396,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
             terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
         ConfirmLane::Sanitizer(tool) => ExecutedReceiptInput::Sanitizer(SanitizerReceiptInput {
             card_id: fields.card_id,
@@ -298,6 +408,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
             terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
             allow_runtime: false,
         }),
         ConfirmLane::Concurrency(tool) => {
@@ -311,6 +422,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
                 command: fields.command,
                 limitations,
                 terminal_status: Some(fields.terminal),
+                subject: fields.binding.clone(),
             })
         }
         ConfirmLane::Proof(tool) => ExecutedReceiptInput::Proof(ProofReceiptInput {
@@ -323,6 +435,7 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             command: fields.command,
             limitations,
             terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
     };
     WitnessReceipt::from_executed_output(input)
@@ -361,12 +474,11 @@ impl Invocation {
     }
 
     fn describe_env(&self) -> String {
-        let masked = self
-            .env
-            .iter()
-            .map(|(key, _)| (key.clone(), "<redacted>".to_string()))
-            .collect::<Vec<_>>();
-        format!("{masked:?}")
+        // Keys only: values may carry secrets from user-authored witness
+        // commands, and this string is printed to the terminal (plus any
+        // CI log capturing stdout).
+        let keys: Vec<&str> = self.env.iter().map(|(key, _)| key.as_str()).collect();
+        format!("{keys:?} (values redacted)")
     }
 }
 
@@ -1019,6 +1131,7 @@ mod tests {
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
                 terminal: TerminalStatus::exited(0),
+                binding: None,
             },
         )?;
 
@@ -1049,6 +1162,7 @@ mod tests {
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
                 terminal: TerminalStatus::exited(0),
+                binding: None,
             },
         );
 
@@ -1192,11 +1306,76 @@ mod tests {
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
                 terminal: TerminalStatus::exited(7),
+                binding: None,
             },
         )?;
 
         assert_eq!(receipt.verdict.as_deref(), Some("inconclusive"));
         assert_eq!(receipt.exit_code, Some(7));
+        Ok(())
+    }
+
+    #[test]
+    fn subject_digest_is_deterministic_and_sensitive() {
+        let parts = ["UR-test-c1", "miri", "owner", "src/lib.rs", "snippet"];
+        assert_eq!(
+            SubjectBinding::digest_subject(&parts),
+            SubjectBinding::digest_subject(&parts)
+        );
+        assert_ne!(
+            SubjectBinding::digest_subject(&parts),
+            SubjectBinding::digest_subject(&[
+                "UR-test-c2",
+                "miri",
+                "owner",
+                "src/lib.rs",
+                "snippet"
+            ])
+        );
+    }
+
+    #[test]
+    fn git_probe_reports_revision_and_dirtiness() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let head = git_head(root);
+        let dirty = git_dirty(root);
+        if let (Some(head), Some(_)) = (head, dirty) {
+            assert_eq!(head.len(), 40, "head: {head}");
+            assert!(head.chars().all(|ch| ch.is_ascii_hexdigit()));
+        }
+    }
+
+    #[test]
+    fn build_receipt_preserves_subject_binding() -> Result<(), String> {
+        let binding = SubjectBinding {
+            subject_digest: "digest".to_string(),
+            invocation_digest: Some("invocation".to_string()),
+            scope: Some("repo".to_string()),
+            head_commit: Some("abc123".to_string()),
+            repo_dirty: Some(false),
+            workdir: Some(".".to_string()),
+            output_digest: Some("output".to_string()),
+            captured_complete: Some(true),
+            tool_version: Some("0.5.0".to_string()),
+        };
+        let receipt = build_receipt(
+            ConfirmLane::Miri,
+            ReceiptFields {
+                card_id:
+                    "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                        .to_string(),
+                output: "running 1 test\ntest read_header ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; finished in 0.01s\n"
+                    .to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-06-06T00:00:00Z".to_string(),
+                expires_at: "2026-07-06".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
+                binding: Some(binding.clone()),
+            },
+        )?;
+
+        assert_eq!(receipt.subject, Some(binding));
         Ok(())
     }
 
@@ -1282,17 +1461,41 @@ mod tests {
     }
 
     #[test]
-    fn describe_env_masks_assignment_values() -> Result<(), String> {
-        let invocation = parse_command_line("SECRET=topsecret cargo test")?;
-        let rendered = invocation.describe_env();
-        assert!(
-            rendered.contains("SECRET"),
-            "assignment key must stay visible: {rendered}"
-        );
-        assert!(
-            !rendered.contains("topsecret"),
-            "assignment value must be redacted: {rendered}"
-        );
+    fn diff_resolved_cards_cannot_execute() -> Result<(), String> {
+        let options = ConfirmOptions {
+            diff: Some(crate::command::DiffInput::Stdin),
+            ..ConfirmOptions::default()
+        };
+        assert!(reject_diff_execution(&options).is_err());
+        let options = ConfirmOptions::default();
+        reject_diff_execution(&options)?;
+        Ok(())
+    }
+
+    #[test]
+    fn describe_env_redacts_assignment_values() -> Result<(), String> {
+        let invocation = parse_command_line("AWS_SECRET_ACCESS_KEY=hunter2 cargo test")?;
+        let shown = invocation.describe_env();
+        assert!(shown.contains("AWS_SECRET_ACCESS_KEY"));
+        assert!(!shown.contains("hunter2"));
+        Ok(())
+    }
+
+    #[test]
+    fn git_probes_return_none_outside_a_repository() -> Result<(), String> {
+        let root = std::env::temp_dir().join(format!(
+            "unsafe-review-confirm-no-repo-{}",
+            std::process::id()
+        ));
+        if root.exists() {
+            fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        }
+        fs::create_dir_all(&root).map_err(|err| format!("create temp dir failed: {err}"))?;
+
+        assert_eq!(git_head(&root), None);
+        assert_eq!(git_dirty(&root), None);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         Ok(())
     }
 }
