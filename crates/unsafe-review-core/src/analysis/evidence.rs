@@ -36,6 +36,7 @@ mod set_len;
 mod site_context;
 mod source_value;
 mod target_feature_discharge;
+mod target_feature_guard;
 mod transmute;
 mod u8_bool_value;
 mod unreachable_discharge;
@@ -159,9 +160,7 @@ fn discharge_state_for(
         "non-null" => nullability_discharge_state(site, lower),
         "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
-        "callee-contract" => {
-            callee_contract_discharge_state(family, &site.operation.expression, lower)
-        }
+        "callee-contract" => callee_contract_discharge_state(site, lower),
         "valid-value" => valid_value_discharge_state(site, lower),
         "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
@@ -2572,6 +2571,183 @@ mod tests {
                 .present
         );
         assert!(!unguarded_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn target_feature_detection_discharges_gated_callee_call() {
+        let obligations = vec![SafetyObligation::new(
+            "callee-contract",
+            "callee safety preconditions are satisfied",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let declaration = [
+            "#[target_feature(enable = \"avx2\")]",
+            "pub unsafe fn sum_avx2(ptr: *const f32) -> f32 {",
+            "    unsafe { *ptr }",
+            "}",
+        ];
+        let branch_guarded = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            declaration
+                .iter()
+                .chain(
+                    [
+                        "pub fn call_guarded(ptr: *const f32) -> f32 {",
+                        "    if std::is_x86_feature_detected!(\"avx2\") {",
+                    ]
+                    .iter(),
+                )
+                .copied()
+                .collect(),
+            "unsafe { sum_avx2(ptr) }",
+            vec!["    }", "}"],
+        );
+        let assert_guarded = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            declaration
+                .iter()
+                .chain(["assert!(std::is_x86_feature_detected!(\"avx2\"));"].iter())
+                .copied()
+                .collect(),
+            "unsafe { sum_avx2(ptr) }",
+            vec![],
+        );
+        let early_return_guarded = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            declaration
+                .iter()
+                .chain(["if !std::is_x86_feature_detected!(\"avx2\") { return 0.0; }"].iter())
+                .copied()
+                .collect(),
+            "unsafe { sum_avx2(ptr) }",
+            vec![],
+        );
+
+        assert!(
+            obligation_evidence(&branch_guarded, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&assert_guarded, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+        assert!(
+            obligation_evidence(&early_return_guarded, &obligations, &contract, &reach)[0]
+                .discharge
+                .present
+        );
+    }
+
+    #[test]
+    fn target_feature_detection_negative_controls() {
+        let obligations = vec![SafetyObligation::new(
+            "callee-contract",
+            "callee safety preconditions are satisfied",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Wrong feature: detecting sse4.1 does not gate an avx2 callee.
+        let wrong_feature = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "#[target_feature(enable = \"avx2\")]",
+                "pub unsafe fn sum_avx2(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+                "if std::is_x86_feature_detected!(\"sse4.1\") {",
+            ],
+            "unsafe { sum_avx2(ptr) }",
+            vec!["}"],
+        );
+        // No attribute on the callee: detection alone proves nothing.
+        let no_attribute = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "pub unsafe fn plain(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+                "if std::is_x86_feature_detected!(\"avx2\") {",
+            ],
+            "unsafe { plain(ptr) }",
+            vec!["}"],
+        );
+        // Detection after the call does not dominate it.
+        let post_call = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "#[target_feature(enable = \"avx2\")]",
+                "pub unsafe fn sum_avx2(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+            ],
+            "unsafe { sum_avx2(ptr) }",
+            vec!["if std::is_x86_feature_detected!(\"avx2\") { }"],
+        );
+        // Partial multi-enable coverage is not discharge.
+        let partial_enable = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "#[target_feature(enable = \"avx2\", enable = \"bmi2\")]",
+                "pub unsafe fn wide(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+                "if std::is_x86_feature_detected!(\"avx2\") {",
+            ],
+            "unsafe { wide(ptr) }",
+            vec!["}"],
+        );
+        // A closed branch from an earlier same-callee call does not dominate.
+        let closed_branch = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "#[target_feature(enable = \"avx2\")]",
+                "pub unsafe fn sum_avx2(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+                "if std::is_x86_feature_detected!(\"avx2\") {",
+                "    unsafe { sum_avx2(ptr) }",
+                "}",
+            ],
+            "unsafe { sum_avx2(ptr) }",
+            vec![],
+        );
+        // No detection at all.
+        let unguarded = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            vec![
+                "#[target_feature(enable = \"avx2\")]",
+                "pub unsafe fn sum_avx2(ptr: *const f32) -> f32 {",
+                "    unsafe { *ptr }",
+                "}",
+            ],
+            "unsafe { sum_avx2(ptr) }",
+            vec![],
+        );
+
+        for site in [
+            &wrong_feature,
+            &no_attribute,
+            &post_call,
+            &partial_enable,
+            &closed_branch,
+            &unguarded,
+        ] {
+            assert!(
+                !obligation_evidence(site, &obligations, &contract, &reach)[0]
+                    .discharge
+                    .present,
+                "negative control must stay missing"
+            );
+        }
     }
 
     #[test]
