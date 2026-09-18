@@ -1,5 +1,6 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DiffIndex {
@@ -37,6 +38,28 @@ impl DiffIndex {
     /// skipped.
     pub(crate) fn rust_paths(&self) -> impl Iterator<Item = &PathBuf> {
         self.changed_lines.keys().filter(|path| is_rust_path(path))
+    }
+
+    /// Split changed paths missing from the root into innocent absences
+    /// (wrong tree: fail-closed candidates) and hostile refusals (traversal,
+    /// absolute, or symlink-escaping paths: never resolved by design, per the
+    /// #1883 hostile-input contract that pins exit-0 acceptance for them).
+    pub(crate) fn partition_unresolved(
+        &self,
+        root: &Path,
+        discovered: &BTreeSet<&PathBuf>,
+    ) -> (BTreeSet<PathBuf>, BTreeSet<PathBuf>) {
+        let canonical_root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+        let mut innocent = BTreeSet::new();
+        let mut rejected = BTreeSet::new();
+        for path in self.rust_paths().filter(|path| !discovered.contains(path)) {
+            if path_escapes_root(root, &canonical_root, path) {
+                rejected.insert(path.clone());
+            } else {
+                innocent.insert(path.clone());
+            }
+        }
+        (innocent, rejected)
     }
 
     pub(crate) fn contains_near(&self, path: &PathBuf, line: usize) -> bool {
@@ -116,6 +139,54 @@ impl DiffParserState {
             self.new_line = self.new_line.saturating_add(1);
         }
     }
+}
+
+/// True when a diff path must never resolve to a file: absolute paths,
+/// `..` traversals escaping the root, and paths crossing a symlink that
+/// points outside the root. Lexical check first (no filesystem access), then
+/// the symlink walk over existing prefixes only.
+fn path_escapes_root(root: &Path, canonical_root: &Path, rel: &Path) -> bool {
+    let mut depth = 0i32;
+    for component in rel.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => return true,
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if depth == 0 {
+                    return true;
+                }
+                depth -= 1;
+            }
+            Component::Normal(_) => depth += 1,
+        }
+    }
+    // Lexically inside: refuse only when a symlink on the way out escapes.
+    let joined = root.join(rel);
+    let mut prefix = joined.as_path();
+    loop {
+        match fs::symlink_metadata(prefix) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let target = fs::read_link(prefix).unwrap_or_else(|_| prefix.to_path_buf());
+                let resolved = if target.is_absolute() {
+                    target
+                } else {
+                    prefix.parent().unwrap_or(root).join(target)
+                };
+                let canonical = fs::canonicalize(&resolved).unwrap_or(resolved);
+                if !canonical.starts_with(canonical_root) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        match prefix.parent() {
+            Some(parent) if parent.starts_with(root) && parent != root => {
+                prefix = parent;
+            }
+            _ => break,
+        }
+    }
+    false
 }
 
 fn is_rust_path(path: &Path) -> bool {

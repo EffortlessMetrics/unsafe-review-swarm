@@ -311,8 +311,15 @@ pub struct AnalyzeOutput {
     /// Any non-empty value means the run reviewed less than the diff names:
     /// renderers must surface these paths loudly, and callers must fail
     /// closed when nothing at all resolved (wrong `--root`, usually a foreign
-    /// checkout or the wrong side of the reviewed change).
+    /// checkout or the wrong side of the reviewed change). Traversal,
+    /// absolute, and symlink-escaping paths are excluded here and recorded in
+    /// `rejected_diff_files` instead: they keep the #1883 exit-0 contract.
     pub unresolved_diff_files: BTreeSet<PathBuf>,
+    /// On a diff-scoped run, changed Rust files from the diff that were
+    /// refused rather than missed: absolute paths, `..` traversals escaping
+    /// the root, and paths crossing a symlink that points outside the root.
+    /// Never resolved by design; never triggers the wrong-root error.
+    pub rejected_diff_files: BTreeSet<PathBuf>,
     /// Per-card coverage snapshot loaded from `policy/unsafe-review-baseline-snapshot.toml`.
     ///
     /// Output renderers use this to project the per-card `baseline_state`/`outcome_movement`

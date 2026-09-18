@@ -655,6 +655,18 @@ fn render_diff_scope_bullet(out: &mut String, output: &AnalyzeOutput) {
             names
         ));
     }
+    if !output.rejected_diff_files.is_empty() {
+        let names = output
+            .rejected_diff_files
+            .iter()
+            .map(|path| path.display().to_string())
+            .collect::<Vec<_>>()
+            .join(", ");
+        out.push_str(&format!(
+            "- Refused changed files (never resolved by design): {}\n",
+            names
+        ));
+    }
 }
 
 fn file_word(count: usize) -> &'static str {

@@ -56,6 +56,10 @@ struct JsonAnalyzeOutput<'a> {
     /// then an honest empty, not a narrowed scope masquerading as one.
     #[serde(skip_serializing_if = "BTreeSet::is_empty")]
     unresolved_diff_files: &'a BTreeSet<PathBuf>,
+    /// Changed Rust files refused rather than missed (traversal, absolute, or
+    /// symlink-escaping paths). Absent when the diff named none.
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    rejected_diff_files: &'a BTreeSet<PathBuf>,
     cards: Vec<JsonCard<'a>>,
     /// Traceable evidence metadata (schema 0.2+). Absent in 0.1 artifacts for
     /// backward compatibility; `schema_version` distinguishes the two shapes.
@@ -97,6 +101,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
             unresolved_diff_files: &output.unresolved_diff_files,
+            rejected_diff_files: &output.rejected_diff_files,
             cards: output
                 .cards
                 .iter()
@@ -137,6 +142,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
             unresolved_diff_files: &output.unresolved_diff_files,
+            rejected_diff_files: &output.rejected_diff_files,
             cards: output
                 .cards
                 .iter()

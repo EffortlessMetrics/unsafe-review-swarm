@@ -52,15 +52,30 @@ const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.
 /// proceeds, but the missing files are returned for a loud warning so the
 /// narrowed scope cannot pass unnoticed.
 fn check_unresolved_diff_scope(output: &AnalyzeOutput) -> Result<Option<String>, String> {
-    if output.unresolved_diff_files.is_empty() {
-        return Ok(None);
-    }
     let mut missing: Vec<String> = output
         .unresolved_diff_files
         .iter()
         .map(|path| path.display().to_string())
         .collect();
     missing.sort();
+    let mut refused: Vec<String> = output
+        .rejected_diff_files
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    refused.sort();
+    // Hostile refusals (traversal, absolute, symlink-escaping paths) keep the
+    // #1883 exit-0 contract: they are reported, never resolved, and never fail
+    // the run. Only innocent absences can trigger the wrong-root error.
+    if !refused.is_empty() && missing.is_empty() {
+        return Ok(Some(format!(
+            "warning: refused hostile diff paths (never resolved by design): {}",
+            refused.join(", "),
+        )));
+    }
+    if missing.is_empty() {
+        return Ok(None);
+    }
     if output.summary.changed_rust_files > 0 && output.diff_scoped_files.is_empty() {
         return Err(format!(
             "none of the {} changed Rust {} in the diff resolve under --root {} ({}); refusing to emit an empty review over unscanned content. Point --root at the tree containing the reviewed files, usually the PR head checkout",
@@ -74,13 +89,20 @@ fn check_unresolved_diff_scope(output: &AnalyzeOutput) -> Result<Option<String>,
             missing.join(", "),
         ));
     }
-    Ok(Some(format!(
+    let mut warning = format!(
         "warning: {}/{} changed Rust files not found under --root {} and were not scanned: {}. The review covers only the resolved files",
         missing.len(),
         output.summary.changed_rust_files,
         output.root.display(),
         missing.join(", "),
-    )))
+    );
+    if !refused.is_empty() {
+        warning.push_str(&format!(
+            "; refused hostile paths (never resolved by design): {}",
+            refused.join(", "),
+        ));
+    }
+    Ok(Some(warning))
 }
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
@@ -4052,6 +4074,15 @@ mod tests {
         resolved: &[&str],
         unresolved: &[&str],
     ) -> AnalyzeOutput {
+        diff_scope_output_with_rejected(changed_rust, resolved, unresolved, &[])
+    }
+
+    fn diff_scope_output_with_rejected(
+        changed_rust: usize,
+        resolved: &[&str],
+        unresolved: &[&str],
+        rejected: &[&str],
+    ) -> AnalyzeOutput {
         AnalyzeOutput {
             analysis_identity: AnalysisIdentity::new("diff"),
             schema_version: "0.1".to_string(),
@@ -4067,6 +4098,7 @@ mod tests {
             cards: Vec::new(),
             diff_scoped_files: resolved.iter().map(PathBuf::from).collect(),
             unresolved_diff_files: unresolved.iter().map(PathBuf::from).collect(),
+            rejected_diff_files: rejected.iter().map(PathBuf::from).collect(),
             coverage_snapshot: BTreeMap::new(),
         }
     }
@@ -4098,6 +4130,18 @@ mod tests {
         assert!(warning.contains("1/3"), "{warning}");
         assert!(warning.contains("src/c.rs"), "{warning}");
         assert!(warning.contains("were not scanned"), "{warning}");
+        Ok(())
+    }
+
+    #[test]
+    fn unresolved_scope_keeps_hostile_exit_zero_with_a_warning() -> Result<(), String> {
+        // Traversal-only scope: nothing innocent is missing, so the #1883
+        // exit-0 contract holds, but the refusal must still be loud.
+        let output = diff_scope_output_with_rejected(1, &[], &[], &["../../../../etc/passwd.rs"]);
+        let warning = check_unresolved_diff_scope(&output)?
+            .ok_or_else(|| "hostile refusal must warn".to_string())?;
+        assert!(warning.contains("refused hostile"), "{warning}");
+        assert!(warning.contains("passwd.rs"), "{warning}");
         Ok(())
     }
 

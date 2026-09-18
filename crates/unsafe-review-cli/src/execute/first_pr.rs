@@ -3152,6 +3152,7 @@ mod tests {
             cards: Vec::new(),
             diff_scoped_files: std::collections::BTreeSet::new(),
             unresolved_diff_files: std::collections::BTreeSet::new(),
+            rejected_diff_files: std::collections::BTreeSet::new(),
             coverage_snapshot: std::collections::BTreeMap::new(),
         };
         let check = CheckOptions {
@@ -4144,6 +4145,7 @@ mod tests {
             cards,
             diff_scoped_files: std::collections::BTreeSet::new(),
             unresolved_diff_files: std::collections::BTreeSet::new(),
+            rejected_diff_files: std::collections::BTreeSet::new(),
             coverage_snapshot: std::collections::BTreeMap::new(),
         }
     }

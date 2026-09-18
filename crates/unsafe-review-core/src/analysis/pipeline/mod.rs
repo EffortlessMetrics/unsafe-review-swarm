@@ -150,16 +150,15 @@ fn analyze_with_receipts(
     // Changed Rust files named by the diff that exist nowhere under the root
     // were silently dropped from review. Record them so renderers report the
     // narrowed scope instead of printing an honest-looking "no gaps found".
-    // Computed before the scan loop so partial status events carry it too.
+    // Hostile refusals (traversal, absolute, symlink-escaping paths) are
+    // recorded separately: they keep the #1883 exit-0 contract and never
+    // trigger the wrong-root fail-closed error. Computed before the scan loop
+    // so partial status events carry both sets too.
     let discovered: BTreeSet<&PathBuf> = all_rust_files.iter().collect();
-    let unresolved_diff_files_set: BTreeSet<PathBuf> = if !repo_mode && diff_supplied {
-        diff_index
-            .rust_paths()
-            .filter(|path| !discovered.contains(path))
-            .cloned()
-            .collect()
+    let (unresolved_diff_files_set, rejected_diff_files_set) = if !repo_mode && diff_supplied {
+        diff_index.partition_unresolved(&input.root, &discovered)
     } else {
-        BTreeSet::new()
+        (BTreeSet::new(), BTreeSet::new())
     };
 
     let mut cards = Vec::new();
@@ -247,6 +246,7 @@ fn analyze_with_receipts(
                 &policy_state,
                 &candidate_files,
                 &unresolved_diff_files_set,
+                &rejected_diff_files_set,
             )),
         )?;
         last_scanned_path = Some(rel.clone());
@@ -308,6 +308,7 @@ fn analyze_with_receipts(
         cards,
         diff_scoped_files: diff_scoped_files_set,
         unresolved_diff_files: unresolved_diff_files_set,
+        rejected_diff_files: rejected_diff_files_set,
         coverage_snapshot,
     };
     // Emit a final status event.  A capped scan emits a partial status that
@@ -505,6 +506,7 @@ fn partial_analyze_output(
     policy_state: &PolicyState,
     candidate_files: &[PathBuf],
     unresolved_diff_files: &BTreeSet<PathBuf>,
+    rejected_diff_files: &BTreeSet<PathBuf>,
 ) -> AnalyzeOutput {
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_supplied = !matches!(input.diff, DiffSource::NoneRepoScan);
@@ -546,6 +548,7 @@ fn partial_analyze_output(
         cards,
         diff_scoped_files: diff_scoped_files_set,
         unresolved_diff_files: unresolved_diff_files.clone(),
+        rejected_diff_files: rejected_diff_files.clone(),
         coverage_snapshot: policy_state.coverage_snapshot.clone(),
     }
 }
@@ -1694,6 +1697,108 @@ diff --git a/src/missing.rs b/src/missing.rs
                 .iter()
                 .all(|partial| partial.unresolved_diff_files == output.unresolved_diff_files),
             "partial snapshots must carry the same narrowed-scope truth"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn diff_scope_rejects_traversal_paths_without_failing() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-rejected-diff")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"rejected-diff-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn present() {}
+diff --git a/etc/passwd.rs b/../../../../etc/passwd.rs
+--- a/etc/passwd.rs
++++ b/../../../../etc/passwd.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn hostile() {}
+"#;
+
+        let output = analyze_with_discovery(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 2);
+        assert!(
+            output.unresolved_diff_files.is_empty(),
+            "traversal paths are refusals, not wrong-root evidence: {:?}",
+            output.unresolved_diff_files
+        );
+        assert_eq!(
+            output.rejected_diff_files,
+            BTreeSet::from([PathBuf::from("../../../../etc/passwd.rs")]),
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn diff_scope_rejects_symlink_escaping_paths() -> Result<(), String> {
+        let outside = unique_temp_dir("unsafe-review-rejected-outside")?;
+        fs::create_dir_all(outside.join("src"))
+            .map_err(|err| format!("create src failed: {err}"))?;
+        let root = unique_temp_dir("unsafe-review-rejected-link-root")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"rejected-link-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        std::os::unix::fs::symlink(&outside, root.join("external-link"))
+            .map_err(|err| format!("create symlink failed: {err}"))?;
+        let diff = r#"diff --git a/external-link/src/lib.rs b/external-link/src/lib.rs
+--- a/external-link/src/lib.rs
++++ b/external-link/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn hostile() {}
+"#;
+
+        let output = analyze_with_discovery(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        fs::remove_dir_all(&outside).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 1);
+        assert!(
+            output.unresolved_diff_files.is_empty(),
+            "symlink escapes are refusals, not wrong-root evidence: {:?}",
+            output.unresolved_diff_files
+        );
+        assert_eq!(
+            output.rejected_diff_files,
+            BTreeSet::from([PathBuf::from("external-link/src/lib.rs")]),
         );
         Ok(())
     }
