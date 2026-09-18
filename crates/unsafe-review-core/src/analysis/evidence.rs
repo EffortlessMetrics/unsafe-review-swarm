@@ -90,7 +90,7 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::initialized_discharge::initialized_discharge_state;
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
-use self::operation_scope::code_before_site_operation;
+use self::operation_scope::{code_before_site_operation, site_snippet_anchor};
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_pointer_arithmetic_bounds_guard;
@@ -167,7 +167,7 @@ fn discharge_state_for(
         "unreachable" => unreachable_discharge_state(family, lower),
         "return-value" => return_value_discharge_state(site),
         "target-feature" => target_feature_discharge_state(family, contract),
-        "utf8" => utf8_discharge_state(family, lower),
+        "utf8" => utf8_discharge_state(site, family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),
         _ => EvidenceState::missing("No obligation-specific guard code was detected"),
     }
@@ -4555,6 +4555,113 @@ mod tests {
         assert!(if_let_ok_evidence[0].discharge.present);
         assert!(let_else_ok_evidence[0].discharge.present);
         assert!(match_ok_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn from_utf8_plain_assert_is_ok_discharges_utf8_obligation() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // A failing plain assert aborts before the unchecked conversion, so
+        // it validates the buffer exactly like the branch shapes.
+        let bare_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(bytes).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let message_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(bytes).is_ok(), \"header must be utf8\");"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+
+        for site in [&bare_assert, &message_assert] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(evidence[0].discharge.present);
+        }
+    }
+
+    #[test]
+    fn from_utf8_assert_rejects_debug_wrong_buffer_stale_and_aliased() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // debug_assert! is compiled out in release: no runtime validation.
+        let debug_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["debug_assert!(core::str::from_utf8(bytes).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // The assert must name the converted buffer.
+        let wrong_buffer = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(other).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // Reassigning the buffer after the assert voids the validation.
+        let reassigned = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "assert!(core::str::from_utf8(bytes).is_ok());",
+                "bytes = refill();",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // An aliased boolean carries no inline validation text: crediting it
+        // would require dataflow the analyzer does not have.
+        let aliased = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "let ok = core::str::from_utf8(bytes).is_ok();",
+                "assert!(ok);",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+
+        for site in [&debug_assert, &wrong_buffer, &reassigned, &aliased] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+        }
+    }
+
+    #[test]
+    fn from_utf8_unchecked_anchors_on_own_call_not_first_duplicate() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // An earlier guarded site sharing the window must not donate its
+        // buffer argument to a later unguarded site: the later call converts
+        // a different buffer with no validation of its own.
+        let later_unguarded = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "fn one() {",
+                "assert!(core::str::from_utf8(bytes).is_ok());",
+                "unsafe { core::str::from_utf8_unchecked(bytes) }",
+                "}",
+                "fn two() {",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(other) }",
+            vec!["}"],
+        );
+
+        let evidence = obligation_evidence(&later_unguarded, &obligations, &contract, &reach);
+        assert!(!evidence[0].discharge.present);
     }
 
     #[test]
