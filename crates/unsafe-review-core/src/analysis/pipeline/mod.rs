@@ -7525,6 +7525,21 @@ evidence = "test fixture"
                 .iter()
                 .any(|card| card.site.location.file.ends_with("src/tested.rs"))
         );
+        // Role distribution follows the fixture map: production seams in
+        // src/lib.rs, test seams in src/tested.rs and tests/fixtures, the
+        // generated helper, and unknown for the shared include plus the
+        // example. Counts cover every card; production-first never hides.
+        assert_eq!(output.summary.production_cards, 2);
+        assert_eq!(output.summary.test_cards, 2);
+        assert_eq!(output.summary.generated_cards, 1);
+        assert_eq!(output.summary.unknown_cards, 2);
+        assert_eq!(
+            output.summary.production_cards
+                + output.summary.test_cards
+                + output.summary.generated_cards
+                + output.summary.unknown_cards,
+            output.summary.cards
+        );
         // The `#[path]`-included shared file is inventoried at its real
         // location, not hidden by its directory name.
         assert!(

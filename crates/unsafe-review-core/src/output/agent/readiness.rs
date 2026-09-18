@@ -32,8 +32,8 @@ mod tests {
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, NextAction,
         OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
-        SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence, WitnessKind,
-        WitnessRoute,
+        SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
+        WitnessKind, WitnessRoute,
     };
 
     fn minimal_ready_card() -> ReviewCard {
@@ -56,6 +56,7 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: "unsafe { *ptr }".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),

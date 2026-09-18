@@ -1359,8 +1359,8 @@ fn agent_packet_coverage_agent_lsp_readiness_matches_agent_readiness_state() -> 
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
         NextAction, OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
-        SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence, WitnessKind,
-        WitnessRoute,
+        SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
+        WitnessKind, WitnessRoute,
     };
 
     fn base_card() -> ReviewCard {
@@ -1382,6 +1382,7 @@ fn agent_packet_coverage_agent_lsp_readiness_matches_agent_readiness_state() -> 
                 public_api_surface: false,
                 changed: true,
                 snippet: "unsafe { *ptr }".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),

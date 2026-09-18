@@ -31,6 +31,7 @@ mod js_shared_byte_source;
 mod owner_context;
 mod panic_from_safe_js;
 mod scan_site;
+pub(super) mod source_role;
 mod syntax_scan;
 pub(crate) mod text_detection;
 

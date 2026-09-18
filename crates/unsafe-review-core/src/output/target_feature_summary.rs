@@ -377,8 +377,8 @@ mod tests {
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, EvidenceState, HazardKind,
         MissingEvidence, NextAction, ObligationEvidence, Priority, ProofPath, ReachEvidence,
-        ReviewClass, SafetyObligation, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
-        WitnessEvidence,
+        ReviewClass, SafetyObligation, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite,
+        UnsafeSiteKind, WitnessEvidence,
     };
     use crate::freshness::AnalysisIdentity;
     use std::collections::BTreeSet as StdBTreeSet;
@@ -413,6 +413,7 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: expression.clone(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression,

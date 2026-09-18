@@ -210,7 +210,7 @@ mod tests {
     use crate::api::{PolicyMode, Scope, Summary};
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
-        NextAction, Priority, ProofPath, ReachEvidence, ReviewClass, SourceLocation,
+        NextAction, Priority, ProofPath, ReachEvidence, ReviewClass, SourceLocation, SourceRole,
         UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
     };
     use crate::freshness::AnalysisIdentity;
@@ -235,6 +235,7 @@ mod tests {
                 public_api_surface: true,
                 changed: true,
                 snippet: "pub unsafe fn f() {}".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "pub unsafe fn f() {}".to_string(),

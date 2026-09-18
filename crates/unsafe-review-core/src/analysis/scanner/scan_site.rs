@@ -35,6 +35,7 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
         &input.family,
     );
     let public_api_surface = is_public_api_surface(&input.kind, input.trimmed);
+    let role = source_role::classify_source_role(input.rel, input.lines, line_no);
     Some(ScannedSite {
         site: UnsafeSite {
             location: SourceLocation::new(
@@ -48,6 +49,7 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
             public_api_surface,
             changed,
             snippet: input.trimmed.to_string(),
+            role,
         },
         operation: UnsafeOperation {
             family: input.family,
@@ -91,6 +93,7 @@ pub(super) fn syntax_site(
         (idx + 1).min(lines.len()),
         (idx + 8).min(lines.len()),
     );
+    let role = source_role::classify_source_role(rel, lines, detected.line);
 
     Some(ScannedSite {
         site: UnsafeSite {
@@ -101,6 +104,7 @@ pub(super) fn syntax_site(
             public_api_surface,
             changed,
             snippet: detected.card_snippet.clone(),
+            role,
         },
         operation: UnsafeOperation {
             family: detected.family,
