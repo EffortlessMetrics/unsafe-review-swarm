@@ -31,6 +31,14 @@ impl DiffIndex {
         self.changed_lines.contains_key(path)
     }
 
+    /// Repo-relative paths of changed Rust files in `b/` (post-image) form.
+    /// Callers resolve these against the analysis root; paths with no file
+    /// under the root are unanalyzable and must be reported, never silently
+    /// skipped.
+    pub(crate) fn rust_paths(&self) -> impl Iterator<Item = &PathBuf> {
+        self.changed_lines.keys().filter(|path| is_rust_path(path))
+    }
+
     pub(crate) fn contains_near(&self, path: &PathBuf, line: usize) -> bool {
         self.changed_lines
             .get(path)

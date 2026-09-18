@@ -45,6 +45,43 @@ mod first_pr;
 mod init;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
+
+/// Fail closed when a diff-scoped run resolved none of its changed Rust files
+/// under the analysis root: emitting "no gaps found" over unscanned content
+/// is the wrong-root footgun, not a clean review. A partially resolved scope
+/// proceeds, but the missing files are returned for a loud warning so the
+/// narrowed scope cannot pass unnoticed.
+fn check_unresolved_diff_scope(output: &AnalyzeOutput) -> Result<Option<String>, String> {
+    if output.unresolved_diff_files.is_empty() {
+        return Ok(None);
+    }
+    let mut missing: Vec<String> = output
+        .unresolved_diff_files
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    missing.sort();
+    if output.summary.changed_rust_files > 0 && output.diff_scoped_files.is_empty() {
+        return Err(format!(
+            "none of the {} changed Rust {} in the diff resolve under --root {} ({}); refusing to emit an empty review over unscanned content. Point --root at the tree containing the reviewed files, usually the PR head checkout",
+            output.summary.changed_rust_files,
+            if output.summary.changed_rust_files == 1 {
+                "file"
+            } else {
+                "files"
+            },
+            output.root.display(),
+            missing.join(", "),
+        ));
+    }
+    Ok(Some(format!(
+        "warning: {}/{} changed Rust files not found under --root {} and were not scanned: {}. The review covers only the resolved files",
+        missing.len(),
+        output.summary.changed_rust_files,
+        output.root.display(),
+        missing.join(", "),
+    )))
+}
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 const FIRST_RUN_TRUST_BOUNDARY: &str = "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.";
@@ -274,6 +311,9 @@ fn run_check(
         discovery,
     )
     .map_err(crate::RunFailure::Tool)?;
+    if let Some(warning) = check_unresolved_diff_scope(&output).map_err(crate::RunFailure::Tool)? {
+        eprintln!("{warning}");
+    }
     let rendered = render_with_format_and_provenance(
         &output,
         &options.format,
@@ -1534,6 +1574,9 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    if let Some(warning) = check_unresolved_diff_scope(&output)? {
+        eprintln!("{warning}");
+    }
     let receipt_audit = audit_witness_receipts(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
@@ -3982,14 +4025,17 @@ fn print_candidate_help() {
 #[cfg(test)]
 mod tests {
     use super::{
-        RepoScanScopeMetadata, ensure_readable_diff, ensure_review_root, git_ref_error,
-        render_repo_scan_incomplete_status, render_repo_scan_status, repo_status_operator_json,
-        resolve_diff_path, review_root_error, shell_path_arg, writable_status, yes_no,
+        RepoScanScopeMetadata, check_unresolved_diff_scope, ensure_readable_diff,
+        ensure_review_root, git_ref_error, render_repo_scan_incomplete_status,
+        render_repo_scan_status, repo_status_operator_json, resolve_diff_path, review_root_error,
+        shell_path_arg, writable_status, yes_no,
     };
+    use std::collections::BTreeMap;
     use std::io;
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
-        DiscoveryOptions, PerFileScanStats, RepoScanPhase, RepoScanStatus, RepoStopReason,
+        AnalysisIdentity, AnalysisMode, AnalyzeOutput, DiscoveryOptions, PerFileScanStats,
+        PolicyMode, RepoScanPhase, RepoScanStatus, RepoStopReason, Scope, api::Summary,
     };
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
@@ -3999,6 +4045,60 @@ mod tests {
     #[test]
     fn ensure_review_root_accepts_a_directory() -> Result<(), String> {
         ensure_review_root(Path::new("."))
+    }
+
+    fn diff_scope_output(
+        changed_rust: usize,
+        resolved: &[&str],
+        unresolved: &[&str],
+    ) -> AnalyzeOutput {
+        AnalyzeOutput {
+            analysis_identity: AnalysisIdentity::new("diff"),
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("/tmp/foreign-repo"),
+            scope: Scope::Diff,
+            mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                changed_rust_files: changed_rust,
+                ..Default::default()
+            },
+            cards: Vec::new(),
+            diff_scoped_files: resolved.iter().map(PathBuf::from).collect(),
+            unresolved_diff_files: unresolved.iter().map(PathBuf::from).collect(),
+            coverage_snapshot: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn unresolved_scope_is_clean_when_everything_resolves() -> Result<(), String> {
+        let output = diff_scope_output(2, &["src/a.rs", "src/b.rs"], &[]);
+        assert_eq!(check_unresolved_diff_scope(&output)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn unresolved_scope_fails_closed_when_nothing_resolves() {
+        let output = diff_scope_output(2, &[], &["src/a.rs", "src/b.rs"]);
+        let err = check_unresolved_diff_scope(&output)
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("--root /tmp/foreign-repo"), "{err}");
+        assert!(err.contains("refusing to emit an empty review"), "{err}");
+        assert!(err.contains("src/a.rs"), "{err}");
+        assert!(err.contains("PR head checkout"), "{err}");
+    }
+
+    #[test]
+    fn unresolved_scope_warns_but_proceeds_on_partial_resolution() -> Result<(), String> {
+        let output = diff_scope_output(3, &["src/a.rs", "src/b.rs"], &["src/c.rs"]);
+        let warning = check_unresolved_diff_scope(&output)?
+            .ok_or_else(|| "partial scope must warn".to_string())?;
+        assert!(warning.contains("1/3"), "{warning}");
+        assert!(warning.contains("src/c.rs"), "{warning}");
+        assert!(warning.contains("were not scanned"), "{warning}");
+        Ok(())
     }
 
     #[test]

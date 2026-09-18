@@ -147,6 +147,20 @@ fn analyze_with_receipts(
     } else {
         diff_index.changed_rust_file_count()
     };
+    // Changed Rust files named by the diff that exist nowhere under the root
+    // were silently dropped from review. Record them so renderers report the
+    // narrowed scope instead of printing an honest-looking "no gaps found".
+    // Computed before the scan loop so partial status events carry it too.
+    let discovered: BTreeSet<&PathBuf> = all_rust_files.iter().collect();
+    let unresolved_diff_files_set: BTreeSet<PathBuf> = if !repo_mode && diff_supplied {
+        diff_index
+            .rust_paths()
+            .filter(|path| !discovered.contains(path))
+            .cloned()
+            .collect()
+    } else {
+        BTreeSet::new()
+    };
 
     let mut cards = Vec::new();
     let mut identity_counts = BTreeMap::new();
@@ -232,6 +246,7 @@ fn analyze_with_receipts(
                 policy_state.baseline_ids(),
                 &policy_state,
                 &candidate_files,
+                &unresolved_diff_files_set,
             )),
         )?;
         last_scanned_path = Some(rel.clone());
@@ -292,6 +307,7 @@ fn analyze_with_receipts(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        unresolved_diff_files: unresolved_diff_files_set,
         coverage_snapshot,
     };
     // Emit a final status event.  A capped scan emits a partial status that
@@ -488,6 +504,7 @@ fn partial_analyze_output(
     baseline_ids: &BTreeSet<String>,
     policy_state: &PolicyState,
     candidate_files: &[PathBuf],
+    unresolved_diff_files: &BTreeSet<PathBuf>,
 ) -> AnalyzeOutput {
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_supplied = !matches!(input.diff, DiffSource::NoneRepoScan);
@@ -528,6 +545,7 @@ fn partial_analyze_output(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        unresolved_diff_files: unresolved_diff_files.clone(),
         coverage_snapshot: policy_state.coverage_snapshot.clone(),
     }
 }
@@ -1610,6 +1628,73 @@ diff --git a/src/binding.cpp b/src/binding.cpp
         assert_eq!(first_partial.summary.changed_rust_files, 1);
         assert_eq!(first_partial.summary.changed_non_rust_files, 2);
         assert_eq!(first_partial.cards.len(), 1);
+        Ok(())
+    }
+
+    #[test]
+    fn diff_scope_records_changed_rust_files_missing_from_the_root() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-unresolved-diff")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"unresolved-diff-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn present() {}
+diff --git a/src/missing.rs b/src/missing.rs
+--- a/src/missing.rs
++++ b/src/missing.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn absent() {}
+"#;
+
+        let mut partials = Vec::new();
+        let output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+            |event| {
+                if let Some(partial) = &event.partial_output
+                    && event.status.phase == RepoScanPhase::Scanning
+                {
+                    partials.push(partial.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 2);
+        assert_eq!(
+            output.unresolved_diff_files,
+            BTreeSet::from([PathBuf::from("src/missing.rs")]),
+            "the absent diff path must be recorded, not silently dropped"
+        );
+        assert!(
+            output
+                .diff_scoped_files
+                .contains(&PathBuf::from("src/lib.rs")),
+            "the present file must still resolve and scan"
+        );
+        assert!(
+            partials
+                .iter()
+                .all(|partial| partial.unresolved_diff_files == output.unresolved_diff_files),
+            "partial snapshots must carry the same narrowed-scope truth"
+        );
         Ok(())
     }
 

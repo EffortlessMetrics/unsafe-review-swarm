@@ -462,6 +462,7 @@ mod tests {
             summary: Summary::default(),
             cards,
             diff_scoped_files: StdBTreeSet::new(),
+            unresolved_diff_files: StdBTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         }
     }

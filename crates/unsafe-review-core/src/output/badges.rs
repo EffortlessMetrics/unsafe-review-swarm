@@ -260,6 +260,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);
@@ -325,6 +326,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);
@@ -388,6 +390,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);
@@ -444,6 +447,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);
@@ -502,6 +506,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, _plus) = render(&output);
@@ -542,6 +547,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);
@@ -582,6 +588,7 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         };
         let (main, plus) = render(&output);

@@ -12,6 +12,7 @@ use crate::output::{REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, UNKNOWN_OWNER};
 use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::Serialize;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// Schema version for the plain (no-provenance) JSON analyze artifact.
@@ -50,6 +51,11 @@ struct JsonAnalyzeOutput<'a> {
     trust_boundary: &'static str,
     root: String,
     summary: JsonSummary,
+    /// Changed Rust files from the diff with no file under the analysis root.
+    /// Absent when every changed file resolved: a present-but-empty review is
+    /// then an honest empty, not a narrowed scope masquerading as one.
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    unresolved_diff_files: &'a BTreeSet<PathBuf>,
     cards: Vec<JsonCard<'a>>,
     /// Traceable evidence metadata (schema 0.2+). Absent in 0.1 artifacts for
     /// backward compatibility; `schema_version` distinguishes the two shapes.
@@ -90,6 +96,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
+            unresolved_diff_files: &output.unresolved_diff_files,
             cards: output
                 .cards
                 .iter()
@@ -129,6 +136,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
+            unresolved_diff_files: &output.unresolved_diff_files,
             cards: output
                 .cards
                 .iter()
