@@ -315,19 +315,22 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     names
 }
 
-/// Bare names of `static` items declared inside `unsafe extern` blocks,
-/// split by mutability. Read by the syntax site pass so uses of extern
-/// statics inside `unsafe` blocks card with their hazard family instead of
-/// falling to unknown. Bare names only: extern statics are used unqualified
-/// at their use sites.
+/// Bare names of global `static` items, split by mutability. `mutable`
+/// covers every `static mut` in the file (extern and file-local alike:
+/// a use has the same shared-state hazard either way). `immutable` covers
+/// only `static` items inside `unsafe extern` blocks — reads of file-local
+/// immutable statics are safe and must stay silent. Read by the syntax site
+/// pass so uses inside `unsafe` blocks card with their hazard family
+/// instead of falling to unknown. Bare names only: statics are used
+/// unqualified at their use sites.
 #[derive(Default)]
-struct ExternStaticNames {
+struct GlobalStaticNames {
     mutable: BTreeSet<String>,
     immutable: BTreeSet<String>,
 }
 
-fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
-    let mut names = ExternStaticNames::default();
+fn global_static_names(lines: &[&str]) -> GlobalStaticNames {
+    let mut names = GlobalStaticNames::default();
     let mut in_extern = false;
     let mut state = LineCommentState::default();
     for raw in lines {
@@ -339,15 +342,13 @@ fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
         if is_extern_boundary(trimmed) {
             in_extern = true;
         }
-        if in_extern {
-            if let Some(name) = parse_static_mut_name(trimmed) {
-                names.mutable.insert(name);
-            } else if let Some(name) = parse_static_name(trimmed) {
-                names.immutable.insert(name);
-            }
-            if trimmed.contains('}') {
-                in_extern = false;
-            }
+        if let Some(name) = parse_static_mut_name(trimmed) {
+            names.mutable.insert(name);
+        } else if in_extern && let Some(name) = parse_static_name(trimmed) {
+            names.immutable.insert(name);
+        }
+        if in_extern && trimmed.contains('}') {
+            in_extern = false;
         }
     }
     names
@@ -358,7 +359,7 @@ fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
 /// loom routing), `Ffi` for immutable extern statics (linker-provided
 /// validity, same family as the declaration site). Returns `None` when no
 /// declared extern static is named.
-fn extern_static_use_family(masked: &str, statics: &ExternStaticNames) -> Option<OperationFamily> {
+fn global_static_use_family(masked: &str, statics: &GlobalStaticNames) -> Option<OperationFamily> {
     if statics
         .mutable
         .iter()
@@ -601,7 +602,7 @@ pub(super) struct DetectedSyntaxSite {
 fn detect_syntax_sites(
     parsed: &ParsedSource,
     extern_names: &BTreeSet<String>,
-    extern_statics: &ExternStaticNames,
+    global_statics: &GlobalStaticNames,
     local_modules: &BTreeSet<String>,
 ) -> (Vec<DetectedSyntaxSite>, disposition::NonNullDecisions) {
     let mut sites = Vec::new();
@@ -622,7 +623,7 @@ fn detect_syntax_sites(
             unsafe_fn_ranges: &unsafe_fn_ranges,
             operation_block_ranges: &operation_block_ranges,
             extern_names,
-            extern_statics,
+            global_statics,
             local_modules,
             nonnull: &nonnull,
         }) else {
@@ -835,7 +836,7 @@ struct SyntaxSiteCtx<'a> {
     unsafe_fn_ranges: &'a [(usize, usize)],
     operation_block_ranges: &'a BTreeSet<(usize, usize)>,
     extern_names: &'a BTreeSet<String>,
-    extern_statics: &'a ExternStaticNames,
+    global_statics: &'a GlobalStaticNames,
     local_modules: &'a BTreeSet<String>,
     nonnull: &'a disposition::NonNullDecisions,
 }
@@ -848,7 +849,7 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         unsafe_fn_ranges,
         operation_block_ranges,
         extern_names,
-        extern_statics,
+        global_statics,
         local_modules,
         nonnull,
     } = ctx;
@@ -929,7 +930,7 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
             if compact.starts_with("unsafe {")
                 && !operation_block_ranges.contains(&(fact.start, fact.end))
                 && let Some(family) =
-                    extern_static_use_family(&masked_compact_for_ffi(), extern_statics) =>
+                    global_static_use_family(&masked_compact_for_ffi(), global_statics) =>
         {
             Some((UnsafeSiteKind::Operation, family))
         }

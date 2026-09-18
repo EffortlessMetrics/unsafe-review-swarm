@@ -1916,6 +1916,8 @@ pub fn read_raw(ptr: *const u8) -> u8 {
         // Drift-lock for #2289: the safety reasoning lives at the use, not
         // the declaration. Uses of extern statics inside unsafe blocks must
         // name their hazard family instead of falling to unknown/unknown.
+        // Extended for #2290: file-local `static mut` uses card the same way;
+        // immutable file-local statics stay silent (their reads are safe).
         let output = temp_source_output(
             "unsafe-review-extern-static-uses",
             r#"unsafe extern "C" {
@@ -1923,12 +1925,23 @@ pub fn read_raw(ptr: *const u8) -> u8 {
     static mut COUNTER: u64;
 }
 
+static mut LOCAL_COUNTER: u64 = 0;
+static IMMUTABLE: u64 = 7;
+
 pub fn flag() -> u32 {
     unsafe { CONFIG_FLAG }
 }
 
 pub fn bump() {
     unsafe { COUNTER += 1; }
+}
+
+pub fn bump_local() {
+    unsafe { LOCAL_COUNTER += 1; }
+}
+
+pub fn read_immutable() -> u64 {
+    IMMUTABLE
 }
 "#,
         )?;
@@ -1944,6 +1957,16 @@ pub fn bump() {
         assert!(
             owned.contains(&(Some("bump".to_string()), OperationFamily::StaticMut)),
             "extern static mut write must card as StaticMut, got: {owned:?}"
+        );
+        assert!(
+            owned.contains(&(Some("bump_local".to_string()), OperationFamily::StaticMut)),
+            "file-local static mut write must card as StaticMut, got: {owned:?}"
+        );
+        assert!(
+            owned
+                .iter()
+                .all(|(owner, _)| owner.as_deref() != Some("read_immutable")),
+            "immutable static read must not card, got: {owned:?}"
         );
         Ok(())
     }

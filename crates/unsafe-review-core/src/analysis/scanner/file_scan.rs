@@ -1,6 +1,6 @@
 use super::{
-    ScannedSite, detect_syntax_sites, disposition, extern_fn_names, extern_static_names,
-    fallback_scan, js_buffer_reentry, js_native_ffi_byte_source, js_shared_byte_source,
+    ScannedSite, detect_syntax_sites, disposition, extern_fn_names, fallback_scan,
+    global_static_names, js_buffer_reentry, js_native_ffi_byte_source, js_shared_byte_source,
     local_module_names, panic_from_safe_js, syntax_scan,
 };
 use crate::input::diff::DiffIndex;
@@ -38,10 +38,10 @@ pub(crate) fn scan_file(
     let lines: Vec<&str> = text.lines().collect();
     let parsed = super::super::syntax::parse_source(text.as_str());
     let extern_names = extern_fn_names(&lines);
-    let extern_statics = extern_static_names(&lines);
+    let global_statics = global_static_names(&lines);
     let local_modules = local_module_names(&lines);
     let (syntax_sites, nonnull) =
-        detect_syntax_sites(&parsed, &extern_names, &extern_statics, &local_modules);
+        detect_syntax_sites(&parsed, &extern_names, &global_statics, &local_modules);
     let syntax_index = syntax_scan::SyntaxSiteIndex::new(&parsed, &syntax_sites);
     let mut seen = BTreeSet::new();
 
