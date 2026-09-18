@@ -1,17 +1,19 @@
-use super::operation_scope::source_before_operation;
+use super::operation_scope::source_before_site_operation;
 use super::{
     any_marker_occurrence, compact_code, contains_simple_assignment_to, is_receiver_path_char,
     receiver_before_marker, strip_block_comments_and_literals,
 };
+use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
 
 pub(super) fn maybeuninit_assume_init_discharge_state(
+    site: &ScannedSite,
     family: &OperationFamily,
     expression: &str,
     lower: &str,
 ) -> Option<EvidenceState> {
     if family == &OperationFamily::MaybeUninitAssumeInit
-        && has_maybeuninit_assume_init_initialization_evidence(expression, lower)
+        && has_maybeuninit_assume_init_initialization_evidence(site, expression, lower)
     {
         Some(EvidenceState::present(
             "MaybeUninit initialization evidence was detected before assume_init",
@@ -22,13 +24,14 @@ pub(super) fn maybeuninit_assume_init_discharge_state(
 }
 
 pub(super) fn has_maybeuninit_assume_init_initialization_evidence(
+    site: &ScannedSite,
     expression: &str,
     lower: &str,
 ) -> bool {
     let Some(receiver) = maybeuninit_assume_init_receiver(expression) else {
         return false;
     };
-    let Some(before_operation) = source_before_operation(lower, expression) else {
+    let Some(before_operation) = source_before_site_operation(site, lower, expression) else {
         return false;
     };
     let cleaned = strip_block_comments_and_literals(&before_operation);

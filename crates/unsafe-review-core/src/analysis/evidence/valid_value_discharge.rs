@@ -20,7 +20,7 @@ pub(super) fn valid_value_discharge_state(site: &ScannedSite, lower: &str) -> Ev
             "Same-receiver Option/Result state evidence was detected before unwrap_unchecked",
         )
     } else if family == &OperationFamily::Transmute
-        && has_transmute_u8_bool_valid_value_evidence(lower, &site.operation.expression)
+        && has_transmute_u8_bool_valid_value_evidence(site, lower, &site.operation.expression)
     {
         EvidenceState::present("Transmute u8-to-bool valid-value evidence was detected")
     } else {

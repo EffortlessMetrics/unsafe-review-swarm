@@ -4,7 +4,7 @@ use crate::domain::{EvidenceState, OperationFamily};
 
 pub(super) fn layout_discharge_state(site: &ScannedSite, lower: &str) -> EvidenceState {
     if site.operation.family == OperationFamily::Transmute
-        && has_transmute_layout_size_evidence(lower, &site.operation.expression)
+        && has_transmute_layout_size_evidence(site, lower, &site.operation.expression)
     {
         EvidenceState::present("Transmute layout size evidence was detected")
     } else {

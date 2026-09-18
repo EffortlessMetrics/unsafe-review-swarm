@@ -2,7 +2,7 @@ use crate::analysis::scanner::ScannedSite;
 
 use super::{
     any_compact_if_condition, any_marker_occurrence, any_marker_tail,
-    branch_still_open_at_operation, code_before_operation, compact_code,
+    branch_still_open_at_operation, code_before_site_operation, compact_code,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
     contains_simple_assignment_to, ends_with_some_pattern, is_receiver_path_char,
     match_some_branch_after_marker, matching_code_block_end, receiver_before_marker,
@@ -24,7 +24,7 @@ pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
 /// no such guard was found.
 pub(super) fn nullability_guard_pointer(site: &ScannedSite, lower: &str) -> Option<String> {
     let guard_compact = || {
-        let guard_scope = code_before_operation(lower, &site.operation.expression)
+        let guard_scope = code_before_site_operation(site, lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
         compact_code(&strip_block_comments_and_literals(&guard_scope))
     };
@@ -59,7 +59,7 @@ fn has_unnamed_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
     let stripped = strip_block_comments_and_literals(lower);
     let compact = compact_code(&stripped);
     if let Some(receiver) = raw_pointer_deref_receiver(&site.operation.expression) {
-        let guard_scope = code_before_operation(lower, &site.operation.expression)
+        let guard_scope = code_before_site_operation(site, lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
         let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
         return RawPointerNullContext::new(&guard_compact, receiver).has_null_guard();

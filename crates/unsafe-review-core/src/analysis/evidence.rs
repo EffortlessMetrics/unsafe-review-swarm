@@ -90,7 +90,7 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::initialized_discharge::initialized_discharge_state;
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
-use self::operation_scope::code_before_operation;
+use self::operation_scope::code_before_site_operation;
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_pointer_arithmetic_bounds_guard;

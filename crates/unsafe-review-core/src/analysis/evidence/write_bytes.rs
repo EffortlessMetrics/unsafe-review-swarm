@@ -1,5 +1,5 @@
 use super::{
-    code_before_operation, compact_code, has_u8_bool_value_guard, is_receiver_path_char,
+    code_before_site_operation, compact_code, has_u8_bool_value_guard, is_receiver_path_char,
     matching_call_argument_end, source_value_identifier, split_top_level_pair,
     strip_block_comments_and_literals,
 };
@@ -74,7 +74,9 @@ fn has_maybeuninit_write_bytes_target_context(
     if context.receiver.contains("maybeuninit") {
         return true;
     }
-    let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
+    let Some(before_operation) =
+        code_before_site_operation(site, lower, &site.operation.expression)
+    else {
         return false;
     };
 
@@ -124,6 +126,7 @@ pub(super) fn has_u8_write_bytes_context(site: &ScannedSite, lower: &str) -> boo
     };
 
     pointer_binding_has_type_before_operation(
+        site,
         lower,
         &site.operation.expression,
         context.receiver,
@@ -138,6 +141,7 @@ pub(super) fn has_bool_write_bytes_pointer_context(site: &ScannedSite, lower: &s
     };
 
     pointer_binding_has_type_before_operation(
+        site,
         lower,
         &site.operation.expression,
         context.receiver,
@@ -153,11 +157,14 @@ pub(super) fn has_bool_write_bytes_value_evidence(site: &ScannedSite, lower: &st
     let Some(byte) = source_value_identifier(context.byte) else {
         return false;
     };
-    let Some(before_operation) = code_before_operation(lower, &site.operation.expression) else {
+    let Some(before_operation) =
+        code_before_site_operation(site, lower, &site.operation.expression)
+    else {
         return false;
     };
 
     pointer_binding_has_type_before_operation(
+        site,
         lower,
         &site.operation.expression,
         context.receiver,
@@ -249,12 +256,13 @@ fn matching_open_for_trailing_call(text: &str) -> Option<usize> {
 }
 
 fn pointer_binding_has_type_before_operation(
+    site: &ScannedSite,
     lower: &str,
     expression: &str,
     receiver: &str,
     pointer_type: &str,
 ) -> bool {
-    let Some(before_operation) = code_before_operation(lower, expression) else {
+    let Some(before_operation) = code_before_site_operation(site, lower, expression) else {
         return false;
     };
     before_operation.contains(&format!("{receiver}:{pointer_type}"))
