@@ -74,6 +74,7 @@ pub(super) fn detect_js_shared_byte_sites(
             operation: UnsafeOperation {
                 family: OperationFamily::StableByteSourceSabRace,
                 expression: js_shared_byte_expression(shared, materialize),
+                bound_name: None,
             },
             context_before,
             context_after,

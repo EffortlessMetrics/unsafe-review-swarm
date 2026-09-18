@@ -1386,6 +1386,7 @@ fn agent_packet_coverage_agent_lsp_readiness_matches_agent_readiness_state() -> 
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),
                 family: OperationFamily::RawPointerDeref,
+                bound_name: None,
             },
             hazards: vec![HazardKind::PointerValidity],
             obligations: vec![],

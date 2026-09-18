@@ -239,6 +239,7 @@ mod tests {
             operation: UnsafeOperation {
                 expression: "pub unsafe fn f() {}".to_string(),
                 family: OperationFamily::UnsafeDeclaration,
+                bound_name: None,
             },
             hazards: vec![HazardKind::Unknown],
             obligations: vec![],

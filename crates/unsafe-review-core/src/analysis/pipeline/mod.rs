@@ -6332,6 +6332,66 @@ unsafe extern "C" {
     }
 
     #[test]
+    fn ffi_bound_return_reports_checked_discharge() -> Result<(), String> {
+        let output = fixture_output("ffi_return_value_checked_guard")?;
+        let card = single_card("ffi_return_value_checked_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .any(|evidence| evidence.obligation.key == "return-value"),
+            "a bound FFI return must carry the return-value obligation"
+        );
+        assert!(obligation_discharge_present(card, "return-value"));
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_bound_return_without_check_reports_missing_discharge() -> Result<(), String> {
+        for fixture in [
+            "ffi_return_value_unchecked_not_guard",
+            "ffi_return_value_debug_assert_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .any(|evidence| evidence.obligation.key == "return-value"),
+                "{fixture}: a bound FFI return must carry the return-value obligation"
+            );
+            assert!(
+                !obligation_discharge_present(card, "return-value"),
+                "{fixture}: an unchecked or debug_assert-only return must stay missing"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_discarded_return_carries_no_return_value_obligation() -> Result<(), String> {
+        for fixture in [
+            "ffi_return_value_ignored_no_obligation",
+            "ffi_return_value_discard_no_obligation",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "return-value"),
+                "{fixture}: an ignored or discarded FFI return must not gain the obligation"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn card_identity_counts_duplicate_sites() -> Result<(), String> {
         let output = fixture_output("duplicate_raw_pointer_reads")?;
         if output.cards.len() != 2 {

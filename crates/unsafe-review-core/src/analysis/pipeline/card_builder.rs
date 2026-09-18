@@ -17,7 +17,12 @@ pub(super) fn build_card(
     scanned_site: crate::analysis::scanner::ScannedSite,
 ) -> ReviewCard {
     let hazards = obligations::hazards_for(&scanned_site.operation.family);
-    let obligations = obligations::obligations_for(&scanned_site.operation.family);
+    let mut obligations = obligations::obligations_for(&scanned_site.operation.family);
+    if scanned_site.operation.family == OperationFamily::Ffi {
+        obligations.extend(obligations::ffi_return_value_obligation(
+            scanned_site.operation.bound_name.as_deref(),
+        ));
+    }
     let contract = evidence::contract_evidence(&scanned_site);
     let contract_for_classification = operation_contract_override(&scanned_site.operation.family)
         .unwrap_or_else(|| contract.clone());

@@ -1,0 +1,64 @@
+# Issue-linked work specification for the FFI return-value guard slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2232"
+kind = "correctness"
+objective = "Implement the #2232 decided local fix for the batch-proven return-value miss: attach a return_value obligation to FFI cards whose call binds its return, and recognize an explicit post-call check with a diverging error arm as discharge, while debug_assert-only and unchecked bindings stay missing."
+user_outcome = "A PR that adds a real return-value check to an FFI call (the getrandom-811 shape) gets credit for it; a PR that merely debug_asserts or ignores the return does not. Reviews stop crying wolf on fixed FFI error handling and stop staying silent about unchecked bound returns."
+claim_boundary = "This slice proves one guard shape with paired fixtures and re-blessed goldens; it does not claim match-statement guards, assert!() credit, nested/tail-position capture, distance-domination reasoning, dispatch migration, calibrated accuracy, safety, execution, or policy readiness. The frozen #2224-PR1 batch artifacts are historical evidence and stay untouched."
+
+[scope]
+included = [
+    "Site-conditional return_value obligation for OperationFamily::Ffi: attached only when the call expression binds its return to a named local (let NAME = / NAME =); bare-statement calls and let _ discards gain no new obligation",
+    "New evidence/return_value_discharge.rs recognizer: present only for an if-condition check on the bound name positioned after the binding with a diverging failure arm (return, ?, panic!/unreachable!/todo!/unimplemented!, or Err construction)",
+    "evidence.rs discharge match arm for the return_value key",
+    "card_builder wiring for the Ffi family through the obligations module (family-level obligations_for signature unchanged)",
+    "Five fixtures with expected.cards.json goldens: checked guard present, bound-but-unchecked missing, debug_assert-only missing, ignored-call no obligation, underscore-discard no obligation",
+    "Detector-contract fixture list registration for the new fixtures where the checker requires coverage",
+    "Paired card-level tests (checked vs unchecked vs debug_assert) plus recognizer unit tests in the repository test layout",
+]
+excluded = [
+    "match-statement return checks (recorded follow-up, not this slice)",
+    "assert!() as discharge (stays missing; fail closed)",
+    "Nested-call and tail-position return flow (silence over noise; recorded follow-up)",
+    "Distance-domination bounds reasoning (memchr class; separate #2232 follow-up seed)",
+    "Changes to existing FFI goldens: ignored-return fixtures must stay byte-identical",
+    "Dispatch migration, HIR/MIR engines, target builds, calibration or policy claims",
+    "Any edit to docs/accuracy/batches/2224-pr1/ frozen artifacts; improvement shown via a fresh dated run only",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Existing ignored-return FFI fixtures gain no new obligation and their goldens stay byte-identical; the obligation attaches only to named bindings."
+note = "Fail-closed scoping: ambiguous flow (nested/tail) gets silence, not a missing-discharge obligation."
+
+[[invariant]]
+id = "INV-2"
+text = "debug_assert-only evidence never discharges a return_value obligation; release-compiled-out checks are not guards."
+
+[[invariant]]
+id = "INV-3"
+text = "A check on a different variable than the bound return name never discharges (same-name discipline); a check positioned before the binding never discharges (stale evidence)."
+
+[[acceptance]]
+id = "AC-2232-PR1-1"
+text = "The getrandom-811-shaped fixture (bound return plus if/else Err check) reports return-value discharge present; the bound-but-unchecked and debug_assert-only fixtures report it missing."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- ffi_bound_return return_value_discharge"]
+
+[[acceptance]]
+id = "AC-2232-PR1-2"
+text = "Ignored-call and underscore-discard fixtures emit FFI cards with no return-value obligation key at all."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- ffi_discarded_return"]
+
+[[acceptance]]
+id = "AC-2232-PR1-3"
+text = "New fixtures carry committed expected.cards.json goldens; only affected goldens change and each change has an explained before/after."
+proof = ["cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2232-PR1-4"
+text = "Full workspace proof stays green with no blanket golden regeneration."
+proof = ["cargo fmt --check", "cargo check --workspace --all-targets --locked", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2232-pr1-ffi-return-value"
+notes = "Batch datum: #2224-PR1 getrandom-811-S1 (obligations_correct=false for the missing return-value obligation and uncredited check). Distance-domination follow-up seed goes back to #2232 with the memchr datum. Coordinate obligation-key vocabulary with the #2224-PR2 canonical family list."

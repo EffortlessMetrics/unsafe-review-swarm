@@ -31,6 +31,7 @@ mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod reach_scan;
 mod receiver_path;
+mod return_value_discharge;
 mod set_len;
 mod site_context;
 mod source_value;
@@ -102,6 +103,7 @@ use self::receiver_path::{
     contains_receiver_fragment, contains_receiver_path, is_receiver_path_char,
     receiver_before_marker,
 };
+use self::return_value_discharge::return_value_discharge_state;
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
 use self::target_feature_discharge::target_feature_discharge_state;
@@ -163,6 +165,7 @@ fn discharge_state_for(
         "valid-value" => valid_value_discharge_state(site, lower),
         "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
+        "return-value" => return_value_discharge_state(site),
         "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),
@@ -212,6 +215,7 @@ mod tests {
             operation: UnsafeOperation {
                 family,
                 expression: snippet.to_string(),
+                bound_name: None,
             },
             context_before: context_before.into_iter().map(str::to_string).collect(),
             context_after: context_after.into_iter().map(str::to_string).collect(),

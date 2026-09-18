@@ -115,6 +115,7 @@ fn js_buffer_materialize_after_reentry_site(
         operation: UnsafeOperation {
             family: js_buffer_stable_byte_family(capture),
             expression: js_buffer_stable_byte_expression(capture, reentry, materialize),
+            bound_name: None,
         },
         context_before,
         context_after,
@@ -222,6 +223,7 @@ fn js_buffer_stale_span_use_site(
                 use_line,
                 stale_guard_idx.map(|idx| &owner_lines[idx]),
             ),
+            bound_name: None,
         },
         context_before,
         context_after,
