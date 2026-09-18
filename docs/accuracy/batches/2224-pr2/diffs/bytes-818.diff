@@ -1,0 +1,162 @@
+diff --git a/src/bytes.rs b/src/bytes.rs
+index 441ca80d7..40c902f53 100644
+--- a/src/bytes.rs
++++ b/src/bytes.rs
+@@ -367,34 +367,7 @@ impl Bytes {
+     /// Requires that `begin <= end` and `end <= self.len()`, otherwise slicing
+     /// will panic.
+     pub fn slice(&self, range: impl RangeBounds<usize>) -> Self {
+-        use core::ops::Bound;
+-
+-        let len = self.len();
+-
+-        let begin = match range.start_bound() {
+-            Bound::Included(&n) => n,
+-            Bound::Excluded(&n) => n.checked_add(1).expect("out of range"),
+-            Bound::Unbounded => 0,
+-        };
+-
+-        let end = match range.end_bound() {
+-            Bound::Included(&n) => n.checked_add(1).expect("out of range"),
+-            Bound::Excluded(&n) => n,
+-            Bound::Unbounded => len,
+-        };
+-
+-        assert!(
+-            begin <= end,
+-            "range start must not be greater than end: {:?} <= {:?}",
+-            begin,
+-            end,
+-        );
+-        assert!(
+-            end <= len,
+-            "range end out of bounds: {:?} <= {:?}",
+-            end,
+-            len,
+-        );
++        let (begin, end) = crate::range(range, self.len());
+ 
+         if end == begin {
+             return Bytes::new_empty_with_ptr(self.ptr.wrapping_add(begin));
+diff --git a/src/bytes_mut.rs b/src/bytes_mut.rs
+index 1ad70311c..8766b1765 100644
+--- a/src/bytes_mut.rs
++++ b/src/bytes_mut.rs
+@@ -880,6 +880,41 @@ impl BytesMut {
+         }
+     }
+ 
++    /// Clones the elements in the given `range` within this `BytesMut` and
++    /// appends them to the end.
++    ///
++    /// # Panics
++    ///
++    /// Panics if `range` is out of bounds for this `BytesMut`.
++    ///
++    /// # Examples
++    ///
++    /// ```
++    /// use bytes::BytesMut;
++    ///
++    /// let mut buf = BytesMut::with_capacity(0);
++    /// buf.extend_from_slice(b"aaabbb_");
++    /// buf.extend_from_within(3..6);
++    ///
++    /// assert_eq!(b"aaabbb_bbb", &buf[..]);
++    /// ```
++    pub fn extend_from_within(&mut self, range: impl core::ops::RangeBounds<usize>) {
++        let (begin, end) = crate::range(range, self.len());
++
++        let cnt = end - begin;
++        self.reserve(cnt);
++
++        // SAFETY: range is already checked
++        let src = unsafe { self.as_ptr().add(begin) };
++        let dst = self.spare_capacity_mut();
++
++        // SAFETY: range doesn't overlap with spare capacity
++        unsafe { ptr::copy_nonoverlapping(src, dst.as_mut_ptr().cast(), cnt) }
++
++        // SAFETY: capacity is already reserved and filled with data
++        unsafe { self.advance_mut(cnt) }
++    }
++
+     /// Absorbs a `BytesMut` that was previously split off if they are
+     /// contiguous, otherwise appends its bytes to this `BytesMut`.
+     ///
+diff --git a/src/lib.rs b/src/lib.rs
+index fb5c506e8..1916b6043 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -129,6 +129,43 @@ fn min_u64_usize(a: u64, b: usize) -> usize {
+     }
+ }
+ 
++/// Performs bounds checking of a range.
++///
++/// This is a spiritual copy of [core::slice::index::range] because that
++/// function is currently unstable.
++#[inline(always)]
++#[track_caller]
++fn range(range: impl core::ops::RangeBounds<usize>, len: usize) -> (usize, usize) {
++    use core::ops::Bound;
++
++    let begin = match range.start_bound() {
++        Bound::Included(&n) => n,
++        Bound::Excluded(&n) => n.checked_add(1).expect("out of range"),
++        Bound::Unbounded => 0,
++    };
++
++    let end = match range.end_bound() {
++        Bound::Included(&n) => n.checked_add(1).expect("out of range"),
++        Bound::Excluded(&n) => n,
++        Bound::Unbounded => len,
++    };
++
++    assert!(
++        begin <= end,
++        "range start must not be greater than end: {:?} <= {:?}",
++        begin,
++        end,
++    );
++    assert!(
++        end <= len,
++        "range end out of bounds: {:?} <= {:?}",
++        end,
++        len,
++    );
++
++    (begin, end)
++}
++
+ /// Error type for the `try_get_` methods of [`Buf`].
+ /// Indicates that there were not enough remaining
+ /// bytes in the buffer while attempting
+diff --git a/tests/test_bytes.rs b/tests/test_bytes.rs
+index ec9a60e6c..bdaa47c9b 100644
+--- a/tests/test_bytes.rs
++++ b/tests/test_bytes.rs
+@@ -607,6 +607,23 @@ fn extend_from_slice_mut() {
+     }
+ }
+ 
++#[test]
++fn extend_from_within_normal() {
++    let mut bytes = BytesMut::new();
++    bytes.extend_from_slice(&LONG[..23]);
++    bytes.extend_from_within(10..22);
++    bytes.extend_from_within(22..35);
++    assert_eq!(LONG[..], *bytes);
++}
++
++#[test]
++#[should_panic]
++fn extend_from_within_out_of_range() {
++    let mut bytes = BytesMut::new();
++    bytes.extend_from_slice(&LONG[..23]);
++    bytes.extend_from_within(23..=23);
++}
++
+ #[test]
+ fn extend_mut_from_bytes() {
+     let mut bytes = BytesMut::with_capacity(0);

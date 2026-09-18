@@ -1,8 +1,8 @@
-//! #2224-PR1 seam-batch evaluator.
+//! #2224 seam-batch evaluator.
 //!
-//! Manifest-only, offline validation of the first real-PR seam denominator
-//! batch under `docs/accuracy/batches/2224-pr1/`. The checker recomputes
-//! every reported count from the committed rows and fails closed on anything
+//! Manifest-only, offline validation of the real-PR seam denominator
+//! batches under `docs/accuracy/batches/`. The checker recomputes every
+//! reported count from the committed rows and fails closed on anything
 //! unaccounted: unmapped cards, unmapped seams, tally disagreements, and
 //! hash mismatches on the frozen diffs and outputs.
 //!
@@ -16,10 +16,16 @@ use sha2::{Digest, Sha256};
 
 use crate::{parse_toml_file, workspace_path};
 
-const BATCH_DIR: &str = "docs/accuracy/batches/2224-pr1";
+const BATCH_DIRS: &[&str] = &[
+    "docs/accuracy/batches/2224-pr1",
+    "docs/accuracy/batches/2224-pr2",
+];
 
 pub(crate) fn check() -> Result<(), String> {
-    check_dir(&workspace_path(BATCH_DIR))
+    for dir in BATCH_DIRS {
+        check_dir(&workspace_path(dir))?;
+    }
+    Ok(())
 }
 
 pub(crate) fn check_dir(dir: &Path) -> Result<(), String> {
@@ -36,7 +42,8 @@ pub(crate) fn check_dir(dir: &Path) -> Result<(), String> {
     tally.require_equal(&stated)?;
 
     println!(
-        "check-seam-batch: ok (seams={} matched={} missing={} unknown={} cards={} useful={} quiet={} challenges={}/{})",
+        "check-seam-batch: ok batch={} (seams={} matched={} missing={} unknown={} cards={} useful={} quiet={} challenges={}/{})",
+        dir.display(),
         tally.expected_seams,
         tally.matched,
         tally.missing,

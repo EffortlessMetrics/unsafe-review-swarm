@@ -1,0 +1,484 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/acc-pr2/parking_lot",
+  "summary": {
+    "rust_files": 39,
+    "changed_files": 1,
+    "changed_rust_files": 1,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 4,
+    "cards": 4,
+    "open_actionable_gaps": 4,
+    "contract_missing": 2,
+    "guard_missing": 0,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 2,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 4,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-fb85dcdb09cc-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "lock_api/src/mutex.rs",
+        "line": 687,
+        "column": 1,
+        "kind": "unsafe_impl",
+        "owner": "unknown",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where R::GuardMarker: Send {"
+      },
+      "operation": "#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where R::GuardMarker: Send {",
+      "operation_family": "unknown",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe contract could not be inferred from this syntax shape"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "unknown",
+          "description": "unsafe contract could not be inferred from this syntax shape",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No owner function could be inferred"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No owner function could be inferred",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where R::GuardMarker: Send {`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-fb85dcdb09cc-unknown-c1` still maps to `#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where R::GuardMarker: Send {` at `lock_api/src/mutex.rs:687:1` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-bb2288b4daa0-send_sync_invariant-c1",
+      "class": "requires_loom",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "mutation_miri_model",
+      "site": {
+        "file": "lock_api/src/mutex.rs",
+        "line": 688,
+        "column": 1,
+        "kind": "unsafe_impl_send",
+        "owner": "ArcMutexGuard",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where"
+      },
+      "operation": "unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where",
+      "operation_family": "unsafe_impl_send_sync",
+      "hazards": [
+        "send_sync_invariant",
+        "atomic_ordering"
+      ],
+      "obligations": [
+        "internal mutation and aliasing invariants uphold Send/Sync contract"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "thread-safety",
+          "description": "internal mutation and aliasing invariants uphold Send/Sync contract",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `ArcMutexGuard` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `ArcMutexGuard` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "loom",
+          "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "required": false
+        },
+        {
+          "kind": "shuttle",
+          "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+          "command": "cargo test ArcMutexGuard_shuttle -- --nocapture",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or update a Loom/Shuttle model for the changed concurrency invariant.",
+      "verify_commands": [
+        "cargo test ArcMutexGuard_loom -- --nocapture",
+        "cargo test ArcMutexGuard_shuttle -- --nocapture"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "route_kind": "loom",
+          "summary": "No test reaches `ArcMutexGuard` yet; write or identify a focused test for `ArcMutexGuard` first, then build/run `cargo test ArcMutexGuard_loom -- --nocapture` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "route_kind": "loom",
+          "steps": [
+            "Confirm ReviewCard `UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-bb2288b4daa0-send_sync_invariant-c1` still maps to `unsafe impl<R: RawMutex + Send + Sync, T: Send + ?Sized> Send for ArcMutexGuard<R, T> where` at `lock_api/src/mutex.rs:688:1` before upgrading confidence.",
+            "Write or identify a focused test for `ArcMutexGuard` first (no test reaches it yet), then build/run `cargo test ArcMutexGuard_loom -- --nocapture` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `ArcMutexGuard` first (no test reaches it yet), then build/run `cargo test ArcMutexGuard_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "requires_witness_receipt"
+      }
+    },
+    {
+      "id": "UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-2c0ad5b75588-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "lock_api/src/mutex.rs",
+        "line": 692,
+        "column": 1,
+        "kind": "unsafe_impl",
+        "owner": "unknown",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where R::GuardMarker: Sync {"
+      },
+      "operation": "#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where R::GuardMarker: Sync {",
+      "operation_family": "unknown",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe contract could not be inferred from this syntax shape"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "unknown",
+          "description": "unsafe contract could not be inferred from this syntax shape",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No owner function could be inferred"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No owner function could be inferred",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where R::GuardMarker: Sync {`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-2c0ad5b75588-unknown-c1` still maps to `#[cfg(feature = \"arc_lock\")] unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where R::GuardMarker: Sync {` at `lock_api/src/mutex.rs:692:1` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_sync-unsafe_impl_send_sync-unsafe-impl-send-sync-aaf1622af06e-send_sync_invariant-c1",
+      "class": "requires_loom",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "mutation_miri_model",
+      "site": {
+        "file": "lock_api/src/mutex.rs",
+        "line": 693,
+        "column": 1,
+        "kind": "unsafe_impl_sync",
+        "owner": "ArcMutexGuard",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where"
+      },
+      "operation": "unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where",
+      "operation_family": "unsafe_impl_send_sync",
+      "hazards": [
+        "send_sync_invariant",
+        "atomic_ordering"
+      ],
+      "obligations": [
+        "internal mutation and aliasing invariants uphold Send/Sync contract"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "thread-safety",
+          "description": "internal mutation and aliasing invariants uphold Send/Sync contract",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `ArcMutexGuard` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `ArcMutexGuard` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "loom",
+          "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "required": false
+        },
+        {
+          "kind": "shuttle",
+          "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+          "command": "cargo test ArcMutexGuard_shuttle -- --nocapture",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or update a Loom/Shuttle model for the changed concurrency invariant.",
+      "verify_commands": [
+        "cargo test ArcMutexGuard_loom -- --nocapture",
+        "cargo test ArcMutexGuard_shuttle -- --nocapture"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `requires_loom` ReviewCard for `unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "route_kind": "loom",
+          "summary": "No test reaches `ArcMutexGuard` yet; write or identify a focused test for `ArcMutexGuard` first, then build/run `cargo test ArcMutexGuard_loom -- --nocapture` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo test ArcMutexGuard_loom -- --nocapture",
+          "route_kind": "loom",
+          "steps": [
+            "Confirm ReviewCard `UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_sync-unsafe_impl_send_sync-unsafe-impl-send-sync-aaf1622af06e-send_sync_invariant-c1` still maps to `unsafe impl<R: RawMutex + Sync, T: Sync + ?Sized> Sync for ArcMutexGuard<R, T> where` at `lock_api/src/mutex.rs:693:1` before upgrading confidence.",
+            "Write or identify a focused test for `ArcMutexGuard` first (no test reaches it yet), then build/run `cargo test ArcMutexGuard_loom -- --nocapture` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `ArcMutexGuard` first (no test reaches it yet), then build/run `cargo test ArcMutexGuard_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_selected",
+        "agent_lsp_readiness": "requires_witness_receipt"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T05:35:33Z",
+    "root_abs": "/tmp/acc-pr2/parking_lot",
+    "diff_path": "docs/accuracy/batches/2224-pr2/diffs/parking_lot-349.diff",
+    "diff_sha256": "2314eae50eb4d392df92deea970a629b1a20ad1c0c9ca482c841efc9741e70f5",
+    "dirty_worktree": false
+  }
+}

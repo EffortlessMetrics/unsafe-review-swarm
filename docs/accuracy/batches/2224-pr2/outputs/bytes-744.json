@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/acc-pr2/bytes",
+  "summary": {
+    "rust_files": 33,
+    "changed_files": 1,
+    "changed_rust_files": 1,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 0,
+    "cards": 0,
+    "open_actionable_gaps": 0,
+    "contract_missing": 0,
+    "guard_missing": 0,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 0,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T05:35:44Z",
+    "root_abs": "/tmp/acc-pr2/bytes",
+    "diff_path": "/home/steven/code/Rust/unsafe-review-swarm-2224-pr2/docs/accuracy/batches/2224-pr2/diffs/bytes-744.diff",
+    "diff_sha256": "c61ca9b31781502ea4fd8f49a99346918189ff6af691af6f9ba0b52f029c1aa4",
+    "dirty_worktree": false
+  }
+}

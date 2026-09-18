@@ -1,0 +1,496 @@
+# #2224 PR2 card-to-seam mapping.
+#
+# Mapped from the frozen outputs, after the source-first inventory was
+# committed. This file never edits seams.toml; disagreements surface as
+# missing / wrongly-surfaced rows, inventory challenges, and visible
+# unresolved judgments. Counts in [tally] are recomputed by
+# check-seam-batch from these rows; the check fails on any disagreement.
+schema_version = "seam-batch-mapping/v1"
+batch = "2224-pr2"
+mapped_at = "2026-09-18T02:35:00Z"
+
+[mapper]
+type = "agent-drafted"
+identity = "muse-code session sunny-zaniah"
+provenance = "card-by-card judgment against head source after frozen outputs; draft evidence, not human adjudication"
+
+# Frozen first-run outputs. Re-running the analyzer is acquisition, not
+# checking: the checker verifies these bytes, it does not need network.
+[[outputs]]
+case = "crossbeam-1287"
+file = "outputs/crossbeam-1287.json"
+sha256 = "d507a5230dcdbd4c6a9953bfd4f26d55d71b743b67afa09a0fe582a19f4e97ab"
+
+[[outputs]]
+case = "crossbeam-1297"
+file = "outputs/crossbeam-1297.json"
+sha256 = "57cac7a41ca9c569f9f8f8c0731c39a733d4136da0e48e4d86f73d650a0b8f8e"
+
+[[outputs]]
+case = "bytes-597"
+file = "outputs/bytes-597.json"
+sha256 = "009f026ad066124dbf9b27bab8a688b36bb49fbe0691115dfbf0fcd6814b5098"
+
+[[outputs]]
+case = "bytes-818"
+file = "outputs/bytes-818.json"
+sha256 = "1d5a2c3e9a72d3f44418caad10f06dce2a36330767ea30919e4c40de4f1285a0"
+
+[[outputs]]
+case = "bytes-744"
+file = "outputs/bytes-744.json"
+sha256 = "397c856e00a8f5f28ba6b213003ecc77e42f1751734dca025b7ef2ea568ec659"
+
+[[outputs]]
+case = "parking_lot-349"
+file = "outputs/parking_lot-349.json"
+sha256 = "cbc47266e77a1b76f247d4cdea436ff3c3725183c51fb7162bca2ab700b95d5b"
+
+# ---- Seam results: one row per seams.toml row. ----
+
+[[seam_results]]
+seam = "crossbeam-1287-S1"
+outcome = "match"
+found_family = "unsafe_impl_send_sync"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-crossbeam-crossbeam-skiplist-src-base-rs-refrange-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-967232d92fae-send_sync_invariant-c1"]
+notes = "Both impls found with the canonical family. The card names the thread-safety obligation and correctly reports the missing contract, but claims no obligation-specific guard while the added K/V/C/R where-clauses on the card's own site carry the adequacy argument: missed bound credit. Next action is the same generic Loom/Shuttle text used for every Send/Sync card in the batch, not specific to a bound fix."
+
+[[seam_results]]
+seam = "crossbeam-1297-S1"
+outcome = "match"
+found_family = "raw_pointer_deref"
+family_correct = true
+obligations_correct = true
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-raw_pointer_deref-deref-f43edb6a8a90-pointer_validity-c1"]
+notes = "First deref of the unpin cluster carries the match; nine further cards on the same five lines are duplicates below. The card names live/deref obligations, correctly reports missing contract and no local guard, and does not credit the doc line. Establishment lives at the guard.rs call sites, which a definition-site card cannot see; that cross-function gap is noted, not penalized. Nine duplicates for one five-line function is the batch's loudest granularity noise."
+
+[[seam_results]]
+seam = "crossbeam-1297-S2"
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-crossbeam-crossbeam-epoch-src-guard-rs-drop-operation-unsafe_fn_call-unpin-8446fd3e5806-unknown-c1"]
+notes = "Guard::drop null-checked unpin call found with the right family. The card claims no visible local guard while if !self.local.is_null() dominates the call on the same lines: missed guard credit, the same blindness class as PR1's memchr/getrandom misses. The LocalHandle::drop release_handle card is a same-seam duplicate below."
+
+[[seam_results]]
+seam = "bytes-597-S1"
+outcome = "match"
+found_family = "unknown"
+family_correct = false
+obligations_correct = true
+over_credited = false
+useful = true
+action_correct = true
+action_specific = true
+action_feasible = true
+cards = ["UR-bytes-src-buf-buf-mut-rs-impl-unsafe_impl-unknown-impl-7a9731e95505-unknown-c1"]
+notes = "The new unsafe trait impl is found exactly, and the card correctly reports an uninferrable contract with missing discharge at impl granularity: the missing-contract call is right. But the family is unknown: the tool has no operation family for unsafe trait impls outside Send/Sync, so the canonical label unsafe_declaration I inventoried has no tool counterpart. That family gap is a PR2 finding, and the advance_mut declaration card is a same-cluster duplicate below."
+
+[[seam_results]]
+seam = "bytes-597-S2"
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-bytes-src-buf-buf-mut-rs-put-slice-operation-unsafe_fn_call-advance-mut-e0881139252c-unknown-c1"]
+notes = "The unchecked advance_mut call is found with the right family, but the card claims no visible local guard while the preceding copy_from_slice on the same range panics before the advance runs: missed dominating-guard credit. The demanded Safety section is feasible but generic; the card never mentions the dominating copy."
+
+[[seam_results]]
+seam = "bytes-597-S3"
+outcome = "match"
+found_family = "raw_pointer_write"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-e4635a1226cf-pointer_validity-c1"]
+notes = "The write_bytes site is found with the right family and full deref obligations, but the card claims no visible local guard while assert!(remaining_mut() >= cnt) dominates the write and the extension: missed assert credit. The verify commands name cargo +nightly miri/careful tests (put_bytes) that do not exist in the sampled repo; the documented action itself (a Safety section) stays feasible."
+
+[[seam_results]]
+seam = "bytes-818-S1"
+outcome = "match"
+found_family = "copy_nonoverlapping"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = false
+action_specific = true
+action_feasible = true
+cards = ["UR-bytes-src-bytes-mut-rs-extend-from-within-operation-copy_nonoverlapping-copy-nonoverlapping-3c0b515966d5-pointer_validity-c1"]
+notes = "The copy site is found with the right family, but the card claims no visible local guard while two SAFETY comments plus crate::range asserts plus reserve(cnt) establish every obligation on the same screen: the batch's clearest missed-guard case. The next action (add or expose guards) misdiagnoses: the guards exist, so the action is incorrect though feasible. The as_ptr().add(begin) setup line is an inventory-challenge card below, not part of this seam."
+
+[[seam_results]]
+seam = "bytes-818-S2"
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-bytes-src-bytes-mut-rs-extend-from-within-operation-unsafe_fn_call-advance-mut-70be7728808d-unknown-c1"]
+notes = "The length-extension call is found with the right family, but the card reports a generic callee-preconditions obligation with no guard while the SAFETY comment cites the reservation and the preceding copy initialized exactly cnt rows: missed linked-evidence credit. Judging this call in isolation without the copy is the wrong-obligation direction the seam rationale warned about; the card avoids it but only by staying generic."
+
+[[seam_results]]
+seam = "parking_lot-349-S1"
+outcome = "match"
+found_family = "unsafe_impl_send_sync"
+family_correct = true
+obligations_correct = false
+over_credited = false
+useful = true
+action_correct = true
+action_specific = false
+action_feasible = true
+cards = ["UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-bb2288b4daa0-send_sync_invariant-c1"]
+notes = "The Send impl is found with the canonical family including through the cfg(arc_lock) gate: gated code is covered, not skipped. The card correctly reports the missing contract but misses the GuardMarker where-clauses as discharge, same class as crossbeam-1287-S1. The Sync impl and both unknown-family declaration views are duplicates below; the unknown views sit on the #[cfg] attribute lines with the wrong family. Verify commands name ArcMutexGuard_loom/shuttle tests that do not exist in the sampled repo."
+
+# ---- Card results: one row per emitted card. ----
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-skiplist-src-base-rs-refrange-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-967232d92fae-send_sync_invariant-c1"
+case = "crossbeam-1287"
+disposition = "matched"
+of_seam = "crossbeam-1287-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the Send impl with the tightened bounds, the exact review unit of the soundness fix."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-skiplist-src-base-rs-refrange-unsafe_impl_sync-unsafe_impl_send_sync-unsafe-impl-send-sync-77599c5aba86-send_sync_invariant-c1"
+case = "crossbeam-1287"
+disposition = "duplicate"
+of_seam = "crossbeam-1287-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Same judgment on the Sync twin; no new review information beyond the primary."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-collector-rs-drop-operation-unsafe_fn_call-release-handle-eea4f589ec77-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S2"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Second drop site inside the same seam; the Guard::drop primary carries the review judgment."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-guard-rs-repin-after-operation-unsafe_fn_call-as-ref-9308453561b4-unknown-c1"
+case = "crossbeam-1297"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing context line in the repin path (as_ref on the pinned local); untouched by the PR, covers no seam."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-guard-rs-repin-after-operation-unsafe_fn_call-unpin-8446fd3e5806-unknown-c1"
+case = "crossbeam-1297"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing context line (old &self unpin call in the repin path); untouched by the PR, covers no seam."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-guard-rs-drop-operation-unsafe_fn_call-unpin-8446fd3e5806-unknown-c1"
+case = "crossbeam-1297"
+disposition = "matched"
+of_seam = "crossbeam-1297-S2"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the null-checked unpin call in Guard::drop, the changed drop path."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-unsafe_fn-unsafe_declaration-unpin-efeea00384fb-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Declaration view of the already-matched unpin deref cluster; no new review information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-unsafe_fn_call-unsafe-fn-call-e4677d83ba67-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Call-shape view of the first deref line; the deref primary carries the judgment."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-raw_pointer_deref-deref-f43edb6a8a90-pointer_validity-c1"
+case = "crossbeam-1297"
+disposition = "matched"
+of_seam = "crossbeam-1297-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: first raw deref of the unpin cluster with the canonical family."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-unsafe_fn_call-unsafe-fn-call-987bd5bcb7fe-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Call-shape view of the second deref line; same cluster, no new information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-raw_pointer_deref-deref-f43edb6a8a90-pointer_validity-c2"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Second deref line of the matched cluster; no new review information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-unsafe_fn_call-unsafe-fn-call-b5e5c7bb4a83-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Call-shape view of the third deref line; same cluster, no new information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-raw_pointer_deref-deref-f43edb6a8a90-pointer_validity-c3"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Third deref line of the matched cluster; no new review information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-unsafe_fn_call-unsafe-fn-call-f2d51f6a7973-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Call-shape view of the fourth deref line; same cluster, no new information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-raw_pointer_deref-deref-f43edb6a8a90-pointer_validity-c4"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Fourth deref line of the matched cluster; no new review information."
+
+[[card_results]]
+card = "UR-crossbeam-crossbeam-epoch-src-internal-rs-unpin-operation-unsafe_fn_call-finalize-f10b782374ac-unknown-c1"
+case = "crossbeam-1297"
+disposition = "duplicate"
+of_seam = "crossbeam-1297-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Raw finalize call inside the matched unpin body; same review unit, no new information."
+
+[[card_results]]
+card = "UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-aabaaee592fc-pointer_validity-c1"
+case = "bytes-597"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing &[u8] put_bytes write above the new impl (context line 1416); untouched by the PR, covers no seam."
+
+[[card_results]]
+card = "UR-bytes-src-buf-buf-mut-rs-impl-unsafe_impl-unknown-impl-7a9731e95505-unknown-c1"
+case = "bytes-597"
+disposition = "matched"
+of_seam = "bytes-597-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the new unsafe trait impl itself, flagged with missing contract exactly as inventoried (wrong tool family noted at the seam row)."
+
+[[card_results]]
+card = "UR-bytes-src-buf-buf-mut-rs-advance-mut-unsafe_fn-unsafe_declaration-advance-mut-fea4ee7b3b3e-unknown-c1"
+case = "bytes-597"
+disposition = "duplicate"
+of_seam = "bytes-597-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Declaration view of advance_mut inside the matched impl cluster; no new review information."
+
+[[card_results]]
+card = "UR-bytes-src-buf-buf-mut-rs-put-slice-operation-unsafe_fn_call-advance-mut-e0881139252c-unknown-c1"
+case = "bytes-597"
+disposition = "matched"
+of_seam = "bytes-597-S2"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the unchecked advance_mut call in put_slice with the canonical family."
+
+[[card_results]]
+card = "UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-e4635a1226cf-pointer_validity-c1"
+case = "bytes-597"
+disposition = "matched"
+of_seam = "bytes-597-S3"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the assert-dominated write_bytes site with the canonical family."
+
+[[card_results]]
+card = "UR-bytes-tests-test-buf-mut-rs-make-maybe-uninit-slice-operation-transmute-transmute-e4992462c09d-invalid_value-c1"
+case = "bytes-597"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = true
+reason = "Genuine seam the source-first inventory missed: the test helper transmutes &mut [u8] to &mut [MaybeUninit<u8>]. The transmute itself is the sanctioned same-layout conversion and carries its own SAFETY comment, which the card does not credit; as surfacing, a sound commented test helper is not reviewer-useful. Counts toward the challenge-adjusted tally, not the frozen tally."
+
+[[card_results]]
+card = "UR-bytes-src-bytes-mut-rs-extend-from-slice-operation-unsafe_fn_call-advance-mut-e4af05d24e6d-unknown-c1"
+case = "bytes-818"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing extend_from_slice advance_mut call (context line 878); untouched by the PR, covers no seam."
+
+[[card_results]]
+card = "UR-bytes-src-bytes-mut-rs-extend-from-within-operation-pointer_arithmetic-as-ptr-f9fd55f833b2-same_allocation-c1"
+case = "bytes-818"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = true
+action_feasible = true
+inventory_challenge = true
+reason = "Genuine seam the source-first inventory missed: as_ptr().add(begin) is real unchecked arithmetic feeding the copy, folded into S1's anchor only implicitly. The card misses the dominating crate::range check, but the site is reviewer-worthy. Counts toward the challenge-adjusted tally, not the frozen tally."
+
+[[card_results]]
+card = "UR-bytes-src-bytes-mut-rs-extend-from-within-operation-copy_nonoverlapping-copy-nonoverlapping-3c0b515966d5-pointer_validity-c1"
+case = "bytes-818"
+disposition = "matched"
+of_seam = "bytes-818-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the commented copy_nonoverlapping site with the canonical family."
+
+[[card_results]]
+card = "UR-bytes-src-bytes-mut-rs-extend-from-within-operation-unsafe_fn_call-advance-mut-70be7728808d-unknown-c1"
+case = "bytes-818"
+disposition = "matched"
+of_seam = "bytes-818-S2"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the length-extension call with the canonical family."
+
+[[card_results]]
+card = "UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-fb85dcdb09cc-unknown-c1"
+case = "parking_lot-349"
+disposition = "duplicate"
+of_seam = "parking_lot-349-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Declaration view of the matched Send impl sitting on its #[cfg] attribute line with the wrong (unknown) family; no new review information. The wrong-family-on-attribute pattern recurs on the Sync twin."
+
+[[card_results]]
+card = "UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_send-unsafe_impl_send_sync-unsafe-impl-send-sync-bb2288b4daa0-send_sync_invariant-c1"
+case = "parking_lot-349"
+disposition = "matched"
+of_seam = "parking_lot-349-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary: the Send impl with GuardMarker bounds, the exact review unit of the soundness fix."
+
+[[card_results]]
+card = "UR-parking-lot-lock-api-src-mutex-rs-unknown-unsafe_impl-unknown-unsafe-impl-2c0ad5b75588-unknown-c1"
+case = "parking_lot-349"
+disposition = "duplicate"
+of_seam = "parking_lot-349-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Declaration view of the matched Sync impl on its #[cfg] line with the wrong family; no new review information."
+
+[[card_results]]
+card = "UR-parking-lot-lock-api-src-mutex-rs-arcmutexguard-unsafe_impl_sync-unsafe_impl_send_sync-unsafe-impl-send-sync-aaf1622af06e-send_sync_invariant-c1"
+case = "parking_lot-349"
+disposition = "duplicate"
+of_seam = "parking_lot-349-S1"
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Sync twin of the matched Send impl; same judgment, no new review information beyond the primary."
+
+[tally]
+expected_seams = 9
+matched = 9
+missing = 0
+unknown = 0
+family_correct = 8
+family_total = 9
+over_credited = 0
+obligations_correct = 2
+obligations_total = 9
+emitted_cards = 30
+duplicates = 15
+wrongly_surfaced = 6
+useful = 10
+quiet_cards = 0
+challenge_seams = 2
+challenge_found = 1
+
