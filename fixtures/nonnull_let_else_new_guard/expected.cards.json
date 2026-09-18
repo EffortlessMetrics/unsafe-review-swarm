@@ -56,13 +56,13 @@
     "witness_routes": [
       {
         "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo +nightly miri test expose_nonnull_after_let_else",
         "required": false
       },
       {
         "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo +nightly careful test expose_nonnull_after_let_else",
         "required": false
       }
