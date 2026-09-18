@@ -68,6 +68,16 @@ impl DiffIndex {
             .is_some_and(|lines| lines.iter().any(|changed| changed.abs_diff(line) <= 6))
     }
 
+    /// Exact membership: the line itself was added by the diff (new-file
+    /// coordinates). Unlike [`Self::contains_near`], proximity does not
+    /// count: nearby context lines are in scan scope but are not introduced
+    /// by the diff.
+    pub(crate) fn contains_added_line(&self, path: &PathBuf, line: usize) -> bool {
+        self.changed_lines
+            .get(path)
+            .is_some_and(|lines| lines.contains(&line))
+    }
+
     pub(crate) fn contains_in_range(&self, path: &PathBuf, start: usize, end: usize) -> bool {
         self.changed_lines.get(path).is_some_and(|lines| {
             lines
