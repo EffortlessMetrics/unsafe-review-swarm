@@ -164,6 +164,7 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
     } else {
         None
     };
+    let role = source_role::classify_source_role(input.rel, input.lines, line_no);
     Some(ScannedSite {
         site: UnsafeSite {
             location: SourceLocation::new(
@@ -177,6 +178,7 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
             public_api_surface,
             changed,
             snippet: input.trimmed.to_string(),
+            role,
         },
         operation: UnsafeOperation {
             family: input.family,
@@ -227,6 +229,7 @@ pub(super) fn syntax_site(
         None
     };
     let context_after = context_after_for(lines, idx, is_ffi_call);
+    let role = source_role::classify_source_role(rel, lines, detected.line);
 
     Some(ScannedSite {
         site: UnsafeSite {
@@ -237,6 +240,7 @@ pub(super) fn syntax_site(
             public_api_surface,
             changed,
             snippet: detected.card_snippet.clone(),
+            role,
         },
         operation: UnsafeOperation {
             family: detected.family,

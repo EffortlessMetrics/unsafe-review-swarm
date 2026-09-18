@@ -23,6 +23,7 @@ pub use hazard::HazardKind;
 pub use ids::CardId;
 pub use location::SourceLocation;
 pub use obligation::SafetyObligation;
+pub(crate) use operation::SourceRole;
 pub use operation::{OperationFamily, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
 pub use receipt::{
     CargoCarefulReceiptInput, ConcurrencyReceiptInput, ExecutedReceiptInput, MiriReceiptInput,

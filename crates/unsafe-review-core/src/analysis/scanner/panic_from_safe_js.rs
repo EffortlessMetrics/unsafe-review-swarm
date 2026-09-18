@@ -3,7 +3,9 @@ use super::text_detection::{LineCommentState, line_for_text_detection};
 use super::{
     ScannedSite, contains_any, context_slice, first_non_ws_column, one_line, visibility_for_snippet,
 };
-use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
+use crate::domain::{
+    OperationFamily, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+};
 use crate::input::diff::DiffIndex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -71,6 +73,7 @@ pub(super) fn detect_panic_from_safe_js_sites(
                     public_api_surface: false,
                     changed: true,
                     snippet: sink.text.clone(),
+                    role: SourceRole::Unknown,
                 },
                 operation: UnsafeOperation {
                     family: OperationFamily::PanicFromSafeJs,

@@ -222,6 +222,13 @@ pub struct Summary {
     pub unsafe_sites: usize,
     pub cards: usize,
     pub open_actionable_gaps: usize,
+    /// Source-role triage counts over emitted cards (SPEC-0041): production,
+    /// test, generated, and unknown buckets. They always sum to `cards`;
+    /// production-first review uses them to order work, never to hide it.
+    pub production_cards: usize,
+    pub test_cards: usize,
+    pub generated_cards: usize,
+    pub unknown_cards: usize,
     pub contract_missing: usize,
     pub guard_missing: usize,
     pub guarded_unwitnessed: usize,
