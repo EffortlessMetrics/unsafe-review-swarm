@@ -38,14 +38,6 @@ projection coherence before any curated promotion to `unsafe-review`.
 - live `unsafe-review lsp` server landed (SPEC-0018); extension client wiring
   remains deferred until saved artifacts and first-run UX are solid
 
-## 0.4.0 — Repo posture and policy
-
-- baseline and suppression matching
-- no-new-debt mode
-- repo inventory hardening
-- badge output hardening
-- outcome comparison
-
 ## Versioning: staying on 0.x.y
 
 No 1.0 is planned. Minor bumps mark usefulness arcs; patch bumps mark fixes.
@@ -61,16 +53,25 @@ proven claims, every release stays advisory-only under `0.x.y`.
 - badge output hardening
 - outcome comparison
 
+Qualified under swarm #1925; publication mirrored in swarm #1879
+(`docs/handoffs/2026-09-16-0.4.0-publication.md`).
+
 ## 0.5.0 — Usefulness arc (shipped 2026-09-17, crates.io)
 
-- live-pointer-discharge guard probe for use-after-free / use-after-realloc
-  shapes, with named-guard evidence separated from non-null checks
-- negative guard controls (`unreachable!` discharge scoping for infallible
-  error paths)
-- vendored-copy and non-code-shape masking so scratch worktrees and vendored
-  copies do not inflate the scan
-- rerunnable `first-pr` advisory bundle (rerun without cap + checks flow)
-- CLI copy hardening for empty and no-card states, confidence wording
+Cut from swarm cutline `f281130e` (pre-publish #2250), promoted through
+source #570/#571 with the publication receipt in source #572. Latest
+crates.io version is 0.5.0; latest GitHub Release is v0.4.0. Post-cutline
+fixes (#2251, #2253–#2257) are current-main behavior in `Unreleased`, not
+part of the immutable 0.5.0 crates (see CHANGELOG).
+
+- `SAFETY:` doc comments count as contract evidence (#2235)
+- inner unsafe-fn sites route to caller-contract review (#2237)
+- deref-of-`get_unchecked` folds into the single `get_unchecked` card (#2239)
+- unreached witness commands stay behind a test-first cue (#2241)
+- `--short` risk-ranked one-line-per-card output (#2245)
+- slot-level missing counts in headers (#2243)
+- `--short` rejected for the policy report; shipped selector runs through
+  Git Bash on Windows (#2249, #2246)
 - receipt import for Miri, cargo-careful, sanitizers, Loom, Kani, and Crux;
   witness-plan artifacts; confirmation-cue execution stays opt-in
   (`confirm <card-id> --allow-heavy`)
@@ -79,10 +80,25 @@ proven claims, every release stays advisory-only under `0.x.y`.
 
 - precision measurement on the evidence corpus
   ([swarm #2223](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2223))
+- independent accuracy denominator plus first unfamiliar baseline batch
+  ([swarm #2224](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224));
+  first measured claim for the `NonNull::new_unchecked` aperture
+  ([swarm #2231](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2231))
+- AST-authoritative dispatch, first slice `nonnull_unchecked`
+  ([swarm #2225](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2225))
+- truthful witness execution facts and one structured invocation
+  ([swarm #2228](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2228),
+  [swarm #2229](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2229))
+- subject-bound receipts and comparable outcomes
+  ([swarm #2230](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2230))
+- source-role-aware action surfacing
+  ([swarm #2227](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2227))
 - remaining analyzer acceptance: shadowed/reassigned bindings, after-op and
-  non-dominating guards, debug/test-reference exclusion, cross-function span
-  flow
-  ([swarm #2226](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2226))
+  non-dominating guards, debug/test-reference exclusion. The obligation-key
+  split that closed
+  [swarm #2226](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2226)
+  shipped in #2257; cross-function span flow stays with
+  [swarm #1393](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1393)
 - agent forward-progress governance
   ([swarm #2221](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2221))
 - fixture-backed calibration corpus
