@@ -5167,6 +5167,72 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
     }
 
     #[test]
+    fn maybeuninit_assume_init_drop_credits_dominating_state_bit_guard() -> Result<(), String> {
+        // The Crossbeam shape carries a second (deref) card, so select the
+        // drop card by family instead of asserting a single card.
+        let output = fixture_output("maybeuninit_assume_init_drop_state_bit_guard")?;
+        let Some(card) = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::MaybeUninitAssumeInit)
+        else {
+            return Err("state-bit guard fixture should emit a drop card".to_string());
+        };
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert!(
+            matches!(
+                card.class,
+                ReviewClass::GuardedUnwitnessed | ReviewClass::UnsafeUnreached
+            ),
+            "guard fixture should classify as guarded, got {:?}",
+            card.class
+        );
+        assert!(obligation_discharge_present(card, "initialized"));
+        let Some(evidence) = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "initialized")
+        else {
+            return Err("state-bit guard fixture should carry initialized evidence".to_string());
+        };
+        assert!(
+            evidence.discharge.summary.contains("WRITE")
+                || evidence.discharge.summary.contains("write"),
+            "summary names the bit: {}",
+            evidence.discharge.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_drop_rejects_ungoverning_state_bit_guards() -> Result<(), String> {
+        for (fixture, owner) in [
+            (
+                "maybeuninit_assume_init_drop_state_bit_other_slot_not_guard",
+                "drop_unrelated_state",
+            ),
+            (
+                "maybeuninit_assume_init_drop_state_bit_wrong_arm_not_guard",
+                "drop_when_unset",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let Some(card) = output.cards.iter().find(|card| {
+                card.operation.family == OperationFamily::MaybeUninitAssumeInit
+                    && card.site.owner.as_deref() == Some(owner)
+            }) else {
+                return Err(format!("{fixture} should emit a drop card"));
+            };
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!obligation_discharge_present(card, "initialized"));
+        }
+        Ok(())
+    }
+
+    #[test]
     fn maybeuninit_assume_init_read_uses_assume_init_operation_family() -> Result<(), String> {
         let output = fixture_output("maybeuninit_assume_init_read")?;
         let card = single_card("maybeuninit_assume_init_read", &output)?;

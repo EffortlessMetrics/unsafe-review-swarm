@@ -1,7 +1,9 @@
 use super::operation_scope::source_before_site_operation;
+use super::state_bit_predicate::{parse_state_bit_predicate, receiver_root};
 use super::{
-    any_marker_occurrence, compact_code, contains_simple_assignment_to, is_receiver_path_char,
-    receiver_before_marker, strip_block_comments_and_literals,
+    any_compact_if_condition, any_marker_occurrence, branch_still_open_at_operation, compact_code,
+    contains_simple_assignment_to, is_receiver_path_char, receiver_before_marker,
+    strip_block_comments_and_literals,
 };
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
@@ -12,15 +14,126 @@ pub(super) fn maybeuninit_assume_init_discharge_state(
     expression: &str,
     lower: &str,
 ) -> Option<EvidenceState> {
-    if family == &OperationFamily::MaybeUninitAssumeInit
-        && has_maybeuninit_assume_init_initialization_evidence(site, expression, lower)
+    if family != &OperationFamily::MaybeUninitAssumeInit {
+        return None;
+    }
+    if is_assume_init_drop_call(expression)
+        && let Some(summary) = state_bit_drop_guard_summary(site, expression, lower)
     {
+        return Some(EvidenceState::present(summary));
+    }
+    if has_maybeuninit_assume_init_initialization_evidence(site, expression, lower) {
         Some(EvidenceState::present(
             "MaybeUninit initialization evidence was detected before assume_init",
         ))
     } else {
         None
     }
+}
+
+fn is_assume_init_drop_call(expression: &str) -> bool {
+    expression
+        .to_ascii_lowercase()
+        .contains("assume_init_drop(")
+}
+
+/// Receiver of an `assume_init_drop` call, crossing one balanced bracket
+/// group: `slot` as well as `(*slot.msg.get())`. The shared dot-receiver
+/// extractor stops at parens, which would blind the drop guard to the
+/// common deref-chain shape, so the drop hook extracts locally without
+/// changing method-form behavior elsewhere.
+fn drop_call_receiver(compact_expression: &str) -> Option<&str> {
+    let marker = ".assume_init_drop(";
+    let mut start = compact_expression.find(marker)?;
+    let bytes = compact_expression.as_bytes();
+    loop {
+        while start > 0 && is_receiver_path_char(bytes[start - 1] as char) {
+            start -= 1;
+        }
+        if start == 0 || (bytes[start - 1] != b')' && bytes[start - 1] != b']') {
+            break;
+        }
+        let (open, close) = if bytes[start - 1] == b')' {
+            (b'(', b')')
+        } else {
+            (b'[', b']')
+        };
+        let mut depth = 0usize;
+        let mut idx = start - 1;
+        loop {
+            if bytes[idx] == close {
+                depth += 1;
+            } else if bytes[idx] == open {
+                depth -= 1;
+                if depth == 0 {
+                    break;
+                }
+            }
+            if idx == 0 {
+                return None;
+            }
+            idx -= 1;
+        }
+        start = idx;
+    }
+    let receiver = compact_expression[start..compact_expression.find(marker)?].trim();
+    (!receiver.is_empty()).then_some(receiver)
+}
+
+/// State-bit drop guard for `assume_init_drop` only: `if <state> & <MASK> != 0`
+/// dominating the drop, testing the same slot root with no intervening
+/// reassignment. Returns a summary naming the predicate. This credits the
+/// required bit as evidence for initialized/drop eligibility; it does not
+/// establish that the bit is semantically correct or always maintained.
+fn state_bit_drop_guard_summary(
+    site: &ScannedSite,
+    expression: &str,
+    lower: &str,
+) -> Option<String> {
+    let compact_expression = compact_code(&expression.to_ascii_lowercase());
+    let receiver = drop_call_receiver(&compact_expression)?;
+    let drop_root = receiver_root(receiver)?;
+    let before_operation = source_before_site_operation(site, lower, expression)?;
+    let cleaned = strip_block_comments_and_literals(&before_operation);
+    let compact = compact_code(&cleaned);
+    let mut found = None;
+    any_compact_if_condition(&compact, |condition, after_guard| {
+        let Some(predicate) = parse_state_bit_predicate(condition) else {
+            return false;
+        };
+        let Some(state_root) = receiver_root(predicate.state) else {
+            return false;
+        };
+        if state_root != drop_root
+            || !branch_still_open_at_operation(after_guard)
+            || state_reassigned_after_guard(after_guard, drop_root, predicate.state)
+        {
+            return false;
+        }
+        found = Some(format!(
+            "State bit required on this branch: {} & {} != 0 supports initialized/drop eligibility",
+            predicate.state, predicate.mask,
+        ));
+        true
+    });
+    found
+}
+
+/// Reassignment of the tested state between guard and operation voids the
+/// guard: a rebound root or an assigned state path means the tested value no
+/// longer describes the slot.
+fn state_reassigned_after_guard(after_guard: &str, root: &str, state: &str) -> bool {
+    if contains_simple_assignment_to(after_guard, root) {
+        return true;
+    }
+    let path = state
+        .trim()
+        .trim_start_matches(['(', '*', '&', ' '])
+        .split(['(', '['])
+        .next()
+        .unwrap_or_default()
+        .trim_end();
+    !path.is_empty() && contains_assignment_to_receiver_path(after_guard, path)
 }
 
 pub(super) fn has_maybeuninit_assume_init_initialization_evidence(
