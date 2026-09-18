@@ -1,12 +1,18 @@
 use super::{
     compact_code, contains_executable_return, has_assignment_to_identifier,
-    has_fresh_guard_pattern, is_receiver_path_char, matching_call_argument_end,
-    matching_code_block_end, source_value_identifier, strip_block_comments_and_literals,
+    has_fresh_guard_pattern, is_receiver_path_char, is_runtime_assert_at,
+    matching_call_argument_end, matching_code_block_end, source_value_identifier,
+    strip_block_comments_and_literals,
 };
 
-pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
+pub(super) fn has_from_utf8_unchecked_validation_evidence(
+    lower: &str,
+    snippet_offset: usize,
+) -> bool {
     let compact = compact_code(&strip_block_comments_and_literals(lower));
-    let Some((before_call, argument)) = from_utf8_unchecked_argument_context(&compact) else {
+    let Some((before_call, argument)) =
+        from_utf8_unchecked_argument_context(&compact, snippet_offset)
+    else {
         return false;
     };
     let Some(argument_identifier) = source_value_identifier(argument) else {
@@ -18,7 +24,8 @@ pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
         argument_identifier,
     };
 
-    has_validation_is_ok_branch_guard(&context)
+    has_validation_assert_guard(&context)
+        || has_validation_is_ok_branch_guard(&context)
         || has_validation_if_let_ok_branch_guard(&context)
         || has_validation_let_else_ok_guard(&context)
         || has_validation_match_ok_branch_guard(&context)
@@ -76,14 +83,81 @@ impl Utf8ValidationContext<'_> {
     }
 }
 
-fn from_utf8_unchecked_argument_context(compact: &str) -> Option<(&str, &str)> {
+fn from_utf8_unchecked_argument_context(
+    compact: &str,
+    snippet_offset: usize,
+) -> Option<(&str, &str)> {
     let marker = "from_utf8_unchecked(";
-    let call_pos = compact.find(marker)?;
+    // Anchor on the site's own call: the first marker at or after the
+    // snippet offset. Earlier markers belong to other sites sharing the
+    // context window and must not donate their argument or guards.
+    // Without a marker there, keep the legacy first-marker anchor.
+    let mut search_from = 0usize;
+    let mut call_pos = None;
+    while let Some(offset) = compact[search_from..].find(marker) {
+        let abs_pos = search_from + offset;
+        if call_pos.is_none() {
+            call_pos = Some(abs_pos);
+        }
+        if abs_pos >= snippet_offset {
+            call_pos = Some(abs_pos);
+            break;
+        }
+        search_from = abs_pos + marker.len();
+    }
+    let call_pos = call_pos?;
     let before_call = &compact[..call_pos];
     let after_marker = &compact[call_pos + marker.len()..];
     let argument_end = matching_call_argument_end(after_marker)?;
     let argument = &after_marker[..argument_end];
     (!argument.is_empty()).then_some((before_call, argument))
+}
+
+/// An `assert!(from_utf8(buffer).is_ok())` before the unchecked conversion
+/// panics on invalid input, so the same-buffer conversion after it is
+/// guarded. Only plain `assert!` counts: `debug_assert!` is compiled out in
+/// release builds (`is_runtime_assert_at`), and an aliased boolean (e.g.
+/// `let valid = ...; assert!(valid);`) stays uncredited without dataflow.
+fn has_validation_assert_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let predicate = format!("{}.is_ok()", context.validation);
+    let mut cursor = context.before_call;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find("assert!(") {
+        let abs_pos = offset + pos;
+        if is_runtime_assert_at(context.before_call, abs_pos) {
+            let after_prefix = &context.before_call[abs_pos + "assert!(".len()..];
+            let statement_end = after_prefix.find(';').unwrap_or(after_prefix.len());
+            let statement = &after_prefix[..statement_end];
+            let after_statement = &after_prefix[statement_end..];
+            if statement_contains_validation_predicate(statement, &predicate)
+                && !context.has_stale_argument(after_statement)
+            {
+                return true;
+            }
+        }
+        let next = pos + "assert!(".len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
+
+fn statement_contains_validation_predicate(statement: &str, predicate: &str) -> bool {
+    let mut search_from = 0usize;
+    while let Some(pos) = statement[search_from..].find(predicate) {
+        let abs_pos = search_from + pos;
+        let before_ok = abs_pos == 0
+            || statement[..abs_pos]
+                .chars()
+                .next_back()
+                .is_none_or(|ch| !ch.is_ascii_alphanumeric() && ch != '_');
+        let after = &statement[abs_pos + predicate.len()..];
+        if before_ok && (after.starts_with(')') || after.starts_with(',')) {
+            return true;
+        }
+        search_from = abs_pos + predicate.len();
+    }
+    false
 }
 
 fn has_validation_is_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> bool {
