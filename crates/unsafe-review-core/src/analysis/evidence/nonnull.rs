@@ -10,21 +10,54 @@ use super::{
 };
 
 pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
-    let stripped = strip_block_comments_and_literals(lower);
-    let compact = compact_code(&stripped);
-    if let Some(arg) = nonnull_new_unchecked_argument(&site.operation.expression) {
-        let arg = compact_code(&arg.to_ascii_lowercase());
+    // A `NonNull::new_unchecked` expression is decided by the same-pointer
+    // rule alone: the generic substring fallback must never rescue a stale
+    // or mismatched guard for this form.
+    if nonnull_new_unchecked_argument(&site.operation.expression).is_some() {
+        return nullability_guard_pointer(site, lower).is_some();
+    }
+    has_unnamed_nullability_guard(site, lower)
+}
+
+/// The pointer identifier a nullability guard was proven to apply to, when
+/// the guard matched a same-pointer (or same-receiver) shape. `None` means
+/// no such guard was found.
+pub(super) fn nullability_guard_pointer(site: &ScannedSite, lower: &str) -> Option<String> {
+    let guard_compact = || {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
-        let guard_compact = compact_code(&strip_block_comments_and_literals(&guard_scope));
-        let context = NonNullPointerContext::new(&guard_compact, arg);
-        return context.has_nullability_guard();
+        compact_code(&strip_block_comments_and_literals(&guard_scope))
+    };
+    if let Some(arg) = nonnull_new_unchecked_argument(&site.operation.expression) {
+        let arg = compact_code(&arg.to_ascii_lowercase());
+        let guard_text = guard_compact();
+        let context = NonNullPointerContext::new(&guard_text, arg.clone());
+        if context.has_nullability_guard() {
+            return Some(arg);
+        }
+        return None;
     }
     // For raw-pointer deref families (`.read()`, `.write()`, `*ptr`, free-fn
     // forms) require a same-receiver, position-aware null check.  The bare
     // substring scan below is intentionally bypassed: an unrelated
     // `b.is_null()` near `a.read()` must not discharge `a`'s pointer-live
     // obligation.
+    if let Some(receiver) = raw_pointer_deref_receiver(&site.operation.expression) {
+        let guard_text = guard_compact();
+        if RawPointerNullContext::new(&guard_text, receiver.clone()).has_null_guard() {
+            return Some(receiver);
+        }
+        return None;
+    }
+    None
+}
+
+/// Nullability evidence for expressions without a decidable same-pointer
+/// shape: same-receiver checks where available, else the generic substring
+/// rule. Its summary stays generic because it names no pointer.
+fn has_unnamed_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
+    let stripped = strip_block_comments_and_literals(lower);
+    let compact = compact_code(&stripped);
     if let Some(receiver) = raw_pointer_deref_receiver(&site.operation.expression) {
         let guard_scope = code_before_operation(lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());

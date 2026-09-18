@@ -1228,6 +1228,167 @@ mod tests {
         Ok(())
     }
 
+    /// First narrow measured claim, #2231: within the declared aperture —
+    /// single-line `NonNull::new_unchecked(ident)` with a plain identifier
+    /// argument in the `nonnull_*` guard-shape fixtures — every seam is
+    /// enumerated source-first (analyzer output is never consulted for the
+    /// denominator), then each seam must produce exactly one
+    /// `NonNullUnchecked` card whose non-nullness evidence is correct for
+    /// the same pointer: present and naming the pointer on positive guard
+    /// fixtures, absent on negative controls (reassigned, shadowed, or
+    /// unrelated-pointer guards).
+    ///
+    /// The `nonnull_*` family scope is load-bearing, not a convenience:
+    /// positivity is inferred from the guard-shape fixture name, which is
+    /// only meaningful inside that family. A role-taxonomy fixture such as
+    /// `mixed_source_roles` (#2227) holds a `SAFETY`-comment-only production
+    /// seam with no code guard; the name rule would mislabel it positive
+    /// while the analyzer correctly leaves its evidence missing (a `SAFETY`
+    /// comment is not a guard). That seam is pinned by #2227's inventory
+    /// test, not by this aperture.
+    ///
+    /// Fixture-bound by construction: this measures the pinned corpus, not
+    /// unfamiliar code, and earns no global recall claim.
+    #[test]
+    fn nonnull_aperture_denominator_measures_same_pointer_evidence() -> Result<(), String> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let fixture_root = workspace.join("fixtures");
+        let mut seams: Vec<(String, PathBuf, usize, String, bool)> = Vec::new();
+        let mut entries = fs::read_dir(&fixture_root)
+            .map_err(|err| format!("read fixtures failed: {err}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| format!("read fixtures failed: {err}"))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let fixture = entry.file_name().to_string_lossy().into_owned();
+            if !fixture.starts_with("nonnull_") {
+                continue;
+            }
+            collect_aperture_seams(&entry.path(), &entry.path(), &fixture, &mut seams)?;
+        }
+        assert!(!seams.is_empty(), "aperture denominator must not be empty");
+
+        let mut recalled = 0usize;
+        let mut evidence_correct = 0usize;
+        let mut failures: Vec<String> = Vec::new();
+        for (fixture, rel, line, pointer, positive) in &seams {
+            let output = fixture_output(fixture)?;
+            let cards: Vec<&ReviewCard> = output
+                .cards
+                .iter()
+                .filter(|card| {
+                    card.operation.family == OperationFamily::NonNullUnchecked
+                        && card.site.location.line == *line
+                })
+                .collect();
+            if cards.len() != 1 {
+                failures.push(format!(
+                    "{fixture} {}:{line}: expected 1 NonNullUnchecked card, found {}",
+                    rel.display(),
+                    cards.len()
+                ));
+                continue;
+            }
+            recalled += 1;
+            let card = cards[0];
+            let evidence = card
+                .obligation_evidence
+                .iter()
+                .find(|evidence| evidence.obligation.key == "non-null");
+            match (positive, evidence) {
+                (true, Some(evidence))
+                    if evidence.discharge.present
+                        && evidence.discharge.summary.contains(pointer.as_str()) =>
+                {
+                    evidence_correct += 1;
+                }
+                (false, None) => {
+                    evidence_correct += 1;
+                }
+                (false, Some(evidence)) if !evidence.discharge.present => {
+                    evidence_correct += 1;
+                }
+                _ => failures.push(format!(
+                    "{fixture} {}:{line}: same-pointer evidence wrong for pointer `{pointer}` (positive={positive})",
+                    rel.display()
+                )),
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "aperture misses (denominator {}):\n{}",
+            seams.len(),
+            failures.join("\n")
+        );
+        assert_eq!(recalled, seams.len());
+        assert_eq!(evidence_correct, seams.len());
+        Ok(())
+    }
+
+    fn collect_aperture_seams(
+        root: &std::path::Path,
+        dir: &std::path::Path,
+        fixture: &str,
+        seams: &mut Vec<(String, PathBuf, usize, String, bool)>,
+    ) -> Result<(), String> {
+        let mut entries = fs::read_dir(dir)
+            .map_err(|err| format!("read {} failed: {err}", dir.display()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_aperture_seams(root, &path, fixture, seams)?;
+                continue;
+            }
+            if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                continue;
+            }
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {} failed: {err}", path.display()))?;
+            for (idx, line) in text.lines().enumerate() {
+                if let Some(pointer) = aperture_pointer(line) {
+                    seams.push((
+                        fixture.to_string(),
+                        path.strip_prefix(root).unwrap_or(&path).to_path_buf(),
+                        idx + 1,
+                        pointer,
+                        !fixture.contains("not_guard") && !fixture.contains("not_evidence"),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Declared aperture: one line contains `NonNull::new_unchecked(ident)`
+    /// with a plain identifier argument and no turbofish. Returns the pointer
+    /// identifier lowercased, matching the discharge summary convention
+    /// (`nullability_guard_pointer` lowercases before summarizing), so the
+    /// same-pointer substring check is case-stable. Everything else
+    /// (multiline, turbofish, UFCS, macros, non-ident arguments) is outside
+    /// the aperture by construction.
+    fn aperture_pointer(line: &str) -> Option<String> {
+        let marker = "NonNull::new_unchecked(";
+        let start = line.find(marker)? + marker.len();
+        let rest = &line[start..];
+        let end = rest.find(')')?;
+        let arg = rest[..end].trim();
+        if arg.is_empty()
+            || !arg
+                .chars()
+                .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+            || arg.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+        {
+            return None;
+        }
+        Some(arg.to_ascii_lowercase())
+    }
+
     #[test]
     fn repo_scan_honors_discovery_filters_before_analysis() -> Result<(), String> {
         let root = unique_temp_dir("unsafe-review-filtered-repo")?;

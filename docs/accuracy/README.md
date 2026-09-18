@@ -130,6 +130,12 @@ The current fixture-pinned slices are:
   branches and null early-return branches, while rejecting inverse boolean
   branch shapes, wrong-pointer, observed-only, non-returning `is_null`,
   post-check, and stale-pointer controls.
+- `NonNull::new_unchecked` aperture denominator: enumerates all 26
+  single-line plain-identifier seams source-first and requires one
+  `NonNullUnchecked` card per seam with correct same-pointer evidence
+  (7 positive, 19 negative controls). Fixture-bound by construction; see the
+  [size-risk note](NONNULL_APERTURE_SIZE_RISK.md) for why n=26 correlated
+  seams cannot support a calibrated rate.
 - `Pin::new_unchecked` human-review routing: checks that pinning move-prevention
   and projection invariants route to human deep review without implying an
   executable witness ran.

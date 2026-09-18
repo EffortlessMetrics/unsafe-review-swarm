@@ -1,5 +1,5 @@
 use super::box_raw_origin::has_drop_in_place_box_origin_evidence;
-use super::nonnull::has_nullability_guard;
+use super::nonnull::{has_nullability_guard, nullability_guard_pointer};
 use super::vec_from_raw_parts::has_vec_from_raw_parts_origin_pointer_live_evidence;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
@@ -8,7 +8,11 @@ use crate::domain::{EvidenceState, OperationFamily};
 /// genuine evidence that the pointer is not null. Unchanged by the
 /// non-null/pointer-live split.
 pub(super) fn nullability_discharge_state(site: &ScannedSite, lower: &str) -> EvidenceState {
-    if has_nullability_guard(site, lower) {
+    if let Some(pointer) = nullability_guard_pointer(site, lower) {
+        EvidenceState::present(format!(
+            "Nullability guard code was detected for `{pointer}`"
+        ))
+    } else if has_nullability_guard(site, lower) {
         EvidenceState::present("Nullability guard code was detected")
     } else {
         EvidenceState::missing("No nullability guard code was detected")

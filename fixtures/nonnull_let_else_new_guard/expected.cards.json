@@ -35,7 +35,7 @@
         "discharge": {
           "present": true,
           "state": "present",
-          "summary": "Nullability guard code was detected"
+          "summary": "Nullability guard code was detected for `ptr`"
         },
         "reach": {
           "present": false,
