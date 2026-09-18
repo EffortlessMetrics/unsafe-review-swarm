@@ -1110,6 +1110,92 @@ mod tests {
     }
 
     #[test]
+    fn maybeuninit_array_assume_init_accepts_fully_initialized_array_binding() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Assoc form names the slot as its first argument, not a dot
+        // receiver; an array binding of `MaybeUninit::new` elements
+        // initializes every element, so it discharges like the method form.
+        let array_new = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];"],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        let ev = obligation_evidence(&array_new, &obligations, &contract, &reach);
+        assert!(ev[0].discharge.present);
+        // Same shape with the enclosing function signature in context, as
+        // the scanner emits it.
+        let array_new_in_fn = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "pub fn array_new_init() -> [u32; 4] {",
+                "let buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec!["}"],
+        );
+        let ev_fn = obligation_evidence(&array_new_in_fn, &obligations, &contract, &reach);
+        assert!(ev_fn[0].discharge.present);
+    }
+
+    #[test]
+    fn maybeuninit_array_assume_init_rejects_partial_and_stale_coverage() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Loop element writes cannot prove totality textually: a loop over
+        // half the slots must not discharge, even though the write marker
+        // names the same slot.
+        let half_loop = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut buf: [MaybeUninit<u32>; 4] = MaybeUninit::uninit_array();",
+                "for i in 0..2 {",
+                "    buf[i].write(i as u32);",
+                "}",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        // Rebinding the slot after the initializing binding discards it.
+        let stale_binding = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];",
+                "buf = MaybeUninit::uninit_array();",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        // No initialization evidence at all.
+        let bare_passthrough = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let buf: [MaybeUninit<u32>; 4] = MaybeUninit::uninit_array();"],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+
+        for site in [&half_loop, &stale_binding, &bare_passthrough] {
+            let ev = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!ev[0].discharge.present);
+        }
+    }
+
+    #[test]
     fn maybeuninit_assume_init_rejects_conditional_other_and_stale_initialization() {
         let obligations = vec![SafetyObligation::new(
             "initialized",

@@ -1661,6 +1661,13 @@ mod tests {
                 OperationFamily::MaybeUninitAssumeInit
             ))
         );
+        assert_eq!(
+            detect_site("unsafe { MaybeUninit::array_assume_init(buf) }"),
+            Some((
+                UnsafeSiteKind::Operation,
+                OperationFamily::MaybeUninitAssumeInit
+            ))
+        );
     }
 
     #[test]
