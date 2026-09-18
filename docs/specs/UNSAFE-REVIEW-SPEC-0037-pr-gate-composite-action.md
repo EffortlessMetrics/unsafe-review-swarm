@@ -11,7 +11,8 @@ Linked specs:
 
 Linked docs:
 - [docs/ci/github-action.md](../ci/github-action.md)
-- [.github/actions/unsafe-review-first-pr/action.yml](../../.github/actions/unsafe-review-first-pr/action.yml)
+- [action.yml (single authority)](../../action.yml)
+- [.github/actions/unsafe-review-first-pr/action.yml (thin wrapper)](../../.github/actions/unsafe-review-first-pr/action.yml)
 - [.github/examples/unsafe-review-first-pr.yml](../../.github/examples/unsafe-review-first-pr.yml)
 
 ## 1. Purpose
@@ -38,13 +39,14 @@ status, not Miri-clean status, and not site-execution proof.
 
 ## 2. Action placement and `uses:` line
 
-The action lives at:
+The single Action authority lives at the repository root:
 
 ```text
-.github/actions/unsafe-review-first-pr/action.yml
+action.yml
 ```
 
-in the development repository (`unsafe-review-swarm`). Once promoted to the
+in the development repository (`unsafe-review-swarm`), with a thin wrapper at
+`.github/actions/unsafe-review-first-pr/action.yml` that delegates to it. Once promoted to the
 source/public repository (`EffortlessMetrics/unsafe-review`), external callers
 reference it as:
 
@@ -60,7 +62,7 @@ callers.
 
 The action installs the `unsafe-review` CLI from crates.io using
 `cargo install --locked --version <pin>`. A pinned version input (default
-`0.3.8`, the latest published crates.io version) prevents silent breakage on
+`0.5.0`, the latest published crates.io version) prevents silent breakage on
 new releases.
 
 Binary acquisition decision: `cargo install` from crates.io is the MVP path
@@ -81,7 +83,7 @@ runs.
 | Input | Required | Default | Description |
 |---|---|---|---|
 | `base_ref` | no | `${{ github.event.repository.default_branch }}` | Base ref to diff against (e.g. `main`) |
-| `version` | no | `0.3.8` | `unsafe-review` crate version to install from crates.io |
+| `version` | no | `0.5.0` | `unsafe-review` crate version to install from crates.io |
 | `fetch_depth` | no | `100` | Depth passed to `git fetch --depth` when fetching the base ref. Increase this for repositories with very long histories or shallow clones that fail to find the common ancestor. |
 | `out_dir` | no | `target/unsafe-review` | Directory for the advisory bundle output |
 | `fail_on_new_debt` | no | `false` | When `true`, exit non-zero if new or worsened coverage gaps are found (maps to exit 1; inherited gaps never fail). Advisory by default — callers must set this explicitly to change the default. |
@@ -211,14 +213,15 @@ The action may fail for the following reasons:
 - Is not a live end-to-end CI smoke test in this PR. A full smoke test that
   installs the binary in a GitHub Actions run and exercises it against a real
   diff is a follow-up item. The test path is: add a caller workflow in the
-  `unsafe-review-swarm` repo that `uses:` the action from the local path
-  `.github/actions/unsafe-review-first-pr`, triggers on `workflow_dispatch`,
-  and asserts that `bundle_dir` and `gate_status` are set.
+  `unsafe-review-swarm` repo that `uses:` the root action authority from the
+  local path `./`, triggers on `workflow_dispatch`,
+  and asserts that `bundle_dir` and `gate_status` are set
+  (see `.github/workflows/smoke-action.yml`).
 
 ## 11. Version-skew rule
 
 The action installs the **pinned published** crates.io version (the `version`
-input, default `0.3.8`). Its required-artifact verify must therefore match what
+input, default `0.5.0`). Its required-artifact verify must therefore match what
 **that version** emits — not the dev-tree tip.
 
 Concrete rule: bundle artifacts added to the dev tree after the pinned published
