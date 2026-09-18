@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -135,6 +135,9 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     println!("tool: {}", receipt.tool);
     println!("strength recorded: {}", receipt.strength);
     println!("receipt: {}", receipt_path.display());
+    if let Some(note) = receipt_install_note(&options.root, &receipt_path) {
+        println!("{note}");
+    }
     println!();
     println!(
         "next: re-run check or first-pr to import this receipt; the card upgrades only through the saved receipt."
@@ -744,6 +747,42 @@ fn confirm_log_path(root: &Path, card_id: &str) -> PathBuf {
     root.join("target")
         .join("unsafe-review-confirm")
         .join(format!("{prefix}-output.log"))
+}
+
+/// Advisory note naming where to install a receipt that landed outside the
+/// auto-discovery directory (`<root>/.unsafe-review/receipts/`). Returns
+/// `None` when the written path is already discovered, so the default flow
+/// stays quiet.
+fn receipt_install_note(root: &Path, written: &Path) -> Option<String> {
+    fn absolutize(base: &Path, path: &Path) -> PathBuf {
+        let joined = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            base.join(path)
+        };
+        let mut out = PathBuf::new();
+        for component in joined.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    out.pop();
+                }
+                rest => out.push(rest.as_os_str()),
+            }
+        }
+        out
+    }
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let discovery = absolutize(&cwd, root)
+        .join(".unsafe-review")
+        .join("receipts");
+    if absolutize(&cwd, written).starts_with(&discovery) {
+        return None;
+    }
+    Some(format!(
+        "note: receipt written outside the discovery dir; copy it to {} so re-running check or first-pr imports it automatically",
+        discovery.display(),
+    ))
 }
 
 fn receipt_output_path(options: &ConfirmOptions, receipt: &WitnessReceipt) -> PathBuf {
@@ -1376,6 +1415,29 @@ mod tests {
         )?;
 
         assert_eq!(receipt.subject, Some(binding));
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_install_note_stays_quiet_inside_discovery_dir() {
+        let root = Path::new("/repo");
+        let written = root
+            .join(".unsafe-review")
+            .join("receipts")
+            .join("confirm-miri-abc123.json");
+        assert_eq!(receipt_install_note(root, &written), None);
+    }
+
+    #[test]
+    fn receipt_install_note_names_discovery_dir_for_outside_paths() -> Result<(), String> {
+        let root = Path::new("/repo");
+        let note = receipt_install_note(root, Path::new("/tmp/stray-receipt.json"))
+            .ok_or_else(|| "outside path must produce a note".to_string())?;
+        assert!(
+            note.contains("/repo/.unsafe-review/receipts"),
+            "note must name the install dir: {note}"
+        );
+        assert!(note.contains("imports it automatically"), "{note}");
         Ok(())
     }
 
