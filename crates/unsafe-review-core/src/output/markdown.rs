@@ -678,6 +678,34 @@ fn render_pr_summary_header(out: &mut String, output: &AnalyzeOutput) {
     render_pr_summary_header_bullets(out, output);
 }
 
+/// Capped related-test exemplars behind a reach count, so a reviewer can judge
+/// in one screen whether the count is signal (calls that execute the owner)
+/// or noise (a common function name matched in unrelated tests). The agent
+/// packet and LSP surfaces already project the full list; the JSON card keeps
+/// only the summary so fixture goldens do not churn on exemplar text.
+const REACH_EXEMPLAR_CAP: usize = 3;
+
+fn reach_exemplars(card: &ReviewCard) -> Option<String> {
+    if card.related_tests.is_empty() {
+        return None;
+    }
+    let shown = card
+        .related_tests
+        .iter()
+        .take(REACH_EXEMPLAR_CAP)
+        .map(|test| format!("{}:{} ({})", test.file, test.line, test.name))
+        .collect::<Vec<_>>()
+        .join(", ");
+    if card.related_tests.len() > REACH_EXEMPLAR_CAP {
+        Some(format!(
+            "{shown} (+{} more)",
+            card.related_tests.len() - REACH_EXEMPLAR_CAP
+        ))
+    } else {
+        Some(shown)
+    }
+}
+
 fn render_pr_summary_reviewer_cockpit(out: &mut String, top_card: Option<&ReviewCard>) {
     out.push_str("## Reviewer cockpit\n\n");
     if let Some(card) = top_card {
@@ -717,6 +745,9 @@ fn render_pr_summary_reviewer_cockpit(out: &mut String, top_card: Option<&Review
             card.discharge.summary
         ));
         out.push_str(&format!("  - Reach: {}\n", card.reach.summary));
+        if let Some(examples) = reach_exemplars(card) {
+            out.push_str(&format!("  - Reach examples: {examples}\n"));
+        }
         out.push_str(&format!("  - Witness: {}\n", card.witness.summary));
         out.push_str(&format!(
             "- Confirmation state: {}\n",
@@ -1089,6 +1120,9 @@ pub(crate) fn render_card_detail(card: &ReviewCard) -> String {
     out.push_str(&format!("- Contract: {}\n", card.contract.summary));
     out.push_str(&format!("- Guard/discharge: {}\n", card.discharge.summary));
     out.push_str(&format!("- Reach: {}\n", card.reach.summary));
+    if let Some(examples) = reach_exemplars(card) {
+        out.push_str(&format!("- Reach examples: {examples}\n"));
+    }
     out.push_str("- Reach note: static reach evidence only; it does not prove site execution.\n");
     out.push_str(&format!("- Witness: {}\n", card.witness.summary));
     if !card.obligation_evidence.is_empty() {
@@ -2448,6 +2482,69 @@ mod tests {
     // from the selected card. Fields with no canonical row here remain
     // parked under the shared owner rather than being invented as new rows.
     // ------------------------------------------------------------------
+
+    #[test]
+    fn cockpit_and_explain_show_related_test_exemplars() -> Result<(), String> {
+        let output = fixture_output("copy_nonoverlapping")?;
+        let card = output
+            .cards
+            .iter()
+            .find(|card| !card.related_tests.is_empty())
+            .ok_or_else(|| {
+                "copy_nonoverlapping should emit a card with related tests".to_string()
+            })?;
+        let exemplar = &card.related_tests[0];
+        let cockpit = render_pr_summary(&output);
+        assert!(
+            cockpit.contains("- Reach examples:"),
+            "cockpit must name related tests behind the reach count:\n{cockpit}"
+        );
+        assert!(
+            cockpit.contains(&format!(
+                "{}:{} ({})",
+                exemplar.file, exemplar.line, exemplar.name
+            )),
+            "cockpit exemplar must identify the test file, line, and name:\n{cockpit}"
+        );
+        let detail = render_card_detail(card);
+        assert!(
+            detail.contains("- Reach examples:"),
+            "explain must name related tests behind the reach count:\n{detail}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn reach_examples_absent_when_no_related_tests() -> Result<(), String> {
+        for fixture in ["alignment_other_pointer_not_guard", "raw_pointer_alignment"] {
+            let output = fixture_output(fixture)?;
+            for card in &output.cards {
+                if !card.related_tests.is_empty() {
+                    continue;
+                }
+                let detail = render_card_detail(card);
+                assert!(
+                    !detail.contains("- Reach examples:"),
+                    "explain must not invent exemplars for `{}`:\n{detail}",
+                    card.id
+                );
+            }
+            // The cockpit renders one of the output cards: with no related
+            // tests anywhere it cannot name exemplars either.
+            if output
+                .cards
+                .iter()
+                .all(|card| card.related_tests.is_empty())
+            {
+                let cockpit = render_pr_summary(&output);
+                assert!(
+                    !cockpit.contains("- Reach examples:"),
+                    "cockpit must not invent exemplars in {fixture}:\n{cockpit}"
+                );
+            }
+        }
+        Ok(())
+    }
 
     #[test]
     fn explain_markdown_projects_canonical_card_fields() -> Result<(), String> {
