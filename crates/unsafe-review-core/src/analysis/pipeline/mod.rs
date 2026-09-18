@@ -636,8 +636,9 @@ mod tests {
     use super::*;
     use crate::api::{AnalysisMode, DiffSource, DiscoveryOptions, PolicyMode, Scope};
     use crate::domain::{
-        CardId, HazardKind, OperationFamily, Priority, ProofPath, ReviewCard, ReviewClass,
-        UnsafeSiteKind, WitnessKind, WitnessRoute,
+        CardId, EvidenceState, HazardKind, ObligationEvidence, OperationFamily, Priority,
+        ProofPath, ReviewCard, ReviewClass, SafetyObligation, UnsafeSiteKind, WitnessKind,
+        WitnessRoute,
     };
     use std::collections::BTreeSet;
     use std::fs;
@@ -1094,6 +1095,67 @@ mod tests {
                 class.as_str()
             );
         }
+    }
+
+    #[test]
+    fn asm_options_contradiction_directs_the_code_fix() {
+        // Drift-lock for #2293: a definite-UB options/template contradiction
+        // must direct the code fix, never documentation advice docs cannot satisfy.
+        fn asm_evidence(summary: &str) -> ObligationEvidence {
+            ObligationEvidence {
+                obligation: SafetyObligation::new(
+                    "asm",
+                    "inline assembly obeys register, memory, and target invariants",
+                ),
+                contract: EvidenceState::missing("contract"),
+                discharge: EvidenceState::missing(summary),
+                reach: EvidenceState::missing("reach"),
+                witness: EvidenceState::missing("witness"),
+            }
+        }
+        let contradiction =
+            asm_evidence("asm template addresses memory (`[...]`) while options declare `nomem`");
+        for class in [ReviewClass::ContractMissing, ReviewClass::GuardMissing] {
+            let summary = next_action_summary(
+                &class,
+                "inline_asm",
+                false,
+                "private",
+                &[],
+                std::slice::from_ref(&contradiction),
+                false,
+                Some("bad_nomem"),
+                &[],
+                "pending",
+            );
+            assert!(
+                summary.contains("self-contradictory") || summary.contains("contradiction"),
+                "`{}` next action `{summary}` should direct the options fix",
+                class.as_str()
+            );
+            assert!(
+                !summary.contains("Add a precise") && !summary.contains("Document the unsafe"),
+                "`{}` next action `{summary}` must not advise documentation",
+                class.as_str()
+            );
+        }
+        let generic = asm_evidence("No obligation-specific guard code was detected");
+        let summary = next_action_summary(
+            &ReviewClass::ContractMissing,
+            "inline_asm",
+            false,
+            "private",
+            &[],
+            std::slice::from_ref(&generic),
+            false,
+            Some("good_pure"),
+            &[],
+            "pending",
+        );
+        assert!(
+            summary.contains("# Safety"),
+            "consistent asm keeps documentation advice, got: `{summary}`"
+        );
     }
 
     #[test]

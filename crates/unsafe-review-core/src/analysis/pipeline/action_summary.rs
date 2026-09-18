@@ -1,3 +1,4 @@
+use crate::analysis::evidence::ASM_OPTIONS_CONTRADICTION_MARKER;
 use crate::domain::{ObligationEvidence, ReviewClass, WitnessKind, WitnessRoute};
 
 #[allow(
@@ -17,6 +18,15 @@ pub(super) fn next_action_summary(
     witness_confirmation: &str,
 ) -> String {
     match class {
+        // A self-contradictory asm declaration is definite UB: documentation
+        // cannot discharge it, so the code fix outranks every docs-directed
+        // arm below. Scoped to the unwitnessed classes; witnessed states keep
+        // their receipt logic.
+        ReviewClass::ContractMissing | ReviewClass::GuardMissing
+            if operation == "inline_asm" && has_asm_options_contradiction(obligation_evidence) =>
+        {
+            "Fix the self-contradictory asm options: the template touches memory the declared options disclaim — remove `nomem`/`readonly` or declare the memory through operands. A `# Safety` section cannot discharge this.".to_string()
+        }
         ReviewClass::ContractMissing if public_api_surface => {
             "Add a precise public `# Safety` section that names the required caller obligations."
                 .to_string()
@@ -115,6 +125,15 @@ pub(super) fn next_action_summary(
 
 fn has_witness_route(routes: &[WitnessRoute], kind: WitnessKind) -> bool {
     routes.iter().any(|route| route.kind == kind)
+}
+
+fn has_asm_options_contradiction(obligation_evidence: &[ObligationEvidence]) -> bool {
+    obligation_evidence.iter().any(|ev| {
+        ev.discharge
+            .summary
+            .contains(ASM_OPTIONS_CONTRADICTION_MARKER)
+            && !ev.discharge.present
+    })
 }
 
 /// Whether the before-context contains the declaration of `owner` as an

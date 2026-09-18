@@ -53,6 +53,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
+pub(crate) use self::asm_options::ASM_OPTIONS_CONTRADICTION_MARKER;
 use self::asm_options::asm_options_discharge_state;
 pub(crate) use self::assignment_syntax::{
     contains_assignment_to_target, contains_simple_assignment_to,

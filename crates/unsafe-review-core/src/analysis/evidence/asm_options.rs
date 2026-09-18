@@ -1,6 +1,11 @@
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
 
+/// Marker shared with next-action routing: contradiction summaries always
+/// contain this phrase, so the card directs the code fix instead of
+/// documentation advice docs cannot satisfy.
+pub(crate) const ASM_OPTIONS_CONTRADICTION_MARKER: &str = "while options declare";
+
 pub(super) fn asm_options_discharge_state(
     family: &OperationFamily,
     expression: &str,
@@ -92,17 +97,16 @@ fn contradiction_in(lowered: &str) -> Option<String> {
         return None;
     }
     if options.iter().any(|opt| opt == "nomem") && templates.iter().any(|t| t.contains('[')) {
-        return Some(
-            "asm template addresses memory (`[...]`) while options declare `nomem`".to_string(),
-        );
+        return Some(format!(
+            "asm template addresses memory (`[...]`) {ASM_OPTIONS_CONTRADICTION_MARKER} `nomem`"
+        ));
     }
     if options.iter().any(|opt| opt == "readonly")
         && templates.iter().any(|t| intel_destination_writes_memory(t))
     {
-        return Some(
-            "asm template writes a bracketed memory destination while options declare `readonly`"
-                .to_string(),
-        );
+        return Some(format!(
+            "asm template writes a bracketed memory destination {ASM_OPTIONS_CONTRADICTION_MARKER} `readonly`"
+        ));
     }
     None
 }
