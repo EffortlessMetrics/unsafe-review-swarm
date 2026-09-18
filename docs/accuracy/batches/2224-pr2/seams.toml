@@ -1,0 +1,157 @@
+# #2224 PR2 source-first expected-seam inventory.
+#
+# Recorded from diff reading plus full enclosing-function reads at each
+# pinned head. No analyzer output has been consulted for any case in this
+# batch (analyzer_outputs_consulted = false). Mapping must not edit this
+# inventory to fit outputs.
+schema_version = "seam-batch-seams/v1"
+batch = "2224-pr2"
+recorded_at = "2026-09-18T02:10:00Z"
+analyzer_outputs_consulted = false
+
+[labeler]
+type = "agent-drafted"
+identity = "muse-code session sunny-zaniah"
+provenance = "source-first diff reading plus enclosing-function reads at pinned heads before any analyzer run on these cases; useful draft evidence, not human adjudication"
+
+trust_boundary = "Static unsafe contract review only. These expected seams describe unsafe operations a reviewer should examine in each sampled PR scope. They are not confirmed bugs, not exploitable vulnerabilities, not memory-safety proof, and not a claim about code outside the sampled diffs."
+
+# bytes-744 is the quiet control: a two-line comment rewording in Buf docs.
+# Zero expected seams. Any emitted card there is wrongly-surfaced by
+# protocol rule.
+
+# crossbeam-1287: both unsafe impls (Send and Sync for RefRange) change in
+# one review unit. The struct holds &'a SkipList plus epoch-guarded entries
+# and a PhantomData<fn() -> Q> covariance marker; the fix adds K/V/C
+# Send+Sync bounds and R Send/Sync bounds. One seam for the pair.
+[[seams]]
+id = "crossbeam-1287-S1"
+case = "crossbeam-1287"
+source_anchor = "crossbeam-skiplist/src/base.rs unsafe impl Send/Sync for RefRange with added K/V/C Send+Sync and R Send/Sync bounds"
+operation_family = "unsafe_impl_send_sync"
+obligation_keys = ["pointer-live"]
+expected_contract = "missing"
+expected_discharge = "partial"
+rationale = "Soundness fix for thread-crossing a skiplist view: no SAFETY comment on either impl, so the adequacy argument lives entirely in the added where-clauses. No canonical obligation key covers Send/Sync bound adequacy; pointer-live is the nearest (the referenced skiplist and entries must stay thread-contained), and that vocabulary gap is itself a PR2 finding. A correct card finds the impls and judges the bounds, not the struct fields."
+inclusion = "include"
+
+# crossbeam-1297 S1: Local::unpin changes from &self method to unsafe fn
+# taking *const Self, with raw derefs of guard_count, epoch, and
+# handle_count plus a raw finalize call. Doc comment is functional only.
+[[seams]]
+id = "crossbeam-1297-S1"
+case = "crossbeam-1297"
+source_anchor = "crossbeam-epoch/src/internal.rs pub(crate) unsafe fn unpin(this: *const Self): (*this).guard_count/epoch/handle_count derefs and Self::finalize(this)"
+operation_family = "raw_pointer_deref"
+obligation_keys = ["pointer-live"]
+expected_contract = "missing"
+expected_discharge = "partial"
+rationale = "Epoch-reclamation raw-pointer core: this must be a live Local on every path, argued at the unsafe call sites in guard.rs (pinned guards hold it), not at this definition. No SAFETY section on the fn. A correct card flags the deref cluster and must not credit the /// Unpins the Local. doc line as discharge."
+inclusion = "include"
+
+# crossbeam-1297 S2: Guard::drop replaces the as_ref-based unpin with an
+# is_null check dominating Local::unpin(self.local); LocalHandle::drop
+# passes self.local (already *const) instead of &*self.local. The added
+# regression test calls safe public APIs only, so it contributes no seam
+# (recorded as an excluded consideration in mapping, not a row here).
+[[seams]]
+id = "crossbeam-1297-S2"
+case = "crossbeam-1297"
+source_anchor = "crossbeam-epoch/src/guard.rs Guard::drop: if !self.local.is_null() { Local::unpin(self.local) }; collector.rs LocalHandle::drop passes self.local"
+operation_family = "unsafe_fn_call"
+obligation_keys = ["pointer-live"]
+expected_contract = "missing"
+expected_discharge = "present"
+rationale = "The null check dominates the raw unpin call and the handle path keeps a live pointer, so the pointer-live obligation is established in code. There is still no documented contract for what makes the pointer valid beyond non-null-plus-pinned. A correct card either stays silent or reports the dominated check; flagging this as an unguarded raw call would be wrong-obligation."
+inclusion = "include"
+
+# bytes-597 S1: new unsafe trait impl for MaybeUninit slices. The trait
+# documents advance_mut semantics (panic past remaining, or behave as if
+# clamped); the impl carries no SAFETY comment, so implementer-side
+# adequacy is argued only by the method bodies below.
+[[seams]]
+id = "bytes-597-S1"
+case = "bytes-597"
+source_anchor = "src/buf/buf_mut.rs unsafe impl BufMut for &mut [MaybeUninit<u8>]: chunk_mut via UninitSlice, advance_mut via replace/split_at_mut, put_slice/put_bytes"
+operation_family = "unsafe_declaration"
+obligation_keys = ["initialized", "valid-range"]
+expected_contract = "missing"
+expected_discharge = "partial"
+rationale = "New unsafe impl over uninitialized memory with no SAFETY comment: the trait-level contract (advance panics past remaining or clamps; chunk exposes only writable prefix) must be re-established per method. Discharge is partial because put_bytes asserts while put_slice relies on a preceding panicking copy. A correct card finds the impl and judges per-method establishment rather than crediting the trait docs as impl evidence."
+inclusion = "include"
+
+# bytes-597 S2: put_slice copies then advances without its own check. The
+# copy_from_slice on chunk_mut()[..src.len()] panics before advance_mut
+# runs when src overruns, so the unsafe call is dominated by a panicking
+# bounds check. Guard-credit probe: the correct card stays silent or
+# reports discharged valid-range.
+[[seams]]
+id = "bytes-597-S2"
+case = "bytes-597"
+source_anchor = "src/buf/buf_mut.rs MaybeUninit impl put_slice: chunk_mut()[..src.len()].copy_from_slice(src) then unsafe advance_mut(src.len())"
+operation_family = "unsafe_fn_call"
+obligation_keys = ["valid-range"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "The trait documents advance_mut bounds behavior and the panicking copy dominates the unchecked advance, so cnt <= remaining holds whenever advance runs. A correct card credits that domination; demanding a redundant explicit check would be wrong-obligation."
+inclusion = "include"
+
+# bytes-597 S3: put_bytes asserts remaining >= cnt, then write_bytes plus
+# advance_mut in one unsafe block. Contract/guard split probe: the assert
+# is a guard, not a contract, and there is no SAFETY comment.
+[[seams]]
+id = "bytes-597-S3"
+case = "bytes-597"
+source_anchor = "src/buf/buf_mut.rs MaybeUninit impl put_bytes: assert!(remaining_mut() >= cnt) then ptr::write_bytes(as_mut_ptr, val, cnt) and advance_mut(cnt)"
+operation_family = "raw_pointer_write"
+obligation_keys = ["valid-range", "allocation"]
+expected_contract = "missing"
+expected_discharge = "present"
+rationale = "The assert dominates both the raw write and the length extension, establishing valid-range and allocation in code, but no safety contract is written down. A correct card reports the dominated guard as discharge while still noting the missing contract; crediting the assert as a contract, or ignoring it, are both Q2 failures in opposite directions."
+inclusion = "include"
+
+# bytes-818 S1: copy_nonoverlapping under two SAFETY comments: range
+# pre-checked by crate::range (which asserts both ends) and spare capacity
+# reserved via reserve(cnt), hence disjoint from the source rows.
+[[seams]]
+id = "bytes-818-S1"
+case = "bytes-818"
+source_anchor = "src/bytes_mut.rs extend_from_within: unsafe ptr::copy_nonoverlapping(src, dst, cnt) with range-checked + reserved-capacity SAFETY comments"
+operation_family = "copy_nonoverlapping"
+obligation_keys = ["valid-range", "allocation", "non-overlap"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Both halves of the obligation are written and established: crate::range asserts begin/end against len, reserve(cnt) plus spare_capacity_mut disjointness covers allocation and non-overlap. Guard-credit probe: a correct card credits both comments to their matching obligations and must not chain them (the range comment does not cover non-overlap)."
+inclusion = "include"
+
+# bytes-818 S2: advance_mut(cnt) extends len over the just-copied rows with
+# a SAFETY comment citing reservation plus filled data. The slice()
+# refactor to crate::range and the range() helper itself are safe code and
+# contribute no seam.
+[[seams]]
+id = "bytes-818-S2"
+case = "bytes-818"
+source_anchor = "src/bytes_mut.rs extend_from_within: unsafe self.advance_mut(cnt) with reserved-and-filled SAFETY comment"
+operation_family = "unsafe_fn_call"
+obligation_keys = ["capacity", "initialized"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Length extension over uninit spare capacity is sound only because the preceding copy initialized exactly cnt rows within reserved capacity. A correct card credits the copy as the initialization evidence for this call; judging the call in isolation as an unguarded set_len would be wrong-obligation."
+inclusion = "include"
+
+# parking_lot-349 S1: ArcMutexGuard gains cfg(arc_lock)-gated unsafe Send
+# and Sync impls while its marker narrows from PhantomData<R::GuardMarker>
+# to PhantomData<*const ()>. The where-clauses carry the adequacy
+# argument; like crossbeam-1287-S1 there is no SAFETY comment and no
+# canonical key for impl-adequacy (allocation is the nearest: Arc
+# ownership plus marker choice decides thread containment).
+[[seams]]
+id = "parking_lot-349-S1"
+case = "parking_lot-349"
+source_anchor = "lock_api/src/mutex.rs unsafe impl Send/Sync for ArcMutexGuard with GuardMarker where-clauses; marker narrowed to PhantomData<*const ()>"
+operation_family = "unsafe_impl_send_sync"
+obligation_keys = ["allocation"]
+expected_contract = "missing"
+expected_discharge = "partial"
+rationale = "Soundness fix making the guard Send/Sync only when the raw mutex, data, and guard marker agree. The impls are cfg-gated, so a card must still cover them as source truth rather than skipping gated code silently. A correct card finds both impls and judges the where-clauses; the marker narrowing is the confine-the-leak half of the fix."
+inclusion = "include"

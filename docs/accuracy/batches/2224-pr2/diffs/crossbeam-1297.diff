@@ -1,0 +1,82 @@
+diff --git a/crossbeam-epoch/src/collector.rs b/crossbeam-epoch/src/collector.rs
+index ee9816ef4..12190f70c 100644
+--- a/crossbeam-epoch/src/collector.rs
++++ b/crossbeam-epoch/src/collector.rs
+@@ -101,7 +101,7 @@ impl Drop for LocalHandle {
+     #[inline]
+     fn drop(&mut self) {
+         unsafe {
+-            Local::release_handle(&*self.local);
++            Local::release_handle(self.local);
+         }
+     }
+ }
+@@ -452,4 +452,17 @@ mod tests {
+         }
+         assert_eq!(DROPS.load(Ordering::Relaxed), COUNT * THREADS);
+     }
++
++    #[test]
++    fn use_guard_after_handle_and_collector_dropped() {
++        let collector = Collector::new();
++        let handle = collector.register();
++
++        let guard = handle.pin();
++
++        drop(collector);
++        drop(handle);
++
++        guard.flush();
++    }
+ }
+diff --git a/crossbeam-epoch/src/guard.rs b/crossbeam-epoch/src/guard.rs
+index 117911e7e..814168859 100644
+--- a/crossbeam-epoch/src/guard.rs
++++ b/crossbeam-epoch/src/guard.rs
+@@ -384,7 +384,7 @@ impl Guard {
+             // We need to acquire a handle here to ensure the Local doesn't
+             // disappear from under us.
+             local.acquire_handle();
+-            local.unpin();
++            unsafe { Local::unpin(self.local) }
+         }
+ 
+         let _guard = ScopeGuard(self.local);
+@@ -416,8 +416,8 @@ impl Guard {
+ impl Drop for Guard {
+     #[inline]
+     fn drop(&mut self) {
+-        if let Some(local) = unsafe { self.local.as_ref() } {
+-            local.unpin();
++        if !self.local.is_null() {
++            unsafe { Local::unpin(self.local) }
+         }
+     }
+ }
+diff --git a/crossbeam-epoch/src/internal.rs b/crossbeam-epoch/src/internal.rs
+index 9abc1131e..4a7a00b87 100644
+--- a/crossbeam-epoch/src/internal.rs
++++ b/crossbeam-epoch/src/internal.rs
+@@ -463,16 +463,16 @@ impl Local {
+ 
+     /// Unpins the `Local`.
+     #[inline]
+-    pub(crate) fn unpin(&self) {
+-        let guard_count = self.guard_count.get();
+-        self.guard_count.set(guard_count - 1);
++    pub(crate) unsafe fn unpin(this: *const Self) {
++        let guard_count = unsafe { (*this).guard_count.get() };
++        unsafe { (*this).guard_count.set(guard_count - 1) }
+ 
+         if guard_count == 1 {
+-            self.epoch.store(Epoch::starting(), Ordering::Release);
++            unsafe { (*this).epoch.store(Epoch::starting(), Ordering::Release) }
+ 
+-            if self.handle_count.get() == 0 {
++            if unsafe { (*this).handle_count.get() } == 0 {
+                 unsafe {
+-                    Self::finalize(self);
++                    Self::finalize(this);
+                 }
+             }
+         }

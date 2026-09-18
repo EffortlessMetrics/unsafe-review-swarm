@@ -1,0 +1,29 @@
+diff --git a/crossbeam-skiplist/src/base.rs b/crossbeam-skiplist/src/base.rs
+index 5028ff790..92561b4be 100644
+--- a/crossbeam-skiplist/src/base.rs
++++ b/crossbeam-skiplist/src/base.rs
+@@ -2107,16 +2107,20 @@ where
+ 
+ unsafe impl<Q, R, K, V, C> Send for RefRange<'_, Q, R, K, V, C>
+ where
+-    C: Comparator<K> + Comparator<K, Q>,
+-    R: RangeBounds<Q>,
++    K: Send + Sync,
++    V: Send + Sync,
++    C: Comparator<K> + Comparator<K, Q> + Send + Sync,
++    R: RangeBounds<Q> + Send,
+     Q: ?Sized,
+ {
+ }
+ 
+ unsafe impl<Q, R, K, V, C> Sync for RefRange<'_, Q, R, K, V, C>
+ where
+-    C: Comparator<K> + Comparator<K, Q>,
+-    R: RangeBounds<Q>,
++    K: Send + Sync,
++    V: Send + Sync,
++    C: Comparator<K> + Comparator<K, Q> + Send + Sync,
++    R: RangeBounds<Q> + Sync,
+     Q: ?Sized,
+ {
+ }
