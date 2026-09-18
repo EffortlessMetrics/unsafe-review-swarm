@@ -309,7 +309,7 @@ fn has_try_operator(body: &str) -> bool {
 mod tests {
     use super::*;
     use crate::domain::{
-        OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+        OperationFamily, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
     };
     use std::path::PathBuf;
 
@@ -323,6 +323,7 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: "unsafe { checkable() }".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 family: OperationFamily::Ffi,
