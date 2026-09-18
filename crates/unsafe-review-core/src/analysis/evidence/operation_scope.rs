@@ -12,7 +12,7 @@ pub(super) fn code_before_site_operation(
     lower: &str,
     expression: &str,
 ) -> Option<String> {
-    code_before_operation_at(lower, expression, site_anchor(site, lower))
+    code_before_operation_at(lower, expression, site_snippet_anchor(site, lower))
 }
 
 /// Source-text counterpart of [`code_before_site_operation`]: same anchoring,
@@ -22,7 +22,7 @@ pub(super) fn source_before_site_operation(
     lower: &str,
     expression: &str,
 ) -> Option<String> {
-    source_before_operation_at(lower, expression, site_anchor(site, lower))
+    source_before_operation_at(lower, expression, site_snippet_anchor(site, lower))
 }
 
 fn code_before_operation_at(lower: &str, expression: &str, anchor: usize) -> Option<String> {
@@ -76,7 +76,9 @@ fn operation_pos_at(compact: &str, expression: &str, anchor: usize) -> Option<us
 /// Compact offset where the site's own snippet starts within `lower`, or 0
 /// when `lower` was not assembled from this site's context (the prefix check
 /// fails and callers transparently keep legacy first-match behavior).
-fn site_anchor(site: &ScannedSite, lower: &str) -> usize {
+/// Shared by the operation-scope helpers and evidence modules (like utf8)
+/// that locate their own marker inside a window shared with duplicate sites.
+pub(super) fn site_snippet_anchor(site: &ScannedSite, lower: &str) -> usize {
     let before = compact_code(&strip_block_comments_and_literals(
         &code_context_before(site).to_ascii_lowercase(),
     ));

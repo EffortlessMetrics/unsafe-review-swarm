@@ -1,12 +1,16 @@
 use super::{
     compact_code, contains_executable_return, has_assignment_to_identifier,
-    has_fresh_guard_pattern, is_receiver_path_char, matching_call_argument_end,
-    matching_code_block_end, source_value_identifier, strip_block_comments_and_literals,
+    has_fresh_guard_pattern, is_receiver_path_char, is_runtime_assert_at,
+    matching_call_argument_end, matching_code_block_end, site_snippet_anchor,
+    source_value_identifier, strip_block_comments_and_literals,
 };
+use crate::analysis::scanner::ScannedSite;
 
-pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
+pub(super) fn has_from_utf8_unchecked_validation_evidence(site: &ScannedSite, lower: &str) -> bool {
     let compact = compact_code(&strip_block_comments_and_literals(lower));
-    let Some((before_call, argument)) = from_utf8_unchecked_argument_context(&compact) else {
+    let anchor = site_snippet_anchor(site, lower);
+    let Some((before_call, argument)) = from_utf8_unchecked_argument_context(&compact, anchor)
+    else {
         return false;
     };
     let Some(argument_identifier) = source_value_identifier(argument) else {
@@ -19,6 +23,7 @@ pub(super) fn has_from_utf8_unchecked_validation_evidence(lower: &str) -> bool {
     };
 
     has_validation_is_ok_branch_guard(&context)
+        || has_validation_assert_is_ok_guard(&context)
         || has_validation_if_let_ok_branch_guard(&context)
         || has_validation_let_else_ok_guard(&context)
         || has_validation_match_ok_branch_guard(&context)
@@ -76,9 +81,18 @@ impl Utf8ValidationContext<'_> {
     }
 }
 
-fn from_utf8_unchecked_argument_context(compact: &str) -> Option<(&str, &str)> {
+fn from_utf8_unchecked_argument_context(compact: &str, anchor: usize) -> Option<(&str, &str)> {
+    // The site's own call is the first marker at or after the snippet
+    // offset. An earlier identical call sharing the window must not donate
+    // its argument (a later unguarded site was once credited present by an
+    // earlier site's guard). Fall back to the first marker when the site's
+    // own call is unreachable, preserving legacy behavior.
     let marker = "from_utf8_unchecked(";
-    let call_pos = compact.find(marker)?;
+    let call_pos = compact
+        .match_indices(marker)
+        .map(|(pos, _)| pos)
+        .find(|pos| *pos >= anchor)
+        .or_else(|| compact.find(marker))?;
     let before_call = &compact[..call_pos];
     let after_marker = &compact[call_pos + marker.len()..];
     let argument_end = matching_call_argument_end(after_marker)?;
@@ -112,6 +126,62 @@ fn has_validation_is_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> boo
         search_from = guard_start + guard.len();
     }
     false
+}
+
+/// A plain `assert!(from_utf8(buf).is_ok())` immediately before the
+/// conversion validates the same buffer: a failing assert aborts before the
+/// unchecked call. `debug_assert!` stays uncredited (compiled out in
+/// release), an optional message tail is tolerated, and anything after the
+/// assert must leave the buffer untouched. An aliased boolean
+/// (`let ok = ...; assert!(ok);`) carries no inline validation text and
+/// stays uncredited without dataflow.
+fn has_validation_assert_is_ok_guard(context: &Utf8ValidationContext<'_>) -> bool {
+    let before_call = context.before_call;
+    let mut search_from = 0usize;
+    while let Some(offset) = before_call[search_from..].find("assert!(") {
+        let assert_start = search_from + offset;
+        let after_open = &before_call[assert_start + "assert!(".len()..];
+        if !is_runtime_assert_at(before_call, assert_start) {
+            search_from = assert_start + "assert!(".len();
+            continue;
+        }
+        let Some(condition_end) = assert_condition_end(after_open) else {
+            search_from = assert_start + "assert!(".len();
+            continue;
+        };
+        let condition = after_open[..condition_end].trim_end_matches(',');
+        let Some(validated) = condition.strip_suffix(".is_ok()") else {
+            search_from = assert_start + "assert!(".len();
+            continue;
+        };
+        if validated.ends_with(&context.validation)
+            && !context.has_stale_argument(&after_open[condition_end..])
+        {
+            return true;
+        }
+        search_from = assert_start + "assert!(".len();
+    }
+    false
+}
+
+/// End of the assert condition: the closing `)` or the top-level `,` before
+/// an optional message. `None` when the assert never closes in this window.
+fn assert_condition_end(after_open: &str) -> Option<usize> {
+    let mut depth = 0usize;
+    for (idx, ch) in after_open.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                if depth == 0 {
+                    return Some(idx);
+                }
+                depth -= 1;
+            }
+            ',' if depth == 0 => return Some(idx),
+            _ => {}
+        }
+    }
+    None
 }
 
 fn has_validation_if_let_ok_branch_guard(context: &Utf8ValidationContext<'_>) -> bool {
