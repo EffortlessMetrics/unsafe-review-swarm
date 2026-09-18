@@ -2730,6 +2730,10 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
         // Templates never claim a run happened, so no verdict is emitted;
         // authors may add one after an actual run.
         verdict: None,
+        // A template records no execution; terminal status stays unknown,
+        // never an assumed clean exit.
+        exit_code: None,
+        terminated_by_signal: None,
     };
     receipt.validate()?;
     let rendered = receipt.to_pretty_json()?;
@@ -2854,6 +2858,7 @@ fn receipt_import_miri(options: SavedOutputReceiptOptions) -> Result<(), String>
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2877,6 +2882,7 @@ fn receipt_import_careful(options: SavedOutputReceiptOptions) -> Result<(), Stri
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2903,6 +2909,7 @@ fn receipt_import_sanitizer(options: SavedOutputReceiptOptions) -> Result<(), St
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
         allow_runtime: options.allow_runtime,
     })?;
     let rendered = receipt.to_pretty_json()?;
@@ -2930,6 +2937,7 @@ fn receipt_import_concurrency(options: SavedOutputReceiptOptions) -> Result<(), 
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2956,6 +2964,7 @@ fn receipt_import_proof(options: SavedOutputReceiptOptions) -> Result<(), String
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {

@@ -75,6 +75,6 @@ pub use domain::{
     DischargeEvidence, ExecutedReceiptInput, HazardKind, MiriReceiptInput, MissingEvidence,
     NextAction, Priority, ProofPath, ProofReceiptInput, ReachEvidence, ReceiptCardIdKind,
     RelatedTest, ReviewCard, ReviewClass, SafetyObligation, SanitizerReceiptInput, SourceLocation,
-    UnsafeOperation, UnsafeSite, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind,
-    WitnessReceipt, WitnessRoute,
+    TerminalStatus, UnsafeOperation, UnsafeSite, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence,
+    WitnessKind, WitnessReceipt, WitnessRoute,
 };
