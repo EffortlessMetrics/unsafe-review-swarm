@@ -75,6 +75,7 @@ pub(super) fn detect_panic_from_safe_js_sites(
                 operation: UnsafeOperation {
                     family: OperationFamily::PanicFromSafeJs,
                     expression: panic_from_safe_js_expression(sink, source_binding.as_deref()),
+                    bound_name: None,
                 },
                 context_before,
                 context_after,

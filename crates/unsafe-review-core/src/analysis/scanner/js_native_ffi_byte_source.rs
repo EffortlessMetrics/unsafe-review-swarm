@@ -76,6 +76,7 @@ pub(super) fn detect_js_native_ffi_byte_sites(
             operation: UnsafeOperation {
                 family: OperationFamily::StableByteSourceNativeFfiRead,
                 expression: js_native_ffi_expression(capture, handoff),
+                bound_name: None,
             },
             context_before,
             context_after,

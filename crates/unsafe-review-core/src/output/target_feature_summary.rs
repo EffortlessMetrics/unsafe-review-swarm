@@ -417,6 +417,7 @@ mod tests {
             operation: UnsafeOperation {
                 expression,
                 family: OperationFamily::TargetFeature,
+                bound_name: None,
             },
             hazards: vec![HazardKind::TargetFeature],
             obligations: vec![],

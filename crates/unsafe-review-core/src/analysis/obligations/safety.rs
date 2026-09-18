@@ -254,3 +254,16 @@ fn ffi_obligations() -> Vec<SafetyObligation> {
         ),
     ]
 }
+
+/// Site-conditional FFI obligation: when the call binds its return value to
+/// a named local, the caller takes responsibility for validating it. Ignored
+/// (`unsafe { call() };`), discarded (`let _ =`), and nested values carry no
+/// such obligation: silence over noise for ambiguous flow.
+pub(crate) fn ffi_return_value_obligation(bound_name: Option<&str>) -> Option<SafetyObligation> {
+    bound_name.map(|_| {
+        SafetyObligation::new(
+            "return-value",
+            "foreign call return value is checked before use",
+        )
+    })
+}

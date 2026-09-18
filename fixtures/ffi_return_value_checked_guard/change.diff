@@ -1,0 +1,13 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,0 +5,9 @@
++pub fn run() -> Result<(), &'static str> {
++    // SAFETY: checkable takes no pointers; only its return value needs validation.
++    let result = unsafe { checkable() };
++    if result == 0 {
++        Ok(())
++    } else {
++        Err("checkable failed")
++    }
++}

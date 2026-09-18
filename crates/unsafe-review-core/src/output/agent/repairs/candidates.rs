@@ -317,6 +317,7 @@ mod tests {
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),
                 family: OperationFamily::RawPointerDeref,
+                bound_name: None,
             },
             hazards: vec![HazardKind::PointerValidity],
             obligations: vec![],

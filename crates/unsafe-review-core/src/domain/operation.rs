@@ -120,6 +120,11 @@ impl OperationFamily {
 pub struct UnsafeOperation {
     pub family: OperationFamily,
     pub expression: String,
+    /// Name the enclosing statement binds this operation's value to, when the
+    /// scanner recovers one (e.g. `result` in `let result = unsafe { ... }`).
+    /// `None` for discarded, ignored, or nested values. Evidence recognizers
+    /// use it for same-name guard discipline; it never enters card identity.
+    pub bound_name: Option<String>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
