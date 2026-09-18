@@ -5807,6 +5807,12 @@ expected_hazard = "ffi_abi"
 fixture = "ffi_return_value_discard_no_obligation"
 kind = "false_positive_control"
 claim = "FFI call with a let-underscore discarded return carries no return-value obligation at all"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
 [[cases]]
 fixture = "movement_context_card_not_new"
 kind = "positive"
