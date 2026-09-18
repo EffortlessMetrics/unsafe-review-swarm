@@ -136,6 +136,29 @@ pub struct UnsafeSite {
     pub public_api_surface: bool,
     pub changed: bool,
     pub snippet: String,
+    /// Source role of the file owning this site, recovered at scan time.
+    /// Pipeline-internal routing data (summary role counts); projections
+    /// omit it until a surface needs it, so it never enters card identity.
+    pub(crate) role: SourceRole,
+}
+
+/// Source role of the code owning an unsafe site: which review bucket the
+/// finding belongs to. Unknown is the default; only positively-evidenced
+/// roles classify.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum SourceRole {
+    /// Ordinary source code reviewed as production work.
+    Production,
+    /// Test code: tests/ or test/ paths, _test/_tests stems, or a site
+    /// inside a #[cfg(test)] region. Visible, never auto-suppressed.
+    Test,
+    /// Machine-generated production code: generated path signals or an
+    /// @generated file marker. Generated origin does not exempt a seam
+    /// from production review work.
+    Generated,
+    /// No positive signal: examples, shared/ambiguous includes, benches,
+    /// root-level files, and anything else without role evidence.
+    Unknown,
 }
 
 #[cfg(test)]

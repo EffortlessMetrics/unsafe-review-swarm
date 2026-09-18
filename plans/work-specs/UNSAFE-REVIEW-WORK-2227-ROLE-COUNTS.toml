@@ -1,0 +1,58 @@
+# Issue-linked work specification for the source-role classification slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2227"
+kind = "usefulness"
+objective = "Classify every card's source role (production, test, generated, unknown) from path plus content signals at scan time, and project role counts into the review summary, so reviewers can triage production unsafe first without losing test, generated, or ambiguous findings."
+user_outcome = "A mixed-repo review reports how many cards are production, test, generated, and unknown work. cfg(test) helpers in src/ stop looking like production defects; generated and ambiguous files stop being silently bucketed as production; fixture/test inputs stay visible."
+claim_boundary = "This slice proves classification plus summary counts; it does not reorder cards, regroup projections, change per-card JSON, claim precision/recall, or touch calibration, safety, execution, or policy. Markdown surfacing and production-first group ordering are the follow-up slice."
+
+[scope]
+included = [
+    "pub(crate) SourceRole enum (Production, Test, Generated, Unknown) with ordered rules: generated signals, then test signals, then src-component production, then unknown default",
+    "Test signals: tests/ or test/ path component, _test/_tests stems, or the site inside a #[cfg(test)] brace region; fixtures/fixture components are stripped before matching so fixtures-named production is never claimed as test",
+    "Generated signals: generated path component or stem fragment, or an @generated file marker",
+    "Per-site cfg(test) region analysis at scan (bounded upward attribute search plus brace-region containment); no-cfg fast path",
+    "pub(crate) role field on UnsafeSite set at both scan constructors; card JSON projections omit it so no golden churns",
+    "Summary production_cards, test_cards, generated_cards, unknown_cards counted over emitted cards in summarize(); JsonSummary projection extended",
+    "Classifier unit tests covering the four acceptance cases (cfg(test)-in-src, fixtures-named production, generated production, unknown default with negative list) plus pipeline test on mixed_source_roles asserting the fixture map's role distribution",
+]
+excluded = [
+    "Card reordering, regrouping, or production-first group ordering (follow-up slice)",
+    "Per-card role in JSON or markdown projections (follow-up; JSON omits the field in this slice)",
+    "Markdown summary rendering changes (follow-up)",
+    "benches/ classification (unknown by default; no rule in this slice)",
+    "Method-call or macro-generated test signals beyond #[cfg(test)] regions",
+    "New public types (the enum and field stay pub(crate); summary gains plain counts)",
+    "Calibration, accuracy, safety, execution, blocking, or policy claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Complete inventory is preserved: classification changes no counts, no cards, and no goldens; it only labels and aggregates."
+
+[[invariant]]
+id = "INV-2"
+text = "Unknown is the default: only positively-evidenced roles classify; examples, shared/ambiguous, benches, and root-level files stay unknown."
+
+[[invariant]]
+id = "INV-3"
+text = "A production file's in-file test module never recolors the file's production seams: cfg(test) scoping is per site region, and production seams outside the region stay production."
+
+[[acceptance]]
+id = "AC-2227-ROLE-1"
+text = "The four acceptance cases classify correctly: cfg(test)-in-src site is test, fixtures-named crate file is production, @generated file is generated, ambiguous file is unknown."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- source_role"]
+
+[[acceptance]]
+id = "AC-2227-ROLE-2"
+text = "mixed_source_roles cards distribute per the fixture map with inventory intact: production, test, generated, and unknown buckets sum to the emitted card count."
+proof = ["cargo test -p unsafe-review-core --locked --lib -- mixed_source_roles_inventory_retains_every_seam"]
+
+[[acceptance]]
+id = "AC-2227-ROLE-3"
+text = "Full workspace proof stays green with zero golden churn outside the intended new assertions."
+proof = ["cargo fmt --check", "cargo check --workspace --all-targets --locked", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2227-role-counts"
+notes = "Follows the mixed fixture (#2262) and role-row cleanup already on the lane. Follow-up: production-first group ordering in markdown/first-PR surfaces plus per-card role projection. Coordinate bucket vocabulary with the #2224-PR2 canonical family list."

@@ -177,7 +177,7 @@ fn discharge_state_for(
 mod tests {
     use super::*;
     use crate::domain::{
-        OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+        OperationFamily, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -211,6 +211,7 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: snippet.to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 family,
