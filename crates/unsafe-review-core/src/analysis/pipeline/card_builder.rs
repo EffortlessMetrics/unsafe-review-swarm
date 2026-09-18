@@ -43,7 +43,11 @@ pub(super) fn build_card(
         &reach,
     );
     let discharge = evidence::summarize_discharge(&obligation_evidence);
-    let routes = witness::routes_for(&hazards, scanned_site.site.owner.as_ref());
+    let routes = witness::routes_for(
+        &hazards,
+        scanned_site.site.owner.as_ref(),
+        reach.state != "unreached",
+    );
     let (mut class, mut priority, confidence) =
         classify::classify(&hazards, &contract_for_classification, &discharge, &reach);
     let mut missing = Vec::new();

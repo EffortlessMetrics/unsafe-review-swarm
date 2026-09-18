@@ -57,13 +57,13 @@
     "witness_routes": [
       {
         "kind": "loom",
-        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test SharedCell_loom -- --nocapture",
         "required": false
       },
       {
         "kind": "shuttle",
-        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test SharedCell_shuttle -- --nocapture",
         "required": false
       }
