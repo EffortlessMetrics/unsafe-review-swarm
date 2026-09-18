@@ -35,6 +35,7 @@ mod return_value_discharge;
 mod set_len;
 mod site_context;
 mod source_value;
+mod state_bit_predicate;
 mod target_feature_discharge;
 mod transmute;
 mod u8_bool_value;
@@ -1144,6 +1145,112 @@ mod tests {
         );
         let ev_fn = obligation_evidence(&array_new_in_fn, &obligations, &contract, &reach);
         assert!(ev_fn[0].discharge.present);
+    }
+
+    #[test]
+    fn maybeuninit_drop_accepts_dominating_state_bit_guard() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Crossbeam shape: the drop runs only when the slot state records a
+        // prior write. The summary must name the predicate, not generic
+        // guard code.
+        let guarded = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+
+        let evidence = obligation_evidence(&guarded, &obligations, &contract, &reach);
+        assert!(evidence[0].discharge.present);
+        let summary = &evidence[0].discharge.summary;
+        assert!(
+            summary.contains("write"),
+            "summary names the bit: {summary}"
+        );
+    }
+
+    #[test]
+    fn maybeuninit_drop_rejects_ungoverning_state_bit_shapes() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Bit test after the operation cannot guard it.
+        let guarded_after = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let slot = (*block).slots.get_unchecked_mut(offset);"],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["if *slot.state.get_mut() & WRITE != 0 {", "}"],
+        );
+        // The tested state must belong to the dropped slot.
+        let other_state = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *other.state.get_mut() & WRITE != 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+        // `== 0` puts the operation in the bit-unset arm.
+        let wrong_arm = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE == 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+        // A closed sibling branch does not dominate the operation.
+        let sibling_branch = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+                "}",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec![],
+        );
+        // Rebinding the slot between guard and operation voids the guard.
+        let rebound = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+                "slot = (*block).slots.get_unchecked_mut(other);",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+
+        for site in [
+            &guarded_after,
+            &other_state,
+            &wrong_arm,
+            &sibling_branch,
+            &rebound,
+        ] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+        }
     }
 
     #[test]
