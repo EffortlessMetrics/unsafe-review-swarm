@@ -34,6 +34,157 @@ pub struct WitnessReceipt {
     /// Absent means unknown, never assumed clean.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub terminated_by_signal: Option<bool>,
+    /// Structured identity of the reviewed subject and the observation
+    /// context. Absent on unbound legacy receipts, which remain readable
+    /// but explicitly limited: they never gain invented source identity.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub subject: Option<SubjectBinding>,
+}
+
+/// Minimum structured identity binding a witness observation to the exact
+/// reviewed subject, source revision, analysis configuration, and capture
+/// facts. Only non-secret configuration is recorded: digests and revision
+/// strings, never file contents, ambient environment, or absolute paths.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SubjectBinding {
+    /// Digest of the reviewed subject: card identity, operation family,
+    /// owner, source file, and operation snippet. A changed guard or
+    /// ownership context changes the subject even when the operation text
+    /// does not, so callers must include that context in the digest input.
+    pub subject_digest: String,
+    /// Digest of the executed invocation (program, arguments, environment).
+    /// Two confirmations of the same card with different invocations are
+    /// different executions and never compare applicable. `None` means the
+    /// invocation was not recorded and therefore cannot match anything,
+    /// not even another `None`.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub invocation_digest: Option<String>,
+    /// Analysis scope that produced the subject (`diff`, `repo`, ...).
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub scope: Option<String>,
+    /// Source revision the subject was reviewed at, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub head_commit: Option<String>,
+    /// Whether the working tree was dirty when the observation was recorded.
+    /// Observations from dirty trees never count as clean-tree evidence.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub repo_dirty: Option<bool>,
+    /// Working directory of the invocation, relative to the reviewed root.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub workdir: Option<String>,
+    /// Digest of the captured output bytes the verdict was classified from.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub output_digest: Option<String>,
+    /// Whether output capture completed. Partial capture cannot qualify.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub captured_complete: Option<bool>,
+    /// Analyzer/tool version that produced the subject, when known.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub tool_version: Option<String>,
+}
+
+/// Applicability of a saved observation to a current subject.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum SubjectApplicability {
+    Applicable,
+    Stale { reason: String },
+    Unknown { reason: String },
+}
+
+impl SubjectBinding {
+    pub fn digest_subject(parts: &[&str]) -> String {
+        // Length-prefixed framing: a bare newline join lets ["a\nb"] and
+        // ["a", "b"] hash identically. Lengths make the split unambiguous.
+        let mut framed = String::new();
+        for part in parts {
+            framed.push_str(&format!("{}:\n", part.len()));
+            framed.push_str(part);
+            framed.push('\n');
+        }
+        stable_hash_hex(&framed)
+    }
+
+    pub fn digest_output(output: &str) -> String {
+        stable_hash_hex(output)
+    }
+
+    /// Canonical digest of an executed invocation: program, arguments in
+    /// order, and environment assignments sorted by key. Environment values
+    /// are digested, never stored: the digest proves which invocation ran
+    /// without recording possibly-secret configuration.
+    pub fn digest_invocation(program: &str, args: &[String], env: &[(String, String)]) -> String {
+        let mut parts = vec![program.to_string()];
+        parts.extend(args.iter().cloned());
+        let mut env: Vec<String> = env
+            .iter()
+            .map(|(key, value)| format!("{key}={value}"))
+            .collect();
+        env.sort();
+        parts.extend(env);
+        Self::digest_subject(&parts.iter().map(String::as_str).collect::<Vec<_>>())
+    }
+
+    /// Decide whether an observation recorded under `recorded` still applies
+    /// to the current subject `current`. Unknown never implies applicable;
+    /// only full equivalence of subject, scope, revision, and clean capture
+    /// retains applicability. Unrelated changes keep applicability only
+    /// through this digest equivalence, never through unchanged text alone.
+    pub fn applicability(
+        recorded: Option<&SubjectBinding>,
+        current: &SubjectBinding,
+    ) -> SubjectApplicability {
+        let Some(recorded) = recorded else {
+            return SubjectApplicability::Unknown {
+                reason: "unbound legacy receipt carries no subject identity".to_string(),
+            };
+        };
+        if recorded.subject_digest != current.subject_digest {
+            return SubjectApplicability::Stale {
+                reason: "reviewed subject changed".to_string(),
+            };
+        }
+        if recorded.scope != current.scope {
+            return SubjectApplicability::Stale {
+                reason: "analysis scope changed".to_string(),
+            };
+        }
+        if recorded.invocation_digest != current.invocation_digest
+            || recorded.invocation_digest.is_none()
+        {
+            // Different invocations are different executions, and a missing
+            // digest matches nothing, not even another missing digest.
+            return SubjectApplicability::Unknown {
+                reason: "executed invocation identity is not established on both sides".to_string(),
+            };
+        }
+        if recorded.head_commit != current.head_commit {
+            return SubjectApplicability::Stale {
+                reason: "source revision changed".to_string(),
+            };
+        }
+        if recorded.head_commit.is_none() {
+            // Equal `None` revisions carry no identity: two revision-less
+            // observations must never compare applicable.
+            return SubjectApplicability::Unknown {
+                reason: "source revision unavailable on both sides of the comparison".to_string(),
+            };
+        }
+        if recorded.repo_dirty != Some(false) || current.repo_dirty != Some(false) {
+            // Clean-tree provenance must be established on both sides: a
+            // `None` dirtiness probe (git unavailable, not a repository, or
+            // timed out) carries no clean evidence, exactly like the
+            // `captured_complete` rule below.
+            return SubjectApplicability::Unknown {
+                reason: "clean-tree provenance is not established on both sides".to_string(),
+            };
+        }
+        if recorded.captured_complete != Some(true) || current.captured_complete != Some(true) {
+            return SubjectApplicability::Unknown {
+                reason: "output capture completeness is not established".to_string(),
+            };
+        }
+        SubjectApplicability::Applicable
+    }
 }
 
 /// Terminal facts for a witness child process, retained by the opt-in
@@ -103,6 +254,9 @@ pub struct MiriReceiptInput {
     /// saved-output imports and older receipts predate status retention and
     /// must never be read as exit 0.
     pub terminal_status: Option<TerminalStatus>,
+    /// Structured subject/observation identity. `None` on saved imports
+    /// and legacy observations, which stay explicitly unbound.
+    pub subject: Option<SubjectBinding>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -118,6 +272,9 @@ pub struct CargoCarefulReceiptInput {
     /// saved-output imports and older receipts predate status retention and
     /// must never be read as exit 0.
     pub terminal_status: Option<TerminalStatus>,
+    /// Structured subject/observation identity. `None` on saved imports
+    /// and legacy observations, which stay explicitly unbound.
+    pub subject: Option<SubjectBinding>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -134,6 +291,9 @@ pub struct SanitizerReceiptInput {
     /// saved-output imports and older receipts predate status retention and
     /// must never be read as exit 0.
     pub terminal_status: Option<TerminalStatus>,
+    /// Structured subject/observation identity. `None` on saved imports
+    /// and legacy observations, which stay explicitly unbound.
+    pub subject: Option<SubjectBinding>,
     /// When `true`, accept output from a runtime/program-level sanitizer run
     /// that is not a `cargo test` harness. A clean run (no sanitizer markers)
     /// records `not_reproduced`; a run with sanitizer markers records
@@ -155,6 +315,9 @@ pub struct ConcurrencyReceiptInput {
     /// saved-output imports and older receipts predate status retention and
     /// must never be read as exit 0.
     pub terminal_status: Option<TerminalStatus>,
+    /// Structured subject/observation identity. `None` on saved imports
+    /// and legacy observations, which stay explicitly unbound.
+    pub subject: Option<SubjectBinding>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -171,6 +334,9 @@ pub struct ProofReceiptInput {
     /// saved-output imports and older receipts predate status retention and
     /// must never be read as exit 0.
     pub terminal_status: Option<TerminalStatus>,
+    /// Structured subject/observation identity. `None` on saved imports
+    /// and legacy observations, which stay explicitly unbound.
+    pub subject: Option<SubjectBinding>,
 }
 
 /// Typed output captured by an explicit unsafe-review witness execution.
@@ -245,6 +411,7 @@ struct ClassifiedOutput {
     executor: &'static str,
     extra_limitations: Vec<String>,
     limitations: Vec<String>,
+    subject: Option<SubjectBinding>,
 }
 
 impl WitnessReceipt {
@@ -445,6 +612,7 @@ fn classify_output_text(
                 executor: "Miri",
                 extra_limitations: Vec::new(),
                 limitations: input.limitations,
+                subject: input.subject,
             })
         }
         ExecutedReceiptInput::CargoCareful(input) => {
@@ -468,6 +636,7 @@ fn classify_output_text(
                 executor: "cargo-careful",
                 extra_limitations: Vec::new(),
                 limitations: input.limitations,
+                subject: input.subject,
             })
         }
         ExecutedReceiptInput::Sanitizer(input) => {
@@ -501,6 +670,7 @@ fn classify_output_text(
                 executor: "a sanitizer",
                 extra_limitations,
                 limitations: input.limitations,
+                subject: input.subject,
             })
         }
         ExecutedReceiptInput::Concurrency(input) => {
@@ -524,6 +694,7 @@ fn classify_output_text(
                 executor: "a concurrency witness",
                 extra_limitations: Vec::new(),
                 limitations: input.limitations,
+                subject: input.subject,
             })
         }
         ExecutedReceiptInput::Proof(input) => {
@@ -549,6 +720,7 @@ fn classify_output_text(
                     "proof scope is limited to the recorded harness/output".to_string(),
                 ],
                 limitations: input.limitations,
+                subject: input.subject,
             })
         }
     }
@@ -579,6 +751,7 @@ fn finalize_output_receipt(
         command_hash: Some(command_hash),
         limitations: Some(limitations),
         verdict: Some(classified.verdict),
+        subject: classified.subject,
         exit_code: terminal.and_then(|status| status.exit_code),
         terminated_by_signal: terminal.map(|status| status.signaled),
     };
@@ -1164,6 +1337,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
         assert_eq!(miri.verdict.as_deref(), Some("not_reproduced"));
 
@@ -1177,6 +1351,7 @@ mod tests {
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
         assert_eq!(proof.verdict.as_deref(), Some("not_reproduced"));
         Ok(())
@@ -1334,6 +1509,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.tool, "miri");
@@ -1371,6 +1547,7 @@ mod tests {
                 command: "cargo +nightly miri test read_header".to_string(),
                 limitations: vec!["single explicit run".to_string()],
                 terminal_status: Some(TerminalStatus::exited(0)),
+                subject: None,
             },
         ))?;
 
@@ -1427,6 +1604,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: terminal,
+            subject: None,
         })
     }
 
@@ -1511,6 +1689,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(7)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
@@ -1534,12 +1713,214 @@ mod tests {
                     .to_string(),
                 limitations: Vec::new(),
                 terminal_status: Some(TerminalStatus::exited(1)),
+                subject: None,
                 allow_runtime: true,
             },
         ))?;
 
         assert_eq!(receipt.verdict.as_deref(), Some("confirmed"));
         assert_eq!(receipt.exit_code, Some(1));
+        Ok(())
+    }
+
+    fn bound_subject() -> SubjectBinding {
+        SubjectBinding {
+            subject_digest: SubjectBinding::digest_subject(&[
+                "UR-test-c1",
+                "nonnull_unchecked",
+                "owner",
+                "src/lib.rs",
+                "NonNull::new_unchecked(p)",
+            ]),
+            scope: Some("repo".to_string()),
+            invocation_digest: Some(SubjectBinding::digest_invocation(
+                "cargo",
+                &["test".to_string()],
+                &[],
+            )),
+            head_commit: Some("abc123".to_string()),
+            repo_dirty: Some(false),
+            workdir: Some(".".to_string()),
+            output_digest: Some(SubjectBinding::digest_output("test result: ok\n")),
+            captured_complete: Some(true),
+            tool_version: Some("0.5.0".to_string()),
+        }
+    }
+
+    #[test]
+    fn bound_observation_applies_to_identical_subject() {
+        let binding = bound_subject();
+        assert_eq!(
+            SubjectBinding::applicability(Some(&binding), &binding),
+            SubjectApplicability::Applicable
+        );
+    }
+
+    #[test]
+    fn digest_subject_framing_separates_embedded_newlines() {
+        assert_ne!(
+            SubjectBinding::digest_subject(&["a\nb"]),
+            SubjectBinding::digest_subject(&["a", "b"])
+        );
+    }
+
+    #[test]
+    fn revisionless_bindings_on_both_sides_are_unknown() {
+        let current = bound_subject();
+        let mut recorded = current.clone();
+        recorded.head_commit = None;
+        let mut now = current.clone();
+        now.head_commit = None;
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&recorded), &now),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn different_invocations_are_not_applicable() {
+        let current = bound_subject();
+        let mut recorded = current.clone();
+        recorded.invocation_digest = Some(SubjectBinding::digest_invocation(
+            "cargo",
+            &["test".to_string(), "--release".to_string()],
+            &[],
+        ));
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&recorded), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn missing_invocation_digest_matches_nothing() {
+        let current = bound_subject();
+        let mut recorded = current.clone();
+        recorded.invocation_digest = None;
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&recorded), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn unestablished_clean_tree_on_both_sides_is_unknown() {
+        let current = bound_subject();
+        let mut recorded = current.clone();
+        recorded.repo_dirty = None;
+        let mut now = current.clone();
+        now.repo_dirty = None;
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&recorded), &now),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn unbound_legacy_observation_is_unknown_never_applicable() {
+        assert_eq!(
+            SubjectBinding::applicability(None, &bound_subject()),
+            SubjectApplicability::Unknown {
+                reason: "unbound legacy receipt carries no subject identity".to_string(),
+            }
+        );
+    }
+
+    #[test]
+    fn changed_subject_scope_or_revision_is_stale() {
+        let current = bound_subject();
+        let mut changed = current.clone();
+        changed.subject_digest = "different".to_string();
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&changed), &current),
+            SubjectApplicability::Stale { .. }
+        ));
+
+        let mut rescoped = current.clone();
+        rescoped.scope = Some("diff".to_string());
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&rescoped), &current),
+            SubjectApplicability::Stale { .. }
+        ));
+
+        let mut revised = current.clone();
+        revised.head_commit = Some("def456".to_string());
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&revised), &current),
+            SubjectApplicability::Stale { .. }
+        ));
+    }
+
+    #[test]
+    fn dirty_or_incomplete_capture_is_unknown() {
+        let current = bound_subject();
+        let mut dirty_recorded = current.clone();
+        dirty_recorded.repo_dirty = Some(true);
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&dirty_recorded), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+
+        let mut dirty_current = current.clone();
+        dirty_current.repo_dirty = Some(true);
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&current), &dirty_current),
+            SubjectApplicability::Unknown { .. }
+        ));
+
+        let mut partial = current.clone();
+        partial.captured_complete = Some(false);
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&partial), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn executed_receipt_carries_subject_binding() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_executed_output(ExecutedReceiptInput::Miri(
+            MiriReceiptInput {
+                card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                    .to_string(),
+                output: "test result: ok. 1 passed; 0 failed; finished in 0.01s\n".to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-05-18T00:00:00Z".to_string(),
+                expires_at: "2026-08-18".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                limitations: Vec::new(),
+                terminal_status: Some(TerminalStatus::exited(0)),
+                subject: Some(bound_subject()),
+            },
+        ))?;
+
+        let subject = receipt.subject.as_ref().ok_or("missing subject")?;
+        assert_eq!(
+            SubjectBinding::applicability(Some(subject), &bound_subject()),
+            SubjectApplicability::Applicable
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn saved_receipt_stays_unbound_legacy() -> Result<(), String> {
+        let receipt = WitnessReceipt::from_miri_output(MiriReceiptInput {
+            card_id: "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                .to_string(),
+            output: "test result: ok. 1 passed; 0 failed; finished in 0.01s\n".to_string(),
+            author: "core/fixtures".to_string(),
+            recorded_at: "2026-05-18T00:00:00Z".to_string(),
+            expires_at: "2026-08-18".to_string(),
+            command: "cargo +nightly miri test read_header".to_string(),
+            limitations: Vec::new(),
+            terminal_status: None,
+            subject: None,
+        })?;
+
+        assert_eq!(receipt.subject, None);
+        assert!(matches!(
+            SubjectBinding::applicability(receipt.subject.as_ref(), &bound_subject()),
+            SubjectApplicability::Unknown { .. }
+        ));
         Ok(())
     }
 
@@ -1558,6 +1939,7 @@ mod tests {
                 command: "cargo +nightly miri test read_header".to_string(),
                 limitations: Vec::new(),
                 terminal_status: Some(TerminalStatus::exited(0)),
+                subject: None,
             }))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::CargoCareful(
                 CargoCarefulReceiptInput {
@@ -1569,6 +1951,7 @@ mod tests {
                     command: "cargo +nightly careful test read_header".to_string(),
                     limitations: Vec::new(),
                     terminal_status: Some(TerminalStatus::exited(0)),
+                    subject: None,
                 },
             ))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::Sanitizer(
@@ -1583,6 +1966,7 @@ mod tests {
                         .to_string(),
                     limitations: Vec::new(),
                     terminal_status: Some(TerminalStatus::exited(0)),
+                    subject: None,
                     allow_runtime: false,
                 },
             ))?,
@@ -1597,6 +1981,7 @@ mod tests {
                     command: "cargo test --features loom read_header".to_string(),
                     limitations: Vec::new(),
                     terminal_status: Some(TerminalStatus::exited(0)),
+                    subject: None,
                 },
             ))?,
             WitnessReceipt::from_executed_output(ExecutedReceiptInput::Proof(ProofReceiptInput {
@@ -1609,6 +1994,7 @@ mod tests {
                 command: "cargo kani --harness read_header".to_string(),
                 limitations: Vec::new(),
                 terminal_status: Some(TerminalStatus::exited(0)),
+                subject: None,
             }))?,
         ];
 
@@ -1644,6 +2030,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         };
         assert_eq!(
             WitnessReceipt::from_miri_output(miri("warning: nothing ran\n")),
@@ -1665,6 +2052,7 @@ mod tests {
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         };
         assert_eq!(
             WitnessReceipt::from_cargo_careful_output(careful("")),
@@ -1685,6 +2073,7 @@ mod tests {
             command: "cargo test --features loom read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         };
         assert_eq!(
             WitnessReceipt::from_concurrency_output(concurrency("error: scheduler failed\n")),
@@ -1707,6 +2096,7 @@ mod tests {
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime,
         };
         let sanitizer_output = "test result: ok\nAddressSanitizer: use-after-free\n";
@@ -1748,6 +2138,7 @@ mod tests {
             command: "cargo kani --harness read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         };
         assert_eq!(
             WitnessReceipt::from_proof_output(proof("verification failed\n")),
@@ -1778,6 +2169,7 @@ mod tests {
             command: "cargo +nightly miri test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1795,6 +2187,7 @@ mod tests {
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -1819,6 +2212,7 @@ mod tests {
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.tool, "cargo-careful");
@@ -1854,6 +2248,7 @@ mod tests {
             command: "cargo +nightly careful test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -1871,6 +2266,7 @@ mod tests {
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -1896,6 +2292,7 @@ mod tests {
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: false,
         })?;
 
@@ -1933,6 +2330,7 @@ mod tests {
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: false,
         });
 
@@ -1957,6 +2355,7 @@ mod tests {
             command: "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: false,
         });
 
@@ -1976,6 +2375,7 @@ mod tests {
             command: "cargo test read_header".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: false,
         });
 
@@ -2002,6 +2402,7 @@ mod tests {
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.tool, "loom");
@@ -2038,6 +2439,7 @@ mod tests {
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -2062,6 +2464,7 @@ mod tests {
             command: "cargo test shared_cell_loom -- --nocapture".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -2080,6 +2483,7 @@ mod tests {
             command: "cargo test shared_cell -- --nocapture".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -2107,6 +2511,7 @@ mod tests {
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.tool, "kani");
@@ -2149,6 +2554,7 @@ mod tests {
             command: "crux prove byte_to_bool".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         })?;
 
         assert_eq!(receipt.tool, "crux");
@@ -2173,6 +2579,7 @@ mod tests {
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -2197,6 +2604,7 @@ mod tests {
             command: "cargo kani --harness byte_to_bool_harness".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(result.err().unwrap_or_default().contains("failure marker"));
@@ -2216,6 +2624,7 @@ mod tests {
             command: "cargo test byte_to_bool".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
         });
 
         assert!(
@@ -2335,6 +2744,7 @@ mod tests {
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/debug/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: true,
         })?;
 
@@ -2384,6 +2794,7 @@ mod tests {
             command: "RUSTFLAGS='-Z sanitizer=thread' cargo +nightly test my_test".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: false,
         })?;
 
@@ -2415,6 +2826,7 @@ mod tests {
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: true,
         })?;
 
@@ -2450,6 +2862,7 @@ mod tests {
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: vec!["fixture only".to_string()],
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: true,
         })?;
 
@@ -2475,6 +2888,7 @@ mod tests {
             command: "ASAN_OPTIONS=abort_on_error=0 ./target/release/my-program".to_string(),
             limitations: Vec::new(),
             terminal_status: Some(TerminalStatus::exited(0)),
+            subject: None,
             allow_runtime: true,
         });
 
@@ -2500,6 +2914,7 @@ mod tests {
             verdict: None,
             exit_code: None,
             terminated_by_signal: None,
+            subject: None,
         }
     }
 }
