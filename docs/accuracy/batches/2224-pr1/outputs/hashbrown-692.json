@@ -1,0 +1,566 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/seam-batch/checkouts/hashbrown",
+  "summary": {
+    "rust_files": 37,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 3,
+    "cards": 3,
+    "open_actionable_gaps": 3,
+    "contract_missing": 0,
+    "guard_missing": 3,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 3,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-hashbrown-src-control-tag-rs-fill-tag-operation-raw_pointer_write-as-mut-ptr-d9812818e769-pointer_validity-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/control/tag.rs",
+        "line": 80,
+        "column": 9,
+        "kind": "operation",
+        "owner": "fill_tag",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { self.as_mut_ptr().write_bytes(tag.0, self.len()) }"
+      },
+      "operation": "unsafe { self.as_mut_ptr().write_bytes(tag.0, self.len()) }",
+      "operation_family": "raw_pointer_write",
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "same_allocation"
+      ],
+      "obligations": [
+        "pointer is live and dereferenceable for the accessed type",
+        "buffer has enough bytes for the accessed type",
+        "pointer is aligned for the accessed type",
+        "memory is initialized for the accessed type",
+        "access remains inside one live allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `fill_tag` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "bounds",
+          "description": "buffer has enough bytes for the accessed type",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `fill_tag` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "alignment",
+          "description": "pointer is aligned for the accessed type",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No alignment guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `fill_tag` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "memory is initialized for the accessed type",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "MaybeUninit raw write target evidence was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `fill_tag` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "allocation",
+          "description": "access remains inside one live allocation",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `fill_tag` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "Some inferred safety obligations are missing local guard evidence",
+      "reach": "No static test mention of owner `fill_tag` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test fill_tag",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test fill_tag",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `raw_pointer_write` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) access remains inside one live allocation.",
+      "verify_commands": [
+        "cargo +nightly miri test fill_tag",
+        "cargo +nightly careful test fill_tag"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { self.as_mut_ptr().write_bytes(tag.0, self.len()) }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test fill_tag",
+          "route_kind": "miri",
+          "summary": "No test reaches `fill_tag` yet; write or identify a focused test for `fill_tag` first, then build/run `cargo +nightly miri test fill_tag` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test fill_tag",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-hashbrown-src-control-tag-rs-fill-tag-operation-raw_pointer_write-as-mut-ptr-d9812818e769-pointer_validity-c1` still maps to `unsafe { self.as_mut_ptr().write_bytes(tag.0, self.len()) }` at `src/control/tag.rs:80:9` before upgrading confidence.",
+            "Write or identify a focused test for `fill_tag` first (no test reaches it yet), then build/run `cargo +nightly miri test fill_tag` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `fill_tag` first (no test reaches it yet), then build/run `cargo +nightly miri test fill_tag` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-hashbrown-src-raw-rs-ctrl-operation-pointer_arithmetic-as-ptr-c61949e0546b-same_allocation-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/raw.rs",
+        "line": 2642,
+        "column": 9,
+        "kind": "operation",
+        "owner": "ctrl",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { self.ctrl.as_ptr().add(index).cast() }"
+      },
+      "operation": "unsafe { self.ctrl.as_ptr().add(index).cast() }",
+      "operation_family": "pointer_arithmetic",
+      "hazards": [
+        "same_allocation",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "bounds",
+          "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `# Safety` documentation was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "`debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach."
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `ctrl`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `# Safety` documentation was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `ctrl`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test ctrl",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test ctrl",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Review the callers of `ctrl` against its documented safety contract; this site inherits the enclosing `unsafe fn` contract. Add a guard at this site only for obligations the caller contract cannot cover.",
+      "verify_commands": [
+        "cargo +nightly miri test ctrl",
+        "cargo +nightly careful test ctrl"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { self.ctrl.as_ptr().add(index).cast() }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test ctrl",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test ctrl` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test ctrl",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-hashbrown-src-raw-rs-ctrl-operation-pointer_arithmetic-as-ptr-c61949e0546b-same_allocation-c1` still maps to `unsafe { self.ctrl.as_ptr().add(index).cast() }` at `src/raw.rs:2642:9` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test ctrl` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test ctrl` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-hashbrown-src-raw-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-95e90194eb92-pointer_validity-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/raw.rs",
+        "line": 2648,
+        "column": 9,
+        "kind": "operation",
+        "owner": "ctrl_slice",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes()) }"
+      },
+      "operation": "unsafe { slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes()) }",
+      "operation_family": "slice_from_raw_parts",
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "bounds",
+        "same_allocation"
+      ],
+      "obligations": [
+        "pointer is valid for `len` elements",
+        "pointer is aligned for the element type",
+        "memory range is initialized",
+        "range fits in one allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is valid for `len` elements",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `ctrl_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "alignment",
+          "description": "pointer is aligned for the element type",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "`debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach."
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `ctrl_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "memory range is initialized",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "MaybeUninit slice element evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `ctrl_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "allocation",
+          "description": "range fits in one allocation",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `ctrl_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "Some inferred safety obligations are missing local guard evidence",
+      "reach": "1 related test file mentions owner `ctrl_slice`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test ctrl_slice",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test ctrl_slice",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `slice_from_raw_parts` safety obligations: (1) pointer is valid for `len` elements, (2) pointer is aligned for the element type, (3) range fits in one allocation.",
+      "verify_commands": [
+        "cargo +nightly miri test ctrl_slice",
+        "cargo +nightly careful test ctrl_slice"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes()) }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test ctrl_slice",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test ctrl_slice` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test ctrl_slice",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-hashbrown-src-raw-rs-ctrl-slice-operation-slice_from_raw_parts-from-raw-parts-mut-95e90194eb92-pointer_validity-c1` still maps to `unsafe { slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes()) }` at `src/raw.rs:2648:9` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test ctrl_slice` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test ctrl_slice` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T03:22:36Z",
+    "root_abs": "/tmp/seam-batch/checkouts/hashbrown",
+    "diff_path": "docs/accuracy/batches/2224-pr1/diffs/hashbrown-692.diff",
+    "diff_sha256": "5a9f924063b8fa5f897d5078ab1d7ef77ced92b705a265c6dfe9d7536dec4a77",
+    "dirty_worktree": false
+  }
+}

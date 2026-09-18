@@ -1,0 +1,158 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/seam-batch/checkouts/memchr",
+  "summary": {
+    "rust_files": 64,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 1,
+    "cards": 1,
+    "open_actionable_gaps": 1,
+    "contract_missing": 0,
+    "guard_missing": 1,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 1,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-memchr-src-arch-generic-packedpair-rs-find-in-chunk-operation-pointer_arithmetic-add-7882f1560166-same_allocation-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/arch/generic/packedpair.rs",
+        "line": 246,
+        "column": 13,
+        "kind": "operation",
+        "owner": "find_in_chunk",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "let cur = cur.add(offset);"
+      },
+      "operation": "let cur = cur.add(offset);",
+      "operation_family": "pointer_arithmetic",
+      "hazards": [
+        "same_allocation",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "bounds",
+          "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `# Safety` documentation was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `find_in_chunk` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `# Safety` documentation was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `find_in_chunk` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test find_in_chunk",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test find_in_chunk",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Review the callers of `find_in_chunk` against its documented safety contract; this site inherits the enclosing `unsafe fn` contract. Add a guard at this site only for obligations the caller contract cannot cover.",
+      "verify_commands": [
+        "cargo +nightly miri test find_in_chunk",
+        "cargo +nightly careful test find_in_chunk"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `let cur = cur.add(offset);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test find_in_chunk",
+          "route_kind": "miri",
+          "summary": "No test reaches `find_in_chunk` yet; write or identify a focused test for `find_in_chunk` first, then build/run `cargo +nightly miri test find_in_chunk` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test find_in_chunk",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-memchr-src-arch-generic-packedpair-rs-find-in-chunk-operation-pointer_arithmetic-add-7882f1560166-same_allocation-c1` still maps to `let cur = cur.add(offset);` at `src/arch/generic/packedpair.rs:246:13` before upgrading confidence.",
+            "Write or identify a focused test for `find_in_chunk` first (no test reaches it yet), then build/run `cargo +nightly miri test find_in_chunk` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `find_in_chunk` first (no test reaches it yet), then build/run `cargo +nightly miri test find_in_chunk` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T03:22:38Z",
+    "root_abs": "/tmp/seam-batch/checkouts/memchr",
+    "diff_path": "docs/accuracy/batches/2224-pr1/diffs/memchr-226.diff",
+    "diff_sha256": "868cf29bebf5154a4eccc356c33ef38fc57885445f3e3cc11582a87b39b12584",
+    "dirty_worktree": false
+  }
+}

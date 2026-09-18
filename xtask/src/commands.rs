@@ -45,6 +45,7 @@ pub(crate) enum XtaskCommand {
     CheckSurfaceDeterminism,
     CheckRealPrCorpus,
     CheckCorpusPartitions,
+    CheckSeamBatch,
     CheckEvidenceLossChallenges,
     CheckExternalPilots,
     ExternalPilotRollup,
@@ -174,6 +175,9 @@ impl XtaskCommand {
             }
             Some("check-corpus-partitions") => {
                 parse_no_extra(args, "check-corpus-partitions", Self::CheckCorpusPartitions)
+            }
+            Some("check-seam-batch") => {
+                parse_no_extra(args, "check-seam-batch", Self::CheckSeamBatch)
             }
             Some("check-evidence-loss-challenges") => parse_no_extra(
                 args,
