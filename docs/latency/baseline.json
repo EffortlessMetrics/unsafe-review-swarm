@@ -1,0 +1,446 @@
+{
+  "arch": "x86_64",
+  "binary_profile": "debug",
+  "cold_definition": "run 0 of each row in this invocation; binaries prebuilt once before the matrix; no cache dropping performed",
+  "os": "linux",
+  "pending_inputs": [
+    "staged-diff (waits for #2308 input identity)",
+    "file-range (no file input exists yet)"
+  ],
+  "proposed_budgets": {},
+  "rows": [
+    {
+      "id": "fixture-s-check",
+      "kind": "cli",
+      "runs": [
+        {
+          "cache": "cold",
+          "cards": 1,
+          "output_bytes_total": 9261,
+          "phases": [
+            {
+              "elapsed_ms": 172,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 5,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 0,
+          "total_ms": 177,
+          "wall_ms": 183
+        },
+        {
+          "cache": "warm",
+          "cards": 1,
+          "output_bytes_total": 9261,
+          "phases": [
+            {
+              "elapsed_ms": 159,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 5,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "total_ms": 164,
+          "wall_ms": 170
+        },
+        {
+          "cache": "warm",
+          "cards": 1,
+          "output_bytes_total": 9261,
+          "phases": [
+            {
+              "elapsed_ms": 173,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 5,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 2,
+          "total_ms": 178,
+          "wall_ms": 184
+        }
+      ],
+      "skipped": null
+    },
+    {
+      "id": "fixture-m-check",
+      "kind": "cli",
+      "runs": [
+        {
+          "cache": "cold",
+          "cards": 6,
+          "output_bytes_total": 44651,
+          "phases": [
+            {
+              "elapsed_ms": 148,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 11,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 2,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 0,
+          "total_ms": 161,
+          "wall_ms": 166
+        },
+        {
+          "cache": "warm",
+          "cards": 6,
+          "output_bytes_total": 44651,
+          "phases": [
+            {
+              "elapsed_ms": 146,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 13,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 1,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "total_ms": 160,
+          "wall_ms": 165
+        },
+        {
+          "cache": "warm",
+          "cards": 6,
+          "output_bytes_total": 44651,
+          "phases": [
+            {
+              "elapsed_ms": 175,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 37,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 1,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 2,
+          "total_ms": 213,
+          "wall_ms": 219
+        }
+      ],
+      "skipped": null
+    },
+    {
+      "id": "fixture-m-pr-bundle",
+      "kind": "cli",
+      "runs": [
+        {
+          "cache": "cold",
+          "cards": 6,
+          "output_bytes_total": 484483,
+          "phases": [
+            {
+              "elapsed_ms": 278,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 17,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 17,
+              "name": "receipt_audit"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            },
+            {
+              "elapsed_ms": 16,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 14,
+              "name": "artifact_writes"
+            }
+          ],
+          "run": 0,
+          "total_ms": 342,
+          "wall_ms": 350
+        },
+        {
+          "cache": "warm",
+          "cards": 6,
+          "output_bytes_total": 484483,
+          "phases": [
+            {
+              "elapsed_ms": 139,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 12,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 11,
+              "name": "receipt_audit"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            },
+            {
+              "elapsed_ms": 10,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 12,
+              "name": "artifact_writes"
+            }
+          ],
+          "run": 1,
+          "total_ms": 184,
+          "wall_ms": 191
+        },
+        {
+          "cache": "warm",
+          "cards": 6,
+          "output_bytes_total": 484483,
+          "phases": [
+            {
+              "elapsed_ms": 132,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 17,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 14,
+              "name": "receipt_audit"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            },
+            {
+              "elapsed_ms": 16,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 15,
+              "name": "artifact_writes"
+            }
+          ],
+          "run": 2,
+          "total_ms": 194,
+          "wall_ms": 200
+        }
+      ],
+      "skipped": null
+    },
+    {
+      "id": "repo-pinned-memchr",
+      "kind": "cli",
+      "runs": [
+        {
+          "cache": "cold",
+          "cards": 1683,
+          "output_bytes_total": 9912531,
+          "phases": [
+            {
+              "elapsed_ms": 5,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 133272,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 441,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 10,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 0,
+          "total_ms": 133728,
+          "wall_ms": 133762
+        },
+        {
+          "cache": "warm",
+          "cards": 1683,
+          "output_bytes_total": 9912531,
+          "phases": [
+            {
+              "elapsed_ms": 7,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 162147,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 570,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 25,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "total_ms": 162749,
+          "wall_ms": 162799
+        },
+        {
+          "cache": "warm",
+          "cards": 1683,
+          "output_bytes_total": 9912531,
+          "phases": [
+            {
+              "elapsed_ms": 10,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 116750,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 355,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 11,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 2,
+          "total_ms": 117126,
+          "wall_ms": 117155
+        }
+      ],
+      "skipped": null
+    },
+    {
+      "id": "lsp-save-loop",
+      "kind": "lsp",
+      "runs": [
+        {
+          "cache": "cold",
+          "diagnostics": 1,
+          "edit_save_to_diagnostics_ms": 0,
+          "open_to_diagnostics_ms": 33,
+          "run": 0
+        },
+        {
+          "cache": "warm",
+          "diagnostics": 1,
+          "edit_save_to_diagnostics_ms": 0,
+          "open_to_diagnostics_ms": 28,
+          "run": 1
+        },
+        {
+          "cache": "warm",
+          "diagnostics": 1,
+          "edit_save_to_diagnostics_ms": 1,
+          "open_to_diagnostics_ms": 29,
+          "run": 2
+        }
+      ],
+      "skipped": null
+    }
+  ],
+  "runs_per_row": 3,
+  "schema_version": "1.0",
+  "tool": "unsafe-review latency-baseline",
+  "tool_version": "0.3.8",
+  "trust_boundary": "Phase-latency baseline only; wall-clock times are machine- and load-dependent diagnostics, not performance guarantees, coverage claims, proofs, or UB-free/Miri-clean status. Deterministic counts (cards, bytes, sites) are comparable across machines; timings are not."
+}

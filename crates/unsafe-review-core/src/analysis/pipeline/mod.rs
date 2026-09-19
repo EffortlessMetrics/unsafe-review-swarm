@@ -210,6 +210,9 @@ fn analyze_with_receipts(
             file_timings.push(PerFileScanStats {
                 file: rel.clone(),
                 scan_ms: file_result.scan_ms,
+                bytes: file_result.bytes,
+                lines: file_result.lines,
+                sites: file_result.sites.len() as u64,
             });
         }
         files_scanned += 1;

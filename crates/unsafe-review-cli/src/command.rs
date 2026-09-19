@@ -45,6 +45,9 @@ pub(crate) struct CheckOptions {
     pub max_cards: Option<usize>,
     /// One line per card, highest risk first. Human output only.
     pub short: bool,
+    /// Write a machine-readable phase-latency receipt to this path when the
+    /// run completes. Diagnostic only; never source contents.
+    pub latency_out: Option<PathBuf>,
 }
 
 impl Default for CheckOptions {
@@ -58,6 +61,7 @@ impl Default for CheckOptions {
             out: None,
             max_cards: None,
             short: false,
+            latency_out: None,
         }
     }
 }

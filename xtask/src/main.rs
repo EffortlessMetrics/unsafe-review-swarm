@@ -43,6 +43,7 @@ mod external_pilots;
 mod first_hour;
 mod fixture_surfaces;
 mod fuzz_artifact_checks;
+mod latency_baseline;
 mod lsp_smoke;
 mod markdown;
 mod public_badges;
@@ -961,6 +962,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckLocalRun(id) => check_dispatch::run_named_check(&id, false),
         commands::XtaskCommand::LspSmoke => lsp_smoke::run(&root),
+        commands::XtaskCommand::LatencyBaseline(raw_args) => {
+            let baseline_args = latency_baseline::LatencyBaselineArgs::parse(&raw_args)?;
+            latency_baseline::run(&root, &baseline_args)
+        }
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
@@ -986,7 +991,7 @@ fn print_help() {
 /// command list; the trailing note records that classification.
 fn help_text() -> String {
     format!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-seam-batch, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, latency-baseline [--out <path>] [--runs <N>] [--skip-lsp] [--skip-repo], sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-seam-batch, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
     )
 }
 

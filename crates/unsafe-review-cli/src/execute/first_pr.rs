@@ -3074,6 +3074,7 @@ mod tests {
             out: None,
             max_cards: None,
             short: false,
+            latency_out: None,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3164,6 +3165,7 @@ mod tests {
             out: None,
             max_cards: None,
             short: false,
+            latency_out: None,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4181,6 +4183,7 @@ mod tests {
             out: None,
             max_cards: None,
             short: false,
+            latency_out: None,
         }
     }
 

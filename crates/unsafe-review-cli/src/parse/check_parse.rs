@@ -83,6 +83,14 @@ pub(super) fn try_apply_check_arg(
             options.max_cards = Some(parse_max_cards_inline(arg, "--max-cards")?);
             Ok(Some(1))
         }
+        "--latency-out" => {
+            options.latency_out = Some(PathBuf::from(value(args, idx + 1, "--latency-out")?));
+            Ok(Some(2))
+        }
+        arg if arg.starts_with("--latency-out=") => {
+            options.latency_out = Some(PathBuf::from(inline_value(arg, "--latency-out")?));
+            Ok(Some(1))
+        }
         _ => Ok(None),
     }
 }

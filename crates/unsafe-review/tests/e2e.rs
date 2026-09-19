@@ -6052,7 +6052,8 @@ fn repo_status_sidecar_includes_per_file_timings_for_small_scan() -> Result<(), 
         !timings.is_empty(),
         "file_timings must be non-empty for a scan that scanned files"
     );
-    // Each entry must have 'file' (string) and 'scan_ms' (number).
+    // Each entry must have 'file' (string) and numeric 'scan_ms',
+    // 'bytes', 'lines', and 'sites' fields.
     for entry in timings {
         assert!(
             entry["file"].as_str().is_some(),
@@ -6061,6 +6062,18 @@ fn repo_status_sidecar_includes_per_file_timings_for_small_scan() -> Result<(), 
         assert!(
             entry["scan_ms"].as_u64().is_some(),
             "each file_timings entry must have a numeric 'scan_ms' field; got: {entry}"
+        );
+        assert!(
+            entry["bytes"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'bytes' field; got: {entry}"
+        );
+        assert!(
+            entry["lines"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'lines' field; got: {entry}"
+        );
+        assert!(
+            entry["sites"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'sites' field; got: {entry}"
         );
     }
     // The number of entries must match files_scanned.

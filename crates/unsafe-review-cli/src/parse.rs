@@ -2293,6 +2293,36 @@ mod tests {
     }
 
     #[test]
+    fn parses_latency_out_for_check() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out",
+            "target/latency.json",
+        ]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            options.latency_out,
+            Some(PathBuf::from("target/latency.json"))
+        );
+        let inline = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out=target/inline.json",
+        ]))?;
+        let Command::Check(inline_options) = inline else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            inline_options.latency_out,
+            Some(PathBuf::from("target/inline.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
     fn parses_first_pr_bundle_defaults_to_origin_main() -> Result<(), String> {
         let command = parse(args([
             "unsafe-review",
