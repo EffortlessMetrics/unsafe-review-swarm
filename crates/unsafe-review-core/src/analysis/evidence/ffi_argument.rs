@@ -2,8 +2,14 @@ use super::nonnull::receiver_has_null_guard;
 use super::operation_scope::code_before_site_operation;
 use super::{compact_code, strip_block_comments_and_literals};
 use crate::analysis::scanner::ScannedSite;
-use crate::domain::EvidenceState;
 
+/// Structural call-to-parameter mapping for FFI call sites, preserved for
+/// the #2306 callee-contract model. These helpers report observations only:
+/// which arguments sit at raw-pointer parameter positions, and which carry
+/// a dominating null check. Per #2315 neither fact establishes a callee
+/// requirement, and no obligation synthesizer may treat them as one until
+/// an explicit supported requirement source exists.
+///
 /// Pointer-typed call arguments of an `FfiCall` site: bare identifiers
 /// passed at positions the same-context `extern` declaration types as raw
 /// pointers.
@@ -12,10 +18,8 @@ use crate::domain::EvidenceState;
 /// declaration must appear in the site's context window, be followed by `;`
 /// (a foreign declaration, not a local definition), and sit inside an
 /// `extern` block (no `}` between the block keyword and the declaration).
-/// Callees declared outside the context window stay uncredited rather than
-/// guessed at. Function-pointer parameters are skipped: they cannot be
-/// null-checked with `.is_null()`, so crediting them would mint
-/// undischargeable obligations.
+/// Callees declared outside the context window yield no mapping rather than
+/// a guessed one. Function-pointer parameters are skipped.
 pub(crate) fn ffi_pointer_call_arguments(expression: &str, lower: &str) -> Vec<String> {
     let Some(callee) = call_callee_name(expression) else {
         return Vec::new();
@@ -35,8 +39,9 @@ pub(crate) fn ffi_pointer_call_arguments(expression: &str, lower: &str) -> Vec<S
 
 /// Bare-identifier call arguments with a dominating null check in the
 /// site-anchored guard scope: `if arg.is_null() { return ...; }` or an open
-/// `if !arg.is_null() {` branch. Guard presence also implies pointer-ness,
-/// so a checked argument counts even when no declaration is in context.
+/// `if !arg.is_null() {` branch. An observed check is a caller-established
+/// fact only; it never creates the callee requirement it might one day be
+/// matched against (#2315).
 pub(crate) fn ffi_guarded_call_arguments(site: &ScannedSite, lower: &str) -> Vec<String> {
     let expression = &site.operation.expression;
     let Some(callee) = call_callee_name(expression) else {
@@ -50,38 +55,6 @@ pub(crate) fn ffi_guarded_call_arguments(site: &ScannedSite, lower: &str) -> Vec
         .filter_map(|arg| bare_identifier(arg))
         .filter(|arg| receiver_has_null_guard(&guard_compact, arg))
         .collect()
-}
-
-pub(super) fn ffi_argument_discharge_state(site: &ScannedSite, lower: &str) -> EvidenceState {
-    let pointer_args = ffi_pointer_call_arguments(&site.operation.expression, lower);
-    let guarded_args = ffi_guarded_call_arguments(site, lower);
-    if pointer_args.is_empty() && guarded_args.is_empty() {
-        return EvidenceState::missing("No call-argument pointer contract was detected");
-    }
-    let unguarded: Vec<&String> = pointer_args
-        .iter()
-        .filter(|arg| !guarded_args.contains(arg))
-        .collect();
-    if unguarded.is_empty() {
-        EvidenceState::present(format!(
-            "Null checks dominate the call for argument {}",
-            join_names(&guarded_args)
-        ))
-    } else {
-        EvidenceState::missing(format!(
-            "No dominating null check was detected for argument {}",
-            join_names(&unguarded)
-        ))
-    }
-}
-
-fn join_names(names: &[impl AsRef<str>]) -> String {
-    names
-        .iter()
-        .take(3)
-        .map(|name| format!("`{}`", name.as_ref()))
-        .collect::<Vec<_>>()
-        .join(", ")
 }
 
 /// Final path segment of the called expression: `ffi_strlen` from

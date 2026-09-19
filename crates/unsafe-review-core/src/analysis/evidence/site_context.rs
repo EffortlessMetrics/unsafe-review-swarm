@@ -4,7 +4,7 @@ fn strip_line_comment(line: &str) -> &str {
     line.split_once("//").map_or(line, |(code, _comment)| code)
 }
 
-pub(crate) fn code_context(site: &ScannedSite) -> String {
+pub(super) fn code_context(site: &ScannedSite) -> String {
     site.context_before
         .iter()
         .chain(std::iter::once(&site.site.snippet))

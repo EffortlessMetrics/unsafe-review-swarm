@@ -6414,7 +6414,10 @@ unsafe extern "C" {
     }
 
     #[test]
-    fn ffi_pointer_argument_null_check_discharges() -> Result<(), String> {
+    fn ffi_guarded_pointer_call_carries_no_invented_obligation() -> Result<(), String> {
+        // #2315: a dominating null check is an observed caller fact. It must
+        // not create the callee requirement it might one day satisfy, so no
+        // `argument` obligation may appear even when the check dominates.
         let output = fixture_output("ffi_argument_null_check_guard")?;
         let card = single_card("ffi_argument_null_check_guard", &output)?;
 
@@ -6422,48 +6425,54 @@ unsafe extern "C" {
         assert!(
             card.obligation_evidence
                 .iter()
-                .any(|evidence| evidence.obligation.key == "argument"),
-            "a pointer argument passed to an FFI call must carry the argument obligation"
+                .all(|evidence| evidence.obligation.key != "argument"),
+            "a null check must not invent a call-argument obligation"
         );
-        assert!(obligation_discharge_present(card, "argument"));
         Ok(())
     }
 
     #[test]
-    fn ffi_pointer_argument_unguarded_stays_missing_while_integers_stay_quiet() -> Result<(), String>
-    {
+    fn ffi_unguarded_and_integer_calls_carry_no_invented_obligation() -> Result<(), String> {
+        // #2315: raw-pointer parameter syntax alone must not create a
+        // non-null/validity requirement, and integer parameters never did.
         let output = fixture_output("ffi_argument_unguarded_not_guard")?;
         assert_eq!(output.cards.len(), 2);
 
-        let unguarded = output
-            .cards
-            .iter()
-            .find(|card| card.site.owner.as_deref() == Some("unguarded"))
-            .ok_or("missing card for the unguarded pointer call")?;
-        assert!(
-            unguarded
-                .obligation_evidence
+        for owner in ["unguarded", "added"] {
+            let card = output
+                .cards
                 .iter()
-                .any(|evidence| evidence.obligation.key == "argument"),
-            "an unguarded pointer argument must carry the argument obligation"
-        );
-        assert!(
-            !obligation_discharge_present(unguarded, "argument"),
-            "an unguarded pointer argument must stay missing"
-        );
+                .find(|card| card.site.owner.as_deref() == Some(owner))
+                .ok_or(format!("missing card for the {owner} call"))?;
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "argument"),
+                "{owner}: parameter syntax must not invent a call-argument obligation"
+            );
+        }
+        Ok(())
+    }
 
-        let added = output
-            .cards
-            .iter()
-            .find(|card| card.site.owner.as_deref() == Some("added"))
-            .ok_or("missing card for the integer-parameter call")?;
-        assert!(
-            added
-                .obligation_evidence
-                .iter()
-                .all(|evidence| evidence.obligation.key != "argument"),
-            "integer-parameter calls must not gain the argument obligation"
-        );
+    #[test]
+    fn ffi_nullable_controls_carry_no_invented_obligation() -> Result<(), String> {
+        // #2315 required controls: sentinel, len-coupled, optional-out, and
+        // opaque-handle APIs plus a different-argument check and a
+        // declaration-less guarded call. None may gain an `argument`
+        // obligation from syntax or observed guards.
+        let output = fixture_output("ffi_argument_nullable_no_invented_obligation")?;
+        assert_eq!(output.cards.len(), 6);
+
+        for card in &output.cards {
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "argument"),
+                "{:?}: nullable/relational APIs must not gain an invented obligation",
+                card.site.owner
+            );
+        }
         Ok(())
     }
 
