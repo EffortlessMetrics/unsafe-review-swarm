@@ -11,10 +11,11 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
-    ChangeScopeKind, ChangedFile, DiscoverOptions, FileProvenance, OmissionReason, OmittedFile,
-    RepoFacts, ScopeCompleteness, changeset_from_external_diff, changeset_from_overlay,
-    changeset_from_snapshot, discover_commit_range, discover_repo, discover_staged,
-    discover_unstaged, discover_worktree, render_changeset_human, render_changeset_json,
+    ChangeScopeKind, ChangedFile, DiscoverOptions, FileChangeKind, FileProvenance, OmissionReason,
+    OmittedFile, RepoFacts, ScopeCompleteness, changeset_from_external_diff,
+    changeset_from_overlay, changeset_from_snapshot, discover_commit_range, discover_repo,
+    discover_staged, discover_unstaged, discover_worktree, render_changeset_human,
+    render_changeset_json,
 };
 
 fn unique_dir(prefix: &str) -> PathBuf {
@@ -218,6 +219,65 @@ fn worktree_scope_unions_staged_and_unstaged_without_duplicates() -> Result<(), 
     }
     if !has_path(&set.included_files, "src/extra.rs") {
         return Err("untracked files are included by the default worktree scope".to_string());
+    }
+    Ok(())
+}
+
+#[test]
+fn worktree_staged_modified_then_deleted_is_deleted() -> Result<(), String> {
+    // Net-kind rule: a file staged as modified and then deleted from the
+    // worktree is finally deleted. It must appear as Deleted, never as a
+    // Modified file with an Unreadable omission for bytes that no longer exist.
+    let dir = fresh_repo("changeset-net-delete")?;
+    write(&dir, "src/lib.rs", "pub fn v1() {}\n")?;
+    git(&dir, &["add", "src/lib.rs"])?;
+    fs::remove_file(dir.join("src/lib.rs"))
+        .map_err(|err| format!("delete worktree file failed: {err}"))?;
+
+    let set = discover_worktree(&dir, &repo_facts(&dir)?, &DiscoverOptions::default())?;
+    let entry = set
+        .included_files
+        .iter()
+        .find(|file| file.path.as_path() == Path::new("src/lib.rs"))
+        .ok_or_else(|| "deleted path must stay in the worktree scope".to_string())?;
+    if entry.kind != FileChangeKind::Deleted {
+        return Err(format!("net kind must be deleted, got {:?}", entry.kind));
+    }
+    if omitted_as(&set.omitted_files, "src/lib.rs").is_some() {
+        return Err("a net deletion is an included fact, not an omission".to_string());
+    }
+    Ok(())
+}
+
+#[test]
+fn worktree_staged_deleted_then_recreated_hashes_content() -> Result<(), String> {
+    // Net-kind rule: a file staged as deleted and then recreated carries its
+    // recreated bytes. The digest must cover the content, not a silent deletion.
+    let dir = fresh_repo("changeset-net-recreate")?;
+    git(&dir, &["rm", "-q", "src/lib.rs"])?;
+    write(&dir, "src/lib.rs", "pub fn recreated() {}\n")?;
+
+    let repo = repo_facts(&dir)?;
+    let options = DiscoverOptions::default();
+    let first = discover_worktree(&dir, &repo, &options)?;
+    let entries: Vec<&ChangedFile> = first
+        .included_files
+        .iter()
+        .filter(|file| file.path.as_path() == Path::new("src/lib.rs"))
+        .collect();
+    if entries.len() != 1 {
+        return Err(format!(
+            "recreated path must appear exactly once, got {:?}",
+            first.included_files
+        ));
+    }
+    if entries[0].kind == FileChangeKind::Deleted {
+        return Err("recreated content must not analyze as a deletion".to_string());
+    }
+    write(&dir, "src/lib.rs", "pub fn recreated_v2() {}\n")?;
+    let second = discover_worktree(&dir, &repo, &options)?;
+    if first.digest == second.digest {
+        return Err("recreated bytes must enter the subject digest".to_string());
     }
     Ok(())
 }

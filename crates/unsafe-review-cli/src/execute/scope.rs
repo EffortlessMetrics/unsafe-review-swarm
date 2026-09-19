@@ -21,9 +21,12 @@ pub(crate) fn run(options: &ScopeOptions) -> Result<(), String> {
         ScopeSelect::Unstaged => discover_unstaged(&toplevel, &repo, &discover)?,
         ScopeSelect::Worktree => discover_worktree(&toplevel, &repo, &discover)?,
         ScopeSelect::CommitRange => {
-            let base = options.base.clone().unwrap_or_default();
-            let head = options.head.clone().unwrap_or_else(|| "HEAD".to_string());
-            discover_commit_range(&toplevel, repo.shallow, &base, &head)?
+            let base = options
+                .base
+                .as_deref()
+                .ok_or_else(|| "commit range scope requires a base commit/ref".to_string())?;
+            let head = options.head.as_deref().unwrap_or("HEAD");
+            discover_commit_range(&toplevel, repo.shallow, base, head)?
         }
     };
     match options.format {

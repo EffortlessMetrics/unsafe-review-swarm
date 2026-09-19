@@ -240,20 +240,28 @@ pub fn discover_worktree(
     let index_state = discover_index_state(toplevel)?;
     let staged_rows = diff_name_status(toplevel, true, &[])?;
     let unstaged_rows = diff_name_status(toplevel, false, &[])?;
+    // Net change kinds come from a direct worktree-vs-HEAD comparison: a file
+    // staged as modified and then deleted is finally deleted (not modified),
+    // and a file staged as deleted and then recreated carries its recreated
+    // content (not a silent deletion). Staged/unstaged membership only sets
+    // provenance, never the kind.
+    let net_rows = diff_name_status(toplevel, false, &["HEAD"])?;
     let untracked = untracked_files(toplevel)?;
 
+    let staged_paths: BTreeSet<PathBuf> = staged_rows
+        .iter()
+        .map(|row| effective_path(row).clone())
+        .filter(|path| !is_rejected_path(path))
+        .collect();
     let unstaged_paths: BTreeSet<PathBuf> = unstaged_rows
         .iter()
         .map(|row| effective_path(row).clone())
         .filter(|path| !is_rejected_path(path))
         .collect();
 
-    // Combine: staged rows first, then unstaged-only rows. A file in both
-    // keeps its staged kind with `StagedAndUnstaged` provenance. Renames
-    // combine under their target (post-image) path.
     let mut combined: BTreeMap<PathBuf, (FileChangeKind, FileProvenance)> = BTreeMap::new();
     let mut renames = Vec::new();
-    for row in &staged_rows {
+    for row in &net_rows {
         let (path, kind, rename) = rename_mapping(row);
         if is_rejected_path(&path) {
             continue;
@@ -261,25 +269,12 @@ pub fn discover_worktree(
         if let Some(rename) = rename {
             renames.push(rename);
         }
-        let provenance = if unstaged_paths.contains(&path) {
-            FileProvenance::StagedAndUnstaged
-        } else {
-            FileProvenance::StagedOnly
+        let provenance = match (staged_paths.contains(&path), unstaged_paths.contains(&path)) {
+            (true, true) => FileProvenance::StagedAndUnstaged,
+            (true, false) => FileProvenance::StagedOnly,
+            (false, _) => FileProvenance::UnstagedOnly,
         };
         combined.insert(path, (kind, provenance));
-    }
-    for row in &unstaged_rows {
-        let (path, kind, rename) = rename_mapping(row);
-        if is_rejected_path(&path) {
-            continue;
-        }
-        if combined.contains_key(&path) {
-            continue;
-        }
-        if let Some(rename) = rename {
-            renames.push(rename);
-        }
-        combined.insert(path, (kind, FileProvenance::UnstagedOnly));
     }
     let mut included: Vec<ChangedFile> = combined
         .into_iter()
@@ -293,15 +288,35 @@ pub fn discover_worktree(
     let mut omitted: Vec<OmittedFile> = staged_rows
         .iter()
         .chain(unstaged_rows.iter())
+        .chain(net_rows.iter())
         .filter(|row| is_rejected_path(effective_path(row)))
         .map(|row| OmittedFile {
             path: effective_path(row).clone(),
             reason: OmissionReason::PathRejected,
         })
         .collect();
+    // Deduplicate: a hostile path can appear in several row sets.
+    omitted.sort_by(|left, right| {
+        left.path
+            .cmp(&right.path)
+            .then(left.reason.as_str().cmp(right.reason.as_str()))
+    });
+    omitted.dedup_by(|next, current| next.path == current.path && next.reason == current.reason);
     let mut untracked_included: Vec<PathBuf> = Vec::new();
     for path in untracked.iter().filter(|path| is_rust_path(path)) {
         if options.include_untracked {
+            // A path the net diff already covers must not become a duplicate
+            // entry, with one exception: delete+recreate. The net diff
+            // reports Deleted for a path deleted from the index even when the
+            // worktree holds new bytes there (the bytes surface as untracked).
+            // The bytes win: upgrade to Modified so the digest covers the
+            // actual final state instead of a silent deletion.
+            if let Some(existing) = included.iter_mut().find(|file| file.path == *path) {
+                if existing.kind == FileChangeKind::Deleted {
+                    existing.kind = FileChangeKind::Modified;
+                }
+                continue;
+            }
             untracked_included.push(path.clone());
             included.push(ChangedFile {
                 path: path.clone(),

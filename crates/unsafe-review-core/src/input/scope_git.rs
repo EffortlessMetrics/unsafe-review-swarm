@@ -217,6 +217,10 @@ pub(crate) fn diff_name_status(
     let output = Command::new("git")
         .arg("-C")
         .arg(toplevel)
+        // Pin renames-only detection regardless of the user's `diff.renames`
+        // configuration so identities stay comparable across machines.
+        .arg("-c")
+        .arg("diff.renames=true")
         .args(&args)
         .output()
         .map_err(|err| format!("git diff --name-status failed: {err}"))?;
@@ -232,6 +236,9 @@ pub(crate) fn diff_name_status(
 /// Parse NUL-delimited `--name-status` rows. Rename rows carry the source
 /// path in the path field and the target path as the next NUL field
 /// (`R100\0<from>\0<to>\0`, the same order as the tab-delimited layout).
+/// Copy rows (`C100\0<from>\0<to>\0`), should one ever appear despite
+/// renames-only detection, consume both fields the same way so the parser
+/// can never desynchronize; the target is treated as added content.
 fn parse_name_status_nul(raw: &[u8]) -> Result<Vec<NameStatusRow>, String> {
     let text = std::str::from_utf8(raw)
         .map_err(|err| format!("git diff output is not valid UTF-8: {err}"))?;
@@ -248,11 +255,11 @@ fn parse_name_status_nul(raw: &[u8]) -> Result<Vec<NameStatusRow>, String> {
         let path_field = fields.next().ok_or_else(|| {
             format!("git diff status `{status_field}` has no path field; output truncated?")
         })?;
-        // NUL-delimited rename layout is `<status>\0<from>\0<to>\0`: the
-        // path field names the source and the next field names the target.
-        let (path, renamed_to) = if status == 'R' {
+        // NUL-delimited rename/copy layout is `<status>\0<from>\0<to>\0`:
+        // the path field names the source and the next field names the target.
+        let (path, renamed_to) = if status == 'R' || status == 'C' {
             let to_field = fields.next().ok_or_else(|| {
-                "git diff rename row has no target path field; output truncated?".to_string()
+                "git diff rename/copy row has no target path field; output truncated?".to_string()
             })?;
             (PathBuf::from(path_field), Some(PathBuf::from(to_field)))
         } else {
@@ -404,10 +411,12 @@ pub(crate) fn digest_worktree_state(
 
 /// Map a status row to its effective (post-image) path, kind, and optional
 /// rename record. Renames analyze as their target path with the source
-/// carried as `FileChangeKind::Renamed { from }`.
+/// carried as `FileChangeKind::Renamed { from }`. Copies analyze as added
+/// content at the target path with no rename record: a copy is new content,
+/// not a moved identity.
 pub(crate) fn rename_mapping(row: &NameStatusRow) -> (PathBuf, FileChangeKind, Option<FileRename>) {
     match &row.renamed_to {
-        Some(to) => {
+        Some(to) if row.status == 'R' => {
             let kind = FileChangeKind::Renamed {
                 from: row.path.clone(),
             };
@@ -417,6 +426,7 @@ pub(crate) fn rename_mapping(row: &NameStatusRow) -> (PathBuf, FileChangeKind, O
             };
             (to.clone(), kind, Some(rename))
         }
+        Some(to) => (to.clone(), FileChangeKind::Added, None),
         None => (row.path.clone(), file_kind_from_status(row.status), None),
     }
 }
