@@ -447,9 +447,10 @@ fn run_check(
     let config_features = options.env_features.clone();
     let config_target = options.target.clone();
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
-    // Captured before `diff` moves into the analysis input: the impact
-    // inventory relates these changed lines to enclosing owners.
-    let impact_changed = changed_lines_in_diff(&diff);
+    // Captured before `diff` moves into the analysis input, and only when
+    // `--impact` is selected: parsing the diff twice on every run would
+    // waste a full parse plus a second diff-file read for nothing.
+    let impact_changed = options.impact.then(|| changed_lines_in_diff(&diff));
     clock.tick(crate::latency::PHASE_INPUT);
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
@@ -483,9 +484,9 @@ fn run_check(
         });
         assemble_aperture(&output, config)
     });
-    let impact = options.impact.then(|| {
+    let impact = impact_changed.as_ref().map(|changed| {
         let subjects: Vec<ImpactSubject> = output.cards.iter().map(ImpactSubject::from).collect();
-        relate_same_owner(&config_root, &impact_changed, &subjects)
+        relate_same_owner(&config_root, changed, &subjects)
     });
     let rendered = render_check_sections(
         &output,

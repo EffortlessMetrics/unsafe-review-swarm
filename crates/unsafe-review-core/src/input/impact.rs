@@ -144,10 +144,21 @@ fn is_doc_line(line: &str) -> bool {
         || trimmed.starts_with("#[doc")
 }
 
+/// True for comment lines: doc comments, line comments, and block-comment
+/// openers. String literals that merely mention safety markers stay code.
+fn is_comment_line(line: &str) -> bool {
+    let trimmed = line.trim_start();
+    is_doc_line(line)
+        || trimmed.starts_with("//")
+        || trimmed.starts_with("/*")
+        || trimmed.starts_with("*")
+}
+
 /// True for safety-contract markers the analyzer recognizes elsewhere
-/// (`# Safety` docs, `SAFETY:` / `Safety:` comments).
+/// (`# Safety` docs, `SAFETY:` / `Safety:` comments), on comment lines only.
 fn is_safety_marker(line: &str) -> bool {
-    line.contains("# Safety") || line.contains("SAFETY:") || line.contains("Safety:")
+    is_comment_line(line)
+        && (line.contains("# Safety") || line.contains("SAFETY:") || line.contains("Safety:"))
 }
 
 /// True for configuration attribute lines. Their impact belongs to the
@@ -161,8 +172,38 @@ fn is_cfg_line(line: &str) -> bool {
 
 struct OwnerRange {
     name: String,
+    /// First line including attached doc and attribute lines.
     start_line: usize,
+    /// First line of the function body block. Lines above it are the doc
+    /// prefix (contract docs, attributes, signature); lines at and below
+    /// it are the body (call-site rationale, code).
+    body_line: usize,
     end_line: usize,
+}
+
+/// Start lines of `unsafe { ... }` blocks in one file, via parsed syntax.
+/// Used to notice operations the diff-proximity scope dropped before cards
+/// existed: those lines get a pending-enrichment limitation, never an edge.
+fn unsafe_block_lines(text: &str) -> Vec<usize> {
+    use ra_ap_syntax::{Edition, SourceFile, ast::AstNode};
+    let mut lines = Vec::new();
+    let parse = SourceFile::parse(text, Edition::CURRENT);
+    let starts = line_starts(text);
+    for node in parse.tree().syntax().descendants() {
+        let Some(block) = ra_ap_syntax::ast::BlockExpr::cast(node) else {
+            continue;
+        };
+        if block.unsafe_token().is_none() {
+            continue;
+        }
+        lines.push(offset_to_line(
+            text_size_to_usize(block.syntax().text_range().start()),
+            &starts,
+        ));
+    }
+    lines.sort();
+    lines.dedup();
+    lines
 }
 
 /// A line that can attach to the item below it: doc comments and
@@ -192,7 +233,8 @@ fn owner_ranges(text: &str) -> Vec<OwnerRange> {
         };
         let range = func.syntax().text_range();
         let Some(name) = func.name() else { continue };
-        let mut start_line = offset_to_line(text_size_to_usize(range.start()), &starts);
+        let item_line = offset_to_line(text_size_to_usize(range.start()), &starts);
+        let mut start_line = item_line;
         while start_line > 1
             && source_lines
                 .get(start_line.saturating_sub(2))
@@ -200,10 +242,23 @@ fn owner_ranges(text: &str) -> Vec<OwnerRange> {
         {
             start_line -= 1;
         }
+        // The body block start splits the doc prefix from the body. Without
+        // a body (declarations), every line counts as prefix.
+        let end_line = offset_to_line(text_size_to_usize(range.end()), &starts);
+        let body_line = func
+            .body()
+            .map(|body| {
+                offset_to_line(
+                    text_size_to_usize(body.syntax().text_range().start()),
+                    &starts,
+                )
+            })
+            .unwrap_or(end_line + 1);
         owners.push(OwnerRange {
             name: name.text().to_string(),
             start_line,
-            end_line: offset_to_line(text_size_to_usize(range.end()), &starts),
+            body_line,
+            end_line,
         });
     }
     owners.sort_by(|left, right| {
@@ -242,10 +297,27 @@ pub fn relate_same_owner(
     }
     let mut files: BTreeSet<&PathBuf> = changed.keys().collect();
     files.extend(subjects_by_file.keys().copied());
+    // Fail closed on hostile diff paths: the same traversal, absolute, and
+    // symlink guard the scanner applies before any filesystem read.
+    let canonical_root = std::fs::canonicalize(root).ok();
     for file in files {
         let empty = BTreeSet::new();
         let lines = changed.get(file).unwrap_or(&empty);
         if lines.is_empty() {
+            continue;
+        }
+        let Some(canonical_root) = canonical_root.as_deref() else {
+            limitations.push(format!(
+                "{} unreadable analysis root; same-owner impact unevaluated",
+                file.display()
+            ));
+            continue;
+        };
+        if crate::input::diff::diff_path_escapes_root(root, canonical_root, file) {
+            limitations.push(format!(
+                "{} rejected as escaping the analysis root; same-owner impact unevaluated",
+                file.display()
+            ));
             continue;
         }
         let Ok(text) = std::fs::read_to_string(root.join(file)) else {
@@ -265,30 +337,61 @@ pub fn relate_same_owner(
             ));
             continue;
         }
-        for owner in owners.iter().filter(|owner| {
-            lines
+        // Innermost resolution: nested functions are distinct owners, so a
+        // changed line and a subject meet only inside the same innermost
+        // owner. Cross-item impact stays unevaluated by design.
+        let innermost = |line: usize| {
+            owners
                 .iter()
-                .any(|line| owner.start_line <= *line && *line <= owner.end_line)
-        }) {
-            let owner_changed: Vec<usize> = lines
-                .iter()
-                .copied()
-                .filter(|line| owner.start_line <= *line && *line <= owner.end_line)
-                .collect();
+                .filter(|owner| owner.start_line <= line && line <= owner.end_line)
+                .min_by_key(|owner| owner.end_line - owner.start_line)
+        };
+        let mut owner_order: Vec<usize> = Vec::new();
+        let mut owner_changed: BTreeMap<usize, Vec<usize>> = BTreeMap::new();
+        for line in lines {
+            if let Some(owner) = innermost(*line) {
+                let index = owners.iter().position(|candidate| {
+                    candidate.name == owner.name
+                        && candidate.start_line == owner.start_line
+                        && candidate.end_line == owner.end_line
+                });
+                if let Some(index) = index {
+                    if !owner_order.contains(&index) {
+                        owner_order.push(index);
+                    }
+                    owner_changed.entry(index).or_default().push(*line);
+                }
+            }
+        }
+        for index in owner_order {
+            let owner = &owners[index];
+            let changed_lines = owner_changed.get(&index).cloned().unwrap_or_default();
             let mut code_changed = false;
             let mut contract_changed = false;
             let mut cfg_touched = false;
-            for line in &owner_changed {
+            let mut call_site_rationale = false;
+            for line in &changed_lines {
                 let text_line = source_lines
                     .get(line.saturating_sub(1))
                     .copied()
                     .unwrap_or("");
                 if is_cfg_line(text_line) {
                     cfg_touched = true;
-                } else if is_doc_line(text_line) {
+                } else if *line < owner.body_line {
+                    // Doc prefix: owner-level safety documentation changing is
+                    // a contract edge; attributes and signature lines affect
+                    // the owner item; unrelated rationale edits affect nothing.
                     if is_safety_marker(text_line) {
                         contract_changed = true;
+                    } else if !is_doc_line(text_line) && !is_comment_line(text_line) {
+                        code_changed = true;
                     }
+                } else if is_safety_marker(text_line) {
+                    // Call-site `SAFETY:` rationale inside the body is signup
+                    // analysis (later slice), never a PR1 contract edge.
+                    call_site_rationale = true;
+                } else if is_comment_line(text_line) {
+                    // Unrelated rationale edits affect nothing.
                 } else {
                     code_changed = true;
                 }
@@ -309,39 +412,69 @@ pub fn relate_same_owner(
                     owner.name
                 ));
             }
-            let Some(file_subjects) = subjects_by_file.get(file) else {
-                continue;
-            };
-            for subject in file_subjects.iter().filter(|subject| {
-                let Some(offset) =
-                    line_to_offset(&text, &starts, subject.line, subject.column.max(1))
-                else {
-                    return false;
-                };
-                let subject_line = offset_to_line(offset, &starts);
-                owner.start_line <= subject_line && subject_line <= owner.end_line
-            }) {
-                if code_changed {
-                    affected.push(AffectedSeam {
-                        card_id: subject.card_id.clone(),
-                        file: (*file).clone(),
-                        line: subject.line,
-                        column: subject.column,
-                        owner: owner.name.clone(),
-                        cause: ImpactCause::EnclosingOwnerChanged,
-                        changed_lines: owner_changed.clone(),
-                    });
+            if call_site_rationale {
+                limitations.push(format!(
+                    "{}:{} call-site SAFETY rationale changes defer to signup analysis",
+                    file.display(),
+                    owner.name
+                ));
+            }
+            let file_subjects = subjects_by_file.get(file);
+            let mut owner_subject_lines = BTreeSet::new();
+            if let Some(file_subjects) = file_subjects {
+                for subject in file_subjects.iter().filter(|subject| {
+                    let Some(offset) =
+                        line_to_offset(&text, &starts, subject.line, subject.column.max(1))
+                    else {
+                        return false;
+                    };
+                    let subject_line = offset_to_line(offset, &starts);
+                    innermost(subject_line).is_some_and(|inner| {
+                        inner.name == owner.name
+                            && inner.start_line == owner.start_line
+                            && inner.end_line == owner.end_line
+                    })
+                }) {
+                    owner_subject_lines.insert(subject.line);
+                    if code_changed {
+                        affected.push(AffectedSeam {
+                            card_id: subject.card_id.clone(),
+                            file: (*file).clone(),
+                            line: subject.line,
+                            column: subject.column,
+                            owner: owner.name.clone(),
+                            cause: ImpactCause::EnclosingOwnerChanged,
+                            changed_lines: changed_lines.clone(),
+                        });
+                    }
+                    if contract_changed {
+                        affected.push(AffectedSeam {
+                            card_id: subject.card_id.clone(),
+                            file: (*file).clone(),
+                            line: subject.line,
+                            column: subject.column,
+                            owner: owner.name.clone(),
+                            cause: ImpactCause::SafetyContractChanged,
+                            changed_lines: changed_lines.clone(),
+                        });
+                    }
                 }
-                if contract_changed {
-                    affected.push(AffectedSeam {
-                        card_id: subject.card_id.clone(),
-                        file: (*file).clone(),
-                        line: subject.line,
-                        column: subject.column,
-                        owner: owner.name.clone(),
-                        cause: ImpactCause::SafetyContractChanged,
-                        changed_lines: owner_changed.clone(),
-                    });
+            }
+            // Blind-spot visibility: unsafe blocks in a changed owner with no
+            // emitted subject on their line sit outside diff-proximity scope,
+            // so no edge may name them. They are reported as pending
+            // enrichment, never silently dropped and never invented.
+            for block_line in unsafe_block_lines(&text) {
+                if owner.start_line <= block_line
+                    && block_line <= owner.end_line
+                    && !owner_subject_lines.contains(&block_line)
+                {
+                    limitations.push(format!(
+                        "{}:{} unsafe block at line {} has no emitted subject (outside proximity scope; pending enrichment)",
+                        file.display(),
+                        owner.name,
+                        block_line
+                    ));
                 }
             }
         }
@@ -482,23 +615,6 @@ mod tests {
     }
 
     #[test]
-    fn safety_contract_edit_is_a_contract_cause_not_an_owner_cause() -> Result<(), String> {
-        let body = "/// # Safety\n/// Caller must hold the buffer.\npub unsafe fn read_checked(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
-        let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
-        let inventory = relate_same_owner(
-            &root,
-            &changed("src/lib.rs", &[1]),
-            &[subject("UR-op-c1", "src/lib.rs", 4, 14)],
-        );
-        assert_eq!(inventory.affected.len(), 1);
-        assert_eq!(
-            inventory.affected[0].cause,
-            ImpactCause::SafetyContractChanged
-        );
-        Ok(())
-    }
-
-    #[test]
     fn unrelated_rationale_edit_affects_nothing() -> Result<(), String> {
         let body = "/// Plain rationale, no contract.\npub unsafe fn read_checked(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
         let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
@@ -524,6 +640,125 @@ mod tests {
         );
         assert!(inventory.affected.is_empty());
         assert!(inventory.items.is_empty());
+        Ok(())
+    }
+
+    #[test]
+    fn hostile_diff_paths_never_resolve() -> Result<(), String> {
+        let (_dir, root) = fixture_root(&[("src/lib.rs", OWNER_BODY)])?;
+        let hostile = BTreeMap::from([(
+            PathBuf::from("../../tmp/secret.rs"),
+            BTreeSet::from([1usize]),
+        )]);
+        let inventory = relate_same_owner(
+            &root,
+            &hostile,
+            &[subject("UR-op-c1", "src/lib.rs", 11, 14)],
+        );
+        assert!(inventory.affected.is_empty());
+        assert!(inventory.items.is_empty());
+        assert!(
+            inventory
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("escaping the analysis root")),
+            "traversal paths must be refused visibly: {:?}",
+            inventory.limitations
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn removed_guard_attributes_to_its_post_image_owner() -> Result<(), String> {
+        // Deletion-only diffs carry no added lines; the deletion anchor
+        // still attributes the removed guard to its owner.
+        let (_dir, root) = fixture_root(&[("src/lib.rs", OWNER_BODY)])?;
+        let removed = BTreeMap::from([(PathBuf::from("src/lib.rs"), BTreeSet::from([8usize]))]);
+        let inventory = relate_same_owner(
+            &root,
+            &removed,
+            &[subject("UR-op-c1", "src/lib.rs", 11, 14)],
+        );
+        assert_eq!(inventory.affected.len(), 1);
+        assert_eq!(
+            inventory.affected[0].cause,
+            ImpactCause::EnclosingOwnerChanged
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn doc_prefix_safety_marker_is_a_contract_cause() -> Result<(), String> {
+        let body = "/// SAFETY: caller holds the buffer.\npub unsafe fn read_checked(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
+        let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
+        let inventory = relate_same_owner(
+            &root,
+            &changed("src/lib.rs", &[1]),
+            &[subject("UR-op-c1", "src/lib.rs", 3, 14)],
+        );
+        assert_eq!(inventory.affected.len(), 1);
+        assert_eq!(
+            inventory.affected[0].cause,
+            ImpactCause::SafetyContractChanged
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn call_site_safety_rationale_is_neither_edge() -> Result<(), String> {
+        // Call-site `SAFETY:` rationale inside the body is signup analysis,
+        // never a PR1 edge; it stays visible as a limitation.
+        let body = "pub unsafe fn read_checked(ptr: *const u8) -> u8 {\n    // SAFETY: caller holds the buffer.\n    unsafe { *ptr }\n}\n";
+        let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
+        let inventory = relate_same_owner(
+            &root,
+            &changed("src/lib.rs", &[2]),
+            &[subject("UR-op-c1", "src/lib.rs", 3, 14)],
+        );
+        assert!(inventory.affected.is_empty());
+        assert!(
+            inventory
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("signup analysis")),
+            "deferred rationale must stay visible: {:?}",
+            inventory.limitations
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn nested_functions_are_distinct_owners() -> Result<(), String> {
+        let body = "pub fn outer() {\n    fn inner() {}\n    inner();\n}\n\npub unsafe fn read_checked(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
+        let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
+        // Change inside the nested function: the outer subject is untouched
+        // and no edge claims the nested edit affects it.
+        let inventory = relate_same_owner(
+            &root,
+            &changed("src/lib.rs", &[2]),
+            &[subject("UR-op-c1", "src/lib.rs", 7, 14)],
+        );
+        assert!(inventory.affected.is_empty());
+        assert_eq!(inventory.items.len(), 1);
+        assert_eq!(inventory.items[0].owner, "inner");
+        Ok(())
+    }
+
+    #[test]
+    fn proximity_dropped_operations_stay_visible() -> Result<(), String> {
+        // No emitted subject for the unsafe block: the owner still changed,
+        // so the blind spot is named as pending enrichment, not silence.
+        let (_dir, root) = fixture_root(&[("src/lib.rs", OWNER_BODY)])?;
+        let inventory = relate_same_owner(&root, &changed("src/lib.rs", &[8]), &[]);
+        assert!(inventory.affected.is_empty());
+        assert!(
+            inventory
+                .limitations
+                .iter()
+                .any(|limitation| limitation.contains("pending enrichment")),
+            "dropped operations must stay visible: {:?}",
+            inventory.limitations
+        );
         Ok(())
     }
 
