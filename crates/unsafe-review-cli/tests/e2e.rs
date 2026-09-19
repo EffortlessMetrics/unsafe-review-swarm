@@ -1956,3 +1956,88 @@ fn check_configuration_names_gated_cards_under_selection() -> Result<(), Box<dyn
     );
     Ok(())
 }
+
+#[test]
+fn check_aperture_reports_manifest_only_when_requested() -> Result<(), Box<dyn Error>> {
+    // The aperture manifest is opt-in: `--aperture` adds a versioned
+    // `aperture` section to human/json output, default runs stay
+    // byte-stable without it, and an envelope selection plus `--aperture`
+    // renders both sections with the envelope reflected in the manifest.
+    let temp = TempDir::new("unsafe-review-aperture-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "aperture-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"aperture-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(feature = \"fast\")]\npub unsafe fn read_fast(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("aperture").is_none(),
+        "default runs must not gain an aperture key: {plain}"
+    );
+
+    let manifest = run(&["--aperture"], "json")?;
+    let aperture = &manifest["aperture"];
+    assert_eq!(aperture["schema_version"], 1);
+    assert!(
+        aperture["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("aperture-sha256:"),
+        "manifest names its digest: {aperture}"
+    );
+    assert_eq!(aperture["scope"], "diff");
+    assert_eq!(aperture["configuration"]["envelope_selected"], false);
+    assert!(
+        aperture["limitations"]
+            .as_array()
+            .map(Vec::len)
+            .unwrap_or_default()
+            >= 1,
+        "manifest always states its limitations: {aperture}"
+    );
+
+    let both = run(&["--aperture", "--features", "fast"], "json")?;
+    assert!(
+        both.get("configuration").is_some(),
+        "envelope runs keep the configuration section: {both}"
+    );
+    assert_eq!(both["aperture"]["configuration"]["envelope_selected"], true);
+    assert_eq!(both["aperture"]["configuration"]["gated_cards"], 2);
+    Ok(())
+}

@@ -3078,6 +3078,7 @@ mod tests {
             latency_out: None,
             env_features: EnvFeatureSelect::Default,
             target: None,
+            aperture: false,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3171,6 +3172,7 @@ mod tests {
             latency_out: None,
             env_features: EnvFeatureSelect::Default,
             target: None,
+            aperture: false,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4191,6 +4193,7 @@ mod tests {
             latency_out: None,
             env_features: EnvFeatureSelect::Default,
             target: None,
+            aperture: false,
         }
     }
 

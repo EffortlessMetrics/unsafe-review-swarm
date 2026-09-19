@@ -46,7 +46,9 @@ pub use api::{
     render_baseline_status_human, render_baseline_status_json, render_comment_plan,
     render_fixture_surface, render_fixture_surface_from_workspace, render_gate_manifest,
     render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
-    render_human_with_configuration, render_json, render_json_with_configuration,
+    render_human_with_aperture, render_human_with_configuration,
+    render_human_with_configuration_and_aperture, render_json, render_json_with_aperture,
+    render_json_with_configuration, render_json_with_configuration_and_aperture,
     render_json_with_provenance, render_lsp, render_lsp_hover, render_markdown,
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
@@ -54,6 +56,11 @@ pub use api::{
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 pub use freshness::{AnalysisIdentity, AnalysisState};
+pub use input::aperture::{
+    APERTURE_SCHEMA_VERSION, AnalysisAperture, ApertureCaps, ApertureConfiguration,
+    ApertureConfigurationInput, ApertureFiles, ApertureRoles, ApertureUnsupported,
+    assemble_aperture, render_aperture_human,
+};
 pub use input::cfg::{
     Applicability, CardConfiguration, CfgAtom, CfgAttrGate, CfgExpr, CfgInputs, CfgVerdict,
     ConfigurationCounts, StructuralGates, collect_structural_gates, enclosing_cfg_exprs,

@@ -20,25 +20,28 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardConfiguration, CardId, CargoCarefulReceiptInput,
-    CfgInputs, ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, EnvDiscoverOptions,
-    EnvironmentSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance, RepoScanEvent,
-    RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost, Scope,
-    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
-    baseline_init_preview, baseline_refresh_preview, baseline_status, collect_context_range,
-    compare_outcome_json, discover_environment, discover_repo_files, evaluate_configurations,
-    evaluate_policy_report, evaluate_policy_report_from_output, lint_manual_candidate_text,
-    load_manual_candidates, manual_candidate_implementer_handoff, new_manual_candidate_skeleton,
-    read_manual_candidate, render_badge_jsons, render_baseline_refresh_human,
-    render_baseline_refresh_json, render_baseline_status_human, render_baseline_status_json,
-    render_comment_plan, render_gate_manifest, render_gate_manifest_repo, render_github_summary,
-    render_human, render_human_short, render_human_with_configuration, render_json,
-    render_json_with_configuration, render_json_with_provenance, render_lsp,
-    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
-    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
-    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
+    AnalysisAperture, AnalysisMode, AnalyzeInput, AnalyzeOutput, ApertureConfigurationInput,
+    CardConfiguration, CardId, CargoCarefulReceiptInput, CfgInputs, ConcurrencyReceiptInput,
+    DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource, MiriReceiptInput,
+    PolicyMode, ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus,
+    RepoStopReason, SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION,
+    WitnessReceipt, analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
+    assemble_aperture, audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
+    baseline_refresh_preview, baseline_status, collect_context_range, compare_outcome_json,
+    discover_environment, discover_repo_files, evaluate_configurations, evaluate_policy_report,
+    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
+    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
+    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
+    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
+    render_gate_manifest, render_gate_manifest_repo, render_github_summary, render_human,
+    render_human_short, render_human_with_aperture, render_human_with_configuration,
+    render_human_with_configuration_and_aperture, render_json, render_json_with_aperture,
+    render_json_with_configuration, render_json_with_configuration_and_aperture,
+    render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan, render_markdown,
+    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
+    render_receipt_audit_markdown, render_repair_queue, render_sarif,
+    render_usefulness_telemetry_with_cost, render_witness_plan, summarize_configurations,
     validate_witness_receipts,
 };
 
@@ -406,6 +409,54 @@ fn render_with_configuration_format(
     }
 }
 
+/// Render human/json output with the aperture manifest section. Only called
+/// for explicit `--aperture` runs (parse validation already restricts those
+/// to human/json).
+fn render_with_aperture_format(
+    output: &AnalyzeOutput,
+    format: &Format,
+    short: bool,
+    provenance: Option<&Provenance>,
+    aperture: &AnalysisAperture,
+) -> String {
+    match format {
+        Format::Human => render_human_with_aperture(output, short, aperture),
+        Format::Json => render_json_with_aperture(output, provenance, aperture.clone()),
+        _ => render_with_format_and_provenance(output, format, short, provenance),
+    }
+}
+
+/// Render human/json output with configuration and aperture sections for
+/// runs that select an envelope and `--aperture`.
+fn render_with_configuration_and_aperture_format(
+    output: &AnalyzeOutput,
+    format: &Format,
+    short: bool,
+    provenance: Option<&Provenance>,
+    bundle: &ConfigurationBundle,
+    aperture: &AnalysisAperture,
+) -> String {
+    match format {
+        Format::Human => render_human_with_configuration_and_aperture(
+            output,
+            short,
+            &bundle.digest,
+            bundle.note.as_deref(),
+            &bundle.items,
+            aperture,
+        ),
+        Format::Json => render_json_with_configuration_and_aperture(
+            output,
+            provenance,
+            &bundle.digest,
+            bundle.note.as_deref(),
+            &bundle.items,
+            aperture.clone(),
+        ),
+        _ => render_with_format_and_provenance(output, format, short, provenance),
+    }
+}
+
 fn run_check(
     options: CheckOptions,
     scope: Scope,
@@ -440,20 +491,44 @@ fn run_check(
     if let Some(warning) = check_unresolved_diff_scope(&output).map_err(crate::RunFailure::Tool)? {
         eprintln!("{warning}");
     }
-    let rendered = match configuration_bundle(
+    let bundle = configuration_bundle(
         &config_root,
         &config_features,
         config_target.as_deref(),
         &output,
-    ) {
-        Some(bundle) => render_with_configuration_format(
+    );
+    let aperture = options.aperture.then(|| {
+        let config = bundle.as_ref().map(|bundle| ApertureConfigurationInput {
+            environment_digest: &bundle.digest,
+            note: bundle.note.as_deref(),
+            counts: summarize_configurations(&bundle.items),
+        });
+        assemble_aperture(&output, config)
+    });
+    let rendered = match (bundle.as_ref(), aperture.as_ref()) {
+        (Some(bundle), Some(aperture)) => render_with_configuration_and_aperture_format(
             &output,
             &options.format,
             options.short,
             Some(&provenance),
-            &bundle,
+            bundle,
+            aperture,
         ),
-        None => render_with_format_and_provenance(
+        (Some(bundle), None) => render_with_configuration_format(
+            &output,
+            &options.format,
+            options.short,
+            Some(&provenance),
+            bundle,
+        ),
+        (None, Some(aperture)) => render_with_aperture_format(
+            &output,
+            &options.format,
+            options.short,
+            Some(&provenance),
+            aperture,
+        ),
+        (None, None) => render_with_format_and_provenance(
             &output,
             &options.format,
             options.short,
