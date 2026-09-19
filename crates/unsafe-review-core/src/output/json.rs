@@ -30,6 +30,34 @@ pub(crate) fn render_with_provenance(output: &AnalyzeOutput, provenance: &Proven
     render_pretty(&JsonAnalyzeOutput::from_with_provenance(output, provenance))
 }
 
+/// Render the JSON analyze artifact with an evaluated configuration
+/// section for an explicit envelope selection. Default runs never call
+/// this: their artifacts stay byte-stable with no `configuration` key.
+pub(crate) fn render_with_configuration(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[crate::input::cfg::CardConfiguration],
+) -> String {
+    let counts = crate::input::cfg::summarize_configurations(items);
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.configuration = Some(JsonConfiguration {
+        environment_digest,
+        note,
+        gated_cards: counts.gated,
+        active: counts.active,
+        inactive: counts.inactive,
+        unknown: counts.unknown,
+        unsupported: counts.unsupported,
+        items,
+    });
+    render_pretty(&projected)
+}
+
 fn render_pretty(value: &impl Serialize) -> String {
     match serde_json::to_string_pretty(value) {
         Ok(text) => text,
@@ -65,6 +93,24 @@ struct JsonAnalyzeOutput<'a> {
     /// backward compatibility; `schema_version` distinguishes the two shapes.
     #[serde(skip_serializing_if = "Option::is_none")]
     provenance: Option<JsonProvenance>,
+    /// Configuration section for explicit envelope selections (#2318 PR2).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    configuration: Option<JsonConfiguration<'a>>,
+}
+
+/// JSON projection of an evaluated configuration section.
+#[derive(Serialize)]
+pub(crate) struct JsonConfiguration<'a> {
+    environment_digest: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<&'a str>,
+    gated_cards: usize,
+    active: usize,
+    inactive: usize,
+    unknown: usize,
+    unsupported: usize,
+    items: &'a [crate::input::cfg::CardConfiguration],
 }
 
 /// JSON projection of [`Provenance`].
@@ -115,6 +161,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 })
                 .collect(),
             provenance: None,
+            configuration: None,
         }
     }
 
@@ -156,6 +203,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 })
                 .collect(),
             provenance: Some(json_provenance),
+            configuration: None,
         }
     }
 }

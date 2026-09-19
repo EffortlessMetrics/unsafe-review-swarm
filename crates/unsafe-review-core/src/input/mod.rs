@@ -1,3 +1,4 @@
+pub mod cfg;
 pub mod changeset;
 pub(crate) mod changeset_local;
 pub(crate) mod changeset_spans;

@@ -13,13 +13,19 @@ use unsafe_review_core::{
     render_environment_human,
 };
 
-pub(crate) fn run(options: &EnvOptions) -> Result<(), String> {
-    let features = match &options.features {
+/// Map the CLI feature posture to the core selection. Shared with the
+/// `check` configuration projection.
+pub(crate) fn feature_selection(select: &EnvFeatureSelect) -> FeatureSelection {
+    match select {
         EnvFeatureSelect::Default => FeatureSelection::DefaultFeatures,
         EnvFeatureSelect::NoDefault => FeatureSelection::NoDefaultFeatures,
         EnvFeatureSelect::Explicit(selected) => FeatureSelection::Explicit(selected.clone()),
         EnvFeatureSelect::All => FeatureSelection::AllFeatures,
-    };
+    }
+}
+
+pub(crate) fn run(options: &EnvOptions) -> Result<(), String> {
+    let features = feature_selection(&options.features);
     let env = discover_environment(
         &options.root,
         EnvironmentSource::ExplicitCli,

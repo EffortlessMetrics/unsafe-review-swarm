@@ -3005,6 +3005,7 @@ fn artifact_path_display(base: &Path, name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::EnvFeatureSelect;
 
     #[test]
     fn handoff_commands_quote_roots_with_spaces() {
@@ -3075,6 +3076,8 @@ mod tests {
             max_cards: None,
             short: false,
             latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3166,6 +3169,8 @@ mod tests {
             max_cards: None,
             short: false,
             latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4184,6 +4189,8 @@ mod tests {
             max_cards: None,
             short: false,
             latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
         }
     }
 

@@ -1,6 +1,7 @@
 use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
+use crate::input::cfg::{CardConfiguration, render_configuration_human};
 use crate::input::workspace;
 use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
@@ -544,6 +545,19 @@ pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
 }
 
+/// Render the JSON analyze artifact with an evaluated configuration
+/// section for an explicit envelope selection. Default runs never call
+/// this: their artifacts stay byte-stable with no `configuration` key.
+pub fn render_json_with_configuration(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+) -> String {
+    json::render_with_configuration(output, provenance, environment_digest, note, items)
+}
+
 /// Render the JSON analyze artifact with attached traceable evidence metadata.
 ///
 /// The `provenance` block is inserted as a nested object in the output.
@@ -554,6 +568,24 @@ pub fn render_json_with_provenance(output: &AnalyzeOutput, provenance: &Provenan
 
 pub fn render_human(output: &AnalyzeOutput) -> String {
     human::render(output)
+}
+
+/// Render human output with an evaluated configuration section appended
+/// for an explicit envelope selection. Default runs never call this.
+pub fn render_human_with_configuration(
+    output: &AnalyzeOutput,
+    short: bool,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_configuration_human(items, environment_digest, note));
+    rendered
 }
 
 pub fn render_human_short(output: &AnalyzeOutput) -> String {
