@@ -107,13 +107,13 @@
     "witness_routes": [
       {
         "kind": "asan",
-        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
         "required": false
       },
       {
         "kind": "cargo-careful",
-        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo +nightly careful test len",
         "required": false
       },
