@@ -18,7 +18,7 @@
           "cache": "first_process_run",
           "cards": 1,
           "command": "check",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
           "options_digest": "sha256:9209c744ac8a4ae2",
           "outcome": {
@@ -29,14 +29,14 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 9261,
+          "output_bytes_total": 9262,
           "phases": [
             {
-              "elapsed_ms": 308,
+              "elapsed_ms": 237,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 5,
+              "elapsed_ms": 6,
               "name": "analyze"
             },
             {
@@ -54,17 +54,17 @@
           ],
           "run": 0,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 313,
-          "wall_ms": 1287
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 243,
+          "wall_ms": 1080
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
           "cache": "repeat_process_run",
           "cards": 1,
           "command": "check",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
           "options_digest": "sha256:9209c744ac8a4ae2",
           "outcome": {
@@ -75,10 +75,10 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 9261,
+          "output_bytes_total": 9262,
           "phases": [
             {
-              "elapsed_ms": 335,
+              "elapsed_ms": 233,
               "name": "input_resolution"
             },
             {
@@ -100,17 +100,17 @@
           ],
           "run": 1,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 340,
-          "wall_ms": 1349
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 238,
+          "wall_ms": 1164
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
           "cache": "repeat_process_run",
           "cards": 1,
           "command": "check",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
           "options_digest": "sha256:9209c744ac8a4ae2",
           "outcome": {
@@ -121,18 +121,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 9261,
+          "output_bytes_total": 9262,
           "phases": [
             {
-              "elapsed_ms": 278,
+              "elapsed_ms": 320,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 5,
+              "elapsed_ms": 6,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 2,
+              "elapsed_ms": 0,
               "name": "projections"
             },
             {
@@ -146,10 +146,10 @@
           ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 285,
-          "wall_ms": 1569
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 326,
+          "wall_ms": 1106
         }
       ],
       "skipped": null
@@ -164,7 +164,7 @@
           "cache": "first_process_run",
           "cards": 6,
           "command": "check",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
           "options_digest": "sha256:9209c744ac8a4ae2",
           "outcome": {
@@ -175,10 +175,56 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 44651,
+          "output_bytes_total": 44652,
           "phases": [
             {
-              "elapsed_ms": 294,
+              "elapsed_ms": 242,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 17,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 8,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 0,
+          "scope": "diff",
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 267,
+          "wall_ms": 1101
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 6,
+          "command": "check",
+          "dirty_worktree": false,
+          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 44652,
+          "phases": [
+            {
+              "elapsed_ms": 309,
               "name": "input_resolution"
             },
             {
@@ -198,65 +244,19 @@
               "name": "policy_eval"
             }
           ],
-          "run": 0,
-          "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 317,
-          "wall_ms": 1315
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 6,
-          "command": "check",
-          "dirty_worktree": true,
-          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 44651,
-          "phases": [
-            {
-              "elapsed_ms": 314,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 26,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 11,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
           "run": 1,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 351,
-          "wall_ms": 2092
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 332,
+          "wall_ms": 1107
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
           "cache": "repeat_process_run",
           "cards": 6,
           "command": "check",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
           "options_digest": "sha256:9209c744ac8a4ae2",
           "outcome": {
@@ -267,18 +267,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 44651,
+          "output_bytes_total": 44652,
           "phases": [
             {
-              "elapsed_ms": 354,
+              "elapsed_ms": 183,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 29,
+              "elapsed_ms": 22,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 10,
+              "elapsed_ms": 1,
               "name": "projections"
             },
             {
@@ -292,10 +292,10 @@
           ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 393,
-          "wall_ms": 1230
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 206,
+          "wall_ms": 964
         }
       ],
       "skipped": null
@@ -310,57 +310,7 @@
           "cache": "first_process_run",
           "cards": 6,
           "command": "first-pr",
-          "dirty_worktree": true,
-          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
-          "options_digest": "sha256:8a8f360a2ceae4c1",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "not_evaluated",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 484544,
-          "phases": [
-            {
-              "elapsed_ms": 350,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 22,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 22,
-              "name": "receipt_audit"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            },
-            {
-              "elapsed_ms": 45,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 2,
-              "name": "artifact_writes"
-            }
-          ],
-          "run": 0,
-          "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 441,
-          "wall_ms": 1843
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 6,
-          "command": "first-pr",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
           "options_digest": "sha256:8a8f360a2ceae4c1",
           "outcome": {
@@ -374,15 +324,65 @@
           "output_bytes_total": 484545,
           "phases": [
             {
-              "elapsed_ms": 508,
+              "elapsed_ms": 221,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 26,
+              "elapsed_ms": 18,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 27,
+              "elapsed_ms": 11,
+              "name": "receipt_audit"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            },
+            {
+              "elapsed_ms": 36,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 4,
+              "name": "artifact_writes"
+            }
+          ],
+          "run": 0,
+          "scope": "diff",
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 290,
+          "wall_ms": 968
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 6,
+          "command": "first-pr",
+          "dirty_worktree": false,
+          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
+          "options_digest": "sha256:8a8f360a2ceae4c1",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "not_evaluated",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 484545,
+          "phases": [
+            {
+              "elapsed_ms": 255,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 21,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 17,
               "name": "receipt_audit"
             },
             {
@@ -394,23 +394,23 @@
               "name": "projections"
             },
             {
-              "elapsed_ms": 2,
+              "elapsed_ms": 6,
               "name": "artifact_writes"
             }
           ],
           "run": 1,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 607,
-          "wall_ms": 1892
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 343,
+          "wall_ms": 1031
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
           "cache": "repeat_process_run",
           "cards": 6,
           "command": "first-pr",
-          "dirty_worktree": true,
+          "dirty_worktree": false,
           "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
           "options_digest": "sha256:8a8f360a2ceae4c1",
           "outcome": {
@@ -421,18 +421,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 484545,
+          "output_bytes_total": 484546,
           "phases": [
             {
-              "elapsed_ms": 362,
+              "elapsed_ms": 199,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 81,
+              "elapsed_ms": 18,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 35,
+              "elapsed_ms": 25,
               "name": "receipt_audit"
             },
             {
@@ -440,20 +440,20 @@
               "name": "policy_eval"
             },
             {
-              "elapsed_ms": 60,
+              "elapsed_ms": 61,
               "name": "projections"
             },
             {
-              "elapsed_ms": 7,
+              "elapsed_ms": 8,
               "name": "artifact_writes"
             }
           ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 545,
-          "wall_ms": 1557
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 311,
+          "wall_ms": 1058
         }
       ],
       "skipped": null
@@ -484,19 +484,19 @@
           "output_bytes_total": 9912531,
           "phases": [
             {
-              "elapsed_ms": 130,
+              "elapsed_ms": 8,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 211754,
+              "elapsed_ms": 175557,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 701,
+              "elapsed_ms": 532,
               "name": "projections"
             },
             {
-              "elapsed_ms": 233,
+              "elapsed_ms": 27,
               "name": "artifact_writes"
             },
             {
@@ -506,10 +506,10 @@
           ],
           "run": 0,
           "scope": "repo",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 212818,
-          "wall_ms": 214176
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 176124,
+          "wall_ms": 177069
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
@@ -530,19 +530,19 @@
           "output_bytes_total": 9912531,
           "phases": [
             {
-              "elapsed_ms": 7,
+              "elapsed_ms": 8,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 218356,
+              "elapsed_ms": 176326,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 852,
+              "elapsed_ms": 402,
               "name": "projections"
             },
             {
-              "elapsed_ms": 67,
+              "elapsed_ms": 20,
               "name": "artifact_writes"
             },
             {
@@ -552,10 +552,10 @@
           ],
           "run": 1,
           "scope": "repo",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 219282,
-          "wall_ms": 221934
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 176756,
+          "wall_ms": 177586
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
@@ -576,19 +576,19 @@
           "output_bytes_total": 9912531,
           "phases": [
             {
-              "elapsed_ms": 32,
+              "elapsed_ms": 9,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 221331,
+              "elapsed_ms": 165258,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 559,
+              "elapsed_ms": 534,
               "name": "projections"
             },
             {
-              "elapsed_ms": 41,
+              "elapsed_ms": 59,
               "name": "artifact_writes"
             },
             {
@@ -598,10 +598,10 @@
           ],
           "run": 2,
           "scope": "repo",
-          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
-          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
-          "total_ms": 221963,
-          "wall_ms": 223043
+          "tool_binary_digest": "fnv1a64:8ac081c993269bc3",
+          "tool_commit": "0fe40b8087d69d7814954b756bb061de0880c9d6",
+          "total_ms": 165860,
+          "wall_ms": 166998
         }
       ],
       "skipped": null
@@ -1351,1503 +1351,1503 @@
               "source": "unsafe-review"
             }
           ],
-          "init_to_diagnostics_ms": 55,
+          "init_to_diagnostics_ms": 104,
           "run": 0,
-          "save_refresh_ms": 59,
+          "save_refresh_ms": 93,
+          "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
+          "stale_mark_ms": 1
+        },
+        {
+          "baseline_diagnostics": [
+            {
+              "code": "guard_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+                "code": "guard_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "present",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": true,
+                    "state": "present",
+                    "summary": "Nearby `SAFETY:` comment was detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "Some inferred safety obligations are missing local guard evidence"
+                  },
+                  "reach": {
+                    "state": "owner_reached",
+                    "summary": "1 related test file mentions owner `read_header`"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "missing_evidence": [
+                  "Missing visible local guard for inferred safety obligations",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().read() }",
+                "operation_family": "raw_pointer_read",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 42,
+                    "line": 7
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 7
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test read_header",
+                  "cargo +nightly careful test read_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test read_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test read_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+              "range": {
+                "end": {
+                  "character": 42,
+                  "line": 7
+                },
+                "start": {
+                  "character": 4,
+                  "line": 7
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            }
+          ],
+          "cache": "repeat_process_run",
+          "fresh_diagnostics": [
+            {
+              "code": "guard_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+                "code": "guard_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "present",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": true,
+                    "state": "present",
+                    "summary": "Nearby `SAFETY:` comment was detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "Some inferred safety obligations are missing local guard evidence"
+                  },
+                  "reach": {
+                    "state": "owner_reached",
+                    "summary": "1 related test file mentions owner `read_header`"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "missing_evidence": [
+                  "Missing visible local guard for inferred safety obligations",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().read() }",
+                "operation_family": "raw_pointer_read",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 42,
+                    "line": 7
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 7
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test read_header",
+                  "cargo +nightly careful test read_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test read_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test read_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+              "range": {
+                "end": {
+                  "character": 42,
+                  "line": 7
+                },
+                "start": {
+                  "character": 4,
+                  "line": 7
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            },
+            {
+              "code": "contract_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-write-header-operation-raw_pointer_write-cast-header-09ef4afb9c8d-pointer_validity-c1",
+                "code": "contract_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "missing",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No visible local guard detected"
+                  },
+                  "reach": {
+                    "state": "unreached",
+                    "summary": "No static test mention of owner `write_header` was found"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+                "missing_evidence": [
+                  "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+                  "Missing visible local guard for inferred safety obligations",
+                  "No related test path was found by static search",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().write(header) }",
+                "operation_family": "raw_pointer_write",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 49,
+                    "line": 25
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 25
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test write_header",
+                  "cargo +nightly careful test write_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test write_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test write_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+              "range": {
+                "end": {
+                  "character": 49,
+                  "line": 25
+                },
+                "start": {
+                  "character": 4,
+                  "line": 25
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            }
+          ],
+          "init_to_diagnostics_ms": 52,
+          "run": 1,
+          "save_refresh_ms": 82,
+          "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
+          "stale_mark_ms": 1
+        },
+        {
+          "baseline_diagnostics": [
+            {
+              "code": "guard_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+                "code": "guard_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "present",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": true,
+                    "state": "present",
+                    "summary": "Nearby `SAFETY:` comment was detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "Some inferred safety obligations are missing local guard evidence"
+                  },
+                  "reach": {
+                    "state": "owner_reached",
+                    "summary": "1 related test file mentions owner `read_header`"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "missing_evidence": [
+                  "Missing visible local guard for inferred safety obligations",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().read() }",
+                "operation_family": "raw_pointer_read",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 42,
+                    "line": 7
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 7
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test read_header",
+                  "cargo +nightly careful test read_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test read_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test read_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+              "range": {
+                "end": {
+                  "character": 42,
+                  "line": 7
+                },
+                "start": {
+                  "character": 4,
+                  "line": 7
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            }
+          ],
+          "cache": "repeat_process_run",
+          "fresh_diagnostics": [
+            {
+              "code": "guard_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
+                "code": "guard_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "present",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": true,
+                    "state": "present",
+                    "summary": "Nearby `SAFETY:` comment was detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "Some inferred safety obligations are missing local guard evidence"
+                  },
+                  "reach": {
+                    "state": "owner_reached",
+                    "summary": "1 related test file mentions owner `read_header`"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "missing_evidence": [
+                  "Missing visible local guard for inferred safety obligations",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "Nearby `SAFETY:` comment was detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": true,
+                      "state": "present",
+                      "summary": "1 related test file mentions owner `read_header`"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().read() }",
+                "operation_family": "raw_pointer_read",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 42,
+                    "line": 7
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 7
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test read_header",
+                  "cargo +nightly careful test read_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test read_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test read_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+              "range": {
+                "end": {
+                  "character": 42,
+                  "line": 7
+                },
+                "start": {
+                  "character": 4,
+                  "line": 7
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            },
+            {
+              "code": "contract_missing",
+              "data": {
+                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-write-header-operation-raw_pointer_write-cast-header-09ef4afb9c8d-pointer_validity-c1",
+                "code": "contract_missing",
+                "coverage": {
+                  "agent_lsp_readiness": "ready",
+                  "baseline_state": "new",
+                  "comment_plan_status": "selected",
+                  "contract_coverage": "missing",
+                  "guard_coverage": "missing",
+                  "manual_context": "absent",
+                  "outcome_movement": "regressed",
+                  "test_reach_coverage": "missing",
+                  "witness_receipt_coverage": "missing"
+                },
+                "evidence_summary": {
+                  "contract": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                  },
+                  "discharge": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No visible local guard detected"
+                  },
+                  "reach": {
+                    "state": "unreached",
+                    "summary": "No static test mention of owner `write_header` was found"
+                  },
+                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
+                  "witness": {
+                    "present": false,
+                    "state": "missing",
+                    "summary": "No imported witness receipt was found"
+                  }
+                },
+                "hazards": [
+                  "pointer_validity",
+                  "alignment",
+                  "initialized_memory",
+                  "same_allocation"
+                ],
+                "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+                "missing_evidence": [
+                  "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+                  "Missing visible local guard for inferred safety obligations",
+                  "No related test path was found by static search",
+                  "No witness receipt imported for this card"
+                ],
+                "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+                "obligation_evidence": [
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No pointer-liveness evidence was detected"
+                    },
+                    "key": "pointer-live",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "buffer has enough bytes for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No length or bounds guard code was detected"
+                    },
+                    "key": "bounds",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "pointer is aligned for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No alignment guard code was detected"
+                    },
+                    "key": "alignment",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "memory is initialized for the accessed type",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "initialized",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  },
+                  {
+                    "contract": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+                    },
+                    "description": "access remains inside one live allocation",
+                    "discharge": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No obligation-specific guard code was detected"
+                    },
+                    "key": "allocation",
+                    "reach": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No static test mention of owner `write_header` was found"
+                    },
+                    "witness": {
+                      "present": false,
+                      "state": "missing",
+                      "summary": "No imported witness receipt was found"
+                    }
+                  }
+                ],
+                "operation": "unsafe { ptr.cast::<Header>().write(header) }",
+                "operation_family": "raw_pointer_write",
+                "path": "src/lib.rs",
+                "proof_path": "source_route_only",
+                "range": {
+                  "end": {
+                    "character": 49,
+                    "line": 25
+                  },
+                  "start": {
+                    "character": 4,
+                    "line": 25
+                  }
+                },
+                "required_safety_conditions": [
+                  {
+                    "description": "pointer is live and dereferenceable for the accessed type",
+                    "key": "pointer-live"
+                  },
+                  {
+                    "description": "buffer has enough bytes for the accessed type",
+                    "key": "bounds"
+                  },
+                  {
+                    "description": "pointer is aligned for the accessed type",
+                    "key": "alignment"
+                  },
+                  {
+                    "description": "memory is initialized for the accessed type",
+                    "key": "initialized"
+                  },
+                  {
+                    "description": "access remains inside one live allocation",
+                    "key": "allocation"
+                  }
+                ],
+                "severity": 2,
+                "source": "unsafe-review",
+                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+                "verify_commands": [
+                  "cargo +nightly miri test write_header",
+                  "cargo +nightly careful test write_header"
+                ],
+                "witness_routes": [
+                  {
+                    "command": "cargo +nightly miri test write_header",
+                    "kind": "miri",
+                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+                    "required": false
+                  },
+                  {
+                    "command": "cargo +nightly careful test write_header",
+                    "kind": "cargo-careful",
+                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+                    "required": false
+                  }
+                ]
+              },
+              "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+              "range": {
+                "end": {
+                  "character": 49,
+                  "line": 25
+                },
+                "start": {
+                  "character": 4,
+                  "line": 25
+                }
+              },
+              "severity": 2,
+              "source": "unsafe-review"
+            }
+          ],
+          "init_to_diagnostics_ms": 99,
+          "run": 2,
+          "save_refresh_ms": 116,
           "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
           "stale_mark_ms": 2
-        },
-        {
-          "baseline_diagnostics": [
-            {
-              "code": "guard_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
-                "code": "guard_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "present",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "Some inferred safety obligations are missing local guard evidence"
-                  },
-                  "reach": {
-                    "state": "owner_reached",
-                    "summary": "1 related test file mentions owner `read_header`"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "missing_evidence": [
-                  "Missing visible local guard for inferred safety obligations",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().read() }",
-                "operation_family": "raw_pointer_read",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 42,
-                    "line": 7
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 7
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test read_header",
-                  "cargo +nightly careful test read_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test read_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test read_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-              "range": {
-                "end": {
-                  "character": 42,
-                  "line": 7
-                },
-                "start": {
-                  "character": 4,
-                  "line": 7
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            }
-          ],
-          "cache": "repeat_process_run",
-          "fresh_diagnostics": [
-            {
-              "code": "guard_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
-                "code": "guard_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "present",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "Some inferred safety obligations are missing local guard evidence"
-                  },
-                  "reach": {
-                    "state": "owner_reached",
-                    "summary": "1 related test file mentions owner `read_header`"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "missing_evidence": [
-                  "Missing visible local guard for inferred safety obligations",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().read() }",
-                "operation_family": "raw_pointer_read",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 42,
-                    "line": 7
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 7
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test read_header",
-                  "cargo +nightly careful test read_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test read_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test read_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-              "range": {
-                "end": {
-                  "character": 42,
-                  "line": 7
-                },
-                "start": {
-                  "character": 4,
-                  "line": 7
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            },
-            {
-              "code": "contract_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-write-header-operation-raw_pointer_write-cast-header-09ef4afb9c8d-pointer_validity-c1",
-                "code": "contract_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "missing",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No visible local guard detected"
-                  },
-                  "reach": {
-                    "state": "unreached",
-                    "summary": "No static test mention of owner `write_header` was found"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-                "missing_evidence": [
-                  "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
-                  "Missing visible local guard for inferred safety obligations",
-                  "No related test path was found by static search",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().write(header) }",
-                "operation_family": "raw_pointer_write",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 49,
-                    "line": 25
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 25
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test write_header",
-                  "cargo +nightly careful test write_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test write_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test write_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-              "range": {
-                "end": {
-                  "character": 49,
-                  "line": 25
-                },
-                "start": {
-                  "character": 4,
-                  "line": 25
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            }
-          ],
-          "init_to_diagnostics_ms": 58,
-          "run": 1,
-          "save_refresh_ms": 62,
-          "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
-          "stale_mark_ms": 1
-        },
-        {
-          "baseline_diagnostics": [
-            {
-              "code": "guard_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
-                "code": "guard_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "present",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "Some inferred safety obligations are missing local guard evidence"
-                  },
-                  "reach": {
-                    "state": "owner_reached",
-                    "summary": "1 related test file mentions owner `read_header`"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "missing_evidence": [
-                  "Missing visible local guard for inferred safety obligations",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().read() }",
-                "operation_family": "raw_pointer_read",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 42,
-                    "line": 7
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 7
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test read_header",
-                  "cargo +nightly careful test read_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test read_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test read_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-              "range": {
-                "end": {
-                  "character": 42,
-                  "line": 7
-                },
-                "start": {
-                  "character": 4,
-                  "line": 7
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            }
-          ],
-          "cache": "repeat_process_run",
-          "fresh_diagnostics": [
-            {
-              "code": "guard_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
-                "code": "guard_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "present",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": true,
-                    "state": "present",
-                    "summary": "Nearby `SAFETY:` comment was detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "Some inferred safety obligations are missing local guard evidence"
-                  },
-                  "reach": {
-                    "state": "owner_reached",
-                    "summary": "1 related test file mentions owner `read_header`"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "missing_evidence": [
-                  "Missing visible local guard for inferred safety obligations",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "Nearby `SAFETY:` comment was detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": true,
-                      "state": "present",
-                      "summary": "1 related test file mentions owner `read_header`"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().read() }",
-                "operation_family": "raw_pointer_read",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 42,
-                    "line": 7
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 7
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test read_header",
-                  "cargo +nightly careful test read_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test read_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test read_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_read: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
-              "range": {
-                "end": {
-                  "character": 42,
-                  "line": 7
-                },
-                "start": {
-                  "character": 4,
-                  "line": 7
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            },
-            {
-              "code": "contract_missing",
-              "data": {
-                "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-write-header-operation-raw_pointer_write-cast-header-09ef4afb9c8d-pointer_validity-c1",
-                "code": "contract_missing",
-                "coverage": {
-                  "agent_lsp_readiness": "ready",
-                  "baseline_state": "new",
-                  "comment_plan_status": "selected",
-                  "contract_coverage": "missing",
-                  "guard_coverage": "missing",
-                  "manual_context": "absent",
-                  "outcome_movement": "regressed",
-                  "test_reach_coverage": "missing",
-                  "witness_receipt_coverage": "missing"
-                },
-                "evidence_summary": {
-                  "contract": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                  },
-                  "discharge": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No visible local guard detected"
-                  },
-                  "reach": {
-                    "state": "unreached",
-                    "summary": "No static test mention of owner `write_header` was found"
-                  },
-                  "reach_limitation": "static reach evidence is not proof that the unsafe site executed",
-                  "witness": {
-                    "present": false,
-                    "state": "missing",
-                    "summary": "No imported witness receipt was found"
-                  }
-                },
-                "hazards": [
-                  "pointer_validity",
-                  "alignment",
-                  "initialized_memory",
-                  "same_allocation"
-                ],
-                "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-                "missing_evidence": [
-                  "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
-                  "Missing visible local guard for inferred safety obligations",
-                  "No related test path was found by static search",
-                  "No witness receipt imported for this card"
-                ],
-                "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-                "obligation_evidence": [
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No pointer-liveness evidence was detected"
-                    },
-                    "key": "pointer-live",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "buffer has enough bytes for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No length or bounds guard code was detected"
-                    },
-                    "key": "bounds",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "pointer is aligned for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No alignment guard code was detected"
-                    },
-                    "key": "alignment",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "memory is initialized for the accessed type",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "initialized",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  },
-                  {
-                    "contract": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
-                    },
-                    "description": "access remains inside one live allocation",
-                    "discharge": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No obligation-specific guard code was detected"
-                    },
-                    "key": "allocation",
-                    "reach": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No static test mention of owner `write_header` was found"
-                    },
-                    "witness": {
-                      "present": false,
-                      "state": "missing",
-                      "summary": "No imported witness receipt was found"
-                    }
-                  }
-                ],
-                "operation": "unsafe { ptr.cast::<Header>().write(header) }",
-                "operation_family": "raw_pointer_write",
-                "path": "src/lib.rs",
-                "proof_path": "source_route_only",
-                "range": {
-                  "end": {
-                    "character": 49,
-                    "line": 25
-                  },
-                  "start": {
-                    "character": 4,
-                    "line": 25
-                  }
-                },
-                "required_safety_conditions": [
-                  {
-                    "description": "pointer is live and dereferenceable for the accessed type",
-                    "key": "pointer-live"
-                  },
-                  {
-                    "description": "buffer has enough bytes for the accessed type",
-                    "key": "bounds"
-                  },
-                  {
-                    "description": "pointer is aligned for the accessed type",
-                    "key": "alignment"
-                  },
-                  {
-                    "description": "memory is initialized for the accessed type",
-                    "key": "initialized"
-                  },
-                  {
-                    "description": "access remains inside one live allocation",
-                    "key": "allocation"
-                  }
-                ],
-                "severity": 2,
-                "source": "unsafe-review",
-                "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
-                "verify_commands": [
-                  "cargo +nightly miri test write_header",
-                  "cargo +nightly careful test write_header"
-                ],
-                "witness_routes": [
-                  {
-                    "command": "cargo +nightly miri test write_header",
-                    "kind": "miri",
-                    "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
-                    "required": false
-                  },
-                  {
-                    "command": "cargo +nightly careful test write_header",
-                    "kind": "cargo-careful",
-                    "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
-                    "required": false
-                  }
-                ]
-              },
-              "message": "raw_pointer_write: Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
-              "range": {
-                "end": {
-                  "character": 49,
-                  "line": 25
-                },
-                "start": {
-                  "character": 4,
-                  "line": 25
-                }
-              },
-              "severity": 2,
-              "source": "unsafe-review"
-            }
-          ],
-          "init_to_diagnostics_ms": 62,
-          "run": 2,
-          "save_refresh_ms": 56,
-          "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
-          "stale_mark_ms": 1
         }
       ],
       "skipped": null
