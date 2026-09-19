@@ -92,6 +92,7 @@ pub(super) fn try_apply_check_arg(
             Ok(Some(1))
         }
         "--features" => {
+            reject_second_env_selection(options, "--features")?;
             options.env_features = EnvFeatureSelect::Explicit(parse_feature_list(
                 value(args, idx + 1, "--features")?,
                 "--features",
@@ -99,6 +100,7 @@ pub(super) fn try_apply_check_arg(
             Ok(Some(2))
         }
         arg if arg.starts_with("--features=") => {
+            reject_second_env_selection(options, "--features")?;
             options.env_features = EnvFeatureSelect::Explicit(parse_feature_list(
                 inline_value(arg, "--features")?,
                 "--features",
@@ -132,8 +134,7 @@ pub(super) fn try_apply_check_arg(
 }
 
 /// Reject a second feature-selection flag: the envelope selects exactly
-/// one posture. `--features` overwrites (it carries its own list), so only
-/// the unit flags guard here.
+/// one posture, independent of flag order.
 fn reject_second_env_selection(options: &CheckOptions, flag: &str) -> Result<(), String> {
     if options.env_features != EnvFeatureSelect::Default {
         return Err(format!(

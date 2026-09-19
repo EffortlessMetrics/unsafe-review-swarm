@@ -1956,6 +1956,21 @@ mod tests {
                     .to_string()
             )
         );
+        let repeated = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "a",
+            "--features",
+            "b",
+        ]));
+        assert_eq!(
+            repeated,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given (got --features too)"
+                    .to_string()
+            )
+        );
         let empty_target = parse(args(["unsafe-review", "check", "--target", " "]));
         assert_eq!(
             empty_target,
