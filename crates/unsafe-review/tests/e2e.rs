@@ -9143,10 +9143,21 @@ fn single_confirm_log(log_dir: &Path) -> Result<String, Box<dyn Error>> {
     Ok(fs::read_to_string(logs[0].path())?)
 }
 
+/// Copy a fixture tree for an isolated test run.
+///
+/// `target/` directories are skipped: a parallel test run can leave a
+/// transient build-output directory inside a shared fixture source (created
+/// and removed while another test copies it), and copying it would both
+/// race and pollute the analysis input. The analyzer itself ignores
+/// `target/` under `large_repo_ignores`, so copies stay faithful without it.
+/// No fixture tracks a `target/` directory.
 fn copy_dir_all(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(target)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
+        if entry.file_name() == "target" {
+            continue;
+        }
         let source_path = entry.path();
         let target_path = target.join(entry.file_name());
         if source_path.is_dir() {
@@ -9155,6 +9166,26 @@ fn copy_dir_all(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
             fs::copy(&source_path, &target_path)?;
         }
     }
+    Ok(())
+}
+
+#[test]
+fn copy_dir_all_skips_transient_target_dirs() -> Result<(), Box<dyn Error>> {
+    let source = TempDir::new("unsafe-review-copy-skip-source-e2e")?;
+    fs::create_dir_all(source.path().join("src"))?;
+    fs::write(source.path().join("src/lib.rs"), "pub fn f() {}\n")?;
+    fs::create_dir_all(source.path().join("target/stale"))?;
+    fs::write(source.path().join("target/stale.json"), "{}")?;
+    let dest = TempDir::new("unsafe-review-copy-skip-dest-e2e")?;
+    copy_dir_all(source.path(), dest.path())?;
+    assert!(
+        dest.path().join("src/lib.rs").is_file(),
+        "real sources must copy"
+    );
+    assert!(
+        !dest.path().join("target").exists(),
+        "transient build output must not copy"
+    );
     Ok(())
 }
 
