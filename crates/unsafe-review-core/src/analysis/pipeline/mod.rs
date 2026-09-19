@@ -6414,6 +6414,60 @@ unsafe extern "C" {
     }
 
     #[test]
+    fn ffi_pointer_argument_null_check_discharges() -> Result<(), String> {
+        let output = fixture_output("ffi_argument_null_check_guard")?;
+        let card = single_card("ffi_argument_null_check_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .any(|evidence| evidence.obligation.key == "argument"),
+            "a pointer argument passed to an FFI call must carry the argument obligation"
+        );
+        assert!(obligation_discharge_present(card, "argument"));
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_pointer_argument_unguarded_stays_missing_while_integers_stay_quiet() -> Result<(), String>
+    {
+        let output = fixture_output("ffi_argument_unguarded_not_guard")?;
+        assert_eq!(output.cards.len(), 2);
+
+        let unguarded = output
+            .cards
+            .iter()
+            .find(|card| card.site.owner.as_deref() == Some("unguarded"))
+            .ok_or("missing card for the unguarded pointer call")?;
+        assert!(
+            unguarded
+                .obligation_evidence
+                .iter()
+                .any(|evidence| evidence.obligation.key == "argument"),
+            "an unguarded pointer argument must carry the argument obligation"
+        );
+        assert!(
+            !obligation_discharge_present(unguarded, "argument"),
+            "an unguarded pointer argument must stay missing"
+        );
+
+        let added = output
+            .cards
+            .iter()
+            .find(|card| card.site.owner.as_deref() == Some("added"))
+            .ok_or("missing card for the integer-parameter call")?;
+        assert!(
+            added
+                .obligation_evidence
+                .iter()
+                .all(|evidence| evidence.obligation.key != "argument"),
+            "integer-parameter calls must not gain the argument obligation"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn movement_context_card_is_not_new() -> Result<(), String> {
         let output = fixture_output("movement_context_card_not_new")?;
         let card = single_card("movement_context_card_not_new", &output)?;

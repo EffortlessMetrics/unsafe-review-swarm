@@ -1,21 +1,21 @@
 [
   {
-    "id": "UR-ffi-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-ffi-98a0f273145a-ffi_abi-c1",
+    "id": "UR-ffi-argument-null-check-guard-src-lib-rs-guarded-ffi_call-ffi-ffi-0a13fdd8eb89-ffi_abi-c1",
     "class": "miri_unsupported",
     "priority": "medium",
     "confidence": "medium",
     "proof_path": "observable_red_green",
     "site": {
       "file": "src/lib.rs",
-      "line": 7,
+      "line": 12,
       "column": 5,
       "kind": "ffi_call",
-      "owner": "len",
+      "owner": "guarded",
       "visibility": "private",
       "public_api_surface": false,
-      "snippet": "unsafe { strlen(ptr) }"
+      "snippet": "unsafe { ffi_strlen(s) }"
     },
-    "operation": "unsafe { strlen(ptr) }",
+    "operation": "unsafe { ffi_strlen(s) }",
     "operation_family": "ffi",
     "hazards": [
       "ffi_abi",
@@ -43,7 +43,7 @@
         "reach": {
           "present": false,
           "state": "missing",
-          "summary": "No static test mention of owner `len` was found"
+          "summary": "No static test mention of owner `guarded` was found"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": false,
           "state": "missing",
-          "summary": "No static test mention of owner `len` was found"
+          "summary": "No static test mention of owner `guarded` was found"
         },
         "witness": {
           "present": false,
@@ -84,14 +84,14 @@
           "summary": "Nearby `SAFETY:` comment was detected"
         },
         "discharge": {
-          "present": false,
-          "state": "missing",
-          "summary": "No dominating null check was detected for argument `ptr`"
+          "present": true,
+          "state": "present",
+          "summary": "Null checks dominate the call for argument `s`"
         },
         "reach": {
           "present": false,
           "state": "missing",
-          "summary": "No static test mention of owner `len` was found"
+          "summary": "No static test mention of owner `guarded` was found"
         },
         "witness": {
           "present": false,
@@ -101,20 +101,20 @@
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
-    "discharge": "No visible local guard detected",
-    "reach": "No static test mention of owner `len` was found",
+    "discharge": "Some inferred safety obligations are missing local guard evidence",
+    "reach": "No static test mention of owner `guarded` was found",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
         "kind": "asan",
         "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded",
         "required": false
       },
       {
         "kind": "cargo-careful",
         "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
-        "command": "cargo +nightly careful test len",
+        "command": "cargo +nightly careful test guarded",
         "required": false
       },
       {
@@ -131,29 +131,29 @@
     ],
     "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
     "verify_commands": [
-      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
-      "cargo +nightly careful test len"
+      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded",
+      "cargo +nightly careful test guarded"
     ],
     "confirmation_cue": {
-      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { strlen(ptr) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { ffi_strlen(s) }`; confirm with external evidence before treating it as observed runtime behavior",
       "build_this_first": {
         "kind": "verify_command",
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded",
         "route_kind": "asan",
-        "summary": "No test reaches `len` yet; write or identify a focused test for `len` first, then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `guarded` yet; write or identify a focused test for `guarded` first, then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
-        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded",
         "route_kind": "asan",
         "steps": [
-          "Confirm ReviewCard `UR-ffi-call-sanitizer-route-src-lib-rs-len-ffi_call-ffi-ffi-98a0f273145a-ffi_abi-c1` still maps to `unsafe { strlen(ptr) }` at `src/lib.rs:7:5` before upgrading confidence.",
-          "Write or identify a focused test for `len` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` as the smallest available command for this card.",
+          "Confirm ReviewCard `UR-ffi-argument-null-check-guard-src-lib-rs-guarded-ffi_call-ffi-ffi-0a13fdd8eb89-ffi_abi-c1` still maps to `unsafe { ffi_strlen(s) }` at `src/lib.rs:12:5` before upgrading confidence.",
+          "Write or identify a focused test for `guarded` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "write or identify a focused test for `len` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test len` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `guarded` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test guarded` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

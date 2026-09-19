@@ -12,6 +12,7 @@ mod contract_text;
 mod control_flow;
 mod copy_range;
 mod evidence_state;
+pub(crate) mod ffi_argument;
 mod freshness;
 mod generic_bounds;
 mod get_unchecked;
@@ -80,6 +81,7 @@ use self::control_flow::{
 use self::copy_range::has_copy_slice_range_evidence;
 pub(crate) use self::evidence_state::summarize_discharge;
 use self::evidence_state::{contract_state, reach_state};
+use self::ffi_argument::ffi_argument_discharge_state;
 use self::freshness::{
     has_assignment_to_any_identifier, has_assignment_to_identifier, has_fresh_guard_pattern,
     has_fresh_runtime_assert_pattern, has_fresh_runtime_assert_pattern_for_identifiers,
@@ -105,7 +107,8 @@ use self::receiver_path::{
     receiver_before_marker,
 };
 use self::return_value_discharge::return_value_discharge_state;
-use self::site_context::{code_context, code_context_through_site};
+pub(crate) use self::site_context::code_context;
+use self::site_context::code_context_through_site;
 use self::source_value::source_value_identifier;
 use self::target_feature_discharge::target_feature_discharge_state;
 use self::u8_bool_value::has_u8_bool_value_guard;
@@ -167,6 +170,7 @@ fn discharge_state_for(
         "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
         "return-value" => return_value_discharge_state(site),
+        "argument" => ffi_argument_discharge_state(site, lower),
         "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(site, family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),

@@ -22,6 +22,11 @@ pub(super) fn build_card(
         obligations.extend(obligations::ffi_return_value_obligation(
             scanned_site.operation.bound_name.as_deref(),
         ));
+        let context_lower = evidence::code_context(&scanned_site).to_ascii_lowercase();
+        obligations.extend(obligations::ffi_argument_obligation(
+            &scanned_site,
+            &context_lower,
+        ));
     }
     let contract = evidence::contract_evidence(&scanned_site);
     let contract_for_classification = operation_contract_override(&scanned_site.operation.family)

@@ -19,6 +19,13 @@ pub(super) fn has_nullability_guard(site: &ScannedSite, lower: &str) -> bool {
     has_unnamed_nullability_guard(site, lower)
 }
 
+/// Whether compacted guard-scope text holds a dominating null check for one
+/// named receiver: `if receiver.is_null() { return ...; }` or an open
+/// `if !receiver.is_null() {` branch.
+pub(super) fn receiver_has_null_guard(guard_compact: &str, receiver: &str) -> bool {
+    RawPointerNullContext::new(guard_compact, receiver.to_string()).has_null_guard()
+}
+
 /// The pointer identifier a nullability guard was proven to apply to, when
 /// the guard matched a same-pointer (or same-receiver) shape. `None` means
 /// no such guard was found.

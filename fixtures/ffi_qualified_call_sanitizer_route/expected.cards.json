@@ -23,7 +23,8 @@
     ],
     "obligations": [
       "foreign declaration matches ABI and layout on both sides",
-      "ownership, lifetime, and nullability contract is explicit"
+      "ownership, lifetime, and nullability contract is explicit",
+      "call arguments satisfy the callee's pointer contract (non-null, valid)"
     ],
     "obligation_evidence": [
       {
@@ -62,6 +63,30 @@
           "present": false,
           "state": "missing",
           "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `len` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "argument",
+        "description": "call arguments satisfy the callee's pointer contract (non-null, valid)",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No dominating null check was detected for argument `ptr`"
         },
         "reach": {
           "present": false,
