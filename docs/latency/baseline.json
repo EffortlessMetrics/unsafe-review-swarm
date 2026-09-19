@@ -32,99 +32,7 @@
           "output_bytes_total": 9261,
           "phases": [
             {
-              "elapsed_ms": 280,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 6,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 1,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
-          "run": 0,
-          "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 287,
-          "wall_ms": 1526
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 1,
-          "command": "check",
-          "dirty_worktree": true,
-          "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 9261,
-          "phases": [
-            {
-              "elapsed_ms": 571,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 10,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
-          "run": 1,
-          "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 581,
-          "wall_ms": 1890
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 1,
-          "command": "check",
-          "dirty_worktree": true,
-          "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 9261,
-          "phases": [
-            {
-              "elapsed_ms": 353,
+              "elapsed_ms": 308,
               "name": "input_resolution"
             },
             {
@@ -144,12 +52,104 @@
               "name": "policy_eval"
             }
           ],
+          "run": 0,
+          "scope": "diff",
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 313,
+          "wall_ms": 1287
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 1,
+          "command": "check",
+          "dirty_worktree": true,
+          "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 9261,
+          "phases": [
+            {
+              "elapsed_ms": 335,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 5,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "scope": "diff",
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 340,
+          "wall_ms": 1349
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 1,
+          "command": "check",
+          "dirty_worktree": true,
+          "input_identity": "diff-sha256:04631b5c2b8cffe961e9084dc6e30b4f2a91bf0db1749eaa332998a5580dc5a4",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 9261,
+          "phases": [
+            {
+              "elapsed_ms": 278,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 5,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 2,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 358,
-          "wall_ms": 1521
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 285,
+          "wall_ms": 1569
         }
       ],
       "skipped": null
@@ -178,53 +178,7 @@
           "output_bytes_total": 44651,
           "phases": [
             {
-              "elapsed_ms": 273,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 20,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 1,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
-          "run": 0,
-          "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 294,
-          "wall_ms": 1071
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 6,
-          "command": "check",
-          "dirty_worktree": true,
-          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 44651,
-          "phases": [
-            {
-              "elapsed_ms": 226,
+              "elapsed_ms": 294,
               "name": "input_resolution"
             },
             {
@@ -244,12 +198,12 @@
               "name": "policy_eval"
             }
           ],
-          "run": 1,
+          "run": 0,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 249,
-          "wall_ms": 1172
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 317,
+          "wall_ms": 1315
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
@@ -270,15 +224,61 @@
           "output_bytes_total": 44651,
           "phases": [
             {
-              "elapsed_ms": 240,
+              "elapsed_ms": 314,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 19,
+              "elapsed_ms": 26,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 1,
+              "elapsed_ms": 11,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "scope": "diff",
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 351,
+          "wall_ms": 2092
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 6,
+          "command": "check",
+          "dirty_worktree": true,
+          "input_identity": "diff-sha256:312be74ad6baafb9ee54b6dff85f110febb80813546cf88d2337dcc580ea1958",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 44651,
+          "phases": [
+            {
+              "elapsed_ms": 354,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 29,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 10,
               "name": "projections"
             },
             {
@@ -292,10 +292,10 @@
           ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 260,
-          "wall_ms": 1090
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 393,
+          "wall_ms": 1230
         }
       ],
       "skipped": null
@@ -321,18 +321,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 484483,
+          "output_bytes_total": 484544,
           "phases": [
             {
-              "elapsed_ms": 198,
+              "elapsed_ms": 350,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 15,
+              "elapsed_ms": 22,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 15,
+              "elapsed_ms": 22,
               "name": "receipt_audit"
             },
             {
@@ -340,20 +340,20 @@
               "name": "policy_eval"
             },
             {
-              "elapsed_ms": 57,
+              "elapsed_ms": 45,
               "name": "projections"
             },
             {
-              "elapsed_ms": 8,
+              "elapsed_ms": 2,
               "name": "artifact_writes"
             }
           ],
           "run": 0,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 293,
-          "wall_ms": 1085
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 441,
+          "wall_ms": 1843
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
@@ -371,18 +371,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 484483,
+          "output_bytes_total": 484545,
           "phases": [
             {
-              "elapsed_ms": 190,
+              "elapsed_ms": 508,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 17,
+              "elapsed_ms": 26,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 16,
+              "elapsed_ms": 27,
               "name": "receipt_audit"
             },
             {
@@ -390,20 +390,20 @@
               "name": "policy_eval"
             },
             {
-              "elapsed_ms": 37,
+              "elapsed_ms": 44,
               "name": "projections"
             },
             {
-              "elapsed_ms": 3,
+              "elapsed_ms": 2,
               "name": "artifact_writes"
             }
           ],
           "run": 1,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 263,
-          "wall_ms": 930
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 607,
+          "wall_ms": 1892
         },
         {
           "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
@@ -421,18 +421,18 @@
             "scan_capped": false,
             "unresolved_diff_files": 0
           },
-          "output_bytes_total": 484483,
+          "output_bytes_total": 484545,
           "phases": [
             {
-              "elapsed_ms": 174,
+              "elapsed_ms": 362,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 13,
+              "elapsed_ms": 81,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 11,
+              "elapsed_ms": 35,
               "name": "receipt_audit"
             },
             {
@@ -440,20 +440,20 @@
               "name": "policy_eval"
             },
             {
-              "elapsed_ms": 24,
+              "elapsed_ms": 60,
               "name": "projections"
             },
             {
-              "elapsed_ms": 5,
+              "elapsed_ms": 7,
               "name": "artifact_writes"
             }
           ],
           "run": 2,
           "scope": "diff",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 227,
-          "wall_ms": 905
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 545,
+          "wall_ms": 1557
         }
       ],
       "skipped": null
@@ -484,15 +484,107 @@
           "output_bytes_total": 9912531,
           "phases": [
             {
-              "elapsed_ms": 9,
+              "elapsed_ms": 130,
               "name": "input_resolution"
             },
             {
-              "elapsed_ms": 190575,
+              "elapsed_ms": 211754,
               "name": "analyze"
             },
             {
-              "elapsed_ms": 489,
+              "elapsed_ms": 701,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 233,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 0,
+          "scope": "repo",
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 212818,
+          "wall_ms": 214176
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 1683,
+          "command": "repo",
+          "dirty_worktree": false,
+          "input_identity": "root-path-sha256:4bd39c0f2d24ff1f",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 9912531,
+          "phases": [
+            {
+              "elapsed_ms": 7,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 218356,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 852,
+              "name": "projections"
+            },
+            {
+              "elapsed_ms": 67,
+              "name": "artifact_writes"
+            },
+            {
+              "elapsed_ms": 0,
+              "name": "policy_eval"
+            }
+          ],
+          "run": 1,
+          "scope": "repo",
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 219282,
+          "wall_ms": 221934
+        },
+        {
+          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
+          "cache": "repeat_process_run",
+          "cards": 1683,
+          "command": "repo",
+          "dirty_worktree": false,
+          "input_identity": "root-path-sha256:4bd39c0f2d24ff1f",
+          "options_digest": "sha256:9209c744ac8a4ae2",
+          "outcome": {
+            "analysis": "complete",
+            "card_cap": null,
+            "policy": "pass",
+            "rejected_diff_files": 0,
+            "scan_capped": false,
+            "unresolved_diff_files": 0
+          },
+          "output_bytes_total": 9912531,
+          "phases": [
+            {
+              "elapsed_ms": 32,
+              "name": "input_resolution"
+            },
+            {
+              "elapsed_ms": 221331,
+              "name": "analyze"
+            },
+            {
+              "elapsed_ms": 559,
               "name": "projections"
             },
             {
@@ -504,104 +596,12 @@
               "name": "policy_eval"
             }
           ],
-          "run": 0,
-          "scope": "repo",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 191114,
-          "wall_ms": 192331
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 1683,
-          "command": "repo",
-          "dirty_worktree": false,
-          "input_identity": "root-path-sha256:4bd39c0f2d24ff1f",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 9912531,
-          "phases": [
-            {
-              "elapsed_ms": 8,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 248764,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 558,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 250,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
-          "run": 1,
-          "scope": "repo",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 249580,
-          "wall_ms": 251228
-        },
-        {
-          "build_rustc": "rustc 1.98.1 (48a229cea 2026-09-01)",
-          "cache": "repeat_process_run",
-          "cards": 1683,
-          "command": "repo",
-          "dirty_worktree": false,
-          "input_identity": "root-path-sha256:4bd39c0f2d24ff1f",
-          "options_digest": "sha256:9209c744ac8a4ae2",
-          "outcome": {
-            "analysis": "complete",
-            "card_cap": null,
-            "policy": "pass",
-            "rejected_diff_files": 0,
-            "scan_capped": false,
-            "unresolved_diff_files": 0
-          },
-          "output_bytes_total": 9912531,
-          "phases": [
-            {
-              "elapsed_ms": 15,
-              "name": "input_resolution"
-            },
-            {
-              "elapsed_ms": 244924,
-              "name": "analyze"
-            },
-            {
-              "elapsed_ms": 1057,
-              "name": "projections"
-            },
-            {
-              "elapsed_ms": 250,
-              "name": "artifact_writes"
-            },
-            {
-              "elapsed_ms": 0,
-              "name": "policy_eval"
-            }
-          ],
           "run": 2,
           "scope": "repo",
-          "tool_binary_digest": "fnv1a64:272fdf996beedb2e",
-          "tool_commit": "e962ab065b0f41a03a3b972bd39e29e4bf171c53",
-          "total_ms": 246246,
-          "wall_ms": 249687
+          "tool_binary_digest": "fnv1a64:1bd5be0a2de70a96",
+          "tool_commit": "fe2cc0bf1ba53609c49a3945f7a035e9bb652b3b",
+          "total_ms": 221963,
+          "wall_ms": 223043
         }
       ],
       "skipped": null
@@ -1351,11 +1351,11 @@
               "source": "unsafe-review"
             }
           ],
-          "init_to_diagnostics_ms": 591,
+          "init_to_diagnostics_ms": 55,
           "run": 0,
-          "save_refresh_ms": 240,
+          "save_refresh_ms": 59,
           "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
-          "stale_mark_ms": 14
+          "stale_mark_ms": 2
         },
         {
           "baseline_diagnostics": [
@@ -2097,9 +2097,9 @@
               "source": "unsafe-review"
             }
           ],
-          "init_to_diagnostics_ms": 80,
+          "init_to_diagnostics_ms": 58,
           "run": 1,
-          "save_refresh_ms": 90,
+          "save_refresh_ms": 62,
           "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
           "stale_mark_ms": 1
         },
@@ -2843,9 +2843,9 @@
               "source": "unsafe-review"
             }
           ],
-          "init_to_diagnostics_ms": 82,
+          "init_to_diagnostics_ms": 62,
           "run": 2,
-          "save_refresh_ms": 141,
+          "save_refresh_ms": 56,
           "saved_source_sha256": "9ae02bf22d07e8ae1d87fc8bd338a418dbda5c8d30fe495e1dbe33f92e668521",
           "stale_mark_ms": 1
         }
