@@ -2022,6 +2022,13 @@ fn check_aperture_reports_manifest_only_when_requested() -> Result<(), Box<dyn E
         "manifest names its digest: {aperture}"
     );
     assert_eq!(aperture["scope"], "diff");
+    assert!(
+        aperture["files"]["analyzed_diff_files"]
+            .as_array()
+            .map(|files| files.iter().any(|file| file == "src/lib.rs"))
+            .unwrap_or(false),
+        "manifest names the analyzed files: {aperture}"
+    );
     assert_eq!(aperture["configuration"]["envelope_selected"], false);
     assert!(
         aperture["limitations"]

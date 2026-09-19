@@ -24,12 +24,17 @@ pub const APERTURE_SCHEMA_VERSION: u32 = 1;
 const HUMAN_PATH_LIMIT: usize = 10;
 
 /// File populations for one analysis revision.
+///
+/// `discovered_rust_files` counts every Rust file under the root; it is a
+/// discovery population, not a scanned set. The analyzed set is
+/// `analyzed_diff_files` on diff-scoped runs; repo-mode runs analyze the
+/// discovered tree instead and leave that list empty.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct ApertureFiles {
     pub changed_files: usize,
     pub changed_rust_files: usize,
-    pub rust_files: usize,
-    pub analyzed_diff_files: usize,
+    pub discovered_rust_files: usize,
+    pub analyzed_diff_files: Vec<PathBuf>,
     pub unresolved_diff_files: Vec<PathBuf>,
     pub rejected_diff_files: Vec<PathBuf>,
 }
@@ -192,8 +197,8 @@ pub fn assemble_aperture(
         files: ApertureFiles {
             changed_files: summary.changed_files,
             changed_rust_files: summary.changed_rust_files,
-            rust_files: summary.rust_files,
-            analyzed_diff_files: output.diff_scoped_files.len(),
+            discovered_rust_files: summary.rust_files,
+            analyzed_diff_files: sorted_paths(&output.diff_scoped_files),
             unresolved_diff_files: sorted_paths(&output.unresolved_diff_files),
             rejected_diff_files: sorted_paths(&output.rejected_diff_files),
         },
@@ -256,12 +261,16 @@ pub fn render_aperture_human(aperture: &AnalysisAperture) -> String {
         aperture.scope, aperture.mode, aperture.policy
     ));
     out.push_str(&format!(
-        "- files: {} changed ({} rust) of {} rust files scanned; {} analyzed diff files\n",
+        "- files: {} changed ({} rust); {} rust files discovered\n",
         aperture.files.changed_files,
         aperture.files.changed_rust_files,
-        aperture.files.rust_files,
-        aperture.files.analyzed_diff_files
+        aperture.files.discovered_rust_files
     ));
+    if aperture.scope == "repo" {
+        out.push_str("- analyzed: full-tree scan over the discovered files\n");
+    } else {
+        render_paths("analyzed", &aperture.files.analyzed_diff_files, &mut out);
+    }
     render_paths(
         "unresolved",
         &aperture.files.unresolved_diff_files,
@@ -345,6 +354,10 @@ mod tests {
         assert_eq!(aperture.schema_version, APERTURE_SCHEMA_VERSION);
         assert!(!aperture.configuration.envelope_selected);
         assert_eq!(aperture.files.unresolved_diff_files.len(), 1);
+        assert_eq!(
+            aperture.files.analyzed_diff_files,
+            vec![PathBuf::from("src/lib.rs")]
+        );
         assert!(aperture.digest.starts_with("aperture-sha256:"));
         let human = render_aperture_human(&aperture);
         assert!(human.contains("no envelope selected"));

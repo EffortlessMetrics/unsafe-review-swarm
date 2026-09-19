@@ -3676,7 +3676,8 @@ fn print_check_help() {
     println!(
         "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
          [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
-         [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>]"
+         [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>] \
+         [--aperture]"
     );
     println!();
     println!("Options:");
@@ -3699,6 +3700,7 @@ fn print_check_help() {
     println!(
         "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
     );
+    println!("- --aperture       append the per-analysis aperture manifest (human/json only)");
     println!("- --json           shorthand for --format json");
     println!("- --markdown       shorthand for --format markdown");
     println!();
