@@ -139,6 +139,11 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
+/// Bundle artifact filenames for `first-pr`, exposed so argument parsing can
+/// reject a `--latency-out` destination that would overwrite one of them.
+pub(crate) fn first_pr_artifact_names() -> &'static [&'static str] {
+    &FIRST_PR_ARTIFACTS
+}
 const FIRST_PR_ARTIFACTS: [&str; 18] = [
     REVIEW_KIT_ARTIFACT,
     GATE_MANIFEST_ARTIFACT,
@@ -317,8 +322,11 @@ fn run_check(
     mode: AnalysisMode,
     discovery: DiscoveryOptions,
 ) -> Result<(), crate::RunFailure> {
+    let mut clock = crate::latency::PhaseClock::start();
+    let scope_name = scope.as_str();
     let provenance = build_provenance(&options);
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
+    clock.tick(crate::latency::PHASE_INPUT);
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
         AnalyzeInput {
@@ -333,6 +341,7 @@ fn run_check(
         discovery,
     )
     .map_err(crate::RunFailure::Tool)?;
+    clock.tick(crate::latency::PHASE_ANALYZE);
     if let Some(warning) = check_unresolved_diff_scope(&output).map_err(crate::RunFailure::Tool)? {
         eprintln!("{warning}");
     }
@@ -342,15 +351,49 @@ fn run_check(
         options.short,
         Some(&provenance),
     );
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    let output_bytes = rendered.len() as u64;
     if let Some(path) = options.out {
         ensure_parent_dir(&path).map_err(crate::RunFailure::Tool)?;
-        fs::write(&path, rendered).map_err(|err| {
+        fs::write(&path, &rendered).map_err(|err| {
             crate::RunFailure::Tool(format!("write {} failed: {err}", path.display()))
         })?;
     } else {
         println!("{rendered}");
     }
-    enforce_policy(&output)?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let policy_result = enforce_policy(&output);
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
+    let options_digest = crate::latency::digest_check_options(
+        options.policy.as_str(),
+        options.max_cards,
+        &format!("{:?}", options.format),
+        options.short,
+    );
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: options.latency_out.as_deref(),
+        command: "check",
+        scope: scope_name,
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })
+    .map_err(crate::RunFailure::Tool)?;
+    policy_result?;
     Ok(())
 }
 
@@ -362,9 +405,19 @@ fn repo(options: RepoOptions) -> Result<(), crate::RunFailure> {
 }
 
 fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
+    let mut clock = crate::latency::PhaseClock::start();
+    let options_digest = crate::latency::digest_repo_options(
+        options.check.policy.as_str(),
+        options.check.max_cards,
+        &format!("{:?}", options.check.format),
+        options.check.short,
+        &options.discovery,
+        options.timeout_seconds,
+    );
     let check = options.check;
     let provenance = build_provenance(&check);
     let diff = diff_source(&check).map_err(crate::RunFailure::Tool)?;
+    clock.tick(crate::latency::PHASE_INPUT);
     let policy = check.policy.clone();
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
@@ -412,8 +465,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
             "unsafe-review repo: no Rust files selected after include/exclude/ignores; check --root, --include, --exclude, --[no-]large-repo-ignores, and --[no-]respect-gitignore"
         );
     }
+    clock.tick(crate::latency::PHASE_ANALYZE);
     let rendered =
         render_with_format_and_provenance(&output, &check.format, check.short, Some(&provenance));
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    let rendered_bytes = rendered.len() as u64;
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
         let output_bytes = match write_repo_report(&path, &partial, rendered) {
@@ -462,7 +518,33 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     } else {
         println!("{rendered}");
     }
-    enforce_policy(&output)?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let policy_result = enforce_policy(&output);
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: check.latency_out.as_deref(),
+        command: "repo",
+        scope: "repo",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: rendered_bytes,
+    })
+    .map_err(crate::RunFailure::Tool)?;
+    policy_result?;
     Ok(())
 }
 
@@ -1071,6 +1153,9 @@ fn render_repo_scan_status(
                 serde_json::json!({
                     "file": repo_path_display(&entry.file),
                     "scan_ms": entry.scan_ms,
+                    "bytes": entry.bytes,
+                    "lines": entry.lines,
+                    "sites": entry.sites,
                 })
             })
             .collect::<Vec<_>>()
@@ -1341,6 +1426,23 @@ fn repo_partial_path(out: &Path) -> PathBuf {
     out_with_suffix(out, ".partial")
 }
 
+/// Every filesystem output a `repo --out <report>` run owns, so argument
+/// parsing can reject a `--latency-out` destination that would overwrite
+/// one of them: the report itself, its status sidecar and partial file,
+/// and the gate manifest written beside the report.
+pub(crate) fn repo_protected_outputs(report: &Path) -> Vec<(&'static str, PathBuf)> {
+    let gate_manifest = report
+        .parent()
+        .map(|dir| dir.join(GATE_MANIFEST_ARTIFACT))
+        .unwrap_or_else(|| PathBuf::from(GATE_MANIFEST_ARTIFACT));
+    vec![
+        ("--out", report.to_path_buf()),
+        ("status sidecar", repo_status_path(report)),
+        ("partial report", repo_partial_path(report)),
+        ("gate manifest", gate_manifest),
+    ]
+}
+
 fn out_with_suffix(out: &Path, suffix: &str) -> PathBuf {
     if let Some(file_name) = out.file_name() {
         let mut suffixed_file_name = file_name.to_os_string();
@@ -1580,12 +1682,15 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             terminal_command,
         )?;
     }
+    let mut clock = crate::latency::PhaseClock::start();
+    let latency_out = check.latency_out.clone();
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
     let root = check.root.clone();
+    clock.tick(crate::latency::PHASE_INPUT);
     // Start wall-clock timer before analysis — used to populate scan_cost in
     // usefulness-telemetry.json (SPEC-0038 §scan_cost).  Core must not measure
-    // wall time; this is the only place where an Instant is allowed for this purpose.
+    // wall time for cost claims; wall clocks live in this emit layer only.
     let scan_started = Instant::now();
     let output = analyze(AnalyzeInput {
         root: root.clone(),
@@ -1596,6 +1701,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    clock.tick(crate::latency::PHASE_ANALYZE);
     if let Some(warning) = check_unresolved_diff_scope(&output)? {
         eprintln!("{warning}");
     }
@@ -1608,16 +1714,26 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    // The receipt_audit span covers the audit's own receipt-less
+    // re-analysis plus receipt auditing: auditing witness receipts
+    // requires analyzing the same input without them. Comparing this
+    // span's cost with the analyze span is expected, not double counting.
+    clock.tick(crate::latency::PHASE_RECEIPT_AUDIT);
     let policy_report = evaluate_policy_report_from_output(&output)?;
+    // The policy_eval span covers policy report evaluation plus loading
+    // the manual candidates, which are policy-domain bundle inputs read
+    // from `.unsafe-review/candidates/`.
     let manual_candidates = load_manual_candidates(&root)?;
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| artifact_write_failure("create", &options.out_dir, err))?;
-    // Accumulate bytes written across all artifact writes.  The total is
-    // the disk footprint of this run's output bundle — diagnostic only,
-    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
-    // performance guarantee.
-    let mut output_bytes: u64 = 0;
+    // The phase vocabulary is a strict render/write partition shared by all
+    // three review commands: `projections` renders every artifact in memory
+    // and writes nothing; `artifact_writes` writes every rendered artifact
+    // and renders nothing (except the cost-dependent telemetry file, whose
+    // byte total is only known after the other writes).
+    let mut rendered_artifacts: Vec<(&str, String)> = Vec::new();
     let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         // cards.json uses the provenance-aware renderer to emit schema 0.2.
@@ -1635,42 +1751,42 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         if name == "comment-plan.json" {
             comment_plan_artifact = Some(rendered.clone());
         }
-        output_bytes += write_artifact(&options.out_dir.join(name), rendered)?;
+        rendered_artifacts.push((name, rendered));
     }
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_ARTIFACT,
         render_receipt_audit_markdown(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_JSON_ARTIFACT,
         render_receipt_audit_json(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_JSON_ARTIFACT,
         render_policy_report_json(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_MARKDOWN_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_MARKDOWN_ARTIFACT,
         render_policy_report_markdown(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_CANDIDATES_ARTIFACT,
         first_pr::render_manual_candidates_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_REPAIR_QUEUE_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_REPAIR_QUEUE_ARTIFACT,
         first_pr::render_manual_repair_queue_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        TOKMD_PACKETS_ARTIFACT,
         first_pr::render_tokmd_packets_artifact(
             &root,
             &manual_candidates,
             comment_plan_artifact.as_deref(),
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(REVIEW_KIT_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        REVIEW_KIT_ARTIFACT,
         first_pr::render_review_kit_manifest(
             &output,
             &root,
@@ -1678,11 +1794,17 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &manual_candidates,
             &FIRST_PR_ARTIFACTS,
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
-        render_gate_manifest(&output),
-    )?;
+    ));
+    rendered_artifacts.push((GATE_MANIFEST_ARTIFACT, render_gate_manifest(&output)));
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    // Accumulate bytes written across all artifact writes.  The total is
+    // the disk footprint of this run's output bundle — diagnostic only,
+    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
+    // performance guarantee.
+    let mut output_bytes: u64 = 0;
+    for (name, rendered) in &rendered_artifacts {
+        output_bytes += write_artifact(&options.out_dir.join(name), rendered.clone())?;
+    }
     // Build scan_cost for the telemetry injection.  elapsed_ms is measured here
     // (after all other artifacts are written); output_bytes at this point is the
     // subtotal excluding the telemetry file itself (it cannot include its own
@@ -1697,6 +1819,27 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         &options.out_dir.join(USEFULNESS_TELEMETRY_ARTIFACT),
         render_usefulness_telemetry_with_cost(&output, Some(&scan_cost)),
     )?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let options_digest =
+        crate::latency::digest_check_options("advisory", check.max_cards, "bundle", false);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: crate::latency::PolicyOutcome::NotEvaluated,
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: latency_out.as_deref(),
+        command: "first-pr",
+        scope: "diff",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {
         terminal_command,
@@ -3318,7 +3461,7 @@ fn print_check_help() {
     println!(
         "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
          [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
-         [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>]"
+         [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>]"
     );
     println!();
     println!("Options:");
@@ -3338,6 +3481,9 @@ fn print_check_help() {
     );
     println!("- --out <file>     write rendered output to a file instead of stdout");
     println!("- --max-cards <N>  stop collecting after N cards");
+    println!(
+        "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
+    );
     println!("- --json           shorthand for --format json");
     println!("- --markdown       shorthand for --format markdown");
     println!();
@@ -3357,7 +3503,7 @@ fn print_first_pr_help() {
     println!("Usage:");
     println!(
         "  unsafe-review first-pr [--root .] [--base origin/main | --base-sha <sha> [--head-sha <sha>] | --diff <file|->] \
-         [--out-dir target/unsafe-review] [--max-cards <N>]"
+         [--out-dir target/unsafe-review] [--max-cards <N>] [--latency-out <file>]"
     );
     println!();
     println!("  pr       preferred first-run entry point for the same advisory bundle");
@@ -3376,6 +3522,9 @@ fn print_first_pr_help() {
     println!("- --diff <file|-> read diff from a file or stdin instead of --base");
     println!("- --out-dir <dir> directory for all artifacts (default: target/unsafe-review)");
     println!("- --max-cards <N> stop collecting after N cards");
+    println!(
+        "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
+    );
     println!();
     println!("Examples:");
     println!("  unsafe-review pr");
@@ -3882,7 +4031,7 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--short] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--short] [--policy advisory|no-new-debt] [--out file] [--max-cards N] [--latency-out file]"
     );
     println!();
     println!("What repo scans today:");
@@ -3928,6 +4077,9 @@ fn print_repo_help() {
     );
     println!("- --out <file> writes the rendered report to a file instead of stdout.");
     println!("- --max-cards <N> stops after N cards are collected; it does not limit discovery.");
+    println!(
+        "- --latency-out <file> writes a machine-readable phase-latency receipt (diagnostic only)."
+    );
     println!();
     println!("Large-repo guidance:");
     println!(

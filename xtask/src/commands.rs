@@ -50,6 +50,7 @@ pub(crate) enum XtaskCommand {
     CheckExternalPilots,
     ExternalPilotRollup,
     LspSmoke,
+    LatencyBaseline(Vec<String>),
     CheckLocal(Vec<String>),
     CheckLocalRun(String),
     DogfoodExec(Vec<String>),
@@ -203,6 +204,10 @@ impl XtaskCommand {
                 Ok(Self::CheckLocalRun(id))
             }
             Some("lsp-smoke") => parse_no_extra(args, "lsp-smoke", Self::LspSmoke),
+            Some("latency-baseline") => {
+                // All trailing args are forwarded to the LatencyBaseline arg parser.
+                Ok(Self::LatencyBaseline(args.to_vec()))
+            }
             Some("dogfood-exec") => {
                 // All trailing args are forwarded to the DogfoodExec arg parser.
                 Ok(Self::DogfoodExec(args.to_vec()))

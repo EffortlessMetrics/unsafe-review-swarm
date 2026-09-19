@@ -17,6 +17,10 @@ pub(crate) struct FileScanResult {
     /// Wall-clock milliseconds for parse + all detection passes on this file.
     /// Diagnostic only — not a proof, coverage claim, or performance guarantee.
     pub(crate) scan_ms: u64,
+    /// Bytes read for this file. Deterministic for identical inputs.
+    pub(crate) bytes: u64,
+    /// Lines parsed for this file. Deterministic for identical inputs.
+    pub(crate) lines: u64,
     /// Per-line record of whether text fallback entered for the
     /// syntax-first `NonNullUnchecked` slice and why. Proves a structural
     /// clean miss was not resurrected by the text path. Read by focused
@@ -87,6 +91,8 @@ pub(crate) fn scan_file(
     Ok(FileScanResult {
         sites: out,
         scan_ms,
+        bytes: text.len() as u64,
+        lines: lines.len() as u64,
         fallback_entries,
     })
 }

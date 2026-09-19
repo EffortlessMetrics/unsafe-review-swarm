@@ -126,6 +126,12 @@ pub struct PerFileScanStats {
     pub file: PathBuf,
     /// Wall-clock milliseconds spent scanning this file (parse + site detection).
     pub scan_ms: u64,
+    /// Bytes read for this file. Deterministic for identical inputs.
+    pub bytes: u64,
+    /// Lines parsed for this file. Deterministic for identical inputs.
+    pub lines: u64,
+    /// Unsafe sites detected in this file. Deterministic for identical inputs.
+    pub sites: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

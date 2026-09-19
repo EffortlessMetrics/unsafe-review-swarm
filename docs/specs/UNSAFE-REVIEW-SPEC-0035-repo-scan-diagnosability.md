@@ -90,7 +90,7 @@ first-class artifact:
   "stop_reason": "none | max_cards | timeout | terminated",
   "cap": null,
   "file_timings": [
-    { "file": "crates/foo/src/raw.rs", "scan_ms": 12 }
+    { "file": "crates/foo/src/raw.rs", "scan_ms": 12, "bytes": 2048, "lines": 64, "sites": 3 }
   ],
   "output_bytes": 142857,
   "error": null,
@@ -108,7 +108,9 @@ first-class artifact:
 ```
 
 **`file_timings` (optional, diagnostic only):** An array of `{ "file": string,
-"scan_ms": number }` entries, one per scanned file, in scan order.  Present only
+"scan_ms": number, "bytes": number, "lines": number, "sites": number }` entries,
+one per scanned file, in scan order.  `scan_ms` is wall-clock; `bytes`, `lines`,
+and `sites` are deterministic counts for identical inputs.  Present only
 when the number of candidate files is fewer than 100 (the `FILE_TIMINGS_CAP`);
 absent (`null`) for larger scans.
 

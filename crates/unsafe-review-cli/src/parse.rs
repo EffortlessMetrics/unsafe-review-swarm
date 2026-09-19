@@ -1071,6 +1071,18 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     }
     validate_first_pr_exact_sha_options(&options, saw_base_ref, saw_base_sha)?;
     validate_check_options(&options.check)?;
+    if let Some(latency_out) = &options.check.latency_out {
+        let mut protected: Vec<(&str, std::path::PathBuf)> = Vec::new();
+        protected.push(("--out-dir", options.out_dir.clone()));
+        for name in crate::execute::first_pr_artifact_names() {
+            protected.push(("bundle artifact", options.out_dir.join(name)));
+        }
+        let borrowed: Vec<(&str, &std::path::Path)> = protected
+            .iter()
+            .map(|(flag, path)| (*flag, path.as_path()))
+            .collect();
+        crate::latency::reject_latency_collision(latency_out, &borrowed)?;
+    }
     Ok(options)
 }
 
@@ -1165,6 +1177,20 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
         idx += 1;
     }
     validate_check_options(&options.check)?;
+    if options.list_files && options.check.latency_out.is_some() {
+        return Err(
+            "--latency-out has no analysis to measure under --list-files/--dry-run; drop one of the flags"
+                .to_string(),
+        );
+    }
+    if let (Some(latency_out), Some(report)) = (&options.check.latency_out, &options.check.out) {
+        let protected = crate::execute::repo_protected_outputs(report);
+        let borrowed: Vec<(&str, &std::path::Path)> = protected
+            .iter()
+            .map(|(flag, path)| (*flag, path.as_path()))
+            .collect();
+        crate::latency::reject_latency_collision(latency_out, &borrowed)?;
+    }
     Ok(options)
 }
 
@@ -1476,6 +1502,9 @@ fn parse_diff_input(raw: &str) -> DiffInput {
 fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
     if options.base.is_some() && options.diff.is_some() {
         return Err("choose only one of --base or --diff".to_string());
+    }
+    if let (Some(latency_out), Some(out)) = (&options.latency_out, &options.out) {
+        crate::latency::reject_latency_collision(latency_out, &[("--out", out)])?;
     }
     if options.short && options.format != Format::Human {
         return Err(
@@ -2289,6 +2318,107 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::Sarif);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_latency_out_for_check() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out",
+            "target/latency.json",
+        ]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            options.latency_out,
+            Some(PathBuf::from("target/latency.json"))
+        );
+        let inline = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out=target/inline.json",
+        ]))?;
+        let Command::Check(inline_options) = inline else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            inline_options.latency_out,
+            Some(PathBuf::from("target/inline.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_colliding_with_report_is_rejected() -> Result<(), String> {
+        let collided = parse(args([
+            "unsafe-review",
+            "check",
+            "--out",
+            "target/report.json",
+            "--latency-out",
+            "target/report.json",
+        ]));
+        assert!(
+            collided.is_err(),
+            "a receipt must not overwrite the rendered report"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_with_list_files_is_rejected() -> Result<(), String> {
+        let listed = parse(args([
+            "unsafe-review",
+            "repo",
+            "--list-files",
+            "--latency-out",
+            "target/latency.json",
+        ]));
+        assert!(
+            listed.is_err(),
+            "list-files performs no analysis for a receipt to measure"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_over_repo_sidecars_is_rejected() -> Result<(), String> {
+        for sidecar in [
+            "target/report.json.status.json",
+            "target/report.json.partial",
+            "target/unsafe-review-gate.json",
+        ] {
+            let collided = parse(args([
+                "unsafe-review",
+                "repo",
+                "--out",
+                "target/report.json",
+                "--latency-out",
+                sidecar,
+            ]));
+            assert!(
+                collided.is_err(),
+                "a receipt must not overwrite the repo-owned {sidecar}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_inside_bundle_dir_is_rejected() -> Result<(), String> {
+        let bundled = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--out-dir=target/review",
+            "--latency-out=target/review/cards.json",
+        ]));
+        assert!(
+            bundled.is_err(),
+            "a receipt must not overwrite a bundle artifact"
+        );
         Ok(())
     }
 
