@@ -424,6 +424,65 @@ fn projections_name_scope_identities_counts_and_completeness() -> Result<(), Str
     if parsed["included_files"].as_array().map(Vec::len) != Some(1) {
         return Err(format!("json must list one included file: {json}"));
     }
+    // Portable JSON must not embed the checkout location.
+    if parsed.get("root").is_some() {
+        return Err(format!("json must not carry the absolute root: {json}"));
+    }
+    Ok(())
+}
+
+#[test]
+fn hostile_paths_cannot_mimic_record_boundaries() -> Result<(), String> {
+    // Length-framed encoding: a path carrying `:`, newline, or `->`
+    // sequences must digest distinctly from any multi-record shape it
+    // resembles, and two such paths must never collide.
+    let root = PathBuf::from("repo");
+    // Identical diff bytes throughout: only the paths vary.
+    let tricky = changeset_from_external_diff(
+        root.clone(),
+        b"same-diff",
+        vec![PathBuf::from("a:modified:not_applicable\nb")],
+    );
+    let plain = changeset_from_external_diff(
+        root.clone(),
+        b"same-diff",
+        vec![PathBuf::from("a"), PathBuf::from("b")],
+    );
+    let other_tricky = changeset_from_external_diff(
+        root,
+        b"same-diff",
+        vec![PathBuf::from("a:modified:not_applicable\nc")],
+    );
+    if tricky.digest == plain.digest {
+        return Err("framed encoding must separate hostile paths from record shapes".to_string());
+    }
+    if tricky.digest == other_tricky.digest {
+        return Err("distinct hostile paths must digest distinctly".to_string());
+    }
+    Ok(())
+}
+
+#[test]
+#[cfg(unix)]
+fn non_utf8_paths_digest_by_bytes_not_display() -> Result<(), String> {
+    // `Path::display()` lossily collapses non-UTF-8 bytes; the digest must
+    // use raw bytes so distinct paths never share an identity.
+    use std::ffi::OsStr;
+    use std::os::unix::ffi::OsStrExt;
+    let root = PathBuf::from("repo");
+    let first = changeset_from_external_diff(
+        root.clone(),
+        b"same-diff",
+        vec![PathBuf::from(OsStr::from_bytes(b"src/a\xff.rs"))],
+    );
+    let second = changeset_from_external_diff(
+        root,
+        b"same-diff",
+        vec![PathBuf::from(OsStr::from_bytes(b"src/a\xfe.rs"))],
+    );
+    if first.digest == second.digest {
+        return Err("byte-distinct paths must digest distinctly".to_string());
+    }
     Ok(())
 }
 

@@ -349,7 +349,7 @@ pub(crate) fn digest_worktree_state(
     untracked: &[PathBuf],
     unreadable_out: &mut Vec<PathBuf>,
     non_regular_out: &mut Vec<PathBuf>,
-) -> String {
+) -> Result<String, String> {
     fn hash_one(
         toplevel: &Path,
         label: &str,
@@ -357,29 +357,52 @@ pub(crate) fn digest_worktree_state(
         hasher_input: &mut String,
         unreadable_out: &mut Vec<PathBuf>,
         non_regular_out: &mut Vec<PathBuf>,
-    ) {
+    ) -> Result<(), String> {
         let abs = toplevel.join(path);
-        match std::fs::symlink_metadata(&abs) {
-            Ok(meta) if meta.file_type().is_file() => {}
+        let before = match std::fs::symlink_metadata(&abs) {
+            Ok(meta) if meta.file_type().is_file() => meta,
             Ok(_) => {
                 non_regular_out.push(path.to_path_buf());
-                return;
+                return Ok(());
             }
             Err(_) => {
                 unreadable_out.push(path.to_path_buf());
-                return;
+                return Ok(());
             }
-        }
-        match std::fs::read(&abs) {
-            Ok(bytes) => {
-                hasher_input.push_str(label);
-                hasher_input.push_str(&path.display().to_string());
-                hasher_input.push('\n');
-                hasher_input.push_str(&sha256_hex_of(&bytes));
-                hasher_input.push('\n');
+        };
+        let bytes = match std::fs::read(&abs) {
+            Ok(bytes) => bytes,
+            Err(_) => {
+                unreadable_out.push(path.to_path_buf());
+                return Ok(());
             }
-            Err(_) => unreadable_out.push(path.to_path_buf()),
+        };
+        // The worktree may change under discovery: re-stat after the read and
+        // reject the digest when the file moved mid-read, instead of
+        // publishing a mixed source generation as current. A same-size,
+        // same-mtime rewrite inside one read window stays undetectable; that
+        // residual is documented, not denied.
+        let after = std::fs::symlink_metadata(&abs).map_err(|err| {
+            instability_error(path, &format!("vanished mid-read ({err})"))
+        })?;
+        if after.file_type() != before.file_type()
+            || after.len() != before.len()
+            || after.modified().ok() != before.modified().ok()
+        {
+            return Err(instability_error(path, "changed mid-read"));
         }
+        hasher_input.push_str(label);
+        hasher_input.push_str(&path.display().to_string());
+        hasher_input.push('\n');
+        hasher_input.push_str(&sha256_hex_of(&bytes));
+        hasher_input.push('\n');
+        Ok(())
+    }
+    fn instability_error(path: &Path, how: &str) -> String {
+        format!(
+            "worktree file {} {how}; the digest would mix source generations. Re-run the scope command.",
+            path.display()
+        )
     }
     let mut hasher_input = String::new();
     let mut sorted: Vec<&PathBuf> = paths.iter().collect();
@@ -392,7 +415,7 @@ pub(crate) fn digest_worktree_state(
             &mut hasher_input,
             unreadable_out,
             non_regular_out,
-        );
+        )?;
     }
     let mut untracked_sorted: Vec<&PathBuf> = untracked.iter().collect();
     untracked_sorted.sort();
@@ -404,9 +427,12 @@ pub(crate) fn digest_worktree_state(
             &mut hasher_input,
             unreadable_out,
             non_regular_out,
-        );
+        )?;
     }
-    format!("worktree-sha256:{}", sha256_hex_of(hasher_input.as_bytes()))
+    Ok(format!(
+        "worktree-sha256:{}",
+        sha256_hex_of(hasher_input.as_bytes())
+    ))
 }
 
 /// Map a status row to its effective (post-image) path, kind, and optional

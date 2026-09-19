@@ -3447,7 +3447,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
 }
 
 fn print_scope_help() {
-    println!("unsafe-review scope: name the analyzed source state and configuration envelope");
+    println!("unsafe-review scope: name the analyzed source state");
     println!();
     println!("Usage:");
     println!(
@@ -4005,7 +4005,7 @@ fn print_help() {
     println!("  review    alias for first-pr");
     println!("  pilot     quick diff review capped at 5 cards");
     println!("  repo      advisory review of every Rust file under --root, not a diff");
-    println!("  scope     name the analyzed source state and configuration envelope (read-only)");
+    println!("  scope     name the analyzed source state (read-only change-set identity)");
     println!("  pr-setup  print read-only external GitHub PR checkout and raw-diff commands");
     println!();
     println!("Inspect a finding:");

@@ -18,7 +18,7 @@
 
 use crate::sha256_hex_of;
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 /// The authoring state a change set was derived from.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
@@ -244,9 +244,12 @@ pub struct ScopeIdentities {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ChangeSet {
     pub scope: ChangeScopeKind,
-    /// Repository toplevel the discovery ran in, repo-relative display only.
-    /// Stored as given (no canonicalization into the artifact: absolute paths
-    /// must not leak into portable outputs).
+    /// Repository toplevel the discovery ran in (absolute, local use only).
+    /// Never serialized: portable JSON must not embed the checkout location.
+    /// Relative file lists are interpreted against the invoking context, and
+    /// the subject digest provably excludes this field. Deserializing
+    /// portable JSON yields an empty root: re-anchor before local use.
+    #[serde(skip_serializing, default)]
     pub root: PathBuf,
     pub identities: ScopeIdentities,
     pub included_files: Vec<ChangedFile>,
@@ -267,12 +270,25 @@ impl ChangeSet {
         self.omitted_files.len()
     }
 
-    /// Canonical encoding covered by [`ChangeSet::digest`]. Sorted file lists
-    /// keep the digest stable across discovery order.
-    fn canonical_encoding(&self) -> String {
-        let mut out = String::new();
-        out.push_str(self.scope.as_str());
-        out.push('\n');
+    /// Canonical encoding covered by [`ChangeSet::digest`]. Sorted record
+    /// lists keep the digest stable across discovery order.
+    ///
+    /// Every field is length-framed (`<len>:<bytes>\n`) and paths are encoded
+    /// as raw bytes, so no two distinct change sets share an encoding: bare
+    /// `:`/`\n` delimiters would let a hostile path mimic record boundaries,
+    /// and `Path::display()` would lossily collapse non-UTF-8 paths.
+    fn canonical_encoding(&self) -> Vec<u8> {
+        fn push_field(out: &mut Vec<u8>, bytes: &[u8]) {
+            out.extend_from_slice(bytes.len().to_string().as_bytes());
+            out.push(b':');
+            out.extend_from_slice(bytes);
+            out.push(b'\n');
+        }
+        fn push_path(out: &mut Vec<u8>, path: &Path) {
+            push_field(out, path.as_os_str().as_encoded_bytes());
+        }
+        let mut out = Vec::new();
+        push_field(&mut out, self.scope.as_str().as_bytes());
         for field in [
             &self.identities.base_commit,
             &self.identities.head_commit,
@@ -283,52 +299,48 @@ impl ChangeSet {
             &self.identities.overlay_digest,
             &self.identities.source_digest,
         ] {
-            out.push_str(field.as_deref().unwrap_or("-"));
-            out.push('\n');
+            push_field(&mut out, field.as_deref().unwrap_or("-").as_bytes());
         }
-        if let Some(version) = self.identities.document_version {
-            out.push_str(&version.to_string());
+        push_field(
+            &mut out,
+            self.identities
+                .document_version
+                .map(|version| version.to_string())
+                .unwrap_or_default()
+                .as_bytes(),
+        );
+        let mut included: Vec<&ChangedFile> = self.included_files.iter().collect();
+        included.sort_by(|left, right| {
+            left.path
+                .cmp(&right.path)
+                .then(left.kind.as_str().cmp(right.kind.as_str()))
+                .then(left.provenance.as_str().cmp(right.provenance.as_str()))
+        });
+        push_field(&mut out, included.len().to_string().as_bytes());
+        for file in included {
+            push_path(&mut out, &file.path);
+            push_field(&mut out, file.kind.as_str().as_bytes());
+            push_field(&mut out, file.provenance.as_str().as_bytes());
         }
-        out.push('\n');
-        let mut included: Vec<String> = self
-            .included_files
-            .iter()
-            .map(|file| {
-                format!(
-                    "{}:{}:{}",
-                    file.path.display(),
-                    file.kind.as_str(),
-                    file.provenance.as_str()
-                )
-            })
-            .collect();
-        included.sort();
-        for entry in included {
-            out.push_str(&entry);
-            out.push('\n');
+        let mut omitted: Vec<&OmittedFile> = self.omitted_files.iter().collect();
+        omitted.sort_by(|left, right| {
+            left.path
+                .cmp(&right.path)
+                .then(left.reason.as_str().cmp(right.reason.as_str()))
+        });
+        push_field(&mut out, omitted.len().to_string().as_bytes());
+        for file in omitted {
+            push_path(&mut out, &file.path);
+            push_field(&mut out, file.reason.as_str().as_bytes());
         }
-        let mut omitted: Vec<String> = self
-            .omitted_files
-            .iter()
-            .map(|file| format!("{}:{}", file.path.display(), file.reason.as_str()))
-            .collect();
-        omitted.sort();
-        for entry in omitted {
-            out.push_str(&entry);
-            out.push('\n');
+        let mut renames: Vec<&FileRename> = self.renames.iter().collect();
+        renames.sort_by(|left, right| left.from.cmp(&right.from).then(left.to.cmp(&right.to)));
+        push_field(&mut out, renames.len().to_string().as_bytes());
+        for rename in renames {
+            push_path(&mut out, &rename.from);
+            push_path(&mut out, &rename.to);
         }
-        let mut renames: Vec<String> = self
-            .renames
-            .iter()
-            .map(|rename| format!("{}->{}", rename.from.display(), rename.to.display()))
-            .collect();
-        renames.sort();
-        for entry in renames {
-            out.push_str(&entry);
-            out.push('\n');
-        }
-        out.push_str(self.completeness.as_str());
-        out.push('\n');
+        push_field(&mut out, self.completeness.as_str().as_bytes());
         out
     }
 
@@ -352,7 +364,7 @@ impl ChangeSet {
             digest: String::new(),
         };
         let encoding = set.canonical_encoding();
-        set.digest = format!("changeset-sha256:{}", sha256_hex_of(encoding.as_bytes()));
+        set.digest = format!("changeset-sha256:{}", sha256_hex_of(&encoding));
         set
     }
 }

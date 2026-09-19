@@ -156,7 +156,7 @@ pub fn discover_unstaged(
     let dropped_count = dropped.len();
     let mut non_regular = Vec::new();
     let worktree_digest =
-        digest_worktree_state(toplevel, &paths, &[], &mut unreadable, &mut non_regular);
+        digest_worktree_state(toplevel, &paths, &[], &mut unreadable, &mut non_regular)?;
 
     let mut omitted = rejected_omissions(&rows);
     for path in untracked.iter().filter(|path| is_rust_path(path)) {
@@ -334,21 +334,13 @@ pub fn discover_worktree(
     let (included, dropped) = apply_cap_note(included, options.file_cap);
     let dropped_count = dropped.len();
 
-    // Deleted files have no worktree bytes; hashing skips them naturally, so
-    // filter them out instead of reporting deletions as unreadable.
-    let deleted: BTreeSet<PathBuf> = included
-        .iter()
-        .filter(|file| file.kind == FileChangeKind::Deleted)
-        .map(|file| file.path.clone())
-        .collect();
-    let mut content_paths: BTreeSet<PathBuf> = included
+    // Deleted files have no worktree bytes: filter them out instead of
+    // reporting deletions as unreadable.
+    let content_paths: BTreeSet<PathBuf> = included
         .iter()
         .filter(|file| file.kind != FileChangeKind::Deleted)
         .map(|file| file.path.clone())
         .collect();
-    for path in &deleted {
-        content_paths.remove(path);
-    }
     let mut unreadable = Vec::new();
     let mut non_regular = Vec::new();
     let worktree_digest = digest_worktree_state(
@@ -357,7 +349,7 @@ pub fn discover_worktree(
         &untracked_included,
         &mut unreadable,
         &mut non_regular,
-    );
+    )?;
     for path in unreadable {
         omitted.push(OmittedFile {
             path,

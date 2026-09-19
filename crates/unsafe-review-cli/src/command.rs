@@ -45,8 +45,8 @@ pub(crate) enum ScopeSelect {
 }
 
 /// Options for the read-only `scope` command: name exactly which source
-/// state and configuration envelope a review would analyze, without running
-/// the analysis.
+/// state a review would analyze, without running the analysis. The
+/// configuration envelope belongs to the environment-identity slice (#2318).
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct ScopeOptions {
     pub root: PathBuf,

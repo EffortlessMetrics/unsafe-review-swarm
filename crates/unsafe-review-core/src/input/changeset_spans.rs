@@ -231,6 +231,9 @@ pub fn render_changeset_human(set: &ChangeSet) -> String {
                 rename.to.display()
             ));
         }
+        if set.renames.len() > 10 {
+            out.push_str(&format!("  ... ({} more)\n", set.renames.len() - 10));
+        }
     }
     out.push_str(&format!("completeness: {}\n", set.completeness.as_str()));
     if let ScopeCompleteness::Partial { limitations } = &set.completeness {

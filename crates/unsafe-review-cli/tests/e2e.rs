@@ -1792,7 +1792,7 @@ impl Drop for TempDir {
 }
 
 #[test]
-fn scope_names_staged_state_and_environment() -> Result<(), Box<dyn Error>> {
+fn scope_names_staged_state() -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-scope-e2e")?;
     let root = temp.path();
     run_git(root, &["init", "-q"])?;
