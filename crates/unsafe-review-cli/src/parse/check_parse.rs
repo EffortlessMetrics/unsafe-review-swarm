@@ -63,6 +63,10 @@ pub(super) fn try_apply_check_arg(
             options.short = true;
             Ok(Some(1))
         }
+        "--aperture" => {
+            options.aperture = true;
+            Ok(Some(1))
+        }
         "--markdown" => {
             options.format = Format::Markdown;
             Ok(Some(1))

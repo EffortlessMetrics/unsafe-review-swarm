@@ -127,6 +127,9 @@ pub(crate) struct CheckOptions {
     pub env_features: EnvFeatureSelect,
     /// Explicitly selected target triple for configuration evaluation.
     pub target: Option<String>,
+    /// Render the additive aperture manifest section (#2331 PR1).
+    /// Default off so default output stays byte-stable.
+    pub aperture: bool,
 }
 
 impl Default for CheckOptions {
@@ -143,6 +146,7 @@ impl Default for CheckOptions {
             latency_out: None,
             env_features: EnvFeatureSelect::Default,
             target: None,
+            aperture: false,
         }
     }
 }

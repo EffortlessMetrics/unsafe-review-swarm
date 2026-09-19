@@ -1,6 +1,7 @@
 use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
+use crate::input::aperture::{AnalysisAperture, render_aperture_human};
 use crate::input::cfg::{CardConfiguration, render_configuration_human};
 use crate::input::workspace;
 use crate::output::{
@@ -585,6 +586,73 @@ pub fn render_human_with_configuration(
         human::render(output)
     };
     rendered.push_str(&render_configuration_human(items, environment_digest, note));
+    rendered
+}
+
+/// Render the JSON analyze artifact with an aperture manifest section for
+/// an explicit `--aperture` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `aperture` key.
+pub fn render_json_with_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    aperture: AnalysisAperture,
+) -> String {
+    json::render_with_aperture(output, provenance, aperture)
+}
+
+/// Render the JSON analyze artifact with both configuration and aperture
+/// sections for runs that select an envelope and `--aperture`.
+pub fn render_json_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+    aperture: AnalysisAperture,
+) -> String {
+    json::render_with_configuration_and_aperture(
+        output,
+        provenance,
+        environment_digest,
+        note,
+        items,
+        aperture,
+    )
+}
+
+/// Render human output with an aperture manifest section appended for an
+/// explicit `--aperture` run. Default runs never call this.
+pub fn render_human_with_aperture(
+    output: &AnalyzeOutput,
+    short: bool,
+    aperture: &AnalysisAperture,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_aperture_human(aperture));
+    rendered
+}
+
+/// Render human output with configuration and aperture sections appended
+/// for runs that select an envelope and `--aperture`.
+pub fn render_human_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    short: bool,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+    aperture: &AnalysisAperture,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_configuration_human(items, environment_digest, note));
+    rendered.push_str(&render_aperture_human(aperture));
     rendered
 }
 

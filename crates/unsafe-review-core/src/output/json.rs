@@ -58,6 +58,51 @@ pub(crate) fn render_with_configuration(
     render_pretty(&projected)
 }
 
+/// Render the JSON analyze artifact with an aperture manifest section for
+/// an explicit `--aperture` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `aperture` key.
+pub(crate) fn render_with_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    aperture: crate::input::aperture::AnalysisAperture,
+) -> String {
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.aperture = Some(JsonAperture { manifest: aperture });
+    render_pretty(&projected)
+}
+
+/// Render the JSON analyze artifact with both configuration and aperture
+/// sections for runs that select an envelope and `--aperture`.
+pub(crate) fn render_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[crate::input::cfg::CardConfiguration],
+    aperture: crate::input::aperture::AnalysisAperture,
+) -> String {
+    let counts = crate::input::cfg::summarize_configurations(items);
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.configuration = Some(JsonConfiguration {
+        environment_digest,
+        note,
+        gated_cards: counts.gated,
+        active: counts.active,
+        inactive: counts.inactive,
+        unknown: counts.unknown,
+        unsupported: counts.unsupported,
+        items,
+    });
+    projected.aperture = Some(JsonAperture { manifest: aperture });
+    render_pretty(&projected)
+}
+
 fn render_pretty(value: &impl Serialize) -> String {
     match serde_json::to_string_pretty(value) {
         Ok(text) => text,
@@ -97,6 +142,18 @@ struct JsonAnalyzeOutput<'a> {
     /// Absent on default runs so golden artifacts stay byte-stable.
     #[serde(skip_serializing_if = "Option::is_none")]
     configuration: Option<JsonConfiguration<'a>>,
+    /// Aperture manifest for explicit `--aperture` runs (#2331 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aperture: Option<JsonAperture>,
+}
+
+/// JSON projection of an aperture manifest: owned, since the manifest is
+/// assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonAperture {
+    #[serde(flatten)]
+    manifest: crate::input::aperture::AnalysisAperture,
 }
 
 /// JSON projection of an evaluated configuration section.
@@ -162,6 +219,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 .collect(),
             provenance: None,
             configuration: None,
+            aperture: None,
         }
     }
 
@@ -204,6 +262,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 .collect(),
             provenance: Some(json_provenance),
             configuration: None,
+            aperture: None,
         }
     }
 }

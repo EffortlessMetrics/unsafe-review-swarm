@@ -1164,9 +1164,10 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             || arg == "--no-default-features"
             || arg == "--target"
             || arg.starts_with("--target=")
+            || arg == "--aperture"
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, and `--target` belong to the \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
@@ -1280,9 +1281,9 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
     let mut options = RepoOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
-        // The envelope-selection flags are `check`-only: the configuration
-        // section projects single-run human/json output, which `repo` never
-        // renders through that path.
+        // The envelope-selection flags and `--aperture` are `check`-only:
+        // those sections project single-run human/json output, which `repo`
+        // never renders through that path.
         let arg = args[idx].as_str();
         if arg == "--features"
             || arg.starts_with("--features=")
@@ -1290,9 +1291,10 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             || arg == "--no-default-features"
             || arg == "--target"
             || arg.starts_with("--target=")
+            || arg == "--aperture"
         {
             return Err(format!(
-                "unknown repo argument `{arg}`; `--features` and `--target` belong to the `check` subcommand"
+                "unknown repo argument `{arg}`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
             ));
         }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
@@ -1716,6 +1718,12 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
                 .to_string(),
         );
     }
+    if options.aperture && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the aperture section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1991,7 +1999,16 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--features", "fast"])),
             Err(
-                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, and `--target` belong to the \
+                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--aperture"])),
+            Err(
+                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2000,7 +2017,27 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--target", "x"])),
             Err(
-                "unknown repo argument `--target`; `--features` and `--target` belong to the `check` subcommand"
+                "unknown repo argument `--target`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--aperture"])),
+            Err(
+                "unknown repo argument `--aperture`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args([
+                "unsafe-review",
+                "check",
+                "--aperture",
+                "--format",
+                "sarif",
+            ])),
+            Err(
+                "the aperture section projects `human` and `json` only; drop --format or use one of those"
                     .to_string()
             )
         );
