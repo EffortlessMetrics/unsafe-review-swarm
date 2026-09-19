@@ -2048,3 +2048,95 @@ fn check_aperture_reports_manifest_only_when_requested() -> Result<(), Box<dyn E
     assert_eq!(both["aperture"]["configuration"]["gated_cards"], 2);
     Ok(())
 }
+
+#[test]
+fn check_impact_reselects_unchanged_seams_by_owner() -> Result<(), Box<dyn Error>> {
+    // Same-owner impact is opt-in: `--impact` relates changed guard and
+    // contract lines to the unchanged unsafe subjects in their owner,
+    // leaves other owners alone, and default runs stay byte-stable.
+    let temp = TempDir::new("unsafe-review-impact-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "impact-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"impact-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "/// # Safety\n/// Caller holds the buffer.\npub unsafe fn read_checked(ptr: *const u8, len: usize) -> u8 {\n    // padding one\n    // padding two\n    // padding three\n    // padding four\n    // padding five\n    // padding six\n    if len == 0 {\n        return 0;\n    }\n    unsafe { *ptr }\n}\n\npub unsafe fn read_other(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "/// # Safety (exclusive)\n/// Caller holds the buffer.\npub unsafe fn read_checked(ptr: *const u8, len: usize) -> u8 {\n    // padding one\n    // padding two\n    // padding three\n    // padding four\n    // padding five\n    // padding six\n    if len == 0 {\n        return 1;\n    }\n    unsafe { *ptr }\n}\n\npub unsafe fn read_other(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("impact").is_none(),
+        "default runs must not gain an impact key: {plain}"
+    );
+
+    let inventory = run(&["--impact"], "json")?;
+    let impact = &inventory["impact"];
+    assert_eq!(impact["schema_version"], 1);
+    assert!(
+        impact["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("impact-sha256:"),
+        "inventory names its digest: {impact}"
+    );
+    let affected = impact["affected"].as_array().cloned().unwrap_or_default();
+    assert!(
+        !affected.is_empty(),
+        "changed guard and contract must reselect the unchanged operation: {impact}"
+    );
+    assert!(
+        affected.iter().all(|seam| seam["owner"] == "read_checked"),
+        "only the changed owner is affected: {impact}"
+    );
+    let causes: Vec<&str> = affected
+        .iter()
+        .filter_map(|seam| seam["cause"].as_str())
+        .collect();
+    assert!(
+        causes.contains(&"enclosing_owner_changed"),
+        "guard edit is an owner cause: {impact}"
+    );
+    assert!(
+        causes.contains(&"safety_contract_changed"),
+        "contract edit is a contract cause: {impact}"
+    );
+    let items = impact["items"].as_array().cloned().unwrap_or_default();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["owner"], "read_checked");
+    assert_eq!(items[0]["code_changed"], true);
+    assert_eq!(items[0]["contract_changed"], true);
+    Ok(())
+}

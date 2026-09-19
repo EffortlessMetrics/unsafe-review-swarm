@@ -3079,6 +3079,7 @@ mod tests {
             env_features: EnvFeatureSelect::Default,
             target: None,
             aperture: false,
+            impact: false,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3173,6 +3174,7 @@ mod tests {
             env_features: EnvFeatureSelect::Default,
             target: None,
             aperture: false,
+            impact: false,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4194,6 +4196,7 @@ mod tests {
             env_features: EnvFeatureSelect::Default,
             target: None,
             aperture: false,
+            impact: false,
         }
     }
 

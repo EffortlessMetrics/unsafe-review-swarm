@@ -205,6 +205,19 @@ fn is_rust_path(path: &Path) -> bool {
         .is_some_and(|extension| extension == "rs")
 }
 
+/// Changed new-file lines per path for one diff source, for the
+/// same-owner impact inventory (#2319 PR1). Unreadable diff files and repo
+/// scans yield an empty map with no rows claimed.
+pub fn changed_lines_in_diff(source: &crate::DiffSource) -> BTreeMap<PathBuf, BTreeSet<usize>> {
+    match source {
+        crate::DiffSource::Text(text) => parse_unified_diff(text).changed_lines,
+        crate::DiffSource::File(path) => std::fs::read_to_string(path)
+            .map(|text| parse_unified_diff(&text).changed_lines)
+            .unwrap_or_default(),
+        crate::DiffSource::NoneRepoScan => BTreeMap::new(),
+    }
+}
+
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
     let mut parser = DiffParserState::default();
 

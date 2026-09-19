@@ -3,6 +3,7 @@ use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
 use crate::input::aperture::{AnalysisAperture, render_aperture_human};
 use crate::input::cfg::{CardConfiguration, render_configuration_human};
+use crate::input::impact::{ImpactInventory, render_impact_human};
 use crate::input::workspace;
 use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
@@ -598,6 +599,62 @@ pub fn render_json_with_aperture(
     aperture: AnalysisAperture,
 ) -> String {
     json::render_with_aperture(output, provenance, aperture)
+}
+
+/// One evaluated configuration section for the unified section renderer.
+pub struct ConfigurationArgs<'a> {
+    pub environment_digest: &'a str,
+    pub note: Option<&'a str>,
+    pub items: &'a [CardConfiguration],
+}
+
+/// Render the JSON analyze artifact with any combination of additive
+/// sections. Default runs pass all `None` and stay byte-stable.
+pub fn render_json_with_sections(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    configuration: Option<ConfigurationArgs<'_>>,
+    aperture: Option<AnalysisAperture>,
+    impact: Option<ImpactInventory>,
+) -> String {
+    json::render_with_sections(
+        output,
+        provenance,
+        configuration.map(|section| json::ConfigurationSection {
+            environment_digest: section.environment_digest,
+            note: section.note,
+            items: section.items,
+        }),
+        aperture,
+        impact,
+    )
+}
+
+/// Render the JSON analyze artifact with a same-owner impact section for
+/// an explicit `--impact` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `impact` key.
+pub fn render_json_with_impact(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    impact: ImpactInventory,
+) -> String {
+    json::render_with_sections(output, provenance, None, None, Some(impact))
+}
+
+/// Render human output with a same-owner impact section appended for an
+/// explicit `--impact` run. Default runs never call this.
+pub fn render_human_with_impact(
+    output: &AnalyzeOutput,
+    short: bool,
+    impact: &ImpactInventory,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_impact_human(impact));
+    rendered
 }
 
 /// Render the JSON analyze artifact with both configuration and aperture
