@@ -25,23 +25,24 @@ use unsafe_review_core::{
     ConfigurationArgs, DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource,
     ImpactInventory, ImpactSubject, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance,
     RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost,
-    Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
-    analyze_with_discovery_and_repo_events, assemble_aperture, audit_witness_receipts,
-    baseline_add, baseline_init, baseline_init_preview, baseline_refresh_preview, baseline_status,
-    changed_lines_in_diff, collect_context_range, compare_outcome_json, discover_environment,
-    discover_repo_files, evaluate_configurations, evaluate_policy_report,
-    evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
-    manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    relate_same_owner, render_aperture_human, render_badge_jsons, render_baseline_refresh_human,
-    render_baseline_refresh_json, render_baseline_status_human, render_baseline_status_json,
-    render_comment_plan, render_configuration_human, render_gate_manifest,
-    render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
-    render_impact_human, render_json, render_json_with_provenance, render_json_with_sections,
-    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    Scope, StageInventory, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
+    analyze_with_discovery, analyze_with_discovery_and_repo_events, assemble_aperture,
+    assemble_stage_inventory, audit_witness_receipts, baseline_add, baseline_init,
+    baseline_init_preview, baseline_refresh_preview, baseline_status, changed_lines_in_diff,
+    collect_context_range, compare_outcome_json, discover_environment, discover_repo_files,
+    evaluate_configurations, evaluate_policy_report, evaluate_policy_report_from_output,
+    lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
+    new_manual_candidate_skeleton, read_manual_candidate, relate_same_owner, render_aperture_human,
+    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
+    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
+    render_configuration_human, render_gate_manifest, render_gate_manifest_repo,
+    render_github_summary, render_human, render_human_short, render_impact_human, render_json,
+    render_json_with_provenance, render_json_with_sections, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
     render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
     render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
-    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
-    summarize_configurations, validate_witness_receipts,
+    render_repair_queue, render_sarif, render_stages_human, render_usefulness_telemetry_with_cost,
+    render_witness_plan, summarize_configurations, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -380,8 +381,12 @@ fn configuration_bundle(
 }
 
 /// Render human/json `check` output with any combination of additive
-/// sections (configuration, aperture, impact) in a fixed order. Default
-/// runs select nothing and render exactly the historical output.
+/// sections (configuration, aperture, impact, stages) in a fixed order.
+/// Default runs select nothing and render exactly the historical output.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one additive section per parameter keeps default runs byte-stable without a params-struct churn across the single call site"
+)]
 fn render_check_sections(
     output: &AnalyzeOutput,
     format: &Format,
@@ -390,8 +395,9 @@ fn render_check_sections(
     bundle: Option<&ConfigurationBundle>,
     aperture: Option<&AnalysisAperture>,
     impact: Option<&ImpactInventory>,
+    stages: Option<&StageInventory>,
 ) -> String {
-    let selected = bundle.is_some() || aperture.is_some() || impact.is_some();
+    let selected = bundle.is_some() || aperture.is_some() || impact.is_some() || stages.is_some();
     if !selected {
         return render_with_format_and_provenance(output, format, short, provenance);
     }
@@ -415,6 +421,9 @@ fn render_check_sections(
             if let Some(impact) = impact {
                 rendered.push_str(&render_impact_human(impact));
             }
+            if let Some(stages) = stages {
+                rendered.push_str(&render_stages_human(stages));
+            }
             rendered
         }
         Format::Json => render_json_with_sections(
@@ -427,6 +436,7 @@ fn render_check_sections(
             }),
             aperture.cloned(),
             impact.cloned(),
+            stages.cloned(),
         ),
         _ => render_with_format_and_provenance(output, format, short, provenance),
     }
@@ -488,6 +498,16 @@ fn run_check(
         let subjects: Vec<ImpactSubject> = output.cards.iter().map(ImpactSubject::from).collect();
         relate_same_owner(&config_root, changed, &subjects)
     });
+    // Assembled after impact and the configuration bundle so the inventory
+    // can reference both; selecting `--stages` changes nothing else about
+    // the run, and default runs skip this entirely.
+    let stages = options.stages.then(|| {
+        assemble_stage_inventory(
+            &output,
+            impact.as_ref(),
+            bundle.as_ref().map(|bundle| bundle.digest.as_str()),
+        )
+    });
     let rendered = render_check_sections(
         &output,
         &options.format,
@@ -496,6 +516,7 @@ fn run_check(
         bundle.as_ref(),
         aperture.as_ref(),
         impact.as_ref(),
+        stages.as_ref(),
     );
     clock.tick(crate::latency::PHASE_PROJECTIONS);
     let output_bytes = rendered.len() as u64;

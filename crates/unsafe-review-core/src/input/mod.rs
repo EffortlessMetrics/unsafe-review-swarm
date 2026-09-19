@@ -7,4 +7,5 @@ pub(crate) mod diff;
 pub mod environment;
 pub mod impact;
 pub(crate) mod scope_git;
+pub mod stages;
 pub(crate) mod workspace;

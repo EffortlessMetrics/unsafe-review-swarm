@@ -1166,9 +1166,10 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             || arg.starts_with("--target=")
             || arg == "--aperture"
             || arg == "--impact"
+            || arg == "--stages"
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
@@ -1294,9 +1295,10 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             || arg.starts_with("--target=")
             || arg == "--aperture"
             || arg == "--impact"
+            || arg == "--stages"
         {
             return Err(format!(
-                "unknown repo argument `{arg}`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                "unknown repo argument `{arg}`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
             ));
         }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
@@ -1732,6 +1734,12 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
                 .to_string(),
         );
     }
+    if options.stages && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the stages section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -2007,7 +2015,7 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--features", "fast"])),
             Err(
-                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
+                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2016,7 +2024,7 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--aperture"])),
             Err(
-                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
+                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2025,21 +2033,21 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--target", "x"])),
             Err(
-                "unknown repo argument `--target`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                "unknown repo argument `--target`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
                     .to_string()
             )
         );
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--aperture"])),
             Err(
-                "unknown repo argument `--aperture`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                "unknown repo argument `--aperture`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
                     .to_string()
             )
         );
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--impact"])),
             Err(
-                "unknown first-pr argument `--impact`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
+                "unknown first-pr argument `--impact`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2048,7 +2056,7 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--impact"])),
             Err(
-                "unknown repo argument `--impact`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                "unknown repo argument `--impact`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
                     .to_string()
             )
         );
@@ -2078,6 +2086,38 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn parses_stages_for_check_only() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "check", "--stages"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(options.stages);
+        assert!(
+            parse(args(["unsafe-review", "first-pr", "--stages"])).is_err(),
+            "first-pr must reject --stages"
+        );
+        assert!(
+            parse(args(["unsafe-review", "repo", "--stages"])).is_err(),
+            "repo must reject --stages"
+        );
+        let error = match parse(args([
+            "unsafe-review",
+            "check",
+            "--stages",
+            "--format",
+            "sarif",
+        ])) {
+            Ok(_) => return Err("stages with sarif format should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("stages section"),
+            "error should name the stages section; got: `{error}`"
+        );
+        Ok(())
     }
 
     #[test]

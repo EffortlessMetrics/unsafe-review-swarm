@@ -4,6 +4,7 @@ use crate::freshness::AnalysisIdentity;
 use crate::input::aperture::{AnalysisAperture, render_aperture_human};
 use crate::input::cfg::{CardConfiguration, render_configuration_human};
 use crate::input::impact::{ImpactInventory, render_impact_human};
+use crate::input::stages::{StageInventory, render_stages_human};
 use crate::input::workspace;
 use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
@@ -616,6 +617,7 @@ pub fn render_json_with_sections(
     configuration: Option<ConfigurationArgs<'_>>,
     aperture: Option<AnalysisAperture>,
     impact: Option<ImpactInventory>,
+    stages: Option<StageInventory>,
 ) -> String {
     json::render_with_sections(
         output,
@@ -627,7 +629,19 @@ pub fn render_json_with_sections(
         }),
         aperture,
         impact,
+        stages,
     )
+}
+
+/// Render the JSON analyze artifact with a stage/fact-requirement section
+/// for an explicit `--stages` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `stages` key.
+pub fn render_json_with_stages(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    stages: StageInventory,
+) -> String {
+    json::render_with_sections(output, provenance, None, None, None, Some(stages))
 }
 
 /// Render the JSON analyze artifact with a same-owner impact section for
@@ -638,7 +652,23 @@ pub fn render_json_with_impact(
     provenance: Option<&Provenance>,
     impact: ImpactInventory,
 ) -> String {
-    json::render_with_sections(output, provenance, None, None, Some(impact))
+    json::render_with_sections(output, provenance, None, None, Some(impact), None)
+}
+
+/// Render human output with a stage/fact-requirement section appended for
+/// an explicit `--stages` run. Default runs never call this.
+pub fn render_human_with_stages(
+    output: &AnalyzeOutput,
+    short: bool,
+    stages: &StageInventory,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_stages_human(stages));
+    rendered
 }
 
 /// Render human output with a same-owner impact section appended for an
