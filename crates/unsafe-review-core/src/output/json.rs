@@ -89,6 +89,7 @@ pub(crate) fn render_with_sections(
     configuration: Option<ConfigurationSection<'_>>,
     aperture: Option<crate::input::aperture::AnalysisAperture>,
     impact: Option<crate::input::impact::ImpactInventory>,
+    stages: Option<crate::input::stages::StageInventory>,
 ) -> String {
     let mut projected = match provenance {
         Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
@@ -112,6 +113,9 @@ pub(crate) fn render_with_sections(
     }
     if let Some(manifest) = impact {
         projected.impact = Some(JsonImpact { manifest });
+    }
+    if let Some(manifest) = stages {
+        projected.stages = Some(JsonStages { manifest });
     }
     render_pretty(&projected)
 }
@@ -192,6 +196,10 @@ struct JsonAnalyzeOutput<'a> {
     /// Absent on default runs so golden artifacts stay byte-stable.
     #[serde(skip_serializing_if = "Option::is_none")]
     impact: Option<JsonImpact>,
+    /// Stage/fact-requirement inventory for explicit `--stages` runs (#2325 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stages: Option<JsonStages>,
 }
 
 /// JSON projection of an aperture manifest: owned, since the manifest is
@@ -208,6 +216,14 @@ pub(crate) struct JsonAperture {
 pub(crate) struct JsonImpact {
     #[serde(flatten)]
     manifest: crate::input::impact::ImpactInventory,
+}
+
+/// JSON projection of a stage/fact-requirement inventory: owned, since the
+/// inventory is assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonStages {
+    #[serde(flatten)]
+    manifest: crate::input::stages::StageInventory,
 }
 
 /// JSON projection of an evaluated configuration section.
@@ -275,6 +291,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             configuration: None,
             aperture: None,
             impact: None,
+            stages: None,
         }
     }
 
@@ -319,6 +336,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             configuration: None,
             aperture: None,
             impact: None,
+            stages: None,
         }
     }
 }

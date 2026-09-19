@@ -3080,6 +3080,7 @@ mod tests {
             target: None,
             aperture: false,
             impact: false,
+            stages: false,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3175,6 +3176,7 @@ mod tests {
             target: None,
             aperture: false,
             impact: false,
+            stages: false,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4197,6 +4199,7 @@ mod tests {
             target: None,
             aperture: false,
             impact: false,
+            stages: false,
         }
     }
 
