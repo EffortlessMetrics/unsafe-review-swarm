@@ -3,7 +3,7 @@ use crate::command::{
     BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
     ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format,
-    InitOptions, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    InitOptions, OutcomeOptions, RepoOptions, ScopeOptions, ScopeSelect, SubcommandHelpTarget,
 };
 use std::{
     env,
@@ -72,6 +72,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             })
         }
         "repo" => parse_repo(rest).map(Command::Repo),
+        "scope" => parse_scope(rest).map(Command::Scope),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
             Command::Pilot(options)
@@ -107,6 +108,7 @@ fn is_known_command(command: &str) -> bool {
             | "pr-setup"
             | "pr"
             | "repo"
+            | "scope"
             | "pilot"
             | "badges"
             | "explain"
@@ -654,6 +656,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "init" => SubcommandHelpTarget::Init,
         "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
+        "scope" => SubcommandHelpTarget::Scope,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
         "support" => SubcommandHelpTarget::Support,
@@ -953,6 +956,82 @@ fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
         idx += 1;
     }
     Ok(Command::Doctor { root })
+}
+
+fn parse_scope_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported scope format `{}`; scope projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_scope(args: Vec<String>) -> Result<ScopeOptions, String> {
+    let mut options = ScopeOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--base" => {
+                idx += 1;
+                options.base = Some(value(&args, idx, "--base")?.to_string());
+            }
+            arg if arg.starts_with("--base=") => {
+                options.base = Some(inline_value(arg, "--base")?.to_string());
+            }
+            "--head" => {
+                idx += 1;
+                options.head = Some(value(&args, idx, "--head")?.to_string());
+            }
+            arg if arg.starts_with("--head=") => {
+                options.head = Some(inline_value(arg, "--head")?.to_string());
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_scope_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_scope_format(inline_value(arg, "--format")?)?;
+            }
+            other => return Err(format!("unknown scope argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err("only one of --staged, --unstaged, --worktree may be given".to_string());
+    }
+    if options.base.is_some() {
+        if scope_flags > 0 {
+            return Err("--base selects a commit range and cannot be combined with --staged, --unstaged, or --worktree".to_string());
+        }
+        options.scope = ScopeSelect::CommitRange;
+    }
+    if options.head.is_some() && options.base.is_none() {
+        return Err("--head needs --base: a range head without a base is not a scope".to_string());
+    }
+    Ok(options)
 }
 
 fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
@@ -3173,6 +3252,87 @@ mod tests {
             }
         );
         Ok(())
+    }
+
+    #[test]
+    fn parses_scope_defaults_to_worktree_human() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "scope"]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::Worktree);
+        assert_eq!(options.format, Format::Human);
+        assert_eq!(options.root, PathBuf::from("."));
+        Ok(())
+    }
+
+    #[test]
+    fn parses_scope_staged_json() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "scope",
+            "--staged",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::Staged);
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_scope_base_as_commit_range() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "scope",
+            "--base",
+            "origin/main",
+            "--head",
+            "HEAD",
+        ]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::CommitRange);
+        assert_eq!(options.base, Some("origin/main".to_string()));
+        assert_eq!(options.head, Some("HEAD".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_scope_flag_conflicts() {
+        let both_scopes = parse(args(["unsafe-review", "scope", "--staged", "--unstaged"]));
+        assert_eq!(
+            both_scopes,
+            Err("only one of --staged, --unstaged, --worktree may be given".to_string())
+        );
+        let base_with_scope = parse(args([
+            "unsafe-review",
+            "scope",
+            "--staged",
+            "--base",
+            "main",
+        ]));
+        assert_eq!(
+            base_with_scope,
+            Err("--base selects a commit range and cannot be combined with --staged, --unstaged, or --worktree".to_string())
+        );
+        let head_without_base = parse(args(["unsafe-review", "scope", "--head", "HEAD"]));
+        assert_eq!(
+            head_without_base,
+            Err("--head needs --base: a range head without a base is not a scope".to_string())
+        );
+        let bad_format = parse(args(["unsafe-review", "scope", "--format", "sarif"]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "unsupported scope format `sarif`; scope projects `human` and `json` only"
+                    .to_string()
+            )
+        );
     }
 
     #[test]

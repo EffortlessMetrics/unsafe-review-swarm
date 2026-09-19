@@ -43,6 +43,7 @@ mod card_lookup;
 mod confirm;
 mod first_pr;
 mod init;
+mod scope;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 
@@ -236,6 +237,7 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
             DiscoveryOptions::default(),
         ),
         Command::Repo(options) => repo(options),
+        Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
         Command::Pilot(options) => run_check(
             options,
             Scope::Diff,
@@ -3437,10 +3439,26 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::Init => print_init_help(),
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
+        SubcommandHelpTarget::Scope => print_scope_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
         SubcommandHelpTarget::Support => print_support(),
     }
+}
+
+fn print_scope_help() {
+    println!("unsafe-review scope: name the analyzed source state");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review scope [--root .] [--staged|--unstaged|--worktree] [--base <ref> [--head <ref>]] \
+         [--format human|json]"
+    );
+    println!();
+    println!("Read-only: prints the canonical change-set identity (scope, Git identities,");
+    println!("included/omitted files, completeness, digest).");
+    println!("The default scope is --worktree. --base selects a commit range (head defaults");
+    println!("to HEAD). Identity only: no analysis runs and no safety claim is made.");
 }
 
 fn print_init_help() {
@@ -3987,6 +4005,7 @@ fn print_help() {
     println!("  review    alias for first-pr");
     println!("  pilot     quick diff review capped at 5 cards");
     println!("  repo      advisory review of every Rust file under --root, not a diff");
+    println!("  scope     name the analyzed source state (read-only change-set identity)");
     println!("  pr-setup  print read-only external GitHub PR checkout and raw-diff commands");
     println!();
     println!("Inspect a finding:");

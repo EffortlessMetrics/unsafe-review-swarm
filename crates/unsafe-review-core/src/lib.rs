@@ -53,6 +53,17 @@ pub use api::{
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 pub use freshness::{AnalysisIdentity, AnalysisState};
+pub use input::changeset::{
+    ChangeScopeKind, ChangeSet, ChangedFile, FileChangeKind, FileProvenance, FileRename,
+    OmissionReason, OmittedFile, ScopeCompleteness, ScopeIdentities, ScopeLimitation,
+    ScopeLimitationKind,
+};
+pub use input::changeset_local::{discover_staged, discover_unstaged, discover_worktree};
+pub use input::changeset_spans::{
+    changeset_from_external_diff, changeset_from_overlay, changeset_from_snapshot,
+    discover_commit_range, render_changeset_human, render_changeset_json,
+};
+pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
 
 /// Compute the SHA-256 hex digest of raw bytes.
 ///

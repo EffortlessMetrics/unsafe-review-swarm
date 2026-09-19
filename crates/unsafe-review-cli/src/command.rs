@@ -34,6 +34,42 @@ pub(crate) enum Format {
     WitnessPlan,
 }
 
+/// Which local authoring state `scope` names. The default (`Worktree`)
+/// covers all tracked local change relative to HEAD.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ScopeSelect {
+    Staged,
+    Unstaged,
+    Worktree,
+    CommitRange,
+}
+
+/// Options for the read-only `scope` command: name exactly which source
+/// state a review would analyze, without running the analysis. The
+/// configuration envelope belongs to the environment-identity slice (#2318).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ScopeOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    /// Range base ref/commit. Selects `CommitRange` when present.
+    pub base: Option<String>,
+    /// Range head ref/commit. Only valid with `--base`; defaults to HEAD.
+    pub head: Option<String>,
+    pub format: Format,
+}
+
+impl Default for ScopeOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            base: None,
+            head: None,
+            format: Format::Human,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CheckOptions {
     pub root: PathBuf,
@@ -360,6 +396,7 @@ pub(crate) enum SubcommandHelpTarget {
     FirstPr,
     Pilot,
     Explain,
+    Scope,
     Context,
     Confirm,
     Receipt,
@@ -387,6 +424,7 @@ pub(crate) enum Command {
     },
     Check(CheckOptions),
     Repo(RepoOptions),
+    Scope(ScopeOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
     PrSetup(ExternalPrSetupOptions),
@@ -444,6 +482,7 @@ impl Command {
             | Command::ReceiptAudit(options)
             | Command::PolicyReport(options) => Some(&options.root),
             Command::Repo(options) => Some(&options.check.root),
+            Command::Scope(options) => Some(&options.root),
             Command::FirstPr(options) => Some(&options.check.root),
             Command::Confirm(options) => Some(&options.root),
             Command::Candidate(command) => match command {
