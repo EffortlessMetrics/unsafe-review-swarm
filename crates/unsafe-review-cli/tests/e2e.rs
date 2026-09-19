@@ -1866,3 +1866,93 @@ fn scope_names_staged_state() -> Result<(), Box<dyn Error>> {
     );
     Ok(())
 }
+
+#[test]
+fn check_configuration_names_gated_cards_under_selection() -> Result<(), Box<dyn Error>> {
+    // Two cfg-gated unsafe fns added on top of a base commit: under
+    // (--features fast, --target aarch64) both are active; under a
+    // contradictory selection both are inactive; default runs print no
+    // configuration section at all so golden output stays byte-stable.
+    let temp = TempDir::new("unsafe-review-configuration-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "configuration-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"configuration-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(feature = \"fast\")]\npub unsafe fn read_fast(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(target_arch = \"aarch64\")]\npub unsafe fn read_neon(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let active = run(
+        &["--features", "fast", "--target", "aarch64-apple-darwin"],
+        "json",
+    )?;
+    assert!(
+        active["cards"].as_array().map(Vec::len).unwrap_or_default() >= 2,
+        "gated unsafe fns must produce cards: {active}"
+    );
+    // Each gated fn yields two subjects (the fn-signature card and the
+    // operation card inside its body); structural scope gates both, where
+    // the old line-window scan only saw the in-body operations.
+    assert_eq!(active["configuration"]["gated_cards"], 4);
+    assert_eq!(active["configuration"]["active"], 4);
+    assert_eq!(active["configuration"]["inactive"], 0);
+    assert!(
+        active["configuration"]["environment_digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("environment-sha256:"),
+        "configuration names the envelope digest: {active}"
+    );
+
+    let inactive = run(
+        &[
+            "--no-default-features",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+        ],
+        "json",
+    )?;
+    assert_eq!(inactive["configuration"]["gated_cards"], 4);
+    assert_eq!(inactive["configuration"]["active"], 0);
+    assert_eq!(inactive["configuration"]["inactive"], 4);
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("configuration").is_none(),
+        "default runs must not gain a configuration key: {plain}"
+    );
+    Ok(())
+}

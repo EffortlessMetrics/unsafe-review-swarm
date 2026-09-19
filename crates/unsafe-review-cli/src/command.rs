@@ -121,6 +121,12 @@ pub(crate) struct CheckOptions {
     /// Write a machine-readable phase-latency receipt to this path when the
     /// run completes. Diagnostic only; never source contents.
     pub latency_out: Option<PathBuf>,
+    /// Explicit envelope selection for the configuration projection
+    /// (#2318 PR2). Default selects nothing: no section is rendered and
+    /// default output stays byte-stable.
+    pub env_features: EnvFeatureSelect,
+    /// Explicitly selected target triple for configuration evaluation.
+    pub target: Option<String>,
 }
 
 impl Default for CheckOptions {
@@ -135,7 +141,18 @@ impl Default for CheckOptions {
             max_cards: None,
             short: false,
             latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
         }
+    }
+}
+
+impl CheckOptions {
+    /// Whether the caller selected an explicit configuration envelope: any
+    /// feature-selection flag or `--target`. Only then is the configuration
+    /// section evaluated and rendered.
+    pub(crate) fn has_env_selection(&self) -> bool {
+        self.env_features != EnvFeatureSelect::Default || self.target.is_some()
     }
 }
 

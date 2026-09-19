@@ -1148,6 +1148,9 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
         // `check`/`repo`. `first-pr` always writes a full advisory artifact
         // bundle to `--out-dir` and is advisory-only; none of these flags are
         // honored. Intercept before try_apply_check_arg silently consumes them.
+        // The envelope-selection flags are `check`-only for the same reason:
+        // the configuration section projects human/json output, which
+        // `first-pr` never renders.
         if arg == "--format"
             || arg.starts_with("--format=")
             || arg == "--policy"
@@ -1155,10 +1158,16 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             || arg == "--json"
             || arg == "--markdown"
             || arg == "--short"
+            || arg == "--features"
+            || arg.starts_with("--features=")
+            || arg == "--all-features"
+            || arg == "--no-default-features"
+            || arg == "--target"
+            || arg.starts_with("--target=")
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format`, `--policy`, and `--short` belong to the \
-                 `check`/`repo` subcommands — `first-pr` always writes a full advisory artifact \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, and `--target` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
         }
@@ -1271,6 +1280,21 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
     let mut options = RepoOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
+        // The envelope-selection flags are `check`-only: the configuration
+        // section projects single-run human/json output, which `repo` never
+        // renders through that path.
+        let arg = args[idx].as_str();
+        if arg == "--features"
+            || arg.starts_with("--features=")
+            || arg == "--all-features"
+            || arg == "--no-default-features"
+            || arg == "--target"
+            || arg.starts_with("--target=")
+        {
+            return Err(format!(
+                "unknown repo argument `{arg}`; `--features` and `--target` belong to the `check` subcommand"
+            ));
+        }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
             idx += consumed;
             continue;
@@ -1683,6 +1707,15 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
                 .to_string(),
         );
     }
+    if options.has_env_selection()
+        && options.format != Format::Human
+        && options.format != Format::Json
+    {
+        return Err(
+            "the configuration section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1863,6 +1896,114 @@ mod tests {
         };
         assert_eq!(options.format, Format::PrSummary);
         Ok(())
+    }
+
+    #[test]
+    fn parses_envelope_selection_for_check() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "fast, checked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+        ]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            options.env_features,
+            EnvFeatureSelect::Explicit(vec!["fast".to_string(), "checked".to_string()])
+        );
+        assert_eq!(options.target, Some("x86_64-unknown-linux-gnu".to_string()));
+        assert!(options.has_env_selection());
+
+        let command = parse(args(["unsafe-review", "check"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(!options.has_env_selection());
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_envelope_selection_conflicts_and_format() {
+        let both = parse(args([
+            "unsafe-review",
+            "check",
+            "--all-features",
+            "--no-default-features",
+        ]));
+        assert_eq!(
+            both,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given (got --no-default-features too)"
+                    .to_string()
+            )
+        );
+        let bad_format = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "fast",
+            "--format",
+            "sarif",
+        ]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "the configuration section projects `human` and `json` only; drop --format or use one of those"
+                    .to_string()
+            )
+        );
+        let repeated = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "a",
+            "--features",
+            "b",
+        ]));
+        assert_eq!(
+            repeated,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given (got --features too)"
+                    .to_string()
+            )
+        );
+        let repeated_target = parse(args([
+            "unsafe-review",
+            "check",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--target",
+            "aarch64-apple-darwin",
+        ]));
+        assert_eq!(
+            repeated_target,
+            Err("--target may be given only once (got --target again)".to_string())
+        );
+        let empty_target = parse(args(["unsafe-review", "check", "--target", " "]));
+        assert_eq!(
+            empty_target,
+            Err("--target needs a triple (for example `x86_64-unknown-linux-gnu`)".to_string())
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--features", "fast"])),
+            Err(
+                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, and `--target` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--target", "x"])),
+            Err(
+                "unknown repo argument `--target`; `--features` and `--target` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
     }
 
     #[test]

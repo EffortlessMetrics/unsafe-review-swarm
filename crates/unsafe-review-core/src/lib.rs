@@ -46,13 +46,20 @@ pub use api::{
     render_baseline_status_human, render_baseline_status_json, render_comment_plan,
     render_fixture_surface, render_fixture_surface_from_workspace, render_gate_manifest,
     render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
-    render_json, render_json_with_provenance, render_lsp, render_lsp_hover, render_markdown,
+    render_human_with_configuration, render_json, render_json_with_configuration,
+    render_json_with_provenance, render_lsp, render_lsp_hover, render_markdown,
     render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif, render_usefulness_telemetry,
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 pub use freshness::{AnalysisIdentity, AnalysisState};
+pub use input::cfg::{
+    Applicability, CardConfiguration, CfgAtom, CfgAttrGate, CfgExpr, CfgInputs, CfgVerdict,
+    ConfigurationCounts, StructuralGates, collect_structural_gates, enclosing_cfg_exprs,
+    evaluate_configurations, parse_cfg_attr_gate, parse_cfg_expr, render_configuration_human,
+    summarize_configurations,
+};
 pub use input::changeset::{
     ChangeScopeKind, ChangeSet, ChangedFile, FileChangeKind, FileProvenance, FileRename,
     OmissionReason, OmittedFile, ScopeCompleteness, ScopeIdentities, ScopeLimitation,

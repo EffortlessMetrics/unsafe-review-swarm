@@ -2,8 +2,9 @@ use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
     BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions,
-    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
+    ContextQuery, DiffInput, EnvFeatureSelect, ExternalPrSetupOptions, FirstPrOptions, Format,
+    OutcomeOptions, ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
+    SubcommandHelpTarget,
 };
 use serde_json::json;
 #[cfg(unix)]
@@ -19,24 +20,26 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
-    ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
-    ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
-    SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
-    analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
-    audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
-    baseline_refresh_preview, baseline_status, collect_context_range, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
-    lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
-    new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons,
-    render_baseline_refresh_human, render_baseline_refresh_json, render_baseline_status_human,
-    render_baseline_status_json, render_comment_plan, render_gate_manifest,
-    render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
-    render_json, render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan,
-    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif,
-    render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardConfiguration, CardId, CargoCarefulReceiptInput,
+    CfgInputs, ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, EnvDiscoverOptions,
+    EnvironmentSource, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance, RepoScanEvent,
+    RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost, Scope,
+    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
+    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
+    baseline_init_preview, baseline_refresh_preview, baseline_status, collect_context_range,
+    compare_outcome_json, discover_environment, discover_repo_files, evaluate_configurations,
+    evaluate_policy_report, evaluate_policy_report_from_output, lint_manual_candidate_text,
+    load_manual_candidates, manual_candidate_implementer_handoff, new_manual_candidate_skeleton,
+    read_manual_candidate, render_badge_jsons, render_baseline_refresh_human,
+    render_baseline_refresh_json, render_baseline_status_human, render_baseline_status_json,
+    render_comment_plan, render_gate_manifest, render_gate_manifest_repo, render_github_summary,
+    render_human, render_human_short, render_human_with_configuration, render_json,
+    render_json_with_configuration, render_json_with_provenance, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
+    validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -322,6 +325,87 @@ fn print_support() {
     println!("- docs/status/SUPPORT_TIERS.md");
 }
 
+/// One evaluated configuration section for an explicit envelope selection.
+struct ConfigurationBundle {
+    digest: String,
+    note: Option<String>,
+    items: Vec<CardConfiguration>,
+}
+
+/// Evaluate card configurations when the caller selected an explicit
+/// envelope (`--features` family or `--target`); `None` on default runs so
+/// their output stays byte-stable. Environment discovery failure never fails
+/// the run: feature and target atoms evaluate to unknown with a note.
+fn configuration_bundle(
+    root: &Path,
+    features: &EnvFeatureSelect,
+    target: Option<&str>,
+    output: &AnalyzeOutput,
+) -> Option<ConfigurationBundle> {
+    if *features == EnvFeatureSelect::Default && target.is_none() {
+        return None;
+    }
+    let selection = environment::feature_selection(features);
+    let discover = EnvDiscoverOptions {
+        probe_toolchain: true,
+        expand_members: true,
+        features: selection.clone(),
+    };
+    let (digest, note, inputs) = match discover_environment(
+        root,
+        EnvironmentSource::ExplicitCli,
+        &discover,
+    ) {
+        Ok(env) => {
+            let digest = env.digest.clone();
+            let inputs = CfgInputs::from_environment(&env, target);
+            (digest, None, inputs)
+        }
+        Err(err) => (
+            "unknown".to_string(),
+            Some(format!(
+                "environment discovery failed ({err}); feature and target atoms stay unevaluated"
+            )),
+            CfgInputs::for_selection(&selection),
+        ),
+    };
+    let items = evaluate_configurations(root, &output.cards, &inputs, &digest);
+    Some(ConfigurationBundle {
+        digest,
+        note,
+        items,
+    })
+}
+
+/// Render human/json output with the evaluated configuration section. Only
+/// called for explicit envelope selections (parse validation already
+/// restricts those to human/json).
+fn render_with_configuration_format(
+    output: &AnalyzeOutput,
+    format: &Format,
+    short: bool,
+    provenance: Option<&Provenance>,
+    bundle: &ConfigurationBundle,
+) -> String {
+    match format {
+        Format::Human => render_human_with_configuration(
+            output,
+            short,
+            &bundle.digest,
+            bundle.note.as_deref(),
+            &bundle.items,
+        ),
+        Format::Json => render_json_with_configuration(
+            output,
+            provenance,
+            &bundle.digest,
+            bundle.note.as_deref(),
+            &bundle.items,
+        ),
+        _ => render_with_format_and_provenance(output, format, short, provenance),
+    }
+}
+
 fn run_check(
     options: CheckOptions,
     scope: Scope,
@@ -331,6 +415,11 @@ fn run_check(
     let mut clock = crate::latency::PhaseClock::start();
     let scope_name = scope.as_str();
     let provenance = build_provenance(&options);
+    // Captured before `options.root` moves into the analysis input: the
+    // configuration projection re-reads card files from the same root.
+    let config_root = options.root.clone();
+    let config_features = options.env_features.clone();
+    let config_target = options.target.clone();
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
     clock.tick(crate::latency::PHASE_INPUT);
     let policy = options.policy.clone();
@@ -351,12 +440,26 @@ fn run_check(
     if let Some(warning) = check_unresolved_diff_scope(&output).map_err(crate::RunFailure::Tool)? {
         eprintln!("{warning}");
     }
-    let rendered = render_with_format_and_provenance(
+    let rendered = match configuration_bundle(
+        &config_root,
+        &config_features,
+        config_target.as_deref(),
         &output,
-        &options.format,
-        options.short,
-        Some(&provenance),
-    );
+    ) {
+        Some(bundle) => render_with_configuration_format(
+            &output,
+            &options.format,
+            options.short,
+            Some(&provenance),
+            &bundle,
+        ),
+        None => render_with_format_and_provenance(
+            &output,
+            &options.format,
+            options.short,
+            Some(&provenance),
+        ),
+    };
     clock.tick(crate::latency::PHASE_PROJECTIONS);
     let output_bytes = rendered.len() as u64;
     if let Some(path) = options.out {
