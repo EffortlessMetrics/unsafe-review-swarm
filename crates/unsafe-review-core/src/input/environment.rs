@@ -165,6 +165,7 @@ pub struct EnvironmentLimitation {
 pub struct AnalysisEnvironment {
     pub source: EnvironmentSource,
     /// Workspace root as given (never canonicalized into portable output).
+    /// The digest deliberately excludes it: a location is not configuration.
     pub workspace_root: PathBuf,
     pub packages: Vec<PackageIdentity>,
     pub targets: Vec<CargoTargetIdentity>,
@@ -193,11 +194,18 @@ pub struct AnalysisEnvironment {
 }
 
 impl AnalysisEnvironment {
+    /// Canonical encoding for the digest. Deliberately checkout-independent:
+    /// the workspace root is a location, not configuration, so it is
+    /// excluded, and absolute paths inside unknown-input details are
+    /// relativized to `$WORKSPACE`. Two checkouts of the same configuration
+    /// therefore digest identically. Sections carry markers so list
+    /// boundaries are unambiguous.
     fn canonical_encoding(&self) -> String {
+        let root = self.workspace_root.display().to_string();
+        let relativize = |text: &str| text.replace(root.as_str(), "$WORKSPACE");
         let mut out = String::new();
+        out.push_str("source:\n");
         out.push_str(self.source.as_str());
-        out.push('\n');
-        out.push_str(&self.workspace_root.display().to_string());
         out.push('\n');
         let mut packages: Vec<String> = self
             .packages
@@ -212,6 +220,7 @@ impl AnalysisEnvironment {
             })
             .collect();
         packages.sort();
+        out.push_str("packages:\n");
         for entry in packages {
             out.push_str(&entry);
             out.push('\n');
@@ -222,10 +231,12 @@ impl AnalysisEnvironment {
             .map(|target| format!("{}:{}", target.kind.as_str(), target.name))
             .collect();
         targets.sort();
+        out.push_str("targets:\n");
         for entry in targets {
             out.push_str(&entry);
             out.push('\n');
         }
+        out.push_str("features:\n");
         out.push_str(self.features.as_str());
         out.push('\n');
         if let FeatureSelection::Explicit(selected) = &self.features {
@@ -238,18 +249,29 @@ impl AnalysisEnvironment {
         }
         let mut known = self.known_features.clone();
         known.sort();
+        out.push_str("known-features:\n");
         for feature in known {
             out.push_str(&feature);
             out.push('\n');
         }
+        let mut default = self.default_features.clone();
+        default.sort();
+        out.push_str("default-features:\n");
+        for feature in default {
+            out.push_str(&feature);
+            out.push('\n');
+        }
+        out.push_str("triples:\n");
         out.push_str(self.host_triple.as_deref().unwrap_or("-"));
         out.push('\n');
         out.push_str(self.selected_triple.as_deref().unwrap_or("-"));
         out.push('\n');
+        out.push_str("cfgs:\n");
         for cfg in &self.cfgs {
             out.push_str(cfg);
             out.push('\n');
         }
+        out.push_str("toolchain:\n");
         match &self.toolchain {
             ToolchainIdentity::Known {
                 channel,
@@ -266,14 +288,22 @@ impl AnalysisEnvironment {
             }
             ToolchainIdentity::Unknown { .. } => out.push_str("unknown\n"),
         }
+        out.push_str("profile:\n");
         out.push_str(self.profile.as_deref().unwrap_or("-"));
         out.push('\n');
         let mut unknown: Vec<String> = self
             .unknown_inputs
             .iter()
-            .map(|limitation| format!("{}:{}", limitation.kind.as_str(), limitation.detail))
+            .map(|limitation| {
+                format!(
+                    "{}:{}",
+                    limitation.kind.as_str(),
+                    relativize(&limitation.detail)
+                )
+            })
             .collect();
         unknown.sort();
+        out.push_str("unknown-inputs:\n");
         for entry in unknown {
             out.push_str(&entry);
             out.push('\n');
@@ -331,13 +361,52 @@ struct PackageSection {
     #[serde(default)]
     name: String,
     #[serde(default)]
-    version: String,
+    version: VersionSpec,
+}
+
+/// A package version as written: literal, inherited from
+/// `[workspace.package]`, or absent. Cargo permits
+/// `version.workspace = true`; rejecting that table would abort discovery
+/// (root) or drop the member, so both forms parse.
+#[derive(Debug, Default, Deserialize)]
+#[serde(untagged)]
+enum VersionSpec {
+    #[default]
+    Missing,
+    Literal(String),
+    Inherited {
+        #[serde(default)]
+        workspace: bool,
+    },
 }
 
 #[derive(Debug, Default, Deserialize)]
 struct WorkspaceSection {
     #[serde(default)]
     members: Vec<String>,
+    #[serde(default)]
+    exclude: Vec<String>,
+    #[serde(default)]
+    package: Option<WorkspacePackageSection>,
+}
+
+#[derive(Debug, Default, Deserialize)]
+struct WorkspacePackageSection {
+    #[serde(default)]
+    version: Option<String>,
+}
+
+/// Resolve a package version: literals as written, `workspace = true`
+/// from the workspace root's `[workspace.package] version`, anything else
+/// empty (identity keeps the name and manifest; the version is unknown).
+fn package_version(package: &PackageSection, workspace_version: Option<&str>) -> String {
+    match &package.version {
+        VersionSpec::Literal(version) => version.clone(),
+        VersionSpec::Inherited { workspace: true } => {
+            workspace_version.unwrap_or_default().to_string()
+        }
+        VersionSpec::Inherited { workspace: false } | VersionSpec::Missing => String::new(),
+    }
 }
 
 #[derive(Debug, Default, Deserialize)]
@@ -395,35 +464,47 @@ fn targets_in_manifest(manifest: &Manifest, manifest_dir: &Path) -> Vec<CargoTar
             });
         }
     }
-    if manifest_dir.join("src").join("main.rs").exists()
-        && !targets
-            .iter()
-            .any(|target| target.kind == CargoTargetKind::Bin)
-    {
+    // Cargo discovers `src/main.rs` as a same-named binary alongside any
+    // explicit `[[bin]]` targets (unless `autobins = false`): skip it only
+    // when that exact name is already present.
+    if manifest_dir.join("src").join("main.rs").exists() {
         let fallback = manifest
             .package
             .as_ref()
             .map(|package| package.name.clone())
             .unwrap_or_default();
-        if !fallback.is_empty() {
+        if !fallback.is_empty()
+            && !targets
+                .iter()
+                .any(|target| target.kind == CargoTargetKind::Bin && target.name == fallback)
+        {
             targets.push(CargoTargetIdentity {
                 name: fallback,
                 kind: CargoTargetKind::Bin,
             });
         }
     }
+    // Both binary layouts: `src/bin/<name>.rs` files and
+    // `src/bin/<name>/main.rs` multi-file targets.
     if let Ok(entries) = std::fs::read_dir(manifest_dir.join("src").join("bin")) {
         for entry in entries.flatten() {
             let path = entry.path();
-            if !path.extension().is_some_and(|ext| ext == "rs") {
-                continue;
-            }
-            let Some(stem) = path.file_stem().and_then(|stem| stem.to_str()) else {
-                continue;
+            let name = if path.is_file() && path.extension().is_some_and(|ext| ext == "rs") {
+                path.file_stem()
+                    .and_then(|stem| stem.to_str())
+                    .map(ToString::to_string)
+            } else if path.is_dir() && path.join("main.rs").is_file() {
+                path.file_name()
+                    .and_then(|name| name.to_str())
+                    .map(ToString::to_string)
+            } else {
+                None
             };
-            if !targets.iter().any(|target| target.name == stem) {
+            if let Some(bin_name) = name
+                && !targets.iter().any(|target| target.name == bin_name)
+            {
                 targets.push(CargoTargetIdentity {
-                    name: stem.to_string(),
+                    name: bin_name,
                     kind: CargoTargetKind::Bin,
                 });
             }
@@ -465,8 +546,10 @@ pub fn discover_environment(
     let manifest: Manifest = toml::from_str(&manifest_text)
         .map_err(|err| format!("parse {} failed: {err}", manifest_path.display()))?;
 
-    // The workspace root is the outermost ancestor with a `[workspace]`
-    // table; otherwise the manifest dir itself is the root package.
+    // The workspace root is the nearest ancestor with a `[workspace]`
+    // table (Cargo's own search rule); otherwise the manifest dir itself
+    // is the root package. An outer workspace above never wins: discovery
+    // would otherwise expand members from the wrong root.
     let workspace_root = workspace_root_above(&manifest_dir);
     let workspace_manifest =
         std::fs::read_to_string(workspace_root.join("Cargo.toml")).map_err(|err| {
@@ -503,6 +586,12 @@ pub fn discover_environment(
         },
     ];
 
+    let workspace_version: Option<String> = workspace_parsed
+        .workspace
+        .as_ref()
+        .and_then(|workspace| workspace.package.as_ref())
+        .and_then(|package| package.version.clone());
+
     let mut packages = Vec::new();
     if let Some(package) = &manifest.package {
         let rel = manifest_dir
@@ -511,7 +600,7 @@ pub fn discover_environment(
             .join("Cargo.toml");
         packages.push(PackageIdentity {
             name: package.name.clone(),
-            version: package.version.clone(),
+            version: package_version(package, workspace_version.as_deref()),
             manifest: rel,
         });
     }
@@ -521,6 +610,8 @@ pub fn discover_environment(
         expand_members(
             &workspace_root,
             &workspace.members,
+            &workspace.exclude,
+            workspace_version.as_deref(),
             &mut packages,
             &mut unknown_inputs,
         );
@@ -670,62 +761,100 @@ fn find_manifest_dir(start: &Path) -> Option<PathBuf> {
     }
 }
 
-/// Outermost ancestor whose manifest carries `[workspace]`; else `manifest_dir`.
+/// Nearest ancestor (or self) whose manifest carries `[workspace]`;
+/// else `manifest_dir`. Cargo resolves the same way: an outer workspace
+/// above never wins over the workspace that directly contains the start.
 fn workspace_root_above(manifest_dir: &Path) -> PathBuf {
-    let mut root = manifest_dir.to_path_buf();
     let mut current = manifest_dir.to_path_buf();
-    while current.pop() {
+    loop {
         let candidate = current.join("Cargo.toml");
-        let Ok(text) = std::fs::read_to_string(&candidate) else {
-            continue;
-        };
-        let Ok(parsed): Result<Manifest, _> = toml::from_str(&text) else {
-            continue;
-        };
-        if parsed.workspace.is_some() {
-            root = current.clone();
+        if let Ok(text) = std::fs::read_to_string(&candidate)
+            && let Ok(parsed) = toml::from_str::<Manifest>(&text)
+            && parsed.workspace.is_some()
+        {
+            return current;
+        }
+        if !current.pop() {
+            return manifest_dir.to_path_buf();
         }
     }
-    root
+}
+
+/// A literal (non-glob) workspace member or exclude entry stays comparable
+/// after normalization; glob entries compile separately.
+fn is_literal_pattern(pattern: &str) -> bool {
+    !pattern.contains(['*', '?', '['])
 }
 
 /// Expand workspace member patterns into member package identities.
 ///
-/// Patterns are matched with glob syntax against the workspace root. Members
-/// whose manifests cannot be read become `MemberUnresolved` limitations;
-/// unexpanded globs are never silently treated as empty selections.
+/// Literal entries resolve directly at any depth (an explicitly listed
+/// member wins over `exclude`, matching Cargo). Glob entries use
+/// single-component `*` semantics (`literal_separator`): `crates/*` matches
+/// `crates/alpha` but not `crates/group/alpha`; deeper layouts need deeper
+/// patterns. `exclude` prunes glob matches, including whole subtrees.
+/// Entries that resolve to no manifest become `MemberUnresolved`
+/// limitations; unexpanded globs are never silently treated as empty
+/// selections.
 fn expand_members(
     workspace_root: &Path,
     patterns: &[String],
+    exclude: &[String],
+    workspace_version: Option<&str>,
     packages: &mut Vec<PackageIdentity>,
     unknown_inputs: &mut Vec<EnvironmentLimitation>,
 ) {
-    use globset::{Glob, GlobSetBuilder};
-    // Per-pattern matchers: a member entry that matches no manifest (a
-    // dangling path or a glob with zero hits) becomes a `MemberUnresolved`
-    // limitation rather than a silently narrowed selection.
-    let mut pattern_matchers: Vec<(&String, globset::GlobSet)> = Vec::new();
+    use globset::{GlobBuilder, GlobSetBuilder};
+    // Literal members first: direct manifest check, any depth, exclude
+    // does not apply to explicitly listed members.
+    let mut glob_patterns: Vec<&String> = Vec::new();
     for pattern in patterns {
-        // Workspace patterns are dir-relative ("crates/*"); match them and
-        // everything beneath ("crates/*/**") for manifest lookup.
+        if !is_literal_pattern(pattern) {
+            glob_patterns.push(pattern);
+            continue;
+        }
+        let manifest_path = workspace_root.join(pattern).join("Cargo.toml");
+        match read_package_manifest(&manifest_path) {
+            Ok(Some(package)) => push_package(
+                packages,
+                &package,
+                workspace_version,
+                manifest_path
+                    .strip_prefix(workspace_root)
+                    .unwrap_or(&manifest_path)
+                    .to_path_buf(),
+            ),
+            Ok(None) => unknown_inputs.push(EnvironmentLimitation {
+                kind: EnvironmentLimitationKind::MemberUnresolved,
+                detail: format!(
+                    "workspace member entry `{pattern}` has a manifest without a [package] table"
+                ),
+            }),
+            Err(detail) => unknown_inputs.push(EnvironmentLimitation {
+                kind: EnvironmentLimitationKind::MemberUnresolved,
+                detail: format!("workspace member entry `{pattern}`: {detail}"),
+            }),
+        }
+    }
+    // Per-pattern glob matchers: a glob with zero hits becomes a
+    // `MemberUnresolved` limitation rather than a silently narrowed
+    // selection.
+    let mut pattern_matchers: Vec<(&String, globset::GlobSet)> = Vec::new();
+    for pattern in &glob_patterns {
         let mut builder = GlobSetBuilder::new();
-        let mut valid = false;
-        for candidate in [pattern.as_str(), &format!("{pattern}/**")] {
-            match Glob::new(candidate) {
-                Ok(glob) => {
-                    builder.add(glob);
-                    valid = true;
-                }
-                Err(_) => unknown_inputs.push(EnvironmentLimitation {
+        match GlobBuilder::new(pattern).literal_separator(true).build() {
+            Ok(glob) => {
+                builder.add(glob);
+            }
+            Err(_) => {
+                unknown_inputs.push(EnvironmentLimitation {
                     kind: EnvironmentLimitationKind::MemberUnresolved,
                     detail: format!(
                         "workspace member pattern `{pattern}` is not valid glob syntax"
                     ),
-                }),
+                });
+                continue;
             }
-        }
-        if !valid {
-            continue;
         }
         match builder.build() {
             Ok(matcher) => pattern_matchers.push((pattern, matcher)),
@@ -735,6 +864,31 @@ fn expand_members(
             }),
         }
     }
+    // Exclude matchers: glob excludes match like member globs; literal
+    // excludes prune the whole subtree beneath them.
+    let mut exclude_builder = GlobSetBuilder::new();
+    let mut exclude_literals: Vec<String> = Vec::new();
+    for pattern in exclude {
+        if is_literal_pattern(pattern) {
+            exclude_literals.push(pattern.clone());
+            continue;
+        }
+        if let Ok(glob) = GlobBuilder::new(pattern).literal_separator(true).build() {
+            exclude_builder.add(glob);
+        }
+    }
+    let exclude_globs = exclude_builder
+        .build()
+        .unwrap_or_else(|_| GlobSetBuilder::new().build().unwrap_or_default());
+    let is_excluded = |rel: &Path| {
+        if exclude_globs.is_match(rel) {
+            return true;
+        }
+        let rel_str = rel.to_string_lossy().replace('\\', "/");
+        exclude_literals
+            .iter()
+            .any(|literal| rel_str == *literal || rel_str.starts_with(&format!("{literal}/")))
+    };
     if pattern_matchers.is_empty() {
         return;
     }
@@ -743,8 +897,10 @@ fn expand_members(
         .map(|(_, matcher)| matcher)
         .collect();
     let is_match = |rel: &Path| matchers.iter().any(|matcher| matcher.is_match(rel));
-    // Candidate member dirs: walk at most three levels (workspace, group,
-    // member) looking for Cargo.toml files under matched paths.
+    // Candidate member dirs: hidden directories (`.git`, `.github`),
+    // build outputs (`target`), and vendored trees (`node_modules`) never
+    // contain members; anything deeper than three nesting levels needs an
+    // explicit literal entry instead of the walk.
     let mut manifest_paths = BTreeSet::new();
     let mut stack = vec![workspace_root.to_path_buf()];
     while let Some(dir) = stack.pop() {
@@ -756,16 +912,28 @@ fn expand_members(
             if !path.is_dir() {
                 continue;
             }
+            if path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .is_some_and(|name| {
+                    name.starts_with('.') || name == "target" || name == "node_modules"
+                })
+            {
+                continue;
+            }
             let Ok(rel) = path.strip_prefix(workspace_root) else {
                 continue;
             };
+            if is_excluded(rel) {
+                continue;
+            }
             if path.join("Cargo.toml").is_file() {
                 if is_match(rel) {
                     manifest_paths.insert(path.join("Cargo.toml"));
                 }
                 continue;
             }
-            if rel.components().count() < 3 {
+            if rel.components().count() < 4 {
                 stack.push(path);
             }
         }
@@ -786,41 +954,77 @@ fn expand_members(
         }
     }
     for manifest_path in manifest_paths {
-        let Ok(text) = std::fs::read_to_string(&manifest_path) else {
-            unknown_inputs.push(EnvironmentLimitation {
+        let rel = manifest_path
+            .strip_prefix(workspace_root)
+            .unwrap_or(&manifest_path)
+            .to_path_buf();
+        match read_package_manifest(&manifest_path) {
+            Ok(Some(package)) => push_package(packages, &package, workspace_version, rel),
+            Ok(None) => unknown_inputs.push(EnvironmentLimitation {
                 kind: EnvironmentLimitationKind::MemberUnresolved,
-                detail: format!("read {} failed", manifest_path.display()),
-            });
-            continue;
-        };
-        let Ok(parsed): Result<Manifest, _> = toml::from_str(&text) else {
-            unknown_inputs.push(EnvironmentLimitation {
+                detail: format!(
+                    "workspace member manifest {} has no [package] table",
+                    manifest_path.display()
+                ),
+            }),
+            Err(detail) => unknown_inputs.push(EnvironmentLimitation {
                 kind: EnvironmentLimitationKind::MemberUnresolved,
-                detail: format!("parse {} failed", manifest_path.display()),
-            });
-            continue;
-        };
-        if let Some(package) = &parsed.package {
-            let rel = manifest_path
-                .strip_prefix(workspace_root)
-                .unwrap_or(&manifest_path)
-                .to_path_buf();
-            if !packages.iter().any(|existing| existing.manifest == rel) {
-                packages.push(PackageIdentity {
-                    name: package.name.clone(),
-                    version: package.version.clone(),
-                    manifest: rel,
-                });
-            }
+                detail,
+            }),
         }
     }
 }
 
-/// Channel from `rust-toolchain.toml` (`[toolchain] channel`), when present.
+/// Read one member manifest: the parsed `[package]` table, or `None` when
+/// the manifest parses but declares no package. I/O and parse failures
+/// return a human detail for the `MemberUnresolved` limitation.
+fn read_package_manifest(manifest_path: &Path) -> Result<Option<PackageSection>, String> {
+    let text = std::fs::read_to_string(manifest_path)
+        .map_err(|err| format!("read {} failed: {err}", manifest_path.display()))?;
+    let parsed: Manifest = toml::from_str(&text)
+        .map_err(|err| format!("parse {} failed: {err}", manifest_path.display()))?;
+    Ok(parsed.package)
+}
+
+/// Push one package identity unless the same manifest is already recorded.
+fn push_package(
+    packages: &mut Vec<PackageIdentity>,
+    package: &PackageSection,
+    workspace_version: Option<&str>,
+    rel: PathBuf,
+) {
+    if packages.iter().any(|existing| existing.manifest == rel) {
+        return;
+    }
+    packages.push(PackageIdentity {
+        name: package.name.clone(),
+        version: package_version(package, workspace_version),
+        manifest: rel,
+    });
+}
+
+/// Channel from the rustup toolchain file, when present. Rustup accepts
+/// both `rust-toolchain.toml` and `rust-toolchain`, and the latter may be
+/// TOML (`[toolchain] channel = ...`) or a plaintext channel name alone.
 fn read_toolchain_channel(workspace_root: &Path) -> Option<String> {
-    let text = std::fs::read_to_string(workspace_root.join("rust-toolchain.toml")).ok()?;
-    let parsed: ToolchainFile = toml::from_str(&text).ok()?;
-    parsed.toolchain?.channel
+    for file in ["rust-toolchain.toml", "rust-toolchain"] {
+        let Ok(text) = std::fs::read_to_string(workspace_root.join(file)) else {
+            continue;
+        };
+        if let Ok(parsed) = toml::from_str::<ToolchainFile>(&text)
+            && let Some(section) = parsed.toolchain
+            && let Some(channel) = section.channel
+        {
+            return Some(channel);
+        }
+        if file == "rust-toolchain" {
+            let trimmed = text.trim();
+            if !trimmed.is_empty() && !trimmed.contains('[') && !trimmed.contains('\n') {
+                return Some(trimmed.to_string());
+            }
+        }
+    }
+    None
 }
 
 /// Read-only `rustc -vV` probe: host triple, version, commit.

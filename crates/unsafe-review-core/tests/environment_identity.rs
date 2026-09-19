@@ -369,6 +369,183 @@ fn workspace_member_targets_are_discovered() -> Result<(), String> {
 }
 
 #[test]
+fn digest_is_checkout_independent_but_default_sensitive() -> Result<(), String> {
+    // Same configuration at two absolute paths digests identically: the
+    // workspace root is a location, not configuration.
+    let first = fixture_crate("env-port-a")?;
+    let second = fixture_crate("env-port-b")?;
+    let discover = |dir: &PathBuf| {
+        discover_environment(
+            dir,
+            EnvironmentSource::RepositoryDefaults,
+            &options_no_probe(FeatureSelection::DefaultFeatures),
+        )
+    };
+    if discover(&first)?.digest != discover(&second)?.digest {
+        return Err("identical configurations must digest identically".to_string());
+    }
+    // Changing only the `default = [...]` list changes the envelope.
+    write(
+        &second,
+        "Cargo.toml",
+        &PACKAGE_MANIFEST.replace("default = [\"checked\"]", "default = [\"fast\"]"),
+    )?;
+    if discover(&first)?.digest == discover(&second)?.digest {
+        return Err("a default-feature change must alter the digest".to_string());
+    }
+    Ok(())
+}
+
+#[test]
+fn inherited_versions_resolve_from_workspace_package() -> Result<(), String> {
+    let dir = unique_dir("env-inherit");
+    write(
+        &dir,
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/*\"]\n[workspace.package]\nversion = \"1.2.3\"\n",
+    )?;
+    write(
+        &dir,
+        "crates/alpha/Cargo.toml",
+        "[package]\nname = \"alpha\"\nversion.workspace = true\n",
+    )?;
+    let env = discover_environment(
+        &dir,
+        EnvironmentSource::RepositoryDefaults,
+        &options_no_probe(FeatureSelection::DefaultFeatures),
+    )?;
+    let Some(package) = env.packages.iter().find(|package| package.name == "alpha") else {
+        return Err(format!("member must be discovered: {:?}", env.packages));
+    };
+    if package.version != "1.2.3" {
+        return Err(format!("inherited version must resolve: {:?}", package));
+    }
+    Ok(())
+}
+
+#[test]
+fn exclude_prunes_globs_but_explicit_members_win() -> Result<(), String> {
+    let dir = unique_dir("env-exclude");
+    write(
+        &dir,
+        "Cargo.toml",
+        "[workspace]\nmembers = [\"crates/*\", \"crates/kept\"]\nexclude = [\"crates/skip\", \"crates/kept\"]\n",
+    )?;
+    for member in ["alpha", "skip", "kept"] {
+        write(
+            &dir,
+            &format!("crates/{member}/Cargo.toml"),
+            &format!("[package]\nname = \"{member}\"\nversion = \"0.1.0\"\n"),
+        )?;
+    }
+    let env = discover_environment(
+        &dir,
+        EnvironmentSource::RepositoryDefaults,
+        &options_no_probe(FeatureSelection::DefaultFeatures),
+    )?;
+    let names: Vec<&str> = env
+        .packages
+        .iter()
+        .map(|package| package.name.as_str())
+        .collect();
+    if !names.contains(&"alpha") {
+        return Err(format!("non-excluded member must expand: {names:?}"));
+    }
+    if names.contains(&"skip") {
+        return Err(format!("excluded glob member must not expand: {names:?}"));
+    }
+    if !names.contains(&"kept") {
+        return Err(format!(
+            "explicitly listed member wins over exclude: {names:?}"
+        ));
+    }
+    Ok(())
+}
+
+#[test]
+fn binary_layouts_cover_subdirs_and_main_alongside_bins() -> Result<(), String> {
+    let dir = unique_dir("env-bins");
+    write(
+        &dir,
+        "Cargo.toml",
+        "[package]\nname = \"bins\"\nversion = \"0.1.0\"\n[[bin]]\nname = \"extra\"\npath = \"src/extra.rs\"\n",
+    )?;
+    write(&dir, "src/main.rs", "fn main() {}\n")?;
+    write(&dir, "src/extra.rs", "fn main() {}\n")?;
+    write(&dir, "src/bin/tool.rs", "fn main() {}\n")?;
+    write(&dir, "src/bin/multi/main.rs", "fn main() {}\n")?;
+    let env = discover_environment(
+        &dir,
+        EnvironmentSource::RepositoryDefaults,
+        &options_no_probe(FeatureSelection::DefaultFeatures),
+    )?;
+    for want in ["bins", "extra", "tool", "multi"] {
+        if !env
+            .targets
+            .iter()
+            .any(|target| target.name == want && target.kind == CargoTargetKind::Bin)
+        {
+            return Err(format!(
+                "binary target `{want}` must be discovered: {:?}",
+                env.targets
+            ));
+        }
+    }
+    Ok(())
+}
+
+#[test]
+fn plaintext_toolchain_file_names_channel() -> Result<(), String> {
+    let dir = unique_dir("env-plainchain");
+    write(
+        &dir,
+        "Cargo.toml",
+        "[package]\nname = \"bare\"\nversion = \"0.0.0\"\n",
+    )?;
+    write(&dir, "rust-toolchain", "stable\n")?;
+    let env = discover_environment(
+        &dir,
+        EnvironmentSource::RepositoryDefaults,
+        &options_no_probe(FeatureSelection::DefaultFeatures),
+    )?;
+    match &env.toolchain {
+        ToolchainIdentity::Known { channel, .. } if channel.as_deref() == Some("stable") => Ok(()),
+        other => Err(format!("plaintext toolchain channel must parse: {other:?}")),
+    }
+}
+
+#[test]
+fn nearest_workspace_root_wins_over_outer() -> Result<(), String> {
+    let dir = unique_dir("env-nested");
+    write(&dir, "Cargo.toml", "[workspace]\nmembers = [\"inner\"]\n")?;
+    write(
+        &dir,
+        "inner/Cargo.toml",
+        "[workspace]\nmembers = [\"crates/*\"]\n",
+    )?;
+    write(
+        &dir,
+        "inner/crates/alpha/Cargo.toml",
+        "[package]\nname = \"alpha\"\nversion = \"0.1.0\"\n",
+    )?;
+    let env = discover_environment(
+        &dir.join("inner/crates/alpha"),
+        EnvironmentSource::RepositoryDefaults,
+        &options_no_probe(FeatureSelection::DefaultFeatures),
+    )?;
+    if env.workspace_root != dir.join("inner") {
+        return Err(format!(
+            "nearest workspace must win: {}",
+            env.workspace_root.display()
+        ));
+    }
+    if !env.packages.iter().any(|package| package.name == "alpha") {
+        return Err(format!("inner member must expand: {:?}", env.packages));
+    }
+    Ok(())
+}
+
+#[test]
 fn projections_name_envelope_selection_unknowns_and_digest() -> Result<(), String> {
     let dir = fixture_crate("env-render")?;
     let env = discover_environment(
