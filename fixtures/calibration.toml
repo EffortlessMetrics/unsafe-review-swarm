@@ -542,6 +542,7 @@ required_core_fixtures = [
   "ffi_return_value_discard_no_obligation",
   "ffi_argument_null_check_guard",
   "ffi_argument_unguarded_not_guard",
+  "ffi_argument_nullable_no_invented_obligation",
   "movement_context_card_not_new",
   "ptr_read_path_segment_not_raw",
   "safe_code_no_cards",
@@ -5820,8 +5821,8 @@ expected_hazard = "ffi_abi"
 
 [[cases]]
 fixture = "ffi_argument_null_check_guard"
-kind = "positive"
-claim = "FFI call passing a pointer argument under a dominating null check discharges the call-argument obligation"
+kind = "false_positive_control"
+claim = "Demoted per #2315 (was: null check discharges a call-argument obligation): a dominating null check is an observed caller fact and must not invent a call-argument obligation"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "miri_unsupported"
@@ -5831,9 +5832,19 @@ expected_hazard = "ffi_abi"
 [[cases]]
 fixture = "ffi_argument_unguarded_not_guard"
 kind = "false_positive_control"
-claim = "FFI call passing a pointer argument with no null check keeps the call-argument obligation missing while integer-parameter calls carry none"
+claim = "Demoted per #2315 (was: unguarded pointer call keeps a missing obligation): raw-pointer parameter syntax alone must not invent a call-argument obligation; integer-parameter calls carry none"
 support_tier = "Witness routing"
 expected_cards = 2
+expected_class = "miri_unsupported"
+expected_operation_family = "ffi"
+expected_hazard = "ffi_abi"
+
+[[cases]]
+fixture = "ffi_argument_nullable_no_invented_obligation"
+kind = "false_positive_control"
+claim = "Sentinel, len-coupled, optional-out, and opaque-handle APIs plus a different-argument check and a declaration-less guarded call gain no call-argument obligation from syntax or observed guards"
+support_tier = "Witness routing"
+expected_cards = 6
 expected_class = "miri_unsupported"
 expected_operation_family = "ffi"
 expected_hazard = "ffi_abi"
