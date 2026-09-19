@@ -67,6 +67,10 @@ pub(super) fn try_apply_check_arg(
             options.aperture = true;
             Ok(Some(1))
         }
+        "--impact" => {
+            options.impact = true;
+            Ok(Some(1))
+        }
         "--markdown" => {
             options.format = Format::Markdown;
             Ok(Some(1))

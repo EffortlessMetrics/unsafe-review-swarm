@@ -130,6 +130,9 @@ pub(crate) struct CheckOptions {
     /// Render the additive aperture manifest section (#2331 PR1).
     /// Default off so default output stays byte-stable.
     pub aperture: bool,
+    /// Render the additive same-owner impact inventory (#2319 PR1).
+    /// Default off so default output stays byte-stable.
+    pub impact: bool,
 }
 
 impl Default for CheckOptions {
@@ -147,6 +150,7 @@ impl Default for CheckOptions {
             env_features: EnvFeatureSelect::Default,
             target: None,
             aperture: false,
+            impact: false,
         }
     }
 }

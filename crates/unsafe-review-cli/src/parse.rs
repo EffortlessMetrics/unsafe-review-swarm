@@ -1165,9 +1165,10 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
             || arg == "--target"
             || arg.starts_with("--target=")
             || arg == "--aperture"
+            || arg == "--impact"
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
@@ -1292,9 +1293,10 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
             || arg == "--target"
             || arg.starts_with("--target=")
             || arg == "--aperture"
+            || arg == "--impact"
         {
             return Err(format!(
-                "unknown repo argument `{arg}`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
+                "unknown repo argument `{arg}`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
             ));
         }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
@@ -1724,6 +1726,12 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
                 .to_string(),
         );
     }
+    if options.impact && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the impact section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1999,7 +2007,7 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--features", "fast"])),
             Err(
-                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
+                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2008,7 +2016,7 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "first-pr", "--aperture"])),
             Err(
-                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, and `--aperture` belong to the \
+                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
                  `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
                     .to_string()
@@ -2017,14 +2025,43 @@ mod tests {
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--target", "x"])),
             Err(
-                "unknown repo argument `--target`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
+                "unknown repo argument `--target`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
                     .to_string()
             )
         );
         assert_eq!(
             parse(args(["unsafe-review", "repo", "--aperture"])),
             Err(
-                "unknown repo argument `--aperture`; `--features`, `--target`, and `--aperture` belong to the `check` subcommand"
+                "unknown repo argument `--aperture`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--impact"])),
+            Err(
+                "unknown first-pr argument `--impact`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, and `--impact` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--impact"])),
+            Err(
+                "unknown repo argument `--impact`; `--features`, `--target`, `--aperture`, and `--impact` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args([
+                "unsafe-review",
+                "check",
+                "--impact",
+                "--format",
+                "sarif",
+            ])),
+            Err(
+                "the impact section projects `human` and `json` only; drop --format or use one of those"
                     .to_string()
             )
         );

@@ -74,6 +74,48 @@ pub(crate) fn render_with_aperture(
     render_pretty(&projected)
 }
 
+/// One evaluated configuration section for the unified renderer.
+pub(crate) struct ConfigurationSection<'a> {
+    pub environment_digest: &'a str,
+    pub note: Option<&'a str>,
+    pub items: &'a [crate::input::cfg::CardConfiguration],
+}
+
+/// Render the JSON analyze artifact with any combination of additive
+/// sections. Default runs pass all `None` and stay byte-stable.
+pub(crate) fn render_with_sections(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    configuration: Option<ConfigurationSection<'_>>,
+    aperture: Option<crate::input::aperture::AnalysisAperture>,
+    impact: Option<crate::input::impact::ImpactInventory>,
+) -> String {
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    if let Some(section) = configuration {
+        let counts = crate::input::cfg::summarize_configurations(section.items);
+        projected.configuration = Some(JsonConfiguration {
+            environment_digest: section.environment_digest,
+            note: section.note,
+            gated_cards: counts.gated,
+            active: counts.active,
+            inactive: counts.inactive,
+            unknown: counts.unknown,
+            unsupported: counts.unsupported,
+            items: section.items,
+        });
+    }
+    if let Some(manifest) = aperture {
+        projected.aperture = Some(JsonAperture { manifest });
+    }
+    if let Some(manifest) = impact {
+        projected.impact = Some(JsonImpact { manifest });
+    }
+    render_pretty(&projected)
+}
+
 /// Render the JSON analyze artifact with both configuration and aperture
 /// sections for runs that select an envelope and `--aperture`.
 pub(crate) fn render_with_configuration_and_aperture(
@@ -146,6 +188,10 @@ struct JsonAnalyzeOutput<'a> {
     /// Absent on default runs so golden artifacts stay byte-stable.
     #[serde(skip_serializing_if = "Option::is_none")]
     aperture: Option<JsonAperture>,
+    /// Same-owner impact inventory for explicit `--impact` runs (#2319 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    impact: Option<JsonImpact>,
 }
 
 /// JSON projection of an aperture manifest: owned, since the manifest is
@@ -154,6 +200,14 @@ struct JsonAnalyzeOutput<'a> {
 pub(crate) struct JsonAperture {
     #[serde(flatten)]
     manifest: crate::input::aperture::AnalysisAperture,
+}
+
+/// JSON projection of a same-owner impact inventory: owned, since the
+/// inventory is assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonImpact {
+    #[serde(flatten)]
+    manifest: crate::input::impact::ImpactInventory,
 }
 
 /// JSON projection of an evaluated configuration section.
@@ -220,6 +274,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             provenance: None,
             configuration: None,
             aperture: None,
+            impact: None,
         }
     }
 
@@ -263,6 +318,7 @@ impl<'a> JsonAnalyzeOutput<'a> {
             provenance: Some(json_provenance),
             configuration: None,
             aperture: None,
+            impact: None,
         }
     }
 }

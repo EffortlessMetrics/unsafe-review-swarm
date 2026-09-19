@@ -30,13 +30,14 @@ pub use policy::baseline_ledger_path;
 
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineHealthCounts, BaselineHealthEntry,
-    BaselineHealthReport, BaselineInitResult, BaselineRefreshPlan, DiffSource, DiscoveryOptions,
-    FILE_TIMINGS_CAP, HealthBucket, OutcomeReport, PerFileScanStats, PolicyMode, PolicyReport,
-    Provenance, ReceiptAuditReport, RefreshAction, RefreshPlanEntry, RefreshPlanSummary,
-    RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, ReviewCardConfirmationProjection,
-    ScanCost, Scope, analyze, analyze_with_discovery, analyze_with_discovery_and_progress,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
-    baseline_init_preview, baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
+    BaselineHealthReport, BaselineInitResult, BaselineRefreshPlan, ConfigurationArgs, DiffSource,
+    DiscoveryOptions, FILE_TIMINGS_CAP, HealthBucket, OutcomeReport, PerFileScanStats, PolicyMode,
+    PolicyReport, Provenance, ReceiptAuditReport, RefreshAction, RefreshPlanEntry,
+    RefreshPlanSummary, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
+    ReviewCardConfirmationProjection, ScanCost, Scope, analyze, analyze_with_discovery,
+    analyze_with_discovery_and_progress, analyze_with_discovery_and_repo_events,
+    audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
+    baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
     bless_fixture_card_goldens_from_workspace, bless_fixture_surface_goldens,
     bless_fixture_surface_goldens_from_workspace, collect_context, collect_context_range,
     compare_outcome_json, discover_repo_files, evaluate_policy_report,
@@ -47,10 +48,11 @@ pub use api::{
     render_fixture_surface, render_fixture_surface_from_workspace, render_gate_manifest,
     render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
     render_human_with_aperture, render_human_with_configuration,
-    render_human_with_configuration_and_aperture, render_json, render_json_with_aperture,
-    render_json_with_configuration, render_json_with_configuration_and_aperture,
-    render_json_with_provenance, render_lsp, render_lsp_hover, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
+    render_human_with_configuration_and_aperture, render_human_with_impact, render_json,
+    render_json_with_aperture, render_json_with_configuration,
+    render_json_with_configuration_and_aperture, render_json_with_impact,
+    render_json_with_provenance, render_json_with_sections, render_lsp, render_lsp_hover,
+    render_markdown, render_outcome_json, render_outcome_markdown, render_policy_report_json,
     render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
     render_receipt_audit_markdown, render_repair_queue, render_sarif, render_usefulness_telemetry,
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
@@ -77,11 +79,16 @@ pub use input::changeset_spans::{
     changeset_from_external_diff, changeset_from_overlay, changeset_from_snapshot,
     discover_commit_range, render_changeset_human, render_changeset_json,
 };
+pub use input::diff::changed_lines_in_diff;
 pub use input::environment::{
     AnalysisEnvironment, CargoTargetIdentity, CargoTargetKind, EnvDiscoverOptions,
     EnvironmentLimitation, EnvironmentLimitationKind, EnvironmentSource, FeatureSelection,
     PackageIdentity, ToolchainIdentity, discover_environment, render_environment_human,
     render_environment_json,
+};
+pub use input::impact::{
+    AffectedSeam, ChangedItem, IMPACT_SCHEMA_VERSION, ImpactCause, ImpactInventory, ImpactSubject,
+    relate_same_owner, render_impact_human,
 };
 pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
 

@@ -22,27 +22,26 @@ use std::time::{Duration, Instant};
 use unsafe_review_core::{
     AnalysisAperture, AnalysisMode, AnalyzeInput, AnalyzeOutput, ApertureConfigurationInput,
     CardConfiguration, CardId, CargoCarefulReceiptInput, CfgInputs, ConcurrencyReceiptInput,
-    DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource, MiriReceiptInput,
-    PolicyMode, ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus,
-    RepoStopReason, SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION,
-    WitnessReceipt, analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
-    assemble_aperture, audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
-    baseline_refresh_preview, baseline_status, collect_context_range, compare_outcome_json,
-    discover_environment, discover_repo_files, evaluate_configurations, evaluate_policy_report,
+    ConfigurationArgs, DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource,
+    ImpactInventory, ImpactSubject, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance,
+    RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost,
+    Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze, analyze_with_discovery,
+    analyze_with_discovery_and_repo_events, assemble_aperture, audit_witness_receipts,
+    baseline_add, baseline_init, baseline_init_preview, baseline_refresh_preview, baseline_status,
+    changed_lines_in_diff, collect_context_range, compare_outcome_json, discover_environment,
+    discover_repo_files, evaluate_configurations, evaluate_policy_report,
     evaluate_policy_report_from_output, lint_manual_candidate_text, load_manual_candidates,
     manual_candidate_implementer_handoff, new_manual_candidate_skeleton, read_manual_candidate,
-    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
-    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
-    render_gate_manifest, render_gate_manifest_repo, render_github_summary, render_human,
-    render_human_short, render_human_with_aperture, render_human_with_configuration,
-    render_human_with_configuration_and_aperture, render_json, render_json_with_aperture,
-    render_json_with_configuration, render_json_with_configuration_and_aperture,
-    render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif,
-    render_usefulness_telemetry_with_cost, render_witness_plan, summarize_configurations,
-    validate_witness_receipts,
+    relate_same_owner, render_aperture_human, render_badge_jsons, render_baseline_refresh_human,
+    render_baseline_refresh_json, render_baseline_status_human, render_baseline_status_json,
+    render_comment_plan, render_configuration_human, render_gate_manifest,
+    render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
+    render_impact_human, render_json, render_json_with_provenance, render_json_with_sections,
+    render_lsp, render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_usefulness_telemetry_with_cost, render_witness_plan,
+    summarize_configurations, validate_witness_receipts,
 };
 
 mod card_lookup;
@@ -380,78 +379,54 @@ fn configuration_bundle(
     })
 }
 
-/// Render human/json output with the evaluated configuration section. Only
-/// called for explicit envelope selections (parse validation already
-/// restricts those to human/json).
-fn render_with_configuration_format(
+/// Render human/json `check` output with any combination of additive
+/// sections (configuration, aperture, impact) in a fixed order. Default
+/// runs select nothing and render exactly the historical output.
+fn render_check_sections(
     output: &AnalyzeOutput,
     format: &Format,
     short: bool,
     provenance: Option<&Provenance>,
-    bundle: &ConfigurationBundle,
+    bundle: Option<&ConfigurationBundle>,
+    aperture: Option<&AnalysisAperture>,
+    impact: Option<&ImpactInventory>,
 ) -> String {
+    let selected = bundle.is_some() || aperture.is_some() || impact.is_some();
+    if !selected {
+        return render_with_format_and_provenance(output, format, short, provenance);
+    }
     match format {
-        Format::Human => render_human_with_configuration(
-            output,
-            short,
-            &bundle.digest,
-            bundle.note.as_deref(),
-            &bundle.items,
-        ),
-        Format::Json => render_json_with_configuration(
+        Format::Human => {
+            let mut rendered = if short {
+                render_human_short(output)
+            } else {
+                render_human(output)
+            };
+            if let Some(bundle) = bundle {
+                rendered.push_str(&render_configuration_human(
+                    &bundle.items,
+                    &bundle.digest,
+                    bundle.note.as_deref(),
+                ));
+            }
+            if let Some(aperture) = aperture {
+                rendered.push_str(&render_aperture_human(aperture));
+            }
+            if let Some(impact) = impact {
+                rendered.push_str(&render_impact_human(impact));
+            }
+            rendered
+        }
+        Format::Json => render_json_with_sections(
             output,
             provenance,
-            &bundle.digest,
-            bundle.note.as_deref(),
-            &bundle.items,
-        ),
-        _ => render_with_format_and_provenance(output, format, short, provenance),
-    }
-}
-
-/// Render human/json output with the aperture manifest section. Only called
-/// for explicit `--aperture` runs (parse validation already restricts those
-/// to human/json).
-fn render_with_aperture_format(
-    output: &AnalyzeOutput,
-    format: &Format,
-    short: bool,
-    provenance: Option<&Provenance>,
-    aperture: &AnalysisAperture,
-) -> String {
-    match format {
-        Format::Human => render_human_with_aperture(output, short, aperture),
-        Format::Json => render_json_with_aperture(output, provenance, aperture.clone()),
-        _ => render_with_format_and_provenance(output, format, short, provenance),
-    }
-}
-
-/// Render human/json output with configuration and aperture sections for
-/// runs that select an envelope and `--aperture`.
-fn render_with_configuration_and_aperture_format(
-    output: &AnalyzeOutput,
-    format: &Format,
-    short: bool,
-    provenance: Option<&Provenance>,
-    bundle: &ConfigurationBundle,
-    aperture: &AnalysisAperture,
-) -> String {
-    match format {
-        Format::Human => render_human_with_configuration_and_aperture(
-            output,
-            short,
-            &bundle.digest,
-            bundle.note.as_deref(),
-            &bundle.items,
-            aperture,
-        ),
-        Format::Json => render_json_with_configuration_and_aperture(
-            output,
-            provenance,
-            &bundle.digest,
-            bundle.note.as_deref(),
-            &bundle.items,
-            aperture.clone(),
+            bundle.map(|bundle| ConfigurationArgs {
+                environment_digest: &bundle.digest,
+                note: bundle.note.as_deref(),
+                items: &bundle.items,
+            }),
+            aperture.cloned(),
+            impact.cloned(),
         ),
         _ => render_with_format_and_provenance(output, format, short, provenance),
     }
@@ -472,6 +447,10 @@ fn run_check(
     let config_features = options.env_features.clone();
     let config_target = options.target.clone();
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
+    // Captured before `diff` moves into the analysis input, and only when
+    // `--impact` is selected: parsing the diff twice on every run would
+    // waste a full parse plus a second diff-file read for nothing.
+    let impact_changed = options.impact.then(|| changed_lines_in_diff(&diff));
     clock.tick(crate::latency::PHASE_INPUT);
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
@@ -505,36 +484,19 @@ fn run_check(
         });
         assemble_aperture(&output, config)
     });
-    let rendered = match (bundle.as_ref(), aperture.as_ref()) {
-        (Some(bundle), Some(aperture)) => render_with_configuration_and_aperture_format(
-            &output,
-            &options.format,
-            options.short,
-            Some(&provenance),
-            bundle,
-            aperture,
-        ),
-        (Some(bundle), None) => render_with_configuration_format(
-            &output,
-            &options.format,
-            options.short,
-            Some(&provenance),
-            bundle,
-        ),
-        (None, Some(aperture)) => render_with_aperture_format(
-            &output,
-            &options.format,
-            options.short,
-            Some(&provenance),
-            aperture,
-        ),
-        (None, None) => render_with_format_and_provenance(
-            &output,
-            &options.format,
-            options.short,
-            Some(&provenance),
-        ),
-    };
+    let impact = impact_changed.as_ref().map(|changed| {
+        let subjects: Vec<ImpactSubject> = output.cards.iter().map(ImpactSubject::from).collect();
+        relate_same_owner(&config_root, changed, &subjects)
+    });
+    let rendered = render_check_sections(
+        &output,
+        &options.format,
+        options.short,
+        Some(&provenance),
+        bundle.as_ref(),
+        aperture.as_ref(),
+        impact.as_ref(),
+    );
     clock.tick(crate::latency::PHASE_PROJECTIONS);
     let output_bytes = rendered.len() as u64;
     if let Some(path) = options.out {
@@ -3677,7 +3639,7 @@ fn print_check_help() {
         "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
          [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
          [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>] \
-         [--aperture]"
+         [--aperture] [--impact]"
     );
     println!();
     println!("Options:");
@@ -3701,6 +3663,7 @@ fn print_check_help() {
         "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
     );
     println!("- --aperture       append the per-analysis aperture manifest (human/json only)");
+    println!("- --impact         append the same-owner impact inventory (human/json only)");
     println!("- --json           shorthand for --format json");
     println!("- --markdown       shorthand for --format markdown");
     println!();
