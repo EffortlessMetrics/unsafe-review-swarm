@@ -71,6 +71,10 @@ pub(super) fn try_apply_check_arg(
             options.impact = true;
             Ok(Some(1))
         }
+        "--stages" => {
+            options.stages = true;
+            Ok(Some(1))
+        }
         "--markdown" => {
             options.format = Format::Markdown;
             Ok(Some(1))

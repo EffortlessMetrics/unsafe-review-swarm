@@ -133,6 +133,9 @@ pub(crate) struct CheckOptions {
     /// Render the additive same-owner impact inventory (#2319 PR1).
     /// Default off so default output stays byte-stable.
     pub impact: bool,
+    /// Render the additive stage/fact-requirement inventory (#2325 PR1).
+    /// Default off so default output stays byte-stable.
+    pub stages: bool,
 }
 
 impl Default for CheckOptions {
@@ -151,6 +154,7 @@ impl Default for CheckOptions {
             target: None,
             aperture: false,
             impact: false,
+            stages: false,
         }
     }
 }
