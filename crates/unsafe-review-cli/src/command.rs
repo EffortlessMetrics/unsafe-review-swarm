@@ -58,6 +58,43 @@ pub(crate) struct ScopeOptions {
     pub format: Format,
 }
 
+/// Which feature posture the `environment` envelope selects. The default
+/// (`Default`) is Cargo defaults; exactly one selection flag may be given.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum EnvFeatureSelect {
+    Default,
+    NoDefault,
+    Explicit(Vec<String>),
+    All,
+}
+
+/// Options for the read-only `environment` command: name the configuration
+/// envelope a result would be computed under, without running the analysis.
+/// New explicit inputs only; zero-argument defaults of other commands change
+/// nothing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EnvOptions {
+    pub root: PathBuf,
+    pub features: EnvFeatureSelect,
+    /// Run the read-only `rustc -vV` probe for host triple and version.
+    pub probe_toolchain: bool,
+    /// Expand workspace member patterns into member manifests.
+    pub expand_members: bool,
+    pub format: Format,
+}
+
+impl Default for EnvOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            features: EnvFeatureSelect::Default,
+            probe_toolchain: true,
+            expand_members: true,
+            format: Format::Human,
+        }
+    }
+}
+
 impl Default for ScopeOptions {
     fn default() -> Self {
         Self {
@@ -397,6 +434,7 @@ pub(crate) enum SubcommandHelpTarget {
     Pilot,
     Explain,
     Scope,
+    Environment,
     Context,
     Confirm,
     Receipt,
@@ -425,6 +463,7 @@ pub(crate) enum Command {
     Check(CheckOptions),
     Repo(RepoOptions),
     Scope(ScopeOptions),
+    Environment(EnvOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
     PrSetup(ExternalPrSetupOptions),
@@ -483,6 +522,7 @@ impl Command {
             | Command::PolicyReport(options) => Some(&options.root),
             Command::Repo(options) => Some(&options.check.root),
             Command::Scope(options) => Some(&options.root),
+            Command::Environment(options) => Some(&options.root),
             Command::FirstPr(options) => Some(&options.check.root),
             Command::Confirm(options) => Some(&options.root),
             Command::Candidate(command) => match command {

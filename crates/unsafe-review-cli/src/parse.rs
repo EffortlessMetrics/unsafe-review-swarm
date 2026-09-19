@@ -2,8 +2,9 @@ use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
     BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format,
-    InitOptions, OutcomeOptions, RepoOptions, ScopeOptions, ScopeSelect, SubcommandHelpTarget,
+    ContextQuery, DiffInput, EnvFeatureSelect, EnvOptions, ExternalPrSetupOptions,
+    FirstPrEntrypoint, FirstPrOptions, Format, InitOptions, OutcomeOptions, RepoOptions,
+    ScopeOptions, ScopeSelect, SubcommandHelpTarget,
 };
 use std::{
     env,
@@ -73,6 +74,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         }
         "repo" => parse_repo(rest).map(Command::Repo),
         "scope" => parse_scope(rest).map(Command::Scope),
+        "environment" => parse_environment(rest).map(Command::Environment),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
             Command::Pilot(options)
@@ -109,6 +111,7 @@ fn is_known_command(command: &str) -> bool {
             | "pr"
             | "repo"
             | "scope"
+            | "environment"
             | "pilot"
             | "badges"
             | "explain"
@@ -657,6 +660,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
         "scope" => SubcommandHelpTarget::Scope,
+        "environment" => SubcommandHelpTarget::Environment,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
         "support" => SubcommandHelpTarget::Support,
@@ -1032,6 +1036,94 @@ fn parse_scope(args: Vec<String>) -> Result<ScopeOptions, String> {
         return Err("--head needs --base: a range head without a base is not a scope".to_string());
     }
     Ok(options)
+}
+
+fn parse_environment_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported environment format `{}`; environment projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_environment(args: Vec<String>) -> Result<EnvOptions, String> {
+    let mut options = EnvOptions::default();
+    let mut feature_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--features" => {
+                idx += 1;
+                let raw = value(&args, idx, "--features")?;
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
+                feature_flags += 1;
+            }
+            arg if arg.starts_with("--features=") => {
+                let raw = inline_value(arg, "--features")?;
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
+                feature_flags += 1;
+            }
+            "--all-features" => {
+                options.features = EnvFeatureSelect::All;
+                feature_flags += 1;
+            }
+            "--no-default-features" => {
+                options.features = EnvFeatureSelect::NoDefault;
+                feature_flags += 1;
+            }
+            "--no-toolchain-probe" => {
+                options.probe_toolchain = false;
+            }
+            "--no-member-expand" => {
+                options.expand_members = false;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_environment_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_environment_format(inline_value(arg, "--format")?)?;
+            }
+            other => return Err(format!("unknown environment argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if feature_flags > 1 {
+        return Err(
+            "only one of --features, --all-features, --no-default-features may be given"
+                .to_string(),
+        );
+    }
+    Ok(options)
+}
+
+/// Split a `--features` value into names. A leading `=` is a typo for the
+/// inline form (`--features =fast` instead of `--features=fast`); accepting
+/// it would record a feature Cargo never recognizes, so it fails closed.
+fn parse_feature_list(raw: &str, flag: &str) -> Result<Vec<String>, String> {
+    if raw.starts_with('=') {
+        return Err(format!(
+            "missing value for {flag} (got `{raw}`; expected `{flag} <a,b>` or `{flag}=<a,b>`)"
+        ));
+    }
+    Ok(raw
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect())
 }
 
 fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
@@ -3330,6 +3422,85 @@ mod tests {
             bad_format,
             Err(
                 "unsupported scope format `sarif`; scope projects `human` and `json` only"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn parses_environment_defaults() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "environment"]))?;
+        let Command::Environment(options) = command else {
+            return Err("expected environment command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert_eq!(options.features, EnvFeatureSelect::Default);
+        assert!(options.probe_toolchain);
+        assert!(options.expand_members);
+        assert_eq!(options.format, Format::Human);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_environment_explicit_features_json() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "fast, checked",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Environment(options) = command else {
+            return Err("expected environment command".to_string());
+        };
+        assert_eq!(
+            options.features,
+            EnvFeatureSelect::Explicit(vec!["fast".to_string(), "checked".to_string()])
+        );
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_environment_feature_conflicts() {
+        let both = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "fast",
+            "--all-features",
+        ]));
+        assert_eq!(
+            both,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given"
+                    .to_string()
+            )
+        );
+        let bad_format = parse(args(["unsafe-review", "environment", "--format", "sarif"]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "unsupported environment format `sarif`; environment projects `human` and `json` only"
+                    .to_string()
+            )
+        );
+        let unknown = parse(args(["unsafe-review", "environment", "--target", "x"]));
+        assert_eq!(
+            unknown,
+            Err("unknown environment argument `--target`".to_string())
+        );
+        let leading_eq = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "=fast",
+        ]));
+        assert_eq!(
+            leading_eq,
+            Err(
+                "missing value for --features (got `=fast`; expected `--features <a,b>` or `--features=<a,b>`)"
                     .to_string()
             )
         );

@@ -41,6 +41,7 @@ use unsafe_review_core::{
 
 mod card_lookup;
 mod confirm;
+mod environment;
 mod first_pr;
 mod init;
 mod scope;
@@ -238,6 +239,9 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
         ),
         Command::Repo(options) => repo(options),
         Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
+        Command::Environment(options) => {
+            environment::run(&options).map_err(crate::RunFailure::Tool)
+        }
         Command::Pilot(options) => run_check(
             options,
             Scope::Diff,
@@ -3440,6 +3444,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Scope => print_scope_help(),
+        SubcommandHelpTarget::Environment => print_environment_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
         SubcommandHelpTarget::Support => print_support(),
@@ -3459,6 +3464,20 @@ fn print_scope_help() {
     println!("included/omitted files, completeness, digest).");
     println!("The default scope is --worktree. --base selects a commit range (head defaults");
     println!("to HEAD). Identity only: no analysis runs and no safety claim is made.");
+}
+
+fn print_environment_help() {
+    println!("unsafe-review environment: name the analyzed configuration envelope");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review environment [--root .] [--features <a,b>] [--all-features] \\\n         [--no-default-features] [--no-toolchain-probe] [--no-member-expand] \\\n         [--format human|json]"
+    );
+    println!();
+    println!("Read-only: prints the canonical environment identity (workspace, packages,");
+    println!("targets, feature selection, toolchain facts, unknown inputs, digest).");
+    println!("At most one feature-selection flag may be given. Identity only: no analysis");
+    println!("runs, no cards are filtered, and no applicability claim is made.");
 }
 
 fn print_init_help() {
@@ -3999,42 +4018,45 @@ fn print_help() {
     println!("  unsafe-review check --base origin/main  advisory review of the current diff");
     println!();
     println!("Review a change:");
-    println!("  check     advisory review of a diff; the core command");
-    println!("  pr        first-run PR review bundle: auto-detects root and base ref");
-    println!("  first-pr  same bundle as `pr`, with inputs passed explicitly (compatibility name)");
-    println!("  review    alias for first-pr");
-    println!("  pilot     quick diff review capped at 5 cards");
-    println!("  repo      advisory review of every Rust file under --root, not a diff");
-    println!("  scope     name the analyzed source state (read-only change-set identity)");
-    println!("  pr-setup  print read-only external GitHub PR checkout and raw-diff commands");
+    println!("  check        advisory review of a diff; the core command");
+    println!("  pr           first-run PR review bundle: auto-detects root and base ref");
+    println!(
+        "  first-pr     same bundle as `pr`, with inputs passed explicitly (compatibility name)"
+    );
+    println!("  review       alias for first-pr");
+    println!("  pilot        quick diff review capped at 5 cards");
+    println!("  repo         advisory review of every Rust file under --root, not a diff");
+    println!("  scope        name the analyzed source state (read-only change-set identity)");
+    println!("  environment  name the analyzed configuration envelope (read-only)");
+    println!("  pr-setup     print read-only external GitHub PR checkout and raw-diff commands");
     println!();
     println!("Inspect a finding:");
-    println!("  explain   show full detail for a single ReviewCard");
-    println!("  context   emit an LLM-ready context packet for a card or file range");
-    println!("  badges    generate badge JSON files for the repository");
-    println!("  lsp       start the Language Server Protocol server over stdio for editors");
+    println!("  explain      show full detail for a single ReviewCard");
+    println!("  context      emit an LLM-ready context packet for a card or file range");
+    println!("  badges       generate badge JSON files for the repository");
+    println!("  lsp          start the Language Server Protocol server over stdio for editors");
     println!();
     println!("Track and discharge coverage debt:");
     println!(
-        "  baseline  record pre-existing debt as the coverage floor (init/add/status/refresh)"
+        "  baseline     record pre-existing debt as the coverage floor (init/add/status/refresh)"
     );
-    println!("  policy    advisory no-new-debt policy simulation report");
-    println!("  outcome   compare two cards.json snapshots for movement");
+    println!("  policy       advisory no-new-debt policy simulation report");
+    println!("  outcome      compare two cards.json snapshots for movement");
     println!(
-        "  confirm   route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`"
+        "  confirm      route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`"
     );
     println!(
         "            executes the routed witness command only with --allow-heavy; never default;"
     );
     println!("            --dry-run previews without executing");
-    println!("  receipt   create, import, validate, and audit witness receipts");
+    println!("  receipt      create, import, validate, and audit witness receipts");
     println!("            `receipt-template` is a compatibility name for `receipt template`");
-    println!("  candidate import and project manual advisory candidates");
+    println!("  candidate    import and project manual advisory candidates");
     println!();
     println!("Repository posture:");
-    println!("  doctor    check the repository setup");
-    println!("  init      preview repository adoption without writing files");
-    println!("  support   print the current support tiers and advisory posture");
+    println!("  doctor       check the repository setup");
+    println!("  init         preview repository adoption without writing files");
+    println!("  support      print the current support tiers and advisory posture");
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();

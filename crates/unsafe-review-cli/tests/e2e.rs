@@ -568,7 +568,7 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(output.stdout)?;
 
     assert!(
-        stdout.contains("  pr        first-run PR review bundle"),
+        stdout.contains("  pr           first-run PR review bundle"),
         "help must mention the `pr` first-run entry point: {stdout}"
     );
     assert!(
@@ -577,9 +577,17 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     );
     assert!(
         stdout.contains(
-            "pr-setup  print read-only external GitHub PR checkout and raw-diff commands"
+            "pr-setup     print read-only external GitHub PR checkout and raw-diff commands"
         ),
         "help must mention the read-only external PR setup helper: {stdout}"
+    );
+    assert!(
+        stdout.contains("  scope        name the analyzed source state"),
+        "help must mention the read-only scope identity: {stdout}"
+    );
+    assert!(
+        stdout.contains("  environment  name the analyzed configuration envelope"),
+        "help must mention the read-only environment identity: {stdout}"
     );
 
     Ok(())
@@ -692,6 +700,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
         "check",
         "repo",
         "scope",
+        "environment",
         "pr",
         "pr-setup",
         "first-pr",
@@ -723,7 +732,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
 }
 
 /// Column (0-indexed) where every top-level help command description starts.
-const HELP_DESCRIPTION_COLUMN: usize = 12;
+const HELP_DESCRIPTION_COLUMN: usize = 15;
 
 #[test]
 fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
