@@ -139,6 +139,11 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
+/// Bundle artifact filenames for `first-pr`, exposed so argument parsing can
+/// reject a `--latency-out` destination that would overwrite one of them.
+pub(crate) fn first_pr_artifact_names() -> &'static [&'static str] {
+    &FIRST_PR_ARTIFACTS
+}
 const FIRST_PR_ARTIFACTS: [&str; 18] = [
     REVIEW_KIT_ARTIFACT,
     GATE_MANIFEST_ARTIFACT,
@@ -359,15 +364,40 @@ fn run_check(
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
     let policy_result = enforce_policy(&output);
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
-    crate::latency::write_receipt_if_requested(
-        options.latency_out.as_deref(),
-        "check",
-        scope_name,
-        &provenance,
-        &clock,
-        output.cards.len(),
-        output_bytes,
-    )
+    let options_digest = crate::latency::digest_options(&[
+        ("policy", options.policy.as_str().to_string()),
+        (
+            "max_cards",
+            options
+                .max_cards
+                .map(|max| max.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
+        ("format", format!("{:?}", options.format)),
+        ("short", options.short.to_string()),
+    ]);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: options.latency_out.as_deref(),
+        command: "check",
+        scope: scope_name,
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })
     .map_err(crate::RunFailure::Tool)?;
     policy_result?;
     Ok(())
@@ -489,15 +519,40 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
     let policy_result = enforce_policy(&output);
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
-    crate::latency::write_receipt_if_requested(
-        check.latency_out.as_deref(),
-        "repo",
-        "repo",
-        &provenance,
-        &clock,
-        output.cards.len(),
-        rendered_bytes,
-    )
+    let options_digest = crate::latency::digest_options(&[
+        ("policy", check.policy.as_str().to_string()),
+        (
+            "max_cards",
+            check
+                .max_cards
+                .map(|max| max.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
+        ("format", format!("{:?}", check.format)),
+        ("short", check.short.to_string()),
+    ]);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: check.latency_out.as_deref(),
+        command: "repo",
+        scope: "repo",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: rendered_bytes,
+    })
     .map_err(crate::RunFailure::Tool)?;
     policy_result?;
     Ok(())
@@ -1659,11 +1714,12 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| artifact_write_failure("create", &options.out_dir, err))?;
-    // Accumulate bytes written across all artifact writes.  The total is
-    // the disk footprint of this run's output bundle — diagnostic only,
-    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
-    // performance guarantee.
-    let mut output_bytes: u64 = 0;
+    // The phase vocabulary is a strict render/write partition shared by all
+    // three review commands: `projections` renders every artifact in memory
+    // and writes nothing; `artifact_writes` writes every rendered artifact
+    // and renders nothing (except the cost-dependent telemetry file, whose
+    // byte total is only known after the other writes).
+    let mut rendered_artifacts: Vec<(&str, String)> = Vec::new();
     let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         // cards.json uses the provenance-aware renderer to emit schema 0.2.
@@ -1681,45 +1737,42 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         if name == "comment-plan.json" {
             comment_plan_artifact = Some(rendered.clone());
         }
-        output_bytes += write_artifact(&options.out_dir.join(name), rendered)?;
+        rendered_artifacts.push((name, rendered));
     }
-    // Renderers and their writes interleave inside each span; the fixed phase
-    // vocabulary records emit order, not a strict render/write partition.
-    clock.tick(crate::latency::PHASE_PROJECTIONS);
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_ARTIFACT,
         render_receipt_audit_markdown(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_JSON_ARTIFACT,
         render_receipt_audit_json(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_JSON_ARTIFACT,
         render_policy_report_json(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_MARKDOWN_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_MARKDOWN_ARTIFACT,
         render_policy_report_markdown(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_CANDIDATES_ARTIFACT,
         first_pr::render_manual_candidates_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_REPAIR_QUEUE_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_REPAIR_QUEUE_ARTIFACT,
         first_pr::render_manual_repair_queue_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        TOKMD_PACKETS_ARTIFACT,
         first_pr::render_tokmd_packets_artifact(
             &root,
             &manual_candidates,
             comment_plan_artifact.as_deref(),
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(REVIEW_KIT_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        REVIEW_KIT_ARTIFACT,
         first_pr::render_review_kit_manifest(
             &output,
             &root,
@@ -1727,11 +1780,17 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &manual_candidates,
             &FIRST_PR_ARTIFACTS,
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
-        render_gate_manifest(&output),
-    )?;
+    ));
+    rendered_artifacts.push((GATE_MANIFEST_ARTIFACT, render_gate_manifest(&output)));
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    // Accumulate bytes written across all artifact writes.  The total is
+    // the disk footprint of this run's output bundle — diagnostic only,
+    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
+    // performance guarantee.
+    let mut output_bytes: u64 = 0;
+    for (name, rendered) in &rendered_artifacts {
+        output_bytes += write_artifact(&options.out_dir.join(name), rendered.clone())?;
+    }
     // Build scan_cost for the telemetry injection.  elapsed_ms is measured here
     // (after all other artifacts are written); output_bytes at this point is the
     // subtotal excluding the telemetry file itself (it cannot include its own
@@ -1747,15 +1806,34 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         render_usefulness_telemetry_with_cost(&output, Some(&scan_cost)),
     )?;
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
-    crate::latency::write_receipt_if_requested(
-        latency_out.as_deref(),
-        "first-pr",
-        "diff",
-        &provenance,
-        &clock,
-        output.cards.len(),
-        output_bytes,
-    )?;
+    let options_digest = crate::latency::digest_options(&[
+        ("policy", "advisory".to_string()),
+        (
+            "max_cards",
+            check
+                .max_cards
+                .map(|max| max.to_string())
+                .unwrap_or_else(|| "none".to_string()),
+        ),
+    ]);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: crate::latency::PolicyOutcome::NotEvaluated,
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: latency_out.as_deref(),
+        command: "first-pr",
+        scope: "diff",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {
         terminal_command,
