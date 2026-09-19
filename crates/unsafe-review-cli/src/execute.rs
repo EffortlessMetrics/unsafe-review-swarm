@@ -25,8 +25,8 @@ use unsafe_review_core::{
     ConfigurationArgs, DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource,
     ImpactInventory, ImpactSubject, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance,
     RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost,
-    Scope, StageInventory, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt, analyze,
-    analyze_with_discovery, analyze_with_discovery_and_repo_events, assemble_aperture,
+    Scope, StageConfigurationInput, StageInventory, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
+    analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events, assemble_aperture,
     assemble_stage_inventory, audit_witness_receipts, baseline_add, baseline_init,
     baseline_init_preview, baseline_refresh_preview, baseline_status, changed_lines_in_diff,
     collect_context_range, compare_outcome_json, discover_environment, discover_repo_files,
@@ -499,13 +499,17 @@ fn run_check(
         relate_same_owner(&config_root, changed, &subjects)
     });
     // Assembled after impact and the configuration bundle so the inventory
-    // can reference both; selecting `--stages` changes nothing else about
-    // the run, and default runs skip this entirely.
+    // can reference both, including a failed environment discovery;
+    // selecting `--stages` changes nothing else about the run, and default
+    // runs skip this entirely.
     let stages = options.stages.then(|| {
         assemble_stage_inventory(
             &output,
             impact.as_ref(),
-            bundle.as_ref().map(|bundle| bundle.digest.as_str()),
+            bundle.as_ref().map(|bundle| StageConfigurationInput {
+                environment_digest: bundle.digest.as_str(),
+                note: bundle.note.as_deref(),
+            }),
         )
     });
     let rendered = render_check_sections(
@@ -3660,7 +3664,7 @@ fn print_check_help() {
         "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
          [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
          [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>] \
-         [--aperture] [--impact]"
+         [--aperture] [--impact] [--stages]"
     );
     println!();
     println!("Options:");
@@ -3685,6 +3689,7 @@ fn print_check_help() {
     );
     println!("- --aperture       append the per-analysis aperture manifest (human/json only)");
     println!("- --impact         append the same-owner impact inventory (human/json only)");
+    println!("- --stages         append the stage/fact-requirement inventory (human/json only)");
     println!("- --json           shorthand for --format json");
     println!("- --markdown       shorthand for --format markdown");
     println!();

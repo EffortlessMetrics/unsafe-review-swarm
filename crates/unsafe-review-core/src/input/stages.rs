@@ -28,6 +28,7 @@ pub const STAGE_SCHEMA_VERSION: u32 = 1;
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum AnalysisStage {
     ScopeResolved,
     ChangedSubjectsAnalyzed,
@@ -54,6 +55,7 @@ impl AnalysisStage {
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum FactState {
     /// Present and complete for the declared scope.
     Available,
@@ -96,6 +98,7 @@ pub struct FactRequirement {
 #[derive(
     Clone, Copy, Debug, PartialEq, Eq, PartialOrd, Ord, serde::Serialize, serde::Deserialize,
 )]
+#[serde(rename_all = "snake_case")]
 pub enum StageCompleteness {
     Complete,
     Partial,
@@ -193,15 +196,26 @@ fn record(
     }
 }
 
+/// Configuration-envelope input for [`assemble_stage_inventory`]: the
+/// evaluated envelope digest plus the discovery note. `None` means no
+/// envelope was selected for this run; `Some` with a note means selection
+/// was attempted but environment discovery failed, so every atom stays
+/// unevaluated and the fact is failed, never available.
+#[derive(Clone, Debug)]
+pub struct StageConfigurationInput<'a> {
+    pub environment_digest: &'a str,
+    pub note: Option<&'a str>,
+}
+
 /// Assemble the stage inventory from one analysis output, an optional
 /// same-owner impact inventory (`--impact`), and an optional evaluated
-/// configuration-envelope digest (explicit `--features`/`--target`
-/// selection). Deterministic: fact order is fixed and the digest covers the
-/// canonical serialization.
+/// configuration envelope (explicit `--features`/`--target` selection).
+/// Deterministic: fact order is fixed and the digest covers the canonical
+/// serialization.
 pub fn assemble_stage_inventory(
     output: &crate::AnalyzeOutput,
     impact: Option<&crate::input::impact::ImpactInventory>,
-    environment_digest: Option<&str>,
+    configuration: Option<StageConfigurationInput<'_>>,
 ) -> StageInventory {
     let summary = &output.summary;
     let identity = &output.analysis_identity;
@@ -322,13 +336,22 @@ pub fn assemble_stage_inventory(
     )];
 
     // Configuration is required before a changed-first action (#2325), so it
-    // is a required fact on the scope stage, not optional enrichment.
-    let configuration_fact = match environment_digest {
-        Some(digest) => required(
-            "configuration_envelope",
-            FactState::Available,
-            Some(format!("environment {digest}")),
-        ),
+    // is a required fact on the scope stage, not optional enrichment. A
+    // failed discovery is a failed fact even though a bundle exists: the
+    // atoms are unevaluated and the requirement is not satisfied.
+    let configuration_fact = match configuration {
+        Some(input) => match input.note {
+            Some(note) => required(
+                "configuration_envelope",
+                FactState::Failed,
+                Some(format!("environment discovery failed ({note})")),
+            ),
+            None => required(
+                "configuration_envelope",
+                FactState::Available,
+                Some(format!("environment {}", input.environment_digest)),
+            ),
+        },
         None => required(
             "configuration_envelope",
             FactState::Pending,
@@ -610,8 +633,14 @@ mod tests {
             limitations: Vec::new(),
             digest: String::new(),
         };
-        let inventory =
-            assemble_stage_inventory(&output, Some(&impact), Some("environment-sha256:abc"));
+        let inventory = assemble_stage_inventory(
+            &output,
+            Some(&impact),
+            Some(StageConfigurationInput {
+                environment_digest: "environment-sha256:abc",
+                note: None,
+            }),
+        );
         let affected_stage = require_stage(&inventory, AnalysisStage::AffectedSubjectsAnalyzed)?;
         if require_fact(affected_stage, "affected_seam_analysis")?.state != FactState::Available {
             return Err("supplied impact must be available".to_string());
@@ -625,6 +654,51 @@ mod tests {
         }
         if scope.completeness != StageCompleteness::Complete {
             return Err("scope must complete with an envelope".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn failed_envelope_discovery_is_a_failed_fact() -> Result<(), String> {
+        // An explicit selection whose discovery failed still yields a
+        // bundle, but its atoms are unevaluated: the requirement fails and
+        // the scope stage blocks instead of reporting satisfied.
+        let output = analyzed_output();
+        let inventory = assemble_stage_inventory(
+            &output,
+            None,
+            Some(StageConfigurationInput {
+                environment_digest: "unknown",
+                note: Some("toolchain probe failed"),
+            }),
+        );
+        let scope = require_stage(&inventory, AnalysisStage::ScopeResolved)?;
+        let envelope = require_fact(scope, "configuration_envelope")?;
+        if envelope.state != FactState::Failed {
+            return Err("failed discovery must not read available".to_string());
+        }
+        if scope.completeness != StageCompleteness::Blocked {
+            return Err("failed envelope must block the scope stage".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn serialized_vocabulary_is_snake_case() -> Result<(), String> {
+        // Consumers follow the as_str vocabulary; PascalCase enum names
+        // must never leak into the versioned artifact.
+        let inventory = assemble_stage_inventory(&analyzed_output(), None, None);
+        let encoding =
+            serde_json::to_string(&inventory).map_err(|err| format!("encode failed: {err}"))?;
+        for forbidden in ["ScopeResolved", "Available", "Complete", "Pending"] {
+            if encoding.contains(forbidden) {
+                return Err(format!("PascalCase leaked into JSON: {forbidden}"));
+            }
+        }
+        for required in ["scope_resolved", "available", "complete", "pending"] {
+            if !encoding.contains(required) {
+                return Err(format!("snake_case missing from JSON: {required}"));
+            }
         }
         Ok(())
     }

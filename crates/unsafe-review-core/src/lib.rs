@@ -94,7 +94,8 @@ pub use input::impact::{
 pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
 pub use input::stages::{
     AnalysisStage, FactRequirement, FactState, STAGE_SCHEMA_VERSION, StageCompleteness,
-    StageInventory, StageRecord, assemble_stage_inventory, render_stages_human,
+    StageConfigurationInput, StageInventory, StageRecord, assemble_stage_inventory,
+    render_stages_human,
 };
 
 /// Compute the SHA-256 hex digest of raw bytes.
