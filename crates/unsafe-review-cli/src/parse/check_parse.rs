@@ -118,12 +118,14 @@ pub(super) fn try_apply_check_arg(
             Ok(Some(1))
         }
         "--target" => {
+            reject_second_target(options)?;
             let triple = value(args, idx + 1, "--target")?;
             reject_empty_target(triple)?;
             options.target = Some(triple.to_string());
             Ok(Some(2))
         }
         arg if arg.starts_with("--target=") => {
+            reject_second_target(options)?;
             let triple = inline_value(arg, "--target")?;
             reject_empty_target(triple)?;
             options.target = Some(triple.to_string());
@@ -140,6 +142,15 @@ fn reject_second_env_selection(options: &CheckOptions, flag: &str) -> Result<(),
         return Err(format!(
             "only one of --features, --all-features, --no-default-features may be given (got {flag} too)"
         ));
+    }
+    Ok(())
+}
+
+/// Reject a second `--target`: the envelope selects exactly one triple,
+/// so a repeated flag is a typo, not an override.
+fn reject_second_target(options: &CheckOptions) -> Result<(), String> {
+    if options.target.is_some() {
+        return Err("--target may be given only once (got --target again)".to_string());
     }
     Ok(())
 }

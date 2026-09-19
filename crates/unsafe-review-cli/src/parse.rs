@@ -1971,6 +1971,18 @@ mod tests {
                     .to_string()
             )
         );
+        let repeated_target = parse(args([
+            "unsafe-review",
+            "check",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--target",
+            "aarch64-apple-darwin",
+        ]));
+        assert_eq!(
+            repeated_target,
+            Err("--target may be given only once (got --target again)".to_string())
+        );
         let empty_target = parse(args(["unsafe-review", "check", "--target", " "]));
         assert_eq!(
             empty_target,
