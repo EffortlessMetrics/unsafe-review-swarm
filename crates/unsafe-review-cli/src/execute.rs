@@ -364,18 +364,12 @@ fn run_check(
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
     let policy_result = enforce_policy(&output);
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
-    let options_digest = crate::latency::digest_options(&[
-        ("policy", options.policy.as_str().to_string()),
-        (
-            "max_cards",
-            options
-                .max_cards
-                .map(|max| max.to_string())
-                .unwrap_or_else(|| "none".to_string()),
-        ),
-        ("format", format!("{:?}", options.format)),
-        ("short", options.short.to_string()),
-    ]);
+    let options_digest = crate::latency::digest_check_options(
+        options.policy.as_str(),
+        options.max_cards,
+        &format!("{:?}", options.format),
+        options.short,
+    );
     let outcome = crate::latency::LatencyOutcome {
         policy: if policy_result.is_ok() {
             crate::latency::PolicyOutcome::Pass
@@ -412,6 +406,14 @@ fn repo(options: RepoOptions) -> Result<(), crate::RunFailure> {
 
 fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     let mut clock = crate::latency::PhaseClock::start();
+    let options_digest = crate::latency::digest_repo_options(
+        options.check.policy.as_str(),
+        options.check.max_cards,
+        &format!("{:?}", options.check.format),
+        options.check.short,
+        &options.discovery,
+        options.timeout_seconds,
+    );
     let check = options.check;
     let provenance = build_provenance(&check);
     let diff = diff_source(&check).map_err(crate::RunFailure::Tool)?;
@@ -519,18 +521,6 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
     let policy_result = enforce_policy(&output);
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
-    let options_digest = crate::latency::digest_options(&[
-        ("policy", check.policy.as_str().to_string()),
-        (
-            "max_cards",
-            check
-                .max_cards
-                .map(|max| max.to_string())
-                .unwrap_or_else(|| "none".to_string()),
-        ),
-        ("format", format!("{:?}", check.format)),
-        ("short", check.short.to_string()),
-    ]);
     let outcome = crate::latency::LatencyOutcome {
         policy: if policy_result.is_ok() {
             crate::latency::PolicyOutcome::Pass
@@ -1436,6 +1426,23 @@ fn repo_partial_path(out: &Path) -> PathBuf {
     out_with_suffix(out, ".partial")
 }
 
+/// Every filesystem output a `repo --out <report>` run owns, so argument
+/// parsing can reject a `--latency-out` destination that would overwrite
+/// one of them: the report itself, its status sidecar and partial file,
+/// and the gate manifest written beside the report.
+pub(crate) fn repo_protected_outputs(report: &Path) -> Vec<(&'static str, PathBuf)> {
+    let gate_manifest = report
+        .parent()
+        .map(|dir| dir.join(GATE_MANIFEST_ARTIFACT))
+        .unwrap_or_else(|| PathBuf::from(GATE_MANIFEST_ARTIFACT));
+    vec![
+        ("--out", report.to_path_buf()),
+        ("status sidecar", repo_status_path(report)),
+        ("partial report", repo_partial_path(report)),
+        ("gate manifest", gate_manifest),
+    ]
+}
+
 fn out_with_suffix(out: &Path, suffix: &str) -> PathBuf {
     if let Some(file_name) = out.file_name() {
         let mut suffixed_file_name = file_name.to_os_string();
@@ -1707,8 +1714,15 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    // The receipt_audit span covers the audit's own receipt-less
+    // re-analysis plus receipt auditing: auditing witness receipts
+    // requires analyzing the same input without them. Comparing this
+    // span's cost with the analyze span is expected, not double counting.
     clock.tick(crate::latency::PHASE_RECEIPT_AUDIT);
     let policy_report = evaluate_policy_report_from_output(&output)?;
+    // The policy_eval span covers policy report evaluation plus loading
+    // the manual candidates, which are policy-domain bundle inputs read
+    // from `.unsafe-review/candidates/`.
     let manual_candidates = load_manual_candidates(&root)?;
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
 
@@ -1806,16 +1820,8 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         render_usefulness_telemetry_with_cost(&output, Some(&scan_cost)),
     )?;
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
-    let options_digest = crate::latency::digest_options(&[
-        ("policy", "advisory".to_string()),
-        (
-            "max_cards",
-            check
-                .max_cards
-                .map(|max| max.to_string())
-                .unwrap_or_else(|| "none".to_string()),
-        ),
-    ]);
+    let options_digest =
+        crate::latency::digest_check_options("advisory", check.max_cards, "bundle", false);
     let outcome = crate::latency::LatencyOutcome {
         policy: crate::latency::PolicyOutcome::NotEvaluated,
         scan_capped: output.summary.scan_capped,

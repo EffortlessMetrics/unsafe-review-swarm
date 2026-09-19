@@ -284,11 +284,48 @@ fn cli_crate_version(workspace_root: &Path) -> Result<String, String> {
 /// Exact commit of a pinned external directory, or a skip reason when the
 /// directory is not a readable git checkout. A row that cannot name its
 /// input commit is skipped, never recorded against an assumed input.
+///
+/// The commit lookup is bound to the directory itself: `git -C <dir>`
+/// walks up past a non-repository, so the toplevel it reports must
+/// canonicalize to `dir`. Otherwise an empty or failed clone would record
+/// the outer checkout's commit as the pinned input's.
 fn pinned_commit(dir: &Path) -> Result<String, String> {
+    let toplevel = Command::new("git")
+        .args([
+            "-C",
+            &dir.display().to_string(),
+            "rev-parse",
+            "--show-toplevel",
+        ])
+        .output()
+        .map_err(|err| format!("pinned dir {} is not a git checkout: {err}", dir.display()))?;
+    if !toplevel.status.success() {
+        return Err(format!(
+            "pinned dir {} is not inside a git work tree",
+            dir.display()
+        ));
+    }
+    let reported = String::from_utf8_lossy(&toplevel.stdout).trim().to_string();
+    let canonical_dir = dir
+        .canonicalize()
+        .map_err(|err| format!("pinned dir {} is unreadable: {err}", dir.display()))?;
+    let canonical_top = PathBuf::from(&reported).canonicalize().map_err(|err| {
+        format!(
+            "pinned dir {} reports an unreadable toplevel: {err}",
+            dir.display()
+        )
+    })?;
+    if canonical_top != canonical_dir {
+        return Err(format!(
+            "pinned dir {} is not itself a repository (toplevel is {})",
+            dir.display(),
+            canonical_top.display()
+        ));
+    }
     let output = Command::new("git")
         .args(["-C", &dir.display().to_string(), "rev-parse", "HEAD"])
         .output()
-        .map_err(|err| format!("pinned dir {} is not a git checkout: {err}", dir.display()))?;
+        .map_err(|err| format!("pinned dir {} has no readable HEAD: {err}", dir.display()))?;
     if !output.status.success() {
         return Err(format!("pinned dir {} has no readable HEAD", dir.display()));
     }
@@ -521,9 +558,17 @@ fn cli_matrix_row_with_meta(
 }
 
 fn skipped_row(id: &str, reason: &str) -> Value {
+    skipped_row_with_kind(
+        id,
+        if id == "lsp-save-loop" { "lsp" } else { "cli" },
+        reason,
+    )
+}
+
+fn skipped_row_with_kind(id: &str, kind: &str, reason: &str) -> Value {
     json!({
         "id": id,
-        "kind": "cli",
+        "kind": kind,
         "meta": {},
         "skipped": reason,
         "runs": [],
@@ -960,6 +1005,27 @@ mod tests {
         expect_rejected(require_superset(&baseline, &same), "unchanged set")?;
         let empty = json!([]);
         expect_rejected(require_superset(&empty, &empty), "empty set")?;
+        Ok(())
+    }
+
+    #[test]
+    fn skipped_lsp_row_keeps_lsp_kind() {
+        let skipped = skipped_row("lsp-save-loop", "no fixture");
+        assert_eq!(skipped["kind"], "lsp");
+        assert_eq!(skipped_row("repo-pinned-memchr", "absent")["kind"], "cli");
+    }
+
+    #[test]
+    fn pinned_commit_rejects_non_repositories() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("latency-norepo-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(|err| format!("test setup failed: {err}"))?;
+        let rejected = pinned_commit(&dir);
+        assert!(
+            rejected.is_err(),
+            "a plain directory must not yield a commit"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
         Ok(())
     }
 

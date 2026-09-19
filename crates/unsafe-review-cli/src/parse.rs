@@ -1183,6 +1183,14 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
                 .to_string(),
         );
     }
+    if let (Some(latency_out), Some(report)) = (&options.check.latency_out, &options.check.out) {
+        let protected = crate::execute::repo_protected_outputs(report);
+        let borrowed: Vec<(&str, &std::path::Path)> = protected
+            .iter()
+            .map(|(flag, path)| (*flag, path.as_path()))
+            .collect();
+        crate::latency::reject_latency_collision(latency_out, &borrowed)?;
+    }
     Ok(options)
 }
 
@@ -2373,6 +2381,29 @@ mod tests {
             listed.is_err(),
             "list-files performs no analysis for a receipt to measure"
         );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_over_repo_sidecars_is_rejected() -> Result<(), String> {
+        for sidecar in [
+            "target/report.json.status.json",
+            "target/report.json.partial",
+            "target/unsafe-review-gate.json",
+        ] {
+            let collided = parse(args([
+                "unsafe-review",
+                "repo",
+                "--out",
+                "target/report.json",
+                "--latency-out",
+                sidecar,
+            ]));
+            assert!(
+                collided.is_err(),
+                "a receipt must not overwrite the repo-owned {sidecar}"
+            );
+        }
         Ok(())
     }
 

@@ -193,6 +193,64 @@ pub(crate) fn input_identity(provenance: &unsafe_review_core::Provenance) -> Str
     "root:unspecified".to_string()
 }
 
+/// Canonical digest of the `check`-family options that affect the analysis:
+/// policy, card cap, and output shape. Paths and other machine-local values
+/// are excluded by construction.
+pub(crate) fn digest_check_options(
+    policy: &str,
+    max_cards: Option<usize>,
+    format: &str,
+    short: bool,
+) -> String {
+    digest_options(&[
+        ("policy", policy.to_string()),
+        ("max_cards", opt_usize(max_cards)),
+        ("format", format.to_string()),
+        ("short", short.to_string()),
+    ])
+}
+
+/// Canonical digest of the `repo` options: everything in
+/// [`digest_check_options`] plus the discovery settings that select the
+/// analyzed file set, plus the scan timeout. Two runs over the same root
+/// with different file selection must never share a digest.
+pub(crate) fn digest_repo_options(
+    policy: &str,
+    max_cards: Option<usize>,
+    format: &str,
+    short: bool,
+    discovery: &unsafe_review_core::DiscoveryOptions,
+    timeout_seconds: Option<u64>,
+) -> String {
+    digest_options(&[
+        ("policy", policy.to_string()),
+        ("max_cards", opt_usize(max_cards)),
+        ("format", format.to_string()),
+        ("short", short.to_string()),
+        ("include", discovery.include.join(",")),
+        ("exclude", discovery.exclude.join(",")),
+        ("respect_gitignore", discovery.respect_gitignore.to_string()),
+        (
+            "large_repo_ignores",
+            discovery.large_repo_ignores.to_string(),
+        ),
+        ("max_files", opt_usize(discovery.max_files)),
+        ("timeout_seconds", opt_u64(timeout_seconds)),
+    ])
+}
+
+fn opt_usize(value: Option<usize>) -> String {
+    value
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "none".to_string())
+}
+
+fn opt_u64(value: Option<u64>) -> String {
+    value
+        .map(|v| v.to_string())
+        .unwrap_or_else(|| "none".to_string())
+}
+
 /// Canonical digest of the command options that affect the analysis.
 /// Each pair is `name=value` in the caller's order; paths and other
 /// machine-local values must not be passed in.
@@ -231,9 +289,12 @@ pub(crate) fn running_binary_digest() -> String {
     }
 }
 
-/// Lexically normalize `path` for collision comparison: absolutize relative
-/// paths against the current directory and resolve `.`/`..` components
-/// without touching the filesystem (targets may not exist yet).
+/// Normalize `path` for collision comparison: absolutize relative paths
+/// against the current directory, then resolve filesystem aliases.
+/// `canonicalize` detects symlink aliases (including aliased parent
+/// directories) but requires the path to exist, so it applies only when it
+/// succeeds; otherwise fall back to lexical `.`/`..` resolution, which
+/// covers not-yet-created outputs.
 fn normalize_for_collision(path: &std::path::Path) -> std::path::PathBuf {
     let absolute = if path.is_absolute() {
         path.to_path_buf()
@@ -242,6 +303,9 @@ fn normalize_for_collision(path: &std::path::Path) -> std::path::PathBuf {
             .unwrap_or_else(|_| std::path::PathBuf::from("."))
             .join(path)
     };
+    if let Ok(canonical) = std::fs::canonicalize(&absolute) {
+        return canonical;
+    }
     let mut normalized = std::path::PathBuf::new();
     for component in absolute.components() {
         match component {
@@ -440,6 +504,49 @@ mod tests {
             ("max_cards", "50".to_string()),
         ];
         assert_ne!(first, digest_options(&changed));
+    }
+
+    #[test]
+    fn repo_digest_distinguishes_file_selection() {
+        use unsafe_review_core::DiscoveryOptions;
+        let base = DiscoveryOptions::repo_defaults();
+        let varied = DiscoveryOptions {
+            include: vec!["src/**".to_string()],
+            ..DiscoveryOptions::repo_defaults()
+        };
+        let first = digest_repo_options("advisory", None, "Json", false, &base, None);
+        assert_eq!(
+            first,
+            digest_repo_options("advisory", None, "Json", false, &base, None)
+        );
+        assert_ne!(
+            first,
+            digest_repo_options("advisory", None, "Json", false, &varied, None)
+        );
+        assert_ne!(
+            first,
+            digest_repo_options("advisory", None, "Json", false, &base, Some(60))
+        );
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn latency_out_symlink_alias_is_rejected() -> Result<(), String> {
+        let dir = std::env::temp_dir().join(format!("latency-collision-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).map_err(|err| format!("test setup failed: {err}"))?;
+        let report = dir.join("report.json");
+        std::fs::write(&report, "{}").map_err(|err| format!("test setup failed: {err}"))?;
+        let alias = dir.join("alias.json");
+        std::os::unix::fs::symlink(&report, &alias)
+            .map_err(|err| format!("test setup failed: {err}"))?;
+        let rejected = reject_latency_collision(&alias, &[("--out", &report)]);
+        assert!(
+            rejected.is_err(),
+            "a symlink alias for the report must collide"
+        );
+        let _ = std::fs::remove_dir_all(&dir);
+        Ok(())
     }
 
     #[test]
