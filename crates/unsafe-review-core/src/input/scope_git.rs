@@ -382,9 +382,8 @@ pub(crate) fn digest_worktree_state(
         // publishing a mixed source generation as current. A same-size,
         // same-mtime rewrite inside one read window stays undetectable; that
         // residual is documented, not denied.
-        let after = std::fs::symlink_metadata(&abs).map_err(|err| {
-            instability_error(path, &format!("vanished mid-read ({err})"))
-        })?;
+        let after = std::fs::symlink_metadata(&abs)
+            .map_err(|err| instability_error(path, &format!("vanished mid-read ({err})")))?;
         if after.file_type() != before.file_type()
             || after.len() != before.len()
             || after.modified().ok() != before.modified().ok()
