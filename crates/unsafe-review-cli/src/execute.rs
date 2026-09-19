@@ -41,6 +41,7 @@ use unsafe_review_core::{
 
 mod card_lookup;
 mod confirm;
+mod environment;
 mod first_pr;
 mod init;
 mod scope;
@@ -238,6 +239,9 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
         ),
         Command::Repo(options) => repo(options),
         Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
+        Command::Environment(options) => {
+            environment::run(&options).map_err(crate::RunFailure::Tool)
+        }
         Command::Pilot(options) => run_check(
             options,
             Scope::Diff,
@@ -3440,6 +3444,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Scope => print_scope_help(),
+        SubcommandHelpTarget::Environment => print_environment_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
         SubcommandHelpTarget::Support => print_support(),
@@ -3459,6 +3464,20 @@ fn print_scope_help() {
     println!("included/omitted files, completeness, digest).");
     println!("The default scope is --worktree. --base selects a commit range (head defaults");
     println!("to HEAD). Identity only: no analysis runs and no safety claim is made.");
+}
+
+fn print_environment_help() {
+    println!("unsafe-review environment: name the analyzed configuration envelope");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review environment [--root .] [--features <a,b>] [--all-features] \\\n         [--no-default-features] [--no-toolchain-probe] [--no-member-expand] \\\n         [--format human|json]"
+    );
+    println!();
+    println!("Read-only: prints the canonical environment identity (workspace, packages,");
+    println!("targets, feature selection, toolchain facts, unknown inputs, digest).");
+    println!("At most one feature-selection flag may be given. Identity only: no analysis");
+    println!("runs, no cards are filtered, and no applicability claim is made.");
 }
 
 fn print_init_help() {

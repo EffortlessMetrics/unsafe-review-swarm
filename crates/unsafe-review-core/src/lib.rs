@@ -63,6 +63,12 @@ pub use input::changeset_spans::{
     changeset_from_external_diff, changeset_from_overlay, changeset_from_snapshot,
     discover_commit_range, render_changeset_human, render_changeset_json,
 };
+pub use input::environment::{
+    AnalysisEnvironment, CargoTargetIdentity, CargoTargetKind, EnvDiscoverOptions,
+    EnvironmentLimitation, EnvironmentLimitationKind, EnvironmentSource, FeatureSelection,
+    PackageIdentity, ToolchainIdentity, discover_environment, render_environment_human,
+    render_environment_json,
+};
 pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
 
 /// Compute the SHA-256 hex digest of raw bytes.
