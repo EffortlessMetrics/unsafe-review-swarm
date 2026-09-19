@@ -146,12 +146,18 @@ fn is_doc_line(line: &str) -> bool {
 
 /// True for comment lines: doc comments, line comments, and block-comment
 /// openers. String literals that merely mention safety markers stay code.
+/// A leading `*` is a comment only for true block-comment continuations
+/// (whitespace, close, or nothing after the star): raw-pointer dereference
+/// assignments such as `*ptr = value;` stay code.
 fn is_comment_line(line: &str) -> bool {
     let trimmed = line.trim_start();
     is_doc_line(line)
         || trimmed.starts_with("//")
         || trimmed.starts_with("/*")
-        || trimmed.starts_with("*")
+        || trimmed == "*"
+        || trimmed.starts_with("* ")
+        || trimmed.starts_with("*\t")
+        || trimmed.starts_with("*/")
 }
 
 /// True for safety-contract markers the analyzer recognizes elsewhere
@@ -759,6 +765,35 @@ mod tests {
             "dropped operations must stay visible: {:?}",
             inventory.limitations
         );
+        Ok(())
+    }
+
+    #[test]
+    fn dereference_assignment_is_code_not_a_comment() -> Result<(), String> {
+        // `*slot = value;` starts with `*` but is a raw-pointer write, not
+        // a block-comment continuation: editing it must reselect the owner.
+        let body = "pub unsafe fn write_slot(slot: *mut u8, value: u8) {\n    *slot = value;\n    unsafe { *slot }\n}\n";
+        let (_dir, root) = fixture_root(&[("src/lib.rs", body)])?;
+        let inventory = relate_same_owner(
+            &root,
+            &changed("src/lib.rs", &[2]),
+            &[subject("UR-op-c1", "src/lib.rs", 3, 14)],
+        );
+        assert_eq!(inventory.affected.len(), 1);
+        assert_eq!(
+            inventory.affected[0].cause,
+            ImpactCause::EnclosingOwnerChanged
+        );
+        // True block-comment continuations stay comments: editing one
+        // affects nothing.
+        let commented = "pub unsafe fn read_checked(ptr: *const u8) -> u8 {\n/*\n * guard note.\n */\n    unsafe { *ptr }\n}\n";
+        let (_dir, root) = fixture_root(&[("src/lib.rs", commented)])?;
+        let inventory = relate_same_owner(
+            &root,
+            &changed("src/lib.rs", &[3]),
+            &[subject("UR-op-c1", "src/lib.rs", 5, 14)],
+        );
+        assert!(inventory.affected.is_empty());
         Ok(())
     }
 
