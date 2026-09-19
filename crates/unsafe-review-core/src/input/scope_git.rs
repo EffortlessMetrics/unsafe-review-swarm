@@ -390,8 +390,11 @@ pub(crate) fn digest_worktree_state(
         {
             return Err(instability_error(path, "changed mid-read"));
         }
+        // The path label is a hash of the raw path bytes, not `display()`:
+        // display lossily collapses non-UTF-8 paths, so two distinct byte
+        // paths with identical content would otherwise share a label.
         hasher_input.push_str(label);
-        hasher_input.push_str(&path.display().to_string());
+        hasher_input.push_str(&sha256_hex_of(path.as_os_str().as_encoded_bytes()));
         hasher_input.push('\n');
         hasher_input.push_str(&sha256_hex_of(&bytes));
         hasher_input.push('\n');
@@ -499,4 +502,54 @@ pub(crate) fn git_output(dir: &Path, args: &[&str], step: &str) -> Result<String
         ));
     }
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::collections::BTreeSet;
+
+    fn unique_dir(prefix: &str) -> Result<PathBuf, String> {
+        let nanos = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map(|duration| duration.as_nanos())
+            .unwrap_or_default();
+        let dir = std::env::temp_dir().join(format!("{prefix}-{}-{nanos}", std::process::id()));
+        std::fs::create_dir_all(&dir).map_err(|err| format!("create temp dir failed: {err}"))?;
+        Ok(dir)
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn worktree_labels_use_path_bytes_not_display() -> Result<(), String> {
+        // Two byte-distinct non-UTF-8 files with identical content must
+        // digest distinctly: `display()`-based labels would collapse them.
+        use std::ffi::OsStr;
+        use std::os::unix::ffi::OsStrExt;
+        let dir = unique_dir("scope-git-labels")?;
+        let first = OsStr::from_bytes(b"a\xff.rs");
+        let second = OsStr::from_bytes(b"a\xfe.rs");
+        std::fs::write(dir.join(first), "same bytes\n")
+            .map_err(|err| format!("write first fixture failed: {err}"))?;
+        std::fs::write(dir.join(second), "same bytes\n")
+            .map_err(|err| format!("write second fixture failed: {err}"))?;
+        let mut unreadable = Vec::new();
+        let mut non_regular = Vec::new();
+        let mut first_paths = BTreeSet::new();
+        first_paths.insert(PathBuf::from(first));
+        let first_digest =
+            digest_worktree_state(&dir, &first_paths, &[], &mut unreadable, &mut non_regular)?;
+        let mut second_paths = BTreeSet::new();
+        second_paths.insert(PathBuf::from(second));
+        let second_digest =
+            digest_worktree_state(&dir, &second_paths, &[], &mut unreadable, &mut non_regular)?;
+        let _ = std::fs::remove_dir_all(&dir);
+        if first_digest == second_digest {
+            return Err("byte-distinct paths must digest distinctly".to_string());
+        }
+        if !unreadable.is_empty() || !non_regular.is_empty() {
+            return Err("both fixtures are regular readable files".to_string());
+        }
+        Ok(())
+    }
 }
