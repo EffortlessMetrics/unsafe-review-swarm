@@ -1065,24 +1065,14 @@ fn parse_environment(args: Vec<String>) -> Result<EnvOptions, String> {
             "--features" => {
                 idx += 1;
                 let raw = value(&args, idx, "--features")?;
-                options.features = EnvFeatureSelect::Explicit(
-                    raw.split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty())
-                        .map(str::to_string)
-                        .collect(),
-                );
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
                 feature_flags += 1;
             }
             arg if arg.starts_with("--features=") => {
                 let raw = inline_value(arg, "--features")?;
-                options.features = EnvFeatureSelect::Explicit(
-                    raw.split(',')
-                        .map(str::trim)
-                        .filter(|item| !item.is_empty())
-                        .map(str::to_string)
-                        .collect(),
-                );
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
                 feature_flags += 1;
             }
             "--all-features" => {
@@ -1117,6 +1107,23 @@ fn parse_environment(args: Vec<String>) -> Result<EnvOptions, String> {
         );
     }
     Ok(options)
+}
+
+/// Split a `--features` value into names. A leading `=` is a typo for the
+/// inline form (`--features =fast` instead of `--features=fast`); accepting
+/// it would record a feature Cargo never recognizes, so it fails closed.
+fn parse_feature_list(raw: &str, flag: &str) -> Result<Vec<String>, String> {
+    if raw.starts_with('=') {
+        return Err(format!(
+            "missing value for {flag} (got `{raw}`; expected `{flag} <a,b>` or `{flag}=<a,b>`)"
+        ));
+    }
+    Ok(raw
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect())
 }
 
 fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
@@ -3483,6 +3490,19 @@ mod tests {
         assert_eq!(
             unknown,
             Err("unknown environment argument `--target`".to_string())
+        );
+        let leading_eq = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "=fast",
+        ]));
+        assert_eq!(
+            leading_eq,
+            Err(
+                "missing value for --features (got `=fast`; expected `--features <a,b>` or `--features=<a,b>`)"
+                    .to_string()
+            )
         );
     }
 
