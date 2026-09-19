@@ -691,6 +691,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
     let mut expected = vec![
         "check",
         "repo",
+        "scope",
         "pr",
         "pr-setup",
         "first-pr",
@@ -1788,4 +1789,71 @@ impl Drop for TempDir {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.path);
     }
+}
+
+#[test]
+fn scope_names_staged_state_and_environment() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-scope-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "scope-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"scope-demo\"\nversion = \"0.1.0\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    fs::write(root.join("src/lib.rs"), "pub fn staged() {}\n")?;
+    run_git(root, &["add", "src/lib.rs"])?;
+
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("scope")
+            .arg("--root")
+            .arg(root)
+            .arg("--staged")
+            .arg("--format")
+            .arg("json"),
+    )?;
+    let value: Value = serde_json::from_str(&String::from_utf8(output.stdout)?)?;
+    assert_eq!(value["changeset"]["scope"], "staged");
+    assert!(
+        value["changeset"]["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("changeset-sha256:"),
+        "change set must carry its subject digest: {value}"
+    );
+    assert_eq!(
+        value["changeset"]["included_files"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert!(
+        value["changeset"]["identities"]["index_state"].is_string(),
+        "staged scope must pin the index state: {value}"
+    );
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("scope")
+            .arg("--root")
+            .arg(root)
+            .arg("--staged"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("scope: staged"),
+        "human scope names the scope: {stdout}"
+    );
+    assert!(
+        stdout.contains("digest: changeset-sha256:"),
+        "human scope names the subject digest: {stdout}"
+    );
+    Ok(())
 }
