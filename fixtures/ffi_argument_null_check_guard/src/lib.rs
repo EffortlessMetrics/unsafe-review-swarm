@@ -1,0 +1,23 @@
+use std::ffi::c_char;
+
+unsafe extern "C" {
+    fn ffi_strlen(s: *const c_char) -> usize;
+}
+
+pub fn guarded(s: *const c_char) -> usize {
+    // SAFETY: ffi_strlen requires non-null; s is null-checked below.
+    if s.is_null() {
+        return 0;
+    }
+    unsafe { ffi_strlen(s) }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::guarded;
+
+    #[test]
+    fn mentions_guarded_wrapper() {
+        let _wrapper = guarded as fn(*const std::ffi::c_char) -> usize;
+    }
+}

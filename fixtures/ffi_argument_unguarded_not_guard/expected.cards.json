@@ -1,0 +1,321 @@
+[
+  {
+    "id": "UR-ffi-argument-unguarded-not-guard-src-lib-rs-unguarded-ffi_call-ffi-ffi-0a13fdd8eb89-ffi_abi-c1",
+    "class": "miri_unsupported",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 9,
+      "column": 5,
+      "kind": "ffi_call",
+      "owner": "unguarded",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { ffi_strlen(s) }"
+    },
+    "operation": "unsafe { ffi_strlen(s) }",
+    "operation_family": "ffi",
+    "hazards": [
+      "ffi_abi",
+      "ffi_ownership"
+    ],
+    "obligations": [
+      "foreign declaration matches ABI and layout on both sides",
+      "ownership, lifetime, and nullability contract is explicit",
+      "call arguments satisfy the callee's pointer contract (non-null, valid)"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "abi",
+        "description": "foreign declaration matches ABI and layout on both sides",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `unguarded` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "ownership, lifetime, and nullability contract is explicit",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `unguarded` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "argument",
+        "description": "call arguments satisfy the callee's pointer contract (non-null, valid)",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No dominating null check was detected for argument `s`"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `unguarded` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `unguarded` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "asan",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "command": "cargo +nightly careful test unguarded",
+        "required": false
+      },
+      {
+        "kind": "human-deep-review",
+        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
+    "verify_commands": [
+      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded",
+      "cargo +nightly careful test unguarded"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { ffi_strlen(s) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded",
+        "route_kind": "asan",
+        "summary": "No test reaches `unguarded` yet; write or identify a focused test for `unguarded` first, then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded",
+        "route_kind": "asan",
+        "steps": [
+          "Confirm ReviewCard `UR-ffi-argument-unguarded-not-guard-src-lib-rs-unguarded-ffi_call-ffi-ffi-0a13fdd8eb89-ffi_abi-c1` still maps to `unsafe { ffi_strlen(s) }` at `src/lib.rs:9:5` before upgrading confidence.",
+          "Write or identify a focused test for `unguarded` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "write or identify a focused test for `unguarded` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test unguarded` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  },
+  {
+    "id": "UR-ffi-argument-unguarded-not-guard-src-lib-rs-added-ffi_call-ffi-ffi-7b7bc5428af5-ffi_abi-c1",
+    "class": "miri_unsupported",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 13,
+      "column": 5,
+      "kind": "ffi_call",
+      "owner": "added",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { ffi_add(a, b) }"
+    },
+    "operation": "unsafe { ffi_add(a, b) }",
+    "operation_family": "ffi",
+    "hazards": [
+      "ffi_abi",
+      "ffi_ownership"
+    ],
+    "obligations": [
+      "foreign declaration matches ABI and layout on both sides",
+      "ownership, lifetime, and nullability contract is explicit"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "abi",
+        "description": "foreign declaration matches ABI and layout on both sides",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `added` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "ownership",
+        "description": "ownership, lifetime, and nullability contract is explicit",
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `added` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `added` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "asan",
+        "reason": "FFI boundary detected; sanitizer/cargo-careful is usually more suitable than Miri for foreign calls",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful can cheaply exercise Rust-side FFI boundary assumptions when a focused test exists",
+        "command": "cargo +nightly careful test added",
+        "required": false
+      },
+      {
+        "kind": "human-deep-review",
+        "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
+        "command": null,
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Use sanitizer/cargo-careful or an explicit FFI boundary contract; Miri may not exercise this seam.",
+    "verify_commands": [
+      "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added",
+      "cargo +nightly careful test added"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `miri_unsupported` ReviewCard for `unsafe { ffi_add(a, b) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added",
+        "route_kind": "asan",
+        "summary": "No test reaches `added` yet; write or identify a focused test for `added` first, then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added",
+        "route_kind": "asan",
+        "steps": [
+          "Confirm ReviewCard `UR-ffi-argument-unguarded-not-guard-src-lib-rs-added-ffi_call-ffi-ffi-7b7bc5428af5-ffi_abi-c1` still maps to `unsafe { ffi_add(a, b) }` at `src/lib.rs:13:5` before upgrading confidence.",
+          "Write or identify a focused test for `added` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "write or identify a focused test for `added` first (no test reaches it yet), then build/run `RUSTFLAGS='-Z sanitizer=address' cargo +nightly test added` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "needs_human"
+    }
+  }
+]

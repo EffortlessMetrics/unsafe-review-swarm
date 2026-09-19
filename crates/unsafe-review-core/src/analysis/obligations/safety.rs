@@ -1,4 +1,8 @@
-use crate::domain::{OperationFamily, SafetyObligation};
+use crate::analysis::evidence::ffi_argument::{
+    ffi_guarded_call_arguments, ffi_pointer_call_arguments,
+};
+use crate::analysis::scanner::ScannedSite;
+use crate::domain::{OperationFamily, SafetyObligation, UnsafeSiteKind};
 
 pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation> {
     match family {
@@ -259,6 +263,28 @@ fn ffi_obligations() -> Vec<SafetyObligation> {
 /// a named local, the caller takes responsibility for validating it. Ignored
 /// (`unsafe { call() };`), discarded (`let _ =`), and nested values carry no
 /// such obligation: silence over noise for ambiguous flow.
+/// Site-conditional FFI obligation: when an `FfiCall` passes a named value
+/// at a raw-pointer parameter position (read from the same-context `extern`
+/// declaration), the caller takes responsibility for argument validity. A
+/// dominating null check for a call argument also implies pointer-ness, so
+/// checked arguments count even without a declaration in context. Calls
+/// with only literals, `_`, integer parameters, or no same-context signal
+/// carry no such obligation: silence over noise for ambiguous flow.
+pub(crate) fn ffi_argument_obligation(site: &ScannedSite, lower: &str) -> Option<SafetyObligation> {
+    if site.site.kind != UnsafeSiteKind::FfiCall {
+        return None;
+    }
+    let pointer_args = ffi_pointer_call_arguments(&site.operation.expression, lower);
+    let guarded_args = ffi_guarded_call_arguments(site, lower);
+    if pointer_args.is_empty() && guarded_args.is_empty() {
+        return None;
+    }
+    Some(SafetyObligation::new(
+        "argument",
+        "call arguments satisfy the callee's pointer contract (non-null, valid)",
+    ))
+}
+
 pub(crate) fn ffi_return_value_obligation(bound_name: Option<&str>) -> Option<SafetyObligation> {
     bound_name.map(|_| {
         SafetyObligation::new(

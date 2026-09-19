@@ -2,7 +2,7 @@ mod hazards;
 mod safety;
 
 pub(crate) use hazards::hazards_for;
-pub(crate) use safety::{ffi_return_value_obligation, obligations_for};
+pub(crate) use safety::{ffi_argument_obligation, ffi_return_value_obligation, obligations_for};
 
 #[cfg(test)]
 mod tests {
