@@ -195,19 +195,31 @@ fn build_footer(scope: &ScopeSelect, root_display: &str, output: &AnalyzeOutput)
     out
 }
 
-pub(crate) fn run(options: &WorkOptions) -> Result<(), crate::RunFailure> {
-    let tool = crate::RunFailure::Tool;
-    let repo = discover_repo(&options.root).map_err(tool)?;
+/// Discover the canonical change set and matching `git diff` text for a
+/// local scope. Shared by `work` (human front door) and `agent tasks`
+/// (machine index) so both analyze exactly the same bytes.
+pub(super) fn local_scope_diff(
+    root: &Path,
+    scope: &ScopeSelect,
+) -> Result<(ChangeSet, String, PathBuf), String> {
+    let repo = discover_repo(root)?;
     let toplevel = repo.toplevel.clone();
     let discover = DiscoverOptions::default();
-    let set: ChangeSet = match options.scope {
-        ScopeSelect::Staged => discover_staged(&toplevel, &repo, &discover).map_err(tool)?,
-        ScopeSelect::Unstaged => discover_unstaged(&toplevel, &repo, &discover).map_err(tool)?,
+    let set: ChangeSet = match scope {
+        ScopeSelect::Staged => discover_staged(&toplevel, &repo, &discover)?,
+        ScopeSelect::Unstaged => discover_unstaged(&toplevel, &repo, &discover)?,
         ScopeSelect::Worktree | ScopeSelect::CommitRange => {
-            discover_worktree(&toplevel, &repo, &discover).map_err(tool)?
+            discover_worktree(&toplevel, &repo, &discover)?
         }
     };
-    let diff_text = run_git(&toplevel, &scope_diff_args(&options.scope)).map_err(tool)?;
+    let diff_text = run_git(&toplevel, &scope_diff_args(scope))?;
+    Ok((set, diff_text, toplevel))
+}
+
+pub(crate) fn run(options: &WorkOptions) -> Result<(), crate::RunFailure> {
+    let tool = crate::RunFailure::Tool;
+    let (set, diff_text, toplevel) =
+        local_scope_diff(&options.root, &options.scope).map_err(tool)?;
     // Staged review analyzes worktree bytes: a file edited after `git add`
     // would otherwise pass as staged-only content. Name every mixed file
     // loudly in the scope header instead.

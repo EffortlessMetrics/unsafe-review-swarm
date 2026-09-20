@@ -1,10 +1,10 @@
 use crate::command::{
-    BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
-    BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
-    CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    ContextQuery, DiffInput, EnvFeatureSelect, EnvOptions, ExternalPrSetupOptions,
-    FirstPrEntrypoint, FirstPrOptions, Format, InitOptions, OutcomeOptions, RepoOptions,
-    ScopeOptions, ScopeSelect, SubcommandHelpTarget, WorkOptions,
+    AgentCommand, AgentTasksOptions, BaselineAddOptions, BaselineCommand, BaselineInitOptions,
+    BaselineRefreshOptions, BaselineStatusOptions, CandidateCommand, CandidateImportOptions,
+    CandidateLintOptions, CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions,
+    CheckOptions, Command, ContextQuery, DiffInput, EnvFeatureSelect, EnvOptions,
+    ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format, InitOptions, OutcomeOptions,
+    RepoOptions, ScopeOptions, ScopeSelect, SubcommandHelpTarget, WorkOptions,
 };
 use std::{
     env,
@@ -75,6 +75,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         "repo" => parse_repo(rest).map(Command::Repo),
         "scope" => parse_scope(rest).map(Command::Scope),
         "work" => parse_work(rest).map(Command::Work),
+        "agent" => parse_agent(rest).map(Command::Agent),
         "environment" => parse_environment(rest).map(Command::Environment),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
@@ -113,6 +114,7 @@ fn is_known_command(command: &str) -> bool {
             | "repo"
             | "scope"
             | "work"
+            | "agent"
             | "environment"
             | "pilot"
             | "badges"
@@ -663,6 +665,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "doctor" => SubcommandHelpTarget::Doctor,
         "scope" => SubcommandHelpTarget::Scope,
         "work" => SubcommandHelpTarget::Work,
+        "agent" => SubcommandHelpTarget::Agent,
         "environment" => SubcommandHelpTarget::Environment,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
@@ -1039,6 +1042,117 @@ fn parse_scope(args: Vec<String>) -> Result<ScopeOptions, String> {
         return Err("--head needs --base: a range head without a base is not a scope".to_string());
     }
     Ok(options)
+}
+
+fn parse_agent(args: Vec<String>) -> Result<AgentCommand, String> {
+    let mut rest = args.as_slice();
+    if rest.first().is_some_and(|word| *word == "help") {
+        return Ok(AgentCommand::Help);
+    }
+    let Some((subcommand, tail)) = rest.split_first() else {
+        return Ok(AgentCommand::Help);
+    };
+    rest = tail;
+    if subcommand != "tasks" {
+        return Err(format!(
+            "unknown agent subcommand `{subcommand}`; expected `tasks` (run `unsafe-review agent --help`)"
+        ));
+    }
+    let mut options = AgentTasksOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < rest.len() {
+        match rest[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(rest, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--scope" => {
+                idx += 1;
+                options.scope = match value(rest, idx, "--scope")? {
+                    "staged" => ScopeSelect::Staged,
+                    "unstaged" => ScopeSelect::Unstaged,
+                    "worktree" => ScopeSelect::Worktree,
+                    other => {
+                        return Err(format!(
+                            "unknown --scope `{other}`; expected staged, unstaged, or worktree"
+                        ));
+                    }
+                };
+                scope_flags += 1;
+            }
+            "--role" => {
+                idx += 1;
+                let raw = value(rest, idx, "--role")?.to_string();
+                unsafe_review_core::TaskRole::parse(&raw)?;
+                options.role = Some(raw);
+            }
+            "--readiness" => {
+                idx += 1;
+                let raw = value(rest, idx, "--readiness")?.to_string();
+                unsafe_review_core::TaskReadiness::parse(&raw)?;
+                options.readiness = Some(raw);
+            }
+            "--human-only" => {
+                options.human_only = true;
+            }
+            "--changed-only" => {
+                options.changed_only = true;
+            }
+            "--max-tasks" => {
+                idx += 1;
+                options.max_tasks = parse_max_cards(value(rest, idx, "--max-tasks")?)?;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_agent_format(value(rest, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_agent_format(inline_value(arg, "--format")?)?;
+            }
+            "--json" => {
+                options.format = Format::Json;
+            }
+            "--help" | "-h" => {
+                return Ok(AgentCommand::Help);
+            }
+            other => return Err(format!("unknown agent tasks argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err(
+            "only one scope selection may be given (--staged, --unstaged, --worktree, --scope)"
+                .to_string(),
+        );
+    }
+    Ok(AgentCommand::Tasks(options))
+}
+
+fn parse_agent_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported agent format `{}`; agent tasks projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
 }
 
 fn parse_work_format(raw: &str) -> Result<Format, String> {
@@ -2184,6 +2298,86 @@ mod tests {
         assert!(
             parse(args(["unsafe-review", "work", "--base", "main"])).is_err(),
             "work is local-only and must reject --base"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_agent_tasks_filters() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "agent", "tasks"]))?;
+        let Command::Agent(AgentCommand::Tasks(options)) = command else {
+            return Err("expected agent tasks command".to_string());
+        };
+        if options.scope != ScopeSelect::Worktree {
+            return Err("agent tasks must default to the worktree scope".to_string());
+        }
+        let command = parse(args([
+            "unsafe-review",
+            "agent",
+            "tasks",
+            "--scope",
+            "staged",
+            "--role",
+            "production",
+            "--readiness",
+            "ready",
+            "--human-only",
+            "--changed-only",
+            "--max-tasks",
+            "5",
+        ]))?;
+        let Command::Agent(AgentCommand::Tasks(options)) = command else {
+            return Err("expected agent tasks command".to_string());
+        };
+        if options.scope != ScopeSelect::Staged
+            || options.role.as_deref() != Some("production")
+            || options.readiness.as_deref() != Some("ready")
+            || !options.human_only
+            || !options.changed_only
+            || options.max_tasks != 5
+        {
+            return Err("agent tasks must honor scope and filters".to_string());
+        }
+        assert!(
+            parse(args(["unsafe-review", "agent", "tasks", "--role", "prod"])).is_err(),
+            "agent tasks must reject unknown roles"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--readiness",
+                "soon"
+            ]))
+            .is_err(),
+            "agent tasks must reject unknown readiness"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--staged",
+                "--unstaged"
+            ]))
+            .is_err(),
+            "agent tasks must reject two scope flags"
+        );
+        assert!(
+            parse(args(["unsafe-review", "agent", "packets"])).is_err(),
+            "agent must reject unknown subcommands"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--format",
+                "sarif"
+            ]))
+            .is_err(),
+            "agent tasks must reject non-human/json formats"
         );
         Ok(())
     }

@@ -14,6 +14,10 @@ mod output;
 mod policy;
 mod util;
 
+pub use output::agent::index::{
+    AGENT_TASK_INDEX_SCHEMA, AgentTask, DEFAULT_MAX_TASKS, TaskIndex, TaskIndexOptions,
+    TaskIndexTruncation, TaskReadiness, TaskRole, assemble_task_index, render_task_index_human,
+};
 pub use output::agent::{
     RepairCandidate, RepairCandidateApplicability, RepairCandidateKind, RepairCandidatePosition,
     RepairCandidateRange, RepairCandidateTarget, RepairEvidenceMovement,
