@@ -45,6 +45,7 @@ use unsafe_review_core::{
     render_witness_plan, summarize_configurations, validate_witness_receipts,
 };
 
+mod agent;
 mod card_lookup;
 mod confirm;
 mod environment;
@@ -247,6 +248,7 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
         Command::Repo(options) => repo(options),
         Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
         Command::Work(options) => work::run(&options),
+        Command::Agent(command) => agent::run(&command),
         Command::Environment(options) => {
             environment::run(&options).map_err(crate::RunFailure::Tool)
         }
@@ -3664,6 +3666,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Scope => print_scope_help(),
         SubcommandHelpTarget::Work => print_work_help(),
+        SubcommandHelpTarget::Agent => agent::print_agent_help(),
         SubcommandHelpTarget::Environment => print_environment_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
@@ -4268,6 +4271,7 @@ fn print_help() {
     println!("  repo         advisory review of every Rust file under --root, not a diff");
     println!("  scope        name the analyzed source state (read-only change-set identity)");
     println!("  work         review staged, unstaged, or combined local changes in one screen");
+    println!("  agent        machine task index over local changes for LLM consumers");
     println!("  environment  name the analyzed configuration envelope (read-only)");
     println!("  pr-setup     print read-only external GitHub PR checkout and raw-diff commands");
     println!();

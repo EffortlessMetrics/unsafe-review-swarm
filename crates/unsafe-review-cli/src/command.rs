@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use unsafe_review_core::{DiscoveryOptions, PolicyMode};
+use unsafe_review_core::{DEFAULT_MAX_TASKS, DiscoveryOptions, PolicyMode};
 
 /// Query surface for `context` — either a single card by id or a file:line range.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -67,6 +67,44 @@ impl Default for WorkOptions {
             max_cards: None,
         }
     }
+}
+
+/// Options for `agent tasks`: the compact machine task index over a local
+/// scope (#2311 PR1). Same scope vocabulary as `work`; filters never
+/// reclassify, and the cap truncates visibly with an expansion path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AgentTasksOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    pub role: Option<String>,
+    pub readiness: Option<String>,
+    pub human_only: bool,
+    pub changed_only: bool,
+    pub max_tasks: usize,
+    pub format: Format,
+}
+
+impl Default for AgentTasksOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            role: None,
+            readiness: None,
+            human_only: false,
+            changed_only: false,
+            max_tasks: DEFAULT_MAX_TASKS,
+            format: Format::Json,
+        }
+    }
+}
+
+/// Agent subcommands. Only the task index ships in PR1; the selected packet
+/// (PR2) and result/recheck envelope (PR3) reuse these identities.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AgentCommand {
+    Tasks(AgentTasksOptions),
+    Help,
 }
 
 /// Options for the read-only `scope` command: name exactly which source
@@ -489,6 +527,7 @@ pub(crate) enum SubcommandHelpTarget {
     Explain,
     Scope,
     Work,
+    Agent,
     Environment,
     Context,
     Confirm,
@@ -519,6 +558,7 @@ pub(crate) enum Command {
     Repo(RepoOptions),
     Scope(ScopeOptions),
     Work(WorkOptions),
+    Agent(AgentCommand),
     Environment(EnvOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
@@ -579,6 +619,10 @@ impl Command {
             Command::Repo(options) => Some(&options.check.root),
             Command::Scope(options) => Some(&options.root),
             Command::Work(options) => Some(&options.root),
+            Command::Agent(command) => match command {
+                AgentCommand::Tasks(options) => Some(&options.root),
+                AgentCommand::Help => None,
+            },
             Command::Environment(options) => Some(&options.root),
             Command::FirstPr(options) => Some(&options.check.root),
             Command::Confirm(options) => Some(&options.root),

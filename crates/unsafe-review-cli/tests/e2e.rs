@@ -701,6 +701,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
         "repo",
         "scope",
         "work",
+        "agent",
         "environment",
         "pr",
         "pr-setup",
@@ -2345,5 +2346,202 @@ fn help_output_mentions_work_front_door() -> Result<(), Box<dyn Error>> {
     )?;
     let work_stdout = String::from_utf8(work_help.stdout)?;
     assert_contains(&work_stdout, "[--staged|--unstaged|--worktree]");
+    Ok(())
+}
+
+fn agent_binary() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+    command.arg("unsafe-review").arg("agent").arg("tasks");
+    command
+}
+
+fn agent_index(root: &Path, extra: &[&str]) -> Result<Value, Box<dyn Error>> {
+    let output = checked_output(agent_binary().arg("--root").arg(root).args(extra))?;
+    Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+}
+
+#[test]
+fn agent_tasks_indexes_staged_scope_with_commands() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-tasks-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    let before = work_tree_state(&root)?;
+
+    let value = agent_index(&root, &["--scope", "staged"])?;
+    assert_eq!(
+        value["schema_version"], "unsafe-review/agent-task-index/v1",
+        "index must carry its versioned schema: {value}"
+    );
+    let tasks = value["tasks"].as_array().ok_or("tasks must be an array")?;
+    assert!(!tasks.is_empty(), "staged unsafe change must yield tasks");
+    let task = &tasks[0];
+    for key in [
+        "task_id",
+        "subject_id",
+        "card_id",
+        "file",
+        "line",
+        "class",
+        "movement",
+        "role",
+        "mechanism",
+        "action_kind",
+        "route_readiness",
+        "agent_applicability",
+        "packet_command",
+        "recheck_command",
+    ] {
+        assert!(task.get(key).is_some(), "task must carry `{key}`: {task}");
+    }
+    assert!(
+        value["changeset_digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("changeset-sha256:"),
+        "index must pin the analyzed change set: {value}"
+    );
+    assert!(
+        value["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("task-index-sha256:"),
+        "index must carry its digest: {value}"
+    );
+    assert_eq!(
+        value["truncation"]["truncated"], false,
+        "index below the cap must not read truncated: {value}"
+    );
+
+    // Execute the generated packet command for the first task.
+    let packet = task["packet_command"]
+        .as_str()
+        .ok_or("packet command must be a string")?;
+    let mut argv: Vec<&str> = packet.split_whitespace().collect();
+    assert_eq!(argv.remove(0), "unsafe-review");
+    let packet_output =
+        checked_output(Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review")).args(argv))?;
+    let packet_stdout = String::from_utf8(packet_output.stdout)?;
+    assert_contains(&packet_stdout, task["card_id"].as_str().unwrap_or_default());
+
+    // Execute the generated recheck command: same scope reproduces the tasks.
+    let recheck = value["tasks"][0]["recheck_command"]
+        .as_str()
+        .ok_or("recheck command must be a string")?;
+    let mut re_argv: Vec<&str> = recheck.split_whitespace().collect();
+    assert_eq!(re_argv.remove(0), "unsafe-review");
+    let recheck_output =
+        checked_output(Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review")).args(re_argv))?;
+    let rechecked: Value = serde_json::from_str(&String::from_utf8(recheck_output.stdout)?)?;
+    assert_eq!(
+        rechecked["tasks"][0]["task_id"], tasks[0]["task_id"],
+        "recheck must reproduce the same tasks"
+    );
+
+    // Read queries never move the index or worktree.
+    assert_eq!(work_tree_state(&root)?, before);
+    Ok(())
+}
+
+#[test]
+fn agent_tasks_filters_narrow_and_caps_truncate() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-filter-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let human_only = agent_index(&root, &["--scope", "staged", "--human-only"])?;
+    for task in human_only["tasks"].as_array().cloned().unwrap_or_default() {
+        assert_eq!(
+            task["agent_applicability"], "human_only",
+            "human-only filter must select human tasks: {task}"
+        );
+    }
+
+    let capped = agent_index(&root, &["--scope", "staged", "--max-tasks", "1"])?;
+    assert_eq!(capped["tasks"].as_array().map(Vec::len), Some(1));
+    assert_eq!(capped["truncation"]["truncated"], true);
+    assert!(
+        capped["truncation"]["omitted_tasks"]
+            .as_u64()
+            .unwrap_or_default()
+            >= 1,
+        "omitted rows must be counted: {capped}"
+    );
+    assert_contains(
+        capped["truncation"]["expansion"]
+            .as_str()
+            .unwrap_or_default(),
+        "--max-tasks",
+    );
+
+    let bad_role = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("agent")
+        .arg("tasks")
+        .arg("--root")
+        .arg(&root)
+        .arg("--role")
+        .arg("prod")
+        .output()?;
+    assert!(!bad_role.status.success(), "unknown role must fail");
+    assert_eq!(bad_role.status.code(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn agent_tasks_human_lists_same_tasks() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-human-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let value = agent_index(&root, &["--scope", "staged"])?;
+    let output = checked_output(
+        agent_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--scope")
+            .arg("staged")
+            .arg("--format")
+            .arg("human"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "Task index unsafe-review/agent-task-index/v1");
+    for task in value["tasks"].as_array().cloned().unwrap_or_default() {
+        let task_id = task["task_id"].as_str().unwrap_or_default();
+        assert_contains(&stdout, task_id);
+    }
+    Ok(())
+}
+
+#[test]
+fn help_output_mentions_agent_tasks() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    assert_contains(
+        &String::from_utf8(output.stdout)?,
+        "agent        machine task index over local changes for LLM consumers",
+    );
+
+    let agent_help = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("agent")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(agent_help.stdout)?;
+    assert_contains(&stdout, "agent tasks");
+    assert_contains(&stdout, "--max-tasks");
+    assert_contains(&stdout, "[--staged|--unstaged|--worktree]");
     Ok(())
 }
