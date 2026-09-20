@@ -700,6 +700,7 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
         "check",
         "repo",
         "scope",
+        "work",
         "environment",
         "pr",
         "pr-setup",
@@ -2138,5 +2139,211 @@ fn check_impact_reselects_unchanged_seams_by_owner() -> Result<(), Box<dyn Error
     assert_eq!(items[0]["owner"], "read_checked");
     assert_eq!(items[0]["code_changed"], true);
     assert_eq!(items[0]["contract_changed"], true);
+    Ok(())
+}
+
+fn work_fixture_repo(prefix: &str) -> Result<(TempDir, PathBuf), Box<dyn Error>> {
+    let temp = TempDir::new(prefix)?;
+    let root = temp.path().to_path_buf();
+    run_git(&root, &["init", "-q"])?;
+    run_git(&root, &["config", "user.email", "test@example.com"])?;
+    run_git(&root, &["config", "user.name", "work-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"work-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    run_git(&root, &["add", "."])?;
+    run_git(&root, &["commit", "-qm", "base"])?;
+    Ok((temp, root))
+}
+
+fn work_tree_state(root: &Path) -> Result<String, Box<dyn Error>> {
+    let staged = run_git(root, &["diff", "--cached"])?;
+    let unstaged = run_git(root, &["diff"])?;
+    let status = run_git(root, &["status", "--porcelain"])?;
+    Ok(format!("{staged}\n---\n{unstaged}\n---\n{status}"))
+}
+
+fn work_binary() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+    command.arg("unsafe-review").arg("work");
+    command
+}
+
+#[test]
+fn work_staged_reviews_index_without_shell_diff() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-staged-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    let before = work_tree_state(&root)?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(
+        &stdout,
+        "unsafe-review work: staged changes (HEAD -> index)",
+    );
+    assert_contains(&stdout, "scope: staged, HEAD ");
+    assert_contains(&stdout, "included: src/lib.rs");
+    assert_contains(&stdout, "changeset ");
+    assert_contains(&stdout, "read_byte");
+    assert_contains(
+        &stdout,
+        "recheck this scope: unsafe-review work --staged --root",
+    );
+    assert_contains(&stdout, "scope identity: unsafe-review scope --root");
+
+    // The authoring loop must not move the index or worktree.
+    assert_eq!(work_tree_state(&root)?, before);
+
+    // Execute the generated recheck command: same scope, same result shape.
+    let recheck = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let recheck_stdout = String::from_utf8(recheck.stdout)?;
+    assert_contains(&recheck_stdout, "scope: staged, HEAD ");
+
+    // Execute the generated explain command for the top JSON card.
+    let json_output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--json"),
+    )?;
+    let value: Value = serde_json::from_str(&String::from_utf8(json_output.stdout)?)?;
+    let card_id = value["cards"][0]["id"]
+        .as_str()
+        .ok_or("work json must carry card ids")?;
+    assert!(!card_id.is_empty(), "card id must not be empty");
+    let explain = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("explain")
+            .arg("--root")
+            .arg(&root)
+            .arg(card_id),
+    )?;
+    let explained = String::from_utf8(explain.stdout)?;
+    assert_contains(&explained, card_id);
+    Ok(())
+}
+
+#[test]
+fn work_staged_names_mixed_unstaged_edits() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-mixed-e2e")?;
+    fs::write(root.join("src/lib.rs"), "pub fn staged() {}\n")?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub fn staged() {}\n\npub fn also_unstaged() {}\n",
+    )?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "also has unstaged edits");
+    assert_contains(
+        &stdout,
+        "worktree bytes are analyzed, not staged-only content",
+    );
+    assert_contains(&stdout, "src/lib.rs");
+    Ok(())
+}
+
+#[test]
+fn work_quiet_scope_names_scope_never_safe() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-quiet-e2e")?;
+    fs::write(root.join("src/lib.rs"), "pub fn harmless() {}\n")?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "scope: staged, HEAD ");
+    assert_contains(&stdout, "No changed unsafe-review gaps were found");
+    assert_contains(&stdout, "cards: 0");
+    Ok(())
+}
+
+#[test]
+fn work_rejects_scope_conflicts_and_non_git_roots() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-reject-e2e")?;
+
+    let conflict = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("work")
+        .arg("--root")
+        .arg(&root)
+        .arg("--staged")
+        .arg("--unstaged")
+        .output()?;
+    assert!(!conflict.status.success(), "two scope flags must fail");
+    assert_eq!(conflict.status.code(), Some(2));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&conflict.stderr),
+        String::from_utf8_lossy(&conflict.stdout)
+    );
+    assert_contains(&combined, "only one of --staged, --unstaged, --worktree");
+
+    let bare = TempDir::new("unsafe-review-work-no-git-e2e")?;
+    let outside = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("work")
+        .arg("--root")
+        .arg(bare.path())
+        .output()?;
+    assert!(!outside.status.success(), "work outside git must fail");
+    assert_eq!(outside.status.code(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn help_output_mentions_work_front_door() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(
+        &stdout,
+        "work         review staged, unstaged, or combined local changes in one screen",
+    );
+
+    let work_help = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("work")
+            .arg("--help"),
+    )?;
+    let work_stdout = String::from_utf8(work_help.stdout)?;
+    assert_contains(&work_stdout, "[--staged|--unstaged|--worktree]");
     Ok(())
 }
