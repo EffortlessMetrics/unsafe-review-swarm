@@ -2542,5 +2542,6 @@ fn help_output_mentions_agent_tasks() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(agent_help.stdout)?;
     assert_contains(&stdout, "agent tasks");
     assert_contains(&stdout, "--max-tasks");
+    assert_contains(&stdout, "[--staged|--unstaged|--worktree]");
     Ok(())
 }

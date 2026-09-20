@@ -132,7 +132,7 @@ pub(crate) fn print_agent_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review agent tasks [--scope staged|unstaged|worktree] [--root .] \\\n         [--role production|test|generated|unknown] [--readiness ready|needs_human|requires_witness_receipt|unsupported] \\\n         [--human-only] [--changed-only] [--max-tasks <N>] [--format human|json]"
+        "  unsafe-review agent tasks [--staged|--unstaged|--worktree] [--scope staged|unstaged|worktree] [--root .] \\\n         [--role production|test|generated|unknown] [--readiness ready|needs_human|requires_witness_receipt|unsupported] \\\n         [--human-only] [--changed-only] [--max-tasks <N>] [--format human|json]"
     );
     println!();
     println!("Read-only: one bounded row per actionable card with exact analysis,");

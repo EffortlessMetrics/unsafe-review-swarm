@@ -1116,7 +1116,7 @@ fn parse_agent(args: Vec<String>) -> Result<AgentCommand, String> {
             }
             "--max-tasks" => {
                 idx += 1;
-                options.max_tasks = parse_max_cards(value(rest, idx, "--max-tasks")?)?;
+                options.max_tasks = parse_max_tasks(value(rest, idx, "--max-tasks")?)?;
             }
             "--format" => {
                 idx += 1;
@@ -1999,6 +1999,11 @@ fn parse_max_files(raw: &str) -> Result<usize, String> {
         .map_err(|err| format!("invalid --max-files `{raw}`: {err}"))
 }
 
+fn parse_max_tasks(raw: &str) -> Result<usize, String> {
+    raw.parse::<usize>()
+        .map_err(|err| format!("invalid --max-tasks `{raw}`: {err}"))
+}
+
 fn parse_timeout_seconds(raw: &str) -> Result<u64, String> {
     let seconds = raw
         .parse::<u64>()
@@ -2378,6 +2383,20 @@ mod tests {
             ]))
             .is_err(),
             "agent tasks must reject non-human/json formats"
+        );
+        let error = match parse(args([
+            "unsafe-review",
+            "agent",
+            "tasks",
+            "--max-tasks",
+            "many",
+        ])) {
+            Ok(_) => return Err("non-numeric --max-tasks should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("invalid --max-tasks"),
+            "error must name the flag the user typed"
         );
         Ok(())
     }
