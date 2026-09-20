@@ -4,7 +4,7 @@ use crate::command::{
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
     ContextQuery, DiffInput, EnvFeatureSelect, EnvOptions, ExternalPrSetupOptions,
     FirstPrEntrypoint, FirstPrOptions, Format, InitOptions, OutcomeOptions, RepoOptions,
-    ScopeOptions, ScopeSelect, SubcommandHelpTarget,
+    ScopeOptions, ScopeSelect, SubcommandHelpTarget, WorkOptions,
 };
 use std::{
     env,
@@ -74,6 +74,7 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
         }
         "repo" => parse_repo(rest).map(Command::Repo),
         "scope" => parse_scope(rest).map(Command::Scope),
+        "work" => parse_work(rest).map(Command::Work),
         "environment" => parse_environment(rest).map(Command::Environment),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
@@ -111,6 +112,7 @@ fn is_known_command(command: &str) -> bool {
             | "pr"
             | "repo"
             | "scope"
+            | "work"
             | "environment"
             | "pilot"
             | "badges"
@@ -660,6 +662,7 @@ fn subcommand_help_for(command: &str) -> Command {
         "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
         "scope" => SubcommandHelpTarget::Scope,
+        "work" => SubcommandHelpTarget::Work,
         "environment" => SubcommandHelpTarget::Environment,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
@@ -1034,6 +1037,72 @@ fn parse_scope(args: Vec<String>) -> Result<ScopeOptions, String> {
     }
     if options.head.is_some() && options.base.is_none() {
         return Err("--head needs --base: a range head without a base is not a scope".to_string());
+    }
+    Ok(options)
+}
+
+fn parse_work_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported work format `{}`; work projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_work(args: Vec<String>) -> Result<WorkOptions, String> {
+    let mut options = WorkOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--short" => {
+                options.short = true;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_work_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_work_format(inline_value(arg, "--format")?)?;
+            }
+            "--json" => {
+                options.format = Format::Json;
+            }
+            "--max-cards" => {
+                idx += 1;
+                options.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+            }
+            arg if arg.starts_with("--max-cards=") => {
+                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+            }
+            other => return Err(format!("unknown work argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err("only one of --staged, --unstaged, --worktree may be given".to_string());
     }
     Ok(options)
 }
@@ -2086,6 +2155,37 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn parses_work_scope_flags() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "work"]))?;
+        let Command::Work(options) = command else {
+            return Err("expected work command".to_string());
+        };
+        if options.scope != ScopeSelect::Worktree {
+            return Err("work must default to the worktree scope".to_string());
+        }
+        let command = parse(args(["unsafe-review", "work", "--staged", "--short"]))?;
+        let Command::Work(options) = command else {
+            return Err("expected work command".to_string());
+        };
+        if options.scope != ScopeSelect::Staged || !options.short {
+            return Err("work must honor --staged --short".to_string());
+        }
+        assert!(
+            parse(args(["unsafe-review", "work", "--staged", "--unstaged"])).is_err(),
+            "work must reject two scope flags"
+        );
+        assert!(
+            parse(args(["unsafe-review", "work", "--format", "sarif"])).is_err(),
+            "work must reject non-human/json formats"
+        );
+        assert!(
+            parse(args(["unsafe-review", "work", "--base", "main"])).is_err(),
+            "work is local-only and must reject --base"
+        );
+        Ok(())
     }
 
     #[test]

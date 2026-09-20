@@ -44,6 +44,31 @@ pub(crate) enum ScopeSelect {
     CommitRange,
 }
 
+/// Options for the local authoring `work` command: review staged, unstaged,
+/// or combined worktree changes without shell-created diff files (#2310).
+/// The default scope is the full worktree (staged plus unstaged) against
+/// HEAD; the chosen scope is always visible in the first output line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct WorkOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    pub short: bool,
+    pub format: Format,
+    pub max_cards: Option<usize>,
+}
+
+impl Default for WorkOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            short: false,
+            format: Format::Human,
+            max_cards: None,
+        }
+    }
+}
+
 /// Options for the read-only `scope` command: name exactly which source
 /// state a review would analyze, without running the analysis. The
 /// configuration envelope belongs to the environment-identity slice (#2318).
@@ -463,6 +488,7 @@ pub(crate) enum SubcommandHelpTarget {
     Pilot,
     Explain,
     Scope,
+    Work,
     Environment,
     Context,
     Confirm,
@@ -492,6 +518,7 @@ pub(crate) enum Command {
     Check(CheckOptions),
     Repo(RepoOptions),
     Scope(ScopeOptions),
+    Work(WorkOptions),
     Environment(EnvOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
@@ -551,6 +578,7 @@ impl Command {
             | Command::PolicyReport(options) => Some(&options.root),
             Command::Repo(options) => Some(&options.check.root),
             Command::Scope(options) => Some(&options.root),
+            Command::Work(options) => Some(&options.root),
             Command::Environment(options) => Some(&options.root),
             Command::FirstPr(options) => Some(&options.check.root),
             Command::Confirm(options) => Some(&options.root),

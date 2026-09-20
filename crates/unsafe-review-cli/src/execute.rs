@@ -51,6 +51,7 @@ mod environment;
 mod first_pr;
 mod init;
 mod scope;
+mod work;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
 
@@ -245,6 +246,7 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
         ),
         Command::Repo(options) => repo(options),
         Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
+        Command::Work(options) => work::run(&options),
         Command::Environment(options) => {
             environment::run(&options).map_err(crate::RunFailure::Tool)
         }
@@ -442,11 +444,48 @@ fn render_check_sections(
     }
 }
 
+/// Footer builder for a framed `run_check` invocation: rendered after the
+/// analysis output is known, so it can name exact card follow-ups.
+pub(crate) type CheckFooter = Box<dyn FnOnce(&AnalyzeOutput) -> String>;
+
+/// Framing for one `run_check` invocation: which command name the latency
+/// receipt carries, plus an optional human-only header/footer around the
+/// rendered output. `check` and `pilot` pass no frame; `work` names its
+/// scope, identities, and copyable next commands.
+pub(crate) struct CheckFrame {
+    pub command_name: &'static str,
+    pub header: Option<String>,
+    pub footer: Option<CheckFooter>,
+}
+
 fn run_check(
     options: CheckOptions,
     scope: Scope,
     mode: AnalysisMode,
     discovery: DiscoveryOptions,
+) -> Result<(), crate::RunFailure> {
+    let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
+    run_check_with_diff(
+        options,
+        scope,
+        mode,
+        discovery,
+        diff,
+        CheckFrame {
+            command_name: "check",
+            header: None,
+            footer: None,
+        },
+    )
+}
+
+fn run_check_with_diff(
+    options: CheckOptions,
+    scope: Scope,
+    mode: AnalysisMode,
+    discovery: DiscoveryOptions,
+    diff: DiffSource,
+    frame: CheckFrame,
 ) -> Result<(), crate::RunFailure> {
     let mut clock = crate::latency::PhaseClock::start();
     let scope_name = scope.as_str();
@@ -456,7 +495,6 @@ fn run_check(
     let config_root = options.root.clone();
     let config_features = options.env_features.clone();
     let config_target = options.target.clone();
-    let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
     // Captured before `diff` moves into the analysis input, and only when
     // `--impact` is selected: parsing the diff twice on every run would
     // waste a full parse plus a second diff-file read for nothing.
@@ -523,14 +561,30 @@ fn run_check(
         stages.as_ref(),
     );
     clock.tick(crate::latency::PHASE_PROJECTIONS);
-    let output_bytes = rendered.len() as u64;
+    // The work frame wraps human output only: headers and next-command
+    // footers are console guidance, never part of a machine artifact.
+    let framed = match (&options.format, frame.header, frame.footer) {
+        (Format::Human, header, footer) => {
+            let mut out = String::new();
+            if let Some(header) = header {
+                out.push_str(&header);
+            }
+            out.push_str(&rendered);
+            if let Some(footer) = footer {
+                out.push_str(&footer(&output));
+            }
+            out
+        }
+        _ => rendered,
+    };
+    let output_bytes = framed.len() as u64;
     if let Some(path) = options.out {
         ensure_parent_dir(&path).map_err(crate::RunFailure::Tool)?;
-        fs::write(&path, &rendered).map_err(|err| {
+        fs::write(&path, &framed).map_err(|err| {
             crate::RunFailure::Tool(format!("write {} failed: {err}", path.display()))
         })?;
     } else {
-        println!("{rendered}");
+        println!("{framed}");
     }
     clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
     let policy_result = enforce_policy(&output);
@@ -554,7 +608,7 @@ fn run_check(
     };
     crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
         path: options.latency_out.as_deref(),
-        command: "check",
+        command: frame.command_name,
         scope: scope_name,
         provenance: &provenance,
         options_digest: &options_digest,
@@ -3609,6 +3663,7 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
         SubcommandHelpTarget::Scope => print_scope_help(),
+        SubcommandHelpTarget::Work => print_work_help(),
         SubcommandHelpTarget::Environment => print_environment_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
@@ -3629,6 +3684,22 @@ fn print_scope_help() {
     println!("included/omitted files, completeness, digest).");
     println!("The default scope is --worktree. --base selects a commit range (head defaults");
     println!("to HEAD). Identity only: no analysis runs and no safety claim is made.");
+}
+
+fn print_work_help() {
+    println!("unsafe-review work: review local changes in one screen");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review work [--root .] [--staged|--unstaged|--worktree] [--short] \\\n         [--format human|json] [--max-cards <N>]"
+    );
+    println!();
+    println!("Advisory review of staged (HEAD -> index), unstaged (index -> worktree),");
+    println!("or combined worktree changes against HEAD. The default scope is --worktree;");
+    println!("the chosen scope and its identities headline every run. Same canonical");
+    println!("cards and renderers as `check`; no PR bundle, no source edits, no hooks.");
+    println!("Files both staged and unstaged are named loudly on --staged runs because");
+    println!("worktree bytes are analyzed. Human and json project the same tasks.");
 }
 
 fn print_environment_help() {
@@ -4196,6 +4267,7 @@ fn print_help() {
     println!("  pilot        quick diff review capped at 5 cards");
     println!("  repo         advisory review of every Rust file under --root, not a diff");
     println!("  scope        name the analyzed source state (read-only change-set identity)");
+    println!("  work         review staged, unstaged, or combined local changes in one screen");
     println!("  environment  name the analyzed configuration envelope (read-only)");
     println!("  pr-setup     print read-only external GitHub PR checkout and raw-diff commands");
     println!();
