@@ -1206,13 +1206,12 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
 
     let temp = TempDir::new("unsafe-review-init-path-encoding")?;
     let root = temp.path().join(OsString::from_vec(b"repo-\xff".to_vec()));
+    init_handoff_repo(&root)?;
+    run_git(&root, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
     let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
     fs::create_dir_all(workflow.parent().ok_or("workflow parent")?)?;
-    fs::write(
-        root.join("Cargo.toml"),
-        "[package]\nname = \"encoded-root\"\n",
-    )?;
     fs::write(&workflow, "name: owner-managed-workflow\n")?;
+    let before = work_tree_state(&root)?;
     // Lossy conversion must never redirect inspection or a later command.
     let lossy_alias = PathBuf::from(root.to_string_lossy().into_owned());
     fs::create_dir_all(&lossy_alias)?;
@@ -1232,10 +1231,18 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
     let proposal: Value = serde_json::from_slice(&first.stdout)?;
     assert_eq!(proposal["mode"], "preview_only");
     assert_eq!(proposal["writes_repository"], false);
+    assert!(proposal.as_object().ok_or("proposal")?.contains_key("root"));
     assert!(proposal["root"].is_null());
     assert!(proposal["root_display"].is_string());
     assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert_eq!(proposal["repository"]["base_ref"], "origin/main");
     assert_eq!(proposal["proposed_files"][0]["status"], "conflict");
+    assert!(
+        proposal["proposed_files"][0]
+            .as_object()
+            .ok_or("file")?
+            .contains_key("absolute_path")
+    );
     assert!(proposal["proposed_files"][0]["absolute_path"].is_null());
     assert_contains(
         proposal["proposed_files"][0]["diff"]
@@ -1250,6 +1257,12 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
         "review_baseline_separately",
     ] {
         assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands")?
+                .contains_key(key)
+        );
+        assert!(
             proposal["commands"][key].is_null(),
             "lossy command/path: {key}"
         );
@@ -1263,6 +1276,24 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
     let recommendations = proposal["recommendations"]
         .as_array()
         .ok_or("recommendations")?;
+    for (kind, keys) in [
+        ("baseline", vec!["command", "ledger_path", "snapshot_path"]),
+        ("badge", vec!["command"]),
+        ("ub_review", vec!["artifact"]),
+    ] {
+        let recommendation = recommendations
+            .iter()
+            .find(|item| item["kind"] == kind)
+            .ok_or("recommendation")?;
+        for key in keys {
+            assert!(
+                recommendation
+                    .as_object()
+                    .ok_or("recommendation object")?
+                    .contains_key(key)
+            );
+        }
+    }
     for recommendation in recommendations {
         for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
             assert!(recommendation[key].is_null(), "lossy recommendation: {key}");
@@ -1272,9 +1303,12 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
     assert_contains(&human, "unrepresentable_path");
     assert_contains(&human, "unavailable");
     assert!(!human.contains("unsafe-review doctor --root"));
+    assert!(!human.contains("Provide an explicit --base"));
     assert_eq!(first.stdout, run_init("json", false)?.stdout);
+    assert!(!proposal_dir.exists());
     assert_eq!(first.stdout, run_init("json", true)?.stdout);
     assert!(proposal_dir.join("unsafe-review-init.json").is_file());
+    assert_eq!(fs::read_dir(&proposal_dir)?.count(), 1);
     assert_eq!(
         fs::read_to_string(&workflow)?,
         "name: owner-managed-workflow\n"
@@ -1283,6 +1317,7 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
         assert!(!root.join(destination).exists());
         assert!(!lossy_alias.join(destination).exists());
     }
+    assert_eq!(work_tree_state(&root)?, before);
     Ok(())
 }
 
