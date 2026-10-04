@@ -511,3 +511,55 @@ jobs:
             ${{ steps.core-verdict.outputs.diagnostics_path }}
           if-no-files-found: ignore
           retention-days: 7
+      # Temporary #2350 proof: a fresh focused execution exposes only fixed
+      # test identities/outcomes. It never reads the prior run's artifact or
+      # core.log, and cannot replace or change the required core verdict.
+      - name: Observe init handoff regressions for PR 2350
+        if: ${{ always() && github.event_name == 'pull_request' && github.event.pull_request.number == 2350 }}
+        continue-on-error: true
+        timeout-minutes: 5
+        env:
+          INIT_REGRESSION_PR_HEAD: ${{ github.event.pull_request.head.sha }}
+        run: |
+          set -uo pipefail
+          umask 077
+          observation="$(mktemp "${RUNNER_TEMP}/init-regression-XXXXXX")"
+          trap 'rm -f -- "$observation"' EXIT
+          checkout_sha="$(git rev-parse HEAD)"
+          for sha in "$checkout_sha" "$INIT_REGRESSION_PR_HEAD"; do
+            [[ "$sha" =~ ^[0-9a-f]{40}$ ]] || exit 1
+          done
+          git merge-base --is-ancestor "$INIT_REGRESSION_PR_HEAD" "$checkout_sha" || exit 1
+          printf 'init-regression checkout=%s pr_head=%s\n' "$checkout_sha" "$INIT_REGRESSION_PR_HEAD"
+          if CARGO_TERM_COLOR=never cargo test --locked -p unsafe-review-cli --test e2e --no-run >"$observation" 2>&1; then
+            printf 'init-regression compile=PASS cargo_exit=0\n'
+          else
+            compile_exit=$?
+            printf 'init-regression compile=FAIL cargo_exit=%s\n' "$compile_exit"
+            # Error codes, without compiler messages or source snippets.
+            LC_ALL=C awk 'match($0, /error\[E[0-9][0-9][0-9][0-9]\]/) {print substr($0, RSTART + 6, 5)}' "$observation" \
+              | sort -u | head -n 5 | sed 's/^/init-regression compiler_code=/'
+            exit 1
+          fi
+          missing=0
+          for test_name in \
+            init_handoffs_keep_foreign_root_base_and_output \
+            init_missing_base_requires_input_instead_of_repo_scan \
+            init_handoff_carries_each_detected_base \
+            init_unrepresentable_root_retains_preview_without_lossy_handoffs; do
+            if CARGO_TERM_COLOR=never cargo test --locked -p unsafe-review-cli --test e2e "$test_name" -- --exact --color never >"$observation" 2>&1; then
+              cargo_exit=0
+            else
+              cargo_exit=$?
+            fi
+            outcome="$(LC_ALL=C awk -v name="$test_name" '
+              $0 == "test " name " ... ok" {status = "PASS"}
+              $0 == "test " name " ... FAILED" {status = "FAIL"}
+              END {print status == "" ? "NOT_OBSERVED" : status}
+            ' "$observation")"
+            printf 'init-regression name=%s outcome=%s cargo_exit=%s\n' "$test_name" "$outcome" "$cargo_exit"
+            if [ "$outcome" = "NOT_OBSERVED" ]; then
+              missing=1
+            fi
+          done
+          exit "$missing"

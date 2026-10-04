@@ -1197,6 +1197,95 @@ fn init_is_preview_only_deterministic_and_conflict_visible() -> Result<(), Box<d
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<(), Box<dyn Error>>
+{
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    let temp = TempDir::new("unsafe-review-init-path-encoding")?;
+    let root = temp.path().join(OsString::from_vec(b"repo-\xff".to_vec()));
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::create_dir_all(workflow.parent().ok_or("workflow parent")?)?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"encoded-root\"\n",
+    )?;
+    fs::write(&workflow, "name: owner-managed-workflow\n")?;
+    // Lossy conversion must never redirect inspection or a later command.
+    let lossy_alias = PathBuf::from(root.to_string_lossy().into_owned());
+    fs::create_dir_all(&lossy_alias)?;
+    fs::write(lossy_alias.join("alias-only.txt"), "wrong repository\n")?;
+    let proposal_dir = temp.path().join("proposal");
+    let run_init = |format, out: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command.args(["unsafe-review", "init", "--format", format]);
+        command.current_dir(&root);
+        if out {
+            command.arg("--out").arg(&proposal_dir);
+        }
+        checked_output(&mut command)
+    };
+
+    let first = run_init("json", false)?;
+    let proposal: Value = serde_json::from_slice(&first.stdout)?;
+    assert_eq!(proposal["mode"], "preview_only");
+    assert_eq!(proposal["writes_repository"], false);
+    assert!(proposal["root"].is_null());
+    assert!(proposal["root_display"].is_string());
+    assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert_eq!(proposal["proposed_files"][0]["status"], "conflict");
+    assert!(proposal["proposed_files"][0]["absolute_path"].is_null());
+    assert_contains(
+        proposal["proposed_files"][0]["diff"]
+            .as_str()
+            .ok_or("diff")?,
+        "owner-managed-workflow",
+    );
+    for key in [
+        "doctor",
+        "first_pr",
+        "first_pr_artifacts",
+        "review_baseline_separately",
+    ] {
+        assert!(
+            proposal["commands"][key].is_null(),
+            "lossy command/path: {key}"
+        );
+    }
+    let warnings = proposal["warnings"].as_array().ok_or("warnings")?;
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    let recommendations = proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?;
+    for recommendation in recommendations {
+        for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
+            assert!(recommendation[key].is_null(), "lossy recommendation: {key}");
+        }
+    }
+    let human = String::from_utf8(run_init("human", false)?.stdout)?;
+    assert_contains(&human, "unrepresentable_path");
+    assert_contains(&human, "unavailable");
+    assert!(!human.contains("unsafe-review doctor --root"));
+    assert_eq!(first.stdout, run_init("json", false)?.stdout);
+    assert_eq!(first.stdout, run_init("json", true)?.stdout);
+    assert!(proposal_dir.join("unsafe-review-init.json").is_file());
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: owner-managed-workflow\n"
+    );
+    for destination in ["target", "policy", "badges", "unsafe-review-init.json"] {
+        assert!(!root.join(destination).exists());
+        assert!(!lossy_alias.join(destination).exists());
+    }
+    Ok(())
+}
+
 #[test]
 fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-init-foreign-root")?;
