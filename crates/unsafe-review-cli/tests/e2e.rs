@@ -1205,9 +1205,10 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
     init_handoff_repo(&caller)?;
     init_handoff_repo(&target)?;
     fs::write(
-        caller.join("src/lib.rs"),
+        caller.join("src/caller_only.rs"),
         "pub unsafe fn caller_only(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
     )?;
+    fs::write(caller.join("src/inherited.rs"), "pub fn caller_safe() {}\n")?;
     let caller_before = work_tree_state(&caller)?;
     run_git(&target, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
     fs::write(
@@ -1222,6 +1223,11 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
     let proposal = init_handoff_proposal(&caller, &relative_target)?;
     let absolute_proposal = init_handoff_proposal(&caller, &target)?;
     assert_eq!(proposal["commands"], absolute_proposal["commands"]);
+    let resolved_target = PathBuf::from(proposal["root"].as_str().ok_or("resolved root")?);
+    assert_eq!(
+        fs::canonicalize(&resolved_target)?,
+        fs::canonicalize(&target)?
+    );
     let first_pr = proposal["commands"]["first_pr"]
         .as_str()
         .ok_or("first PR command missing despite resolvable base")?;
@@ -1243,14 +1249,20 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
     for (label, key) in [("Doctor", "doctor"), ("First PR", "first_pr")] {
         let command = proposal["commands"][key].as_str().ok_or("command string")?;
         assert_contains(&human, &format!("- {label}: {command}\n"));
-        init_follow_handoff(&caller, command)?;
+        let output = init_follow_handoff(&caller, command)?;
+        if key == "doctor" {
+            assert_contains(
+                &String::from_utf8(output.stdout)?,
+                &format!("workspace root: {}", resolved_target.display()),
+            );
+        }
     }
     let artifact_dir = PathBuf::from(
         proposal["commands"]["first_pr_artifacts"]
             .as_str()
             .ok_or("artifact destination")?,
     );
-    assert_eq!(artifact_dir, target.join("target/unsafe-review"));
+    assert_eq!(artifact_dir, resolved_target.join("target/unsafe-review"));
     let cards: Value = serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
     let cards = cards["cards"].as_array().ok_or("cards array")?;
     assert!(!cards.is_empty(), "changed unsafe seam must be selected");
@@ -1268,6 +1280,26 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
         .ok_or("badge")?;
     init_follow_handoff(&caller, badge["command"].as_str().ok_or("badge command")?)?;
     assert!(target.join("badges/unsafe-review.json").is_file());
+    let expected_badges = temp.path().join("expected-badges");
+    let caller_badges = temp.path().join("caller-badges");
+    for (root, out) in [(&target, &expected_badges), (&caller, &caller_badges)] {
+        checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .args(["unsafe-review", "badges", "--root"])
+                .arg(root)
+                .arg("--out")
+                .arg(out),
+        )?;
+    }
+    let generated_badge = fs::read(target.join("badges/unsafe-review.json"))?;
+    assert_eq!(
+        generated_badge,
+        fs::read(expected_badges.join("unsafe-review.json"))?
+    );
+    assert_ne!(
+        generated_badge,
+        fs::read(caller_badges.join("unsafe-review.json"))?
+    );
     let baseline = recommendations
         .iter()
         .find(|item| item["kind"] == "baseline")
@@ -1275,18 +1307,31 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
     let preview = init_follow_handoff(
         &caller,
         &format!(
-            "{} --dry-run",
+            "{} --dry-run --format json",
             baseline["command"].as_str().ok_or("baseline command")?
         ),
     )?;
-    assert_contains(
-        &String::from_utf8(preview.stdout)?,
-        "unsafe-review-baseline",
+    let preview: Value = serde_json::from_slice(&preview.stdout)?;
+    assert_eq!(preview["mode"], "preview");
+    assert_eq!(preview["writes_files"], false);
+    let debt_cards = preview["cards"].as_array().ok_or("baseline debt cards")?;
+    for path in ["src/lib.rs", "src/inherited.rs"] {
+        assert!(
+            debt_cards.iter().any(|card| card["path"] == path),
+            "missing target debt: {path}"
+        );
+    }
+    assert!(
+        !debt_cards
+            .iter()
+            .any(|card| card["path"] == "src/caller_only.rs")
     );
     assert_eq!(
         Path::new(baseline["ledger_path"].as_str().ok_or("ledger path")?),
-        target.join("policy/unsafe-review-baseline.toml")
+        resolved_target.join("policy/unsafe-review-baseline.toml")
     );
+    assert_eq!(preview["ledger_path"], baseline["ledger_path"]);
+    assert_eq!(preview["snapshot_path"], baseline["snapshot_path"]);
     assert!(
         !target.join("policy").exists(),
         "baseline preview must not write"
@@ -1294,11 +1339,18 @@ fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error
 
     // Repeating the copied PR command from a third cwd retains scope and output.
     init_follow_handoff(temp.path(), first_pr)?;
+    let repeated: Value =
+        serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
+    assert_eq!(repeated["cards"].as_array().ok_or("repeated cards")?, cards);
     assert_eq!(work_tree_state(&caller)?, caller_before);
     for destination in ["target", "badges", "policy"] {
         assert!(
             !caller.join(destination).exists(),
             "handoff wrote into caller: {destination}"
+        );
+        assert!(
+            !temp.path().join(destination).exists(),
+            "handoff wrote into third cwd: {destination}"
         );
     }
     Ok(())
@@ -1316,6 +1368,12 @@ fn init_missing_base_requires_input_instead_of_repo_scan() -> Result<(), Box<dyn
             init_handoff_repo(&root)?;
         }
         let proposal = init_handoff_proposal(temp.path(), &root)?;
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands object")?
+                .contains_key("first_pr")
+        );
         assert!(
             proposal["commands"]["first_pr"].is_null(),
             "missing base must not offer an unconstrained PR: {proposal}"
