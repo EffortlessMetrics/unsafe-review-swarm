@@ -49,6 +49,23 @@ optional badge snippet, the canonical ub-review gate-manifest pointer, and the
 exact `doctor` and `pr` commands. `--out` writes only
 `unsafe-review-init.json` to the explicitly selected proposal directory.
 
+In the development checkout, generated commands retain the resolved absolute
+repository root, detected PR base, and root-local output destinations when
+copied into another directory. Check the installed version separately before
+relying on this handoff correction.
+Command text uses PowerShell quoting on Windows and POSIX shell quoting elsewhere.
+If no base can be resolved, JSON `commands.first_pr` is `null` and
+`commands.first_pr_prerequisite` (also shown in human output) asks for an explicit
+`--base` or `--diff`; init does not offer a repository-wide scan as a PR review.
+If the resolved root cannot be represented as UTF-8, init still inspects the
+native path and preserves the preview. JSON marks `root` and unrepresentable
+commands/absolute destinations as null, labels `root_display` as display-only
+through the `unrepresentable_path` warning, and human output explains why
+handoffs are unavailable. Use a UTF-8 checkout path for generated commands;
+lossy display text never selects another repository.
+Baseline creation remains a separate explicit action from the selected clean
+base/default branch.
+
 The generated workflow uses a release placeholder. Do not apply it until the
 placeholder has been replaced with a separately verified public release or
 pinned CLI invocation; no public Action or `v1` publication is implied.

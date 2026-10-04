@@ -1197,6 +1197,428 @@ fn init_is_preview_only_deterministic_and_conflict_visible() -> Result<(), Box<d
     Ok(())
 }
 
+#[cfg(unix)]
+#[test]
+fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<(), Box<dyn Error>>
+{
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    let temp = TempDir::new("unsafe-review-init-path-encoding")?;
+    let root = temp.path().join(OsString::from_vec(b"repo-\xff".to_vec()));
+    init_handoff_repo(&root)?;
+    run_git(&root, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::create_dir_all(workflow.parent().ok_or("workflow parent")?)?;
+    fs::write(&workflow, "name: owner-managed-workflow\n")?;
+    let before = work_tree_state(&root)?;
+    // Lossy conversion must never redirect inspection or a later command.
+    let lossy_alias = PathBuf::from(root.to_string_lossy().into_owned());
+    fs::create_dir_all(&lossy_alias)?;
+    fs::write(lossy_alias.join("alias-only.txt"), "wrong repository\n")?;
+    let proposal_dir = temp.path().join("proposal");
+    let run_init = |format, out: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command.args(["unsafe-review", "init", "--format", format]);
+        command.current_dir(&root);
+        if out {
+            command.arg("--out").arg(&proposal_dir);
+        }
+        checked_output(&mut command)
+    };
+
+    let first = run_init("json", false)?;
+    let proposal: Value = serde_json::from_slice(&first.stdout)?;
+    assert_eq!(proposal["mode"], "preview_only");
+    assert_eq!(proposal["writes_repository"], false);
+    assert!(proposal.as_object().ok_or("proposal")?.contains_key("root"));
+    assert!(proposal["root"].is_null());
+    assert!(proposal["root_display"].is_string());
+    assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert_eq!(proposal["repository"]["base_ref"], "origin/main");
+    assert_eq!(proposal["proposed_files"][0]["status"], "conflict");
+    assert!(
+        proposal["proposed_files"][0]
+            .as_object()
+            .ok_or("file")?
+            .contains_key("absolute_path")
+    );
+    assert!(proposal["proposed_files"][0]["absolute_path"].is_null());
+    assert_contains(
+        proposal["proposed_files"][0]["diff"]
+            .as_str()
+            .ok_or("diff")?,
+        "owner-managed-workflow",
+    );
+    for key in [
+        "doctor",
+        "first_pr",
+        "first_pr_artifacts",
+        "review_baseline_separately",
+    ] {
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands")?
+                .contains_key(key)
+        );
+        assert!(
+            proposal["commands"][key].is_null(),
+            "lossy command/path: {key}"
+        );
+    }
+    let warnings = proposal["warnings"].as_array().ok_or("warnings")?;
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    let recommendations = proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?;
+    for (kind, keys) in [
+        ("baseline", vec!["command", "ledger_path", "snapshot_path"]),
+        ("badge", vec!["command"]),
+        ("ub_review", vec!["artifact"]),
+    ] {
+        let recommendation = recommendations
+            .iter()
+            .find(|item| item["kind"] == kind)
+            .ok_or("recommendation")?;
+        for key in keys {
+            assert!(
+                recommendation
+                    .as_object()
+                    .ok_or("recommendation object")?
+                    .contains_key(key)
+            );
+        }
+    }
+    for recommendation in recommendations {
+        for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
+            assert!(recommendation[key].is_null(), "lossy recommendation: {key}");
+        }
+    }
+    let human = String::from_utf8(run_init("human", false)?.stdout)?;
+    assert_contains(&human, "unrepresentable_path");
+    assert_contains(&human, "unavailable");
+    assert!(!human.contains("unsafe-review doctor --root"));
+    assert!(!human.contains("Provide an explicit --base"));
+    assert_eq!(first.stdout, run_init("json", false)?.stdout);
+    assert!(!proposal_dir.exists());
+    assert_eq!(first.stdout, run_init("json", true)?.stdout);
+    assert!(proposal_dir.join("unsafe-review-init.json").is_file());
+    assert_eq!(fs::read_dir(&proposal_dir)?.count(), 1);
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: owner-managed-workflow\n"
+    );
+    for destination in ["target", "policy", "badges", "unsafe-review-init.json"] {
+        assert!(!root.join(destination).exists());
+        assert!(!lossy_alias.join(destination).exists());
+    }
+    assert_eq!(work_tree_state(&root)?, before);
+    Ok(())
+}
+
+#[test]
+fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-foreign-root")?;
+    let caller = temp.path().join("caller");
+    let target = temp.path().join("target repo's $literal;name");
+    init_handoff_repo(&caller)?;
+    init_handoff_repo(&target)?;
+    fs::write(
+        caller.join("src/caller_only.rs"),
+        "pub unsafe fn caller_only(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    fs::write(caller.join("src/inherited.rs"), "pub fn caller_safe() {}\n")?;
+    let caller_before = work_tree_state(&caller)?;
+    run_git(&target, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+    fs::write(
+        target.join("src/lib.rs"),
+        "pub unsafe fn changed_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&target, &["add", "src/lib.rs"])?;
+    run_git(&target, &["commit", "-qm", "changed seam"])?;
+
+    // Relative input must remain usable after copying the handoff to another cwd.
+    let relative_target = Path::new("..").join(target.file_name().ok_or("target name")?);
+    let proposal = init_handoff_proposal(&caller, &relative_target)?;
+    let absolute_proposal = init_handoff_proposal(&caller, &target)?;
+    assert_eq!(proposal["commands"], absolute_proposal["commands"]);
+    let resolved_target = PathBuf::from(proposal["root"].as_str().ok_or("resolved root")?);
+    assert_eq!(
+        fs::canonicalize(&resolved_target)?,
+        fs::canonicalize(&target)?
+    );
+    let first_pr = proposal["commands"]["first_pr"]
+        .as_str()
+        .ok_or("first PR command missing despite resolvable base")?;
+    assert_contains(first_pr, "--base origin/main");
+    assert_contains(first_pr, "--out-dir");
+    assert!(
+        !target.join("target").exists(),
+        "init must remain preview-only"
+    );
+    assert_eq!(work_tree_state(&caller)?, caller_before);
+
+    let human = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .args(["unsafe-review", "init", "--root"])
+            .arg(&target)
+            .current_dir(&caller),
+    )?;
+    let human = String::from_utf8(human.stdout)?;
+    for (label, key) in [("Doctor", "doctor"), ("First PR", "first_pr")] {
+        let command = proposal["commands"][key].as_str().ok_or("command string")?;
+        assert_contains(&human, &format!("- {label}: {command}\n"));
+        let output = init_follow_handoff(&caller, command)?;
+        if key == "doctor" {
+            assert_contains(
+                &String::from_utf8(output.stdout)?,
+                &format!("workspace root: {}", resolved_target.display()),
+            );
+        }
+    }
+    let artifact_dir = PathBuf::from(
+        proposal["commands"]["first_pr_artifacts"]
+            .as_str()
+            .ok_or("artifact destination")?,
+    );
+    assert_eq!(artifact_dir, resolved_target.join("target/unsafe-review"));
+    let cards: Value = serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
+    let cards = cards["cards"].as_array().ok_or("cards array")?;
+    assert!(!cards.is_empty(), "changed unsafe seam must be selected");
+    for card in cards {
+        assert_eq!(card["site"]["file"], "src/lib.rs");
+        assert_eq!(card["site"]["owner"], "changed_byte");
+    }
+
+    let recommendations = proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?;
+    let badge = recommendations
+        .iter()
+        .find(|item| item["kind"] == "badge")
+        .ok_or("badge")?;
+    init_follow_handoff(&caller, badge["command"].as_str().ok_or("badge command")?)?;
+    assert!(target.join("badges/unsafe-review.json").is_file());
+    let expected_badges = temp.path().join("expected-badges");
+    let caller_badges = temp.path().join("caller-badges");
+    for (root, out) in [(&target, &expected_badges), (&caller, &caller_badges)] {
+        checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .args(["unsafe-review", "badges", "--root"])
+                .arg(root)
+                .arg("--out")
+                .arg(out),
+        )?;
+    }
+    let generated_badge = fs::read(target.join("badges/unsafe-review.json"))?;
+    assert_eq!(
+        generated_badge,
+        fs::read(expected_badges.join("unsafe-review.json"))?
+    );
+    assert_ne!(
+        generated_badge,
+        fs::read(caller_badges.join("unsafe-review.json"))?
+    );
+    let baseline = recommendations
+        .iter()
+        .find(|item| item["kind"] == "baseline")
+        .ok_or("baseline")?;
+    let preview = init_follow_handoff(
+        &caller,
+        &format!(
+            "{} --dry-run --format json",
+            baseline["command"].as_str().ok_or("baseline command")?
+        ),
+    )?;
+    let preview: Value = serde_json::from_slice(&preview.stdout)?;
+    assert_eq!(preview["mode"], "preview");
+    assert_eq!(preview["writes_files"], false);
+    let debt_cards = preview["cards"].as_array().ok_or("baseline debt cards")?;
+    for path in ["src/lib.rs", "src/inherited.rs"] {
+        assert!(
+            debt_cards.iter().any(|card| card["path"] == path),
+            "missing target debt: {path}"
+        );
+    }
+    assert!(
+        !debt_cards
+            .iter()
+            .any(|card| card["path"] == "src/caller_only.rs")
+    );
+    assert_eq!(
+        Path::new(baseline["ledger_path"].as_str().ok_or("ledger path")?),
+        resolved_target.join("policy/unsafe-review-baseline.toml")
+    );
+    assert_eq!(preview["ledger_path"], baseline["ledger_path"]);
+    assert_eq!(preview["snapshot_path"], baseline["snapshot_path"]);
+    assert!(
+        !target.join("policy").exists(),
+        "baseline preview must not write"
+    );
+
+    // Repeating the copied PR command from a third cwd retains scope and output.
+    init_follow_handoff(temp.path(), first_pr)?;
+    let repeated: Value =
+        serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
+    assert_eq!(repeated["cards"].as_array().ok_or("repeated cards")?, cards);
+    assert_eq!(work_tree_state(&caller)?, caller_before);
+    for destination in ["target", "badges", "policy"] {
+        assert!(
+            !caller.join(destination).exists(),
+            "handoff wrote into caller: {destination}"
+        );
+        assert!(
+            !temp.path().join(destination).exists(),
+            "handoff wrote into third cwd: {destination}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn init_missing_base_requires_input_instead_of_repo_scan() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-missing-base")?;
+    for git_checkout in [false, true] {
+        let root = temp
+            .path()
+            .join(if git_checkout { "git" } else { "no-git" });
+        fs::create_dir_all(&root)?;
+        if git_checkout {
+            init_handoff_repo(&root)?;
+        }
+        let proposal = init_handoff_proposal(temp.path(), &root)?;
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands object")?
+                .contains_key("first_pr")
+        );
+        assert!(
+            proposal["commands"]["first_pr"].is_null(),
+            "missing base must not offer an unconstrained PR: {proposal}"
+        );
+        let prerequisite = proposal["commands"]["first_pr_prerequisite"]
+            .as_str()
+            .ok_or("explicit missing-base prerequisite")?;
+        assert_contains(prerequisite, "--base");
+        assert_contains(prerequisite, "--diff");
+        let human = checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .args(["unsafe-review", "init", "--root"])
+                .arg(&root),
+        )?;
+        assert_contains(&String::from_utf8(human.stdout)?, prerequisite);
+        assert!(!root.join("target").exists());
+    }
+    Ok(())
+}
+
+#[test]
+fn init_handoff_carries_each_detected_base() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-base-priority")?;
+    let root = temp.path();
+    init_handoff_repo(root)?;
+    for reference in ["review-base", "main", "master"] {
+        run_git(
+            root,
+            &[
+                "update-ref",
+                &format!("refs/remotes/origin/{reference}"),
+                "HEAD",
+            ],
+        )?;
+    }
+    run_git(
+        root,
+        &[
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/review-base",
+        ],
+    )?;
+    for (reference, remove) in [
+        ("origin/review-base", "refs/remotes/origin/HEAD"),
+        ("origin/main", "refs/remotes/origin/main"),
+        ("origin/master", "refs/remotes/origin/master"),
+    ] {
+        let proposal = init_handoff_proposal(root, root)?;
+        assert_eq!(proposal["repository"]["base_ref"], reference);
+        assert_contains(
+            proposal["commands"]["first_pr"]
+                .as_str()
+                .ok_or("PR command")?,
+            &format!("--base {reference}"),
+        );
+        if remove.ends_with("HEAD") {
+            run_git(root, &["symbolic-ref", "--delete", remove])?;
+        } else {
+            run_git(root, &["update-ref", "-d", remove])?;
+        }
+    }
+    Ok(())
+}
+
+fn init_handoff_repo(root: &Path) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(root.join("src"))?;
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "init@example.test"])?;
+    run_git(root, &["config", "user.name", "init handoff test"])?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"init-handoff\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(root.join(".gitignore"), "target/\nbadges/\n")?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    fs::write(
+        root.join("src/inherited.rs"),
+        "pub unsafe fn inherited_only(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    Ok(())
+}
+
+fn init_handoff_proposal(caller: &Path, root: &Path) -> Result<Value, Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .args(["unsafe-review", "init", "--root"])
+            .arg(root)
+            .args(["--format", "json"])
+            .current_dir(caller),
+    )?;
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+fn init_follow_handoff(caller: &Path, generated: &str) -> Result<Output, Box<dyn Error>> {
+    // Substitute only the executable, leaving the actual generated shell arguments intact.
+    let arguments = generated
+        .strip_prefix("unsafe-review ")
+        .ok_or("handoff executable")?;
+    let mut shell = if cfg!(windows) {
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-NonInteractive", "-Command"]);
+        command.arg(format!("function unsafe_review_test {{ & $env:UNSAFE_REVIEW_TEST_BIN unsafe-review @args }}; unsafe_review_test {arguments}; exit $LASTEXITCODE"));
+        command
+    } else {
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("unsafe_review_test() {{ \"$UNSAFE_REVIEW_TEST_BIN\" unsafe-review \"$@\"; }}; unsafe_review_test {arguments}"));
+        command
+    };
+    checked_output(
+        shell
+            .env(
+                "UNSAFE_REVIEW_TEST_BIN",
+                env!("CARGO_BIN_EXE_cargo-unsafe-review"),
+            )
+            .current_dir(caller),
+    )
+}
+
 #[test]
 fn cargo_bin_policy_violation_exits_1_not_2() -> Result<(), Box<dyn Error>> {
     // Exit-code contract: cargo-unsafe-review must exit 1 for policy violations

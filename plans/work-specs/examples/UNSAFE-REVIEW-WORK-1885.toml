@@ -1,0 +1,64 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1885"
+kind = "ux"
+objective = "Preserve the inspected repository, detected PR base and output destinations in preview-only init handoffs."
+user_outcome = "A maintainer or agent can follow setup commands from another directory without scanning or writing the wrong repository."
+claim_boundary = "Handoff scope and preview behavior only; no analyzer accuracy, safety, witness execution, installed qualification or publication claim."
+affected_files = ["crates/unsafe-review-cli/src/execute/init.rs", "crates/unsafe-review-cli/tests/e2e.rs", "docs/FIRST_USE.md", "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0023", "UNSAFE-REVIEW-SPEC-0044"]
+
+[scope]
+included = ["Init command and destination generation", "Literal platform shell arguments", "Foreign-root, base-priority, no-base and preview regression cases", "Narrow first-use documentation"]
+excluded = ["Global PR parser or analyzer changes", "General effect-plan schema from issue2321", "Workflow application, permissions, security gates, witness execution", "Toolchain or package versions, source promotion and publication"]
+
+[[invariant]]
+id = "INV-1885-ROOT"
+text = "Generated commands retain the inspected root and explicit output destinations independently of caller cwd."
+
+[[invariant]]
+id = "INV-1885-PREVIEW"
+text = "Init remains preview-only and preserves owner files and conflict visibility."
+
+[[acceptance]]
+id = "AC-1885-ROOT"
+text = "Disposable A-to-B repositories select B's changed unsafe seam, omit inherited/caller code, preserve literal relative/absolute paths and confine generated outputs to B."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_handoffs_keep_foreign_root_base_and_output"]
+
+[[acceptance]]
+id = "AC-1885-BASE"
+text = "Every detected origin/HEAD, origin/main and origin/master base is carried into the proposed PR command."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_handoff_carries_each_detected_base"]
+
+[[acceptance]]
+id = "AC-1885-NOBASE"
+text = "No resolvable base means no unconstrained runnable PR command; human/JSON explain the required base or diff input."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_missing_base_requires_input_instead_of_repo_scan"]
+
+[[acceptance]]
+id = "AC-1885-PREVIEW"
+text = "Repeated human/JSON proposals agree, preserve owner workflows, write nothing by default and write only an explicitly requested proposal envelope."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_"]
+
+[[acceptance]]
+id = "AC-1885-ENCODING"
+text = "A native Unix cwd with non-UTF8 bytes retains preview/conflict inspection and explicit proposal output, while unrepresentable commands and absolute identities are null with typed guidance; a lossy-name alias is never selected."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_unrepresentable_root_retains_preview_without_lossy_handoffs"]
+
+[[integration]]
+surface = "CLI human and JSON init proposals"
+expected = "Representable platform shell commands share exact target scope and destination identities; absent commands are explicit null with prerequisite guidance. Non-UTF8 native paths retain inspection and display-only preview without lossy handoffs."
+
+[[integration]]
+surface = "Hosted CI and review"
+expected = "Test-only red head precedes implementation; existing CI proves the final head, with independent exact-head consumer review before protected merge. No local Cargo under the128MiB allocation."
+
+[[risk]]
+id = "RISK-1885-QUOTING"
+mitigation = "Execute the actual generated arguments through the platform shell against paths with spaces, apostrophe, dollar sign and semicolon; do not use interpolation-prone double quoting."
+
+[[risk]]
+id = "RISK-1885-COMPAT"
+mitigation = "Retain existing command keys and preview behavior; document nullable first_pr when its prerequisite is missing, and nullable commands/absolute identities for an unrepresentable native root. Keep global parser, pinned1.98 and MSRV unchanged."
+
+[rollback]
+strategy = "Revert this focused init handoff slice and its regression/spec changes; retain issue1885's broader adoption requirements."
