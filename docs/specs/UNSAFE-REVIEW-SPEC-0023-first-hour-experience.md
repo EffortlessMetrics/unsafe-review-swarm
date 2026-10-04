@@ -97,6 +97,15 @@ overwrite targets. Any workflow release reference must be verified separately;
 the init proposal must not assume that a parked public Action or publication
 lane is ready.
 
+Init handoffs preserve the resolved absolute root and explicit root-local PR,
+badge and baseline destinations independently of caller cwd. A detected base
+is carried into the PR command. With no resolvable base, `commands.first_pr`
+is null and `commands.first_pr_prerequisite` names the required `--base` or
+`--diff` input. Human commands render directly as platform shell text rather
+than JSON-escaped strings; Windows uses PowerShell quoting, other platforms
+use POSIX quoting. This does not alter global PR auto-detection or apply any
+proposal.
+
 ## 4. Non-goals
 
 - no default witness execution
