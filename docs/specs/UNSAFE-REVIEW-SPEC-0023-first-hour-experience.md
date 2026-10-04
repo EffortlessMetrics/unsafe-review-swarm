@@ -106,6 +106,12 @@ than JSON-escaped strings; Windows uses PowerShell quoting, other platforms
 use POSIX quoting. This does not alter global PR auto-detection or apply any
 proposal.
 
+An unrepresentable native root does not suppress inspection or conflict
+preview. Init emits `unrepresentable_path`, retains display-only `root_display`,
+and sets `root` plus unrepresentable executable handoffs and absolute output
+identities to null. Human output explains the unavailable handoffs. Lossy
+display text must never be used to inspect a different path or build a command.
+
 ## 4. Non-goals
 
 - no default witness execution
