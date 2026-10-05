@@ -7737,14 +7737,6 @@ fn require_comment_body_card_projection(
             expected_build_first.summary
         ));
     }
-    if let Some(command) = card.verify_commands.first() {
-        let expected = format!("Confirmation step: build/run `{command}` first");
-        if !body.contains(&expected) {
-            return Err(format!(
-                "{context} body must project ReviewCard confirmation step `{expected}`"
-            ));
-        }
-    }
     // Note: `Minimal repro cue` and `Witness route` sections are intentionally
     // omitted from the body (their content is carried by the structured
     // `minimal_repro` and `witness_routes` JSON fields). Removing them keeps the
@@ -8366,7 +8358,7 @@ fn expected_comment_hypothesis(card: &CardProjection) -> String {
     )
 }
 
-// cards.json projects ReachEvidence.state as its canonical summary. Reuse the
+// cards.json exposes ReachEvidence.summary, not its typed state. Reuse the
 // existing exact summary parser, not coverage status or arbitrary cue prose.
 // Obligation reach uses missing/present, so missing alone cannot mean unreached.
 fn unreached_confirmation_owner(card: &CardProjection) -> Option<&str> {
@@ -9555,6 +9547,11 @@ fn require_witness_plan_common_card_projection(
 
 fn expected_confirmation_step_fragment(card: &CardProjection) -> String {
     if let Some(command) = card.verify_commands.first() {
+        if let Some(owner) = unreached_confirmation_owner(card) {
+            return format!(
+                "- Confirmation step: write or identify a focused test for `{owner}` first (no test reaches it yet), then build/run `{command}` first"
+            );
+        }
         return format!("- Confirmation step: build/run `{command}` first");
     }
     if let Some(route) = card.witness_routes.first() {
@@ -11450,6 +11447,91 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
             || expected_comment_build_this_first(&card).kind != "human_review"
         {
             return Err("commandless card gained a build/run prerequisite".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_projects_comment_and_witness_test_first_prefixes() -> Result<(), String>
+    {
+        for unreached in [true, false] {
+            let (card, cue) = command_confirmation_fixture(unreached);
+            let cue = &cue["confirmation_cue"];
+            let step = cue["confirmation_step"]
+                .as_str()
+                .ok_or("fixture step missing")?;
+            let summary = cue["build_this_first"]["summary"]
+                .as_str()
+                .ok_or("fixture summary missing")?;
+            let hypothesis = cue["hypothesis_to_confirm"]
+                .as_str()
+                .ok_or("fixture hypothesis missing")?;
+            let body = format!(
+                "`unsafe-review` found `contract_missing` for `raw_pointer_read` (`raw_pointer_read`).\nMissing evidence: contract\nProof path: `contract`.\nNext action: add safety contract\nHypothesis to confirm: {hypothesis}\nBuild/run this first: {summary}\nConfirmation step: {step}\nVerify command: `cargo +nightly miri test f`"
+            );
+            require_comment_body_card_projection(&body, &card, "test body")?;
+            let line = format!("- Confirmation step: {step}");
+            let expected = expected_confirmation_step_fragment(&card);
+            require_witness_plan_card_line(
+                &line,
+                Path::new("witness-plan.md"),
+                &card.id,
+                "confirmation step",
+                &expected,
+            )?;
+            let wrong_command = body.replace(
+                "cargo +nightly miri test f",
+                "cargo +nightly miri test other",
+            );
+            err_text(require_comment_body_card_projection(
+                &wrong_command,
+                &card,
+                "test body",
+            ))?;
+            let wrong_line = line.replace(
+                "cargo +nightly miri test f",
+                "cargo +nightly miri test other",
+            );
+            err_text(require_witness_plan_card_line(
+                &wrong_line,
+                Path::new("witness-plan.md"),
+                &card.id,
+                "confirmation step",
+                &expected,
+            ))?;
+            if unreached {
+                let (_, old) = command_confirmation_fixture(false);
+                let old_step = old["confirmation_cue"]["confirmation_step"]
+                    .as_str()
+                    .ok_or("old fixture step missing")?;
+                let stale_body = body.replace(step, old_step);
+                err_text(require_comment_body_card_projection(
+                    &stale_body,
+                    &card,
+                    "test body",
+                ))?;
+                let stale_line = format!("- Confirmation step: {old_step}");
+                err_text(require_witness_plan_card_line(
+                    &stale_line,
+                    Path::new("witness-plan.md"),
+                    &card.id,
+                    "confirmation step",
+                    &expected,
+                ))?;
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_keeps_receipt_backed_reach_cue() -> Result<(), String> {
+        let (mut card, cue) = command_confirmation_fixture(false);
+        card.reach =
+            Some("External integration reach receipt imported: test integration".to_string());
+        require_unreached_confirmation_evidence(&card)?;
+        require_card_confirmation_cue_projection(&cue, &card, "receipt-backed cue")?;
+        if unreached_confirmation_owner(&card).is_some() {
+            return Err("receipt-backed reach gained an unreached prerequisite".to_string());
         }
         Ok(())
     }
