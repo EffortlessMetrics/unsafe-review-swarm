@@ -17,26 +17,26 @@ text = "A receipt cannot silently record a version inconsistent with its candida
 
 [[invariant]]
 id = "INV-1887-NONPUBLISHING"
-text = "Source-built clean-prefix, staged discovery and package inventory remain distinct from registry or archive installation; user installed0.3.8 is untouched."
+text = "Source-built clean-prefix, staged discovery and package inventory remain distinct from registry or archive installation; user installed 0.3.8 is untouched."
 
 [[acceptance]]
 id = "AC-1887-RECEIPT"
-text = "Actual candidate0.3.8 is recorded as0.3.8; manifest/executable mismatch fails; source SHA and executable hash remain present."
+text = "Candidate fixtures (including 0.3.8) are recorded at their actual manifest version; manifest/executable mismatch fails; source SHA and executable hash remain present."
 proof = ["python .github/scripts/test_qualification_receipt.py"]
 
 [[acceptance]]
 id = "AC-1887-CAPABILITY"
-text = "Exit-zero global help is insufficient. Actual init-specific help and schema_versionunsafe-review/init/v1 preview output are required; the preserved legacy0.3.8 control fails capability."
+text = "Exit-zero global help is insufficient. Actual init-specific help and schema_version unsafe-review/init/v1 preview output are required; the preserved legacy 0.3.8 control fails capability."
 proof = ["python .github/scripts/installed_consumer_probe.py --binary <exact-prefix-binary> --scratch <new-task-scratch> --provenance <actual-install-receipt> --candidate <exact-source-sha> --lockfile-sha256 <tracked-lock-hash> --expected-version <actual-manifest-version>"]
 
 [[acceptance]]
 id = "AC-1887-CONSUMER"
-text = "CallerA targetsB through literal path handoffs, selects only changed_byte rather than inherited/caller unsafe, preserves owner workflow and preview/no-write, confines output toB and repeats from a third cwd; missing base is an explicit prerequisite."
+text = "Caller A targets B through literal path handoffs, selects only changed_byte rather than inherited/caller unsafe, preserves owner workflow and preview/no-write, confines output to B and repeats from a third cwd; missing base is an explicit prerequisite."
 proof = ["Hosted candidate source-prefix execution of installed_consumer_probe.py using the actual generated shell commands"]
 
 [[integration]]
 surface = "Existing manual Windows qualification"
-expected = "Actual identity/usable assertions replace historical hardcoded0.4.0; existing trigger, runner, permissions, toolchain and artifact action remain unchanged. Windows execution is separately reported."
+expected = "Actual identity/usable assertions replace historical hardcoded 0.4.0; existing trigger, runner, permissions, toolchain and artifact action remain unchanged. Windows execution is separately reported."
 
 [[integration]]
 surface = "Normal draft-PR hosted observation"

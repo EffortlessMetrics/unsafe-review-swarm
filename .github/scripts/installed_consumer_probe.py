@@ -161,23 +161,33 @@ def main():
             and proposal["proposed_files"][0]["status"] == "conflict", result, elapsed)
         row("preview-preserves-caller-and-target", snapshot(caller) == caller_before and snapshot(target) == target_before)
         output = Path(commands["first_pr_artifacts"])
-        row("target-local-artifact-destination", output.resolve() == (target / "target/unsafe-review").resolve())
+        target_output = output.resolve() == (target / "target/unsafe-review").resolve()
+        row("target-local-artifact-destination", target_output)
+        if not target_output:
+            raise RuntimeError("generated artifact destination escapes the task-owned target")
         env = os.environ.copy()
         env["PATH"] = str(binary.parent) + os.pathsep + env.get("PATH", "")
         row("generated-command-executable-selection", Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary)
         shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["sh", "-c"]
         result, elapsed = run([*shell, commands["doctor"]], cwd=caller, env=env)
+        doctor_roots = [line[len("workspace root: "):] for line in result.stdout.decode().splitlines()
+                        if line.startswith("workspace root: ")]
         row("generated-doctor-usable", result.returncode == 0
-            and b"unsafe-review doctor" in result.stdout, result, elapsed)
+            and b"unsafe-review doctor" in result.stdout and len(doctor_roots) == 1
+            and Path(doctor_roots[0]).resolve() == target.resolve(), result, elapsed)
         command = commands["first_pr"]
         result, elapsed = run([*shell, command], cwd=caller, env=env)
         first = json.loads((output / "cards.json").read_bytes())
         cards = first["cards"]
         changed_only = bool(cards) and all(c["site"]["file"] == "src/lib.rs" and c["site"]["owner"] == "changed_byte" for c in cards)
         row("generated-command-changed-seam-only", result.returncode == 0 and changed_only, result, elapsed)
+        cards_path = output / "cards.json"
+        cards_path.rename(scratch / "first-cards-before-repeat.json")
         result, elapsed = run([*shell, command], cwd=scratch, env=env)
-        repeated = json.loads((output / "cards.json").read_bytes())
-        row("repeat-from-third-cwd", result.returncode == 0 and repeated["cards"] == cards, result, elapsed)
+        fresh_cards = cards_path.is_file()
+        repeated = json.loads(cards_path.read_bytes()) if fresh_cards else {}
+        row("repeat-from-third-cwd", result.returncode == 0 and fresh_cards
+            and repeated.get("cards") == cards, result, elapsed)
         row("caller-and-third-cwd-no-output", all(not (root / name).exists() for root in (caller, scratch) for name in ("target", "policy", "badges")))
         row("owner-workflow-preserved", workflow.read_text() == "name: owner-managed\n")
         quiet = scratch / "quiet"
@@ -204,7 +214,12 @@ def main():
     receipt["cleanup"] = "Task-owned fixtures retained for review; user installation and PATH unchanged."
     path = scratch / "receipt.json"
     path.write_text(json.dumps(receipt, indent=2), encoding="utf-8")
-    print(json.dumps({"result": receipt["result"], "rows": len(rows), "receipt": str(path), "binary_sha256": receipt["binary_sha256"]}))
+    print(json.dumps({"result": receipt["result"], "rows": len(rows), "receipt": str(path),
+                      "binary_sha256": receipt["binary_sha256"], "probe_sha256": receipt["probe_sha256"],
+                      "source_binding": receipt["source_binding"],
+                      "qualification_status": receipt["qualification_status"],
+                      "row_results": [{"name": r["name"], "result": r["result"],
+                                       "command_exit": r["command_exit"]} for r in rows]}))
     return 1 if failed else 0
 
 

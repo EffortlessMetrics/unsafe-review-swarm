@@ -58,8 +58,11 @@ class QualificationReceipt(unittest.TestCase):
         self.assertEqual(receipt["candidate_version"], "0.3.8")
 
     def test_receipt_rejects_manifest_executable_version_mismatch(self):
-        result, _ = self.receipt(observed="0.4.0")
+        result, receipt = self.receipt(observed="0.4.0")
         self.assertNotEqual(result.returncode, 0, "a false version receipt must fail qualification")
+        self.assertIsNotNone(receipt, result.stderr.decode())
+        failures = [row["row"] for row in receipt["rows"] if row["exit"] != 0]
+        self.assertEqual(failures, ["identity:manifest-executable-version"])
 
     def test_candidate_sha_and_binary_hash_are_retained(self):
         result, receipt = self.receipt()

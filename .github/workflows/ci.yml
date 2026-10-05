@@ -524,6 +524,7 @@ jobs:
                    'Run qualification rows', 'Write bounded receipt', 'Probe the actual source-prefix consumer']
           blocks = re.split(r'^      - name: ', workflow, flags=re.M)[1:]
           env = {**os.environ, 'GITHUB_WORKSPACE': str(root),
+                 'QUALIFICATION_VERIFIER_WORKSPACE': str(workspace),
                  'CARGO_TARGET_DIR': str(workspace / 'target/installed-qualification'),
                  'CARGO_BUILD_JOBS': '1'}
           for name in names:
