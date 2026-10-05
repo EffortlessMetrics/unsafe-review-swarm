@@ -115,9 +115,9 @@ jobs:
           for c in doctor pr repo context lsp init pr-setup; do
             case "$c" in
               pr) expected='unsafe-review first-pr:' ;;
-              *) expected="unsafe-review $c" ;;
+              *) expected="unsafe-review $c:" ;;
             esac
-            if "$B" "$c" --help > "help-$c.txt" 2>&1 && grep -F "$expected" "help-$c.txt" >/dev/null && grep -F 'Usage:' "help-$c.txt" >/dev/null; then
+            if "$B" "$c" --help > "help-$c.txt" 2>&1 && head -n 1 "help-$c.txt" | grep -F "$expected" >/dev/null && grep -F 'Usage:' "help-$c.txt" >/dev/null; then
               rec "help:$c" 0 -
             else
               rec "help:$c" 1 "missing usable command-specific help"

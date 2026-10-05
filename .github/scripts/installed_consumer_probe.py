@@ -134,6 +134,13 @@ def main():
         required = proposal.get("commands", {}).get("first_pr_prerequisite", "")
         row("missing-base-explicit-recovery", result.returncode == 0 and no_base
             and "--base" in required and "--diff" in required, result, elapsed)
+        envelope = scratch / "proposal-envelope"
+        result, elapsed = run([binary, "init", "--root", control, "--format", "json", "--out", envelope])
+        output_files = list(envelope.iterdir())
+        row("explicit-proposal-envelope-only", result.returncode == 0
+            and [p.name for p in output_files] == ["unsafe-review-init.json"]
+            and json.loads(output_files[0].read_bytes()) == json.loads(result.stdout), result, elapsed)
+        row("explicit-envelope-preserves-root", snapshot(control) == before)
 
         caller = scratch / "caller"
         target = scratch / "target repo's $literal;name"
@@ -159,6 +166,9 @@ def main():
         env["PATH"] = str(binary.parent) + os.pathsep + env.get("PATH", "")
         row("generated-command-executable-selection", Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary)
         shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["sh", "-c"]
+        result, elapsed = run([*shell, commands["doctor"]], cwd=caller, env=env)
+        row("generated-doctor-usable", result.returncode == 0
+            and b"unsafe-review doctor" in result.stdout, result, elapsed)
         command = commands["first_pr"]
         result, elapsed = run([*shell, command], cwd=caller, env=env)
         first = json.loads((output / "cards.json").read_bytes())
@@ -170,6 +180,19 @@ def main():
         row("repeat-from-third-cwd", result.returncode == 0 and repeated["cards"] == cards, result, elapsed)
         row("caller-and-third-cwd-no-output", all(not (root / name).exists() for root in (caller, scratch) for name in ("target", "policy", "badges")))
         row("owner-workflow-preserved", workflow.read_text() == "name: owner-managed\n")
+        quiet = scratch / "quiet"
+        repo(quiet)
+        git(quiet, "update-ref", "refs/remotes/origin/main", "HEAD")
+        (quiet / "src/lib.rs").write_text("pub fn changed_safe() -> u8 { 1 }\n")
+        git(quiet, "add", "src/lib.rs")
+        git(quiet, "commit", "-qm", "safe-only change")
+        result, _ = run([binary, "init", "--root", quiet, "--format", "json"])
+        quiet_proposal = json.loads(result.stdout)
+        result, elapsed = run([*shell, quiet_proposal["commands"]["first_pr"]], cwd=caller, env=env)
+        quiet_output = Path(quiet_proposal["commands"]["first_pr_artifacts"])
+        quiet_cards = json.loads((quiet_output / "cards.json").read_bytes())
+        row("safe-only-diff-no-sites-control", result.returncode == 0
+            and quiet_cards["cards"] == [], result, elapsed)
     except Exception as error:
         failed = True
         receipt["stop_reason"] = str(error)[:500]
