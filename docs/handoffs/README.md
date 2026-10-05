@@ -5,6 +5,7 @@ what not to do next. Do not put active specs here.
 
 | Handoff | Date | Scope |
 |---|---|---|
+| [Standalone installation-receipt admission](2026-10-05-standalone-receipt-admission.md) | 2026-10-05 | rejects invalid/failed v1 upstream schema and row populations before source-qualified consumer admission under #1887; real-entry-point RED/GREEN, explicit diagnostics and preserved #2352 historical proof |
 | [Installed consumer qualification](2026-10-05-installed-consumer-qualification.md) | 2026-10-05 | exact Source 735fb clean-prefix identity, 19 qualification rows and 20 consumer cases; strict canonical cue verifier repair, explicit current witness-prose boundary, preserved legacy negative control and nonpublishing limits under #1887/#2302/#1918 |
 | [Source init native sync](2026-10-05-source-init-native-sync.md) | 2026-10-05 | absorbs unpublished source PR #576 native identity/Git-presence corrections, exact native assertions, source-built facade recovery and nearby docs under #1885; advances the source-absorption checkpoint while retaining newer swarm features and existing publication receipts |
 | [Source 0.5.0 publication receipt sync](2026-09-18-source-0.5.0-publication-sync.md) | 2026-09-18 | mirrors the source 0.5.0 publication receipt (#572, merge commit f1eda818) into the swarm workbench; records observed tag v0.5.0 and published GitHub Release as follow-through; moves the source-sync checkpoint without safety, UB-free, Miri-clean, site-execution, calibrated, or policy-readiness claims |

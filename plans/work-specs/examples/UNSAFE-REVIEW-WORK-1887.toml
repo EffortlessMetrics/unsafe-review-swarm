@@ -1,14 +1,14 @@
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1887"
 kind = "ux"
-objective = "Bind hosted clean-prefix consumer qualification to actual candidate identity, exercise usable init handoffs and validate current review-artifact cue contracts."
-user_outcome = "A maintainer can distinguish a usable current source-built executable from an older installation and from package inventory alone."
-claim_boundary = "Only exercised source-prefix and package-file inventory cases; no registry/archive installation, complete Windows matrix, actual provider, accuracy, witness or release claim."
-affected_files = [".github/workflows/windows-qual.yml", ".github/scripts/installed_consumer_probe.py", ".github/scripts/test_qualification_receipt.py", "policy/workflow-allowlist.toml", "xtask/src/advisory_artifacts.rs", "docs/handoffs/2026-10-05-installed-consumer-qualification.md", "docs/handoffs/README.md"]
+objective = "Bind candidate identity and usable init handoffs to complete passing upstream receipts; preserve strict review-artifact cue contracts."
+user_outcome = "A maintainer can distinguish a usable current source-built executable from an older installation or package inventory, and cannot source-qualify from an invalid or failed installation receipt."
+claim_boundary = "Historical exercised source-prefix/package-inventory proof and current standalone admission controls remain distinct; no current full consumer rerun, registry/archive installation, complete Windows matrix, actual provider, accuracy, witness or release claim."
+affected_files = [".github/workflows/windows-qual.yml", ".github/scripts/installed_consumer_probe.py", ".github/scripts/test_qualification_receipt.py", "policy/workflow-allowlist.toml", "xtask/src/advisory_artifacts.rs", "docs/handoffs/2026-10-05-installed-consumer-qualification.md", "docs/handoffs/README.md", "docs/handoffs/2026-10-05-standalone-receipt-admission.md"]
 linked_specs = ["UNSAFE-REVIEW-SPEC-0023", "UNSAFE-REVIEW-SPEC-0024", "UNSAFE-REVIEW-SPEC-0044"]
 
 [scope]
-included = ["Actual source/tree/lockfile/package/executable/toolchain receipt identity", "Content-specific help and actual init/foreign-root/repeat/no-write consumer probe", "Discriminating receipt tests", "Existing hosted nonpublishing source-prefix path and package inventory", "Canonical unreached confirmation-cue verifier alignment and discriminating controls", "Narrow status/handoff"]
+included = ["Actual source/tree/lockfile/package/executable/toolchain receipt identity", "Content-specific help and actual init/foreign-root/repeat/no-write consumer probe", "Discriminating receipt tests", "Existing hosted nonpublishing source-prefix path and package inventory", "Canonical unreached confirmation-cue verifier alignment and discriminating controls", "Narrow status/handoff", "Standalone v1 installation-receipt schema and complete passing-row admission before source qualification"]
 excluded = ["Registry/archive installation or publication", "Package version/tag or toolchain/MSRV changes", "Detector/global parser or provider changes", "Unsafe allowances/security gates/credentials/runner/protection changes", "Local Cargo/compiler"]
 
 [[invariant]]
@@ -38,6 +38,15 @@ proof = ["Hosted candidate source-prefix execution of installed_consumer_probe.p
 id = "AC-1887-TEST-FIRST-VERIFIER"
 text = "Under #2302, the unchanged real safe-to-unsafe function with no reaching test passes bundle verification with canonical test-first cues; reached legacy cues pass; missing, stale or contradictory cues, wrong command/subject/boundary and inconsistent owner/obligation reach evidence fail. Ownerless and commandless cards retain existing posture. Canonical body labels bind the full step; current legacy witness prose is checked against its distinct producer contract, with actual renderer controls. Its prose alignment remains a #2302 follow-up."
 proof = ["Hosted unchanged Source 735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1 first-pr fixture and check-first-pr-artifacts", "cargo test --locked -p xtask confirmation_verifier_"]
+
+[[invariant]]
+id = "INV-1887-UPSTREAM-ADMISSION"
+text = "Matching identity fields cannot grant source-qualified status from invalid or failed upstream installation receipts; rejection occurs before candidate/fixture command execution."
+
+[[acceptance]]
+id = "AC-1887-UPSTREAM-ADMISSION"
+text = "The real standalone probe admits a complete passing v1 writer receipt. Wrong/missing schema, failed source/help/bundle or additive row, missing required row/population, duplicate row, malformed row and non-integer exit retain unknown source binding, return not_qualified with explicit upstream invalid/failed diagnostics, and execute no commands. Passing additive metadata/rows remain compatible; passing rows cannot rescue an identity mismatch; no-provenance stays capability-only."
+proof = ["python .github/scripts/test_qualification_receipt.py -v"]
 
 [[integration]]
 surface = "Existing manual Windows qualification"
