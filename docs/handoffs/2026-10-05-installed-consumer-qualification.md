@@ -94,7 +94,7 @@ recorded; representative CPU time and peak memory are not measured.
 ## Unchanged installation control
 
 The pre-existing 5700X facade remains untouched:
-`C:\Users\Steven\.cargo\bin\unsafe-review.exe`, SHA-256
+the user's existing Cargo-bin `unsafe-review.exe`, SHA-256
 `e8202f8b3ea24341e41b0b18a31f57b3d0484884ae8c43c38eb3a020df62743e`.
 The final probe logic reports 0.3.8, rejects exit-zero global help, observes
 actual init exit 2, and confirms preview control files unchanged. It stops
@@ -114,7 +114,7 @@ before final review and merge. The workflow ledger change is descriptive only;
 unsafe allowances, runner permissions and required-check configuration are unchanged.
 
 The normal GH CLI workflow-metadata read failed before GitHub while opening
-`C:\Users\Steven\AppData\Roaming\GitHub CLI\config.yml`: `Access is denied.`
+the user's existing GitHub CLI configuration file: `Access is denied.`
 No manual dispatch, config read, retry, alternate credential or transport followed.
 Normal artifact materialization for run 37264284861, artifact 11326047347,
 file `file_00000000f78881f58d680b0addda52d0`, failed:
