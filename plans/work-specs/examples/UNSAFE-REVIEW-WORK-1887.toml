@@ -1,10 +1,10 @@
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1887"
 kind = "ux"
-objective = "Bind hosted clean-prefix consumer qualification to actual candidate and executable identity, then exercise usable init handoffs."
+objective = "Bind hosted clean-prefix consumer qualification to actual candidate identity, exercise usable init handoffs and validate current review-artifact cue contracts."
 user_outcome = "A maintainer can distinguish a usable current source-built executable from an older installation and from package inventory alone."
 claim_boundary = "Only exercised source-prefix and package-file inventory cases; no registry/archive installation, complete Windows matrix, actual provider, accuracy, witness or release claim."
-affected_files = [".github/workflows/windows-qual.yml", ".github/scripts/installed_consumer_probe.py", ".github/scripts/test_qualification_receipt.py", "policy/workflow-allowlist.toml", "xtask/src/advisory_artifacts.rs", "docs/handoffs/2026-10-05-installed-consumer-qualification.md"]
+affected_files = [".github/workflows/windows-qual.yml", ".github/scripts/installed_consumer_probe.py", ".github/scripts/test_qualification_receipt.py", "policy/workflow-allowlist.toml", "xtask/src/advisory_artifacts.rs", "docs/handoffs/2026-10-05-installed-consumer-qualification.md", "docs/handoffs/README.md"]
 linked_specs = ["UNSAFE-REVIEW-SPEC-0023", "UNSAFE-REVIEW-SPEC-0024", "UNSAFE-REVIEW-SPEC-0044"]
 
 [scope]
