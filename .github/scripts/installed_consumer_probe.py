@@ -1,7 +1,9 @@
 """Probe a known executable; never build, install, or alter a user's PATH.
 
 With --provenance, require a receipt binding the binary to the selected source
-SHA/lockfile. Without it, report capability observations only. All fixture and
+SHA/lockfile and a complete passing v1 installation qualification. Invalid or
+failed upstream receipts stop before commands and cannot qualify the source.
+Without provenance, report capability observations only. All fixture and
 receipt writes stay in an explicitly supplied, previously absent scratch root.
 """
 import argparse
@@ -13,6 +15,50 @@ import shutil
 import subprocess
 import sys
 import time
+
+
+INSTALL_QUALIFICATION_SCHEMA = "unsafe-review/installed-qualification/v1"
+REQUIRED_INSTALL_ROWS = frozenset((
+    "identity", "help:doctor", "help:pr", "help:repo", "help:context",
+    "help:lsp", "help:init", "help:pr-setup", "init:exit", "init:json-parse",
+    "init:no-mutation", "init:no-tracked-writes", "bundle:exit", "bundle:verifier",
+    "fail:invalid-flag", "fail:malformed-diff", "identity:manifest-executable-version",
+    "identity:source-sha", "identity:package-versions",
+))
+
+
+def installation_qualification(provenance):
+    """Admit the v1 writer's complete passing population; retain additive rows."""
+    if not isinstance(provenance, dict):
+        return "invalid", "upstream installation receipt must be a JSON object"
+    if provenance.get("schema") != INSTALL_QUALIFICATION_SCHEMA:
+        return "invalid", "upstream installation receipt schema must be " + INSTALL_QUALIFICATION_SCHEMA
+    rows = provenance.get("rows")
+    if not isinstance(rows, list) or not rows:
+        return "invalid", "upstream installation receipt rows must be a nonempty array"
+    seen = set()
+    failed = []
+    for index, item in enumerate(rows):
+        if not isinstance(item, dict):
+            return "invalid", f"upstream installation receipt row {index} must be an object"
+        name = item.get("row")
+        if not isinstance(name, str) or not name.strip():
+            return "invalid", f"upstream installation receipt row {index} needs a nonempty row name"
+        if name in seen:
+            return "invalid", f"upstream installation receipt has duplicate row {name[:80]}"
+        if type(item.get("exit")) is not int:
+            return "invalid", f"upstream installation receipt row {index} needs an integer exit"
+        seen.add(name)
+        if item["exit"] != 0:
+            failed.append(name)
+    missing = REQUIRED_INSTALL_ROWS - seen
+    if missing:
+        return "invalid", "upstream installation receipt is missing required rows: " + ", ".join(sorted(missing))
+    if failed:
+        names = ", ".join(name[:80] for name in sorted(failed)[:4])
+        return "failed", "upstream installation qualification failed rows: " + names
+    return "passed", ""
+
 
 
 def sha256(path):
@@ -45,7 +91,8 @@ def main():
                "probe_sha256": sha256(Path(__file__).resolve()),
                "binary": str(binary), "binary_sha256": sha256(binary),
                "requested_candidate": args.candidate,
-               "source_binding": "unknown", "rows": rows,
+               "source_binding": "unknown", "upstream_qualification_status": "not_supplied",
+               "rows": rows,
                "cpu_time": "not_measured", "peak_memory": "not_measured",
                "platform": sys.platform,
                "execution_class": "source_prefix" if args.provenance else "capability_observation",
@@ -83,7 +130,18 @@ def main():
     failed = False
     try:
         if args.provenance:
-            provenance = json.loads(args.provenance.read_text(encoding="utf-8"))
+            receipt["upstream_qualification_status"] = "invalid"
+            try:
+                provenance = json.loads(args.provenance.read_text(encoding="utf-8"))
+            except (OSError, UnicodeError, ValueError) as error:
+                diagnostic = ("cannot read upstream installation qualification receipt: " + str(error))[:400]
+                row("upstream-install-qualification", False, detail=diagnostic)
+                raise RuntimeError(diagnostic) from error
+            status, diagnostic = installation_qualification(provenance)
+            receipt["upstream_qualification_status"] = status
+            row("upstream-install-qualification", status == "passed", detail=diagnostic)
+            if status != "passed":
+                raise RuntimeError(diagnostic)
             ok = (provenance.get("candidate_sha") == args.candidate
                   and provenance.get("lockfile_sha256") == args.lockfile_sha256
                   and provenance.get("installed_binary_sha256") == receipt["binary_sha256"]
@@ -226,6 +284,8 @@ def main():
     print(json.dumps({"result": receipt["result"], "rows": len(rows), "receipt": str(path),
                       "binary_sha256": receipt["binary_sha256"], "probe_sha256": receipt["probe_sha256"],
                       "source_binding": receipt["source_binding"],
+                      "upstream_qualification_status": receipt["upstream_qualification_status"],
+                      "stop_reason": receipt.get("stop_reason"),
                       "qualification_status": receipt["qualification_status"],
                       "row_results": [{"name": r["name"], "result": r["result"],
                                        "command_exit": r["command_exit"]} for r in rows]}))
