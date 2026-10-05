@@ -20,7 +20,7 @@ class QualificationReceipt(unittest.TestCase):
         script = textwrap.dedent(block.split("python - <<'EOF'\n", 1)[1].split("          EOF", 1)[0])
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            binary = root / "qual-prefix/bin/unsafe-review.exe"
+            binary = root / ("qual-prefix/bin/unsafe-review" + (".exe" if sys.platform == "win32" else ""))
             binary.parent.mkdir(parents=True)
             binary.write_bytes(b"fixture source-built binary")
             source = root / "source-candidate"

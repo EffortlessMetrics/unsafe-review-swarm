@@ -1,0 +1,54 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1887"
+kind = "ux"
+objective = "Bind hosted clean-prefix consumer qualification to actual candidate and executable identity, then exercise usable init handoffs."
+user_outcome = "A maintainer can distinguish a usable current source-built executable from an older same-version installation and from package inventory alone."
+claim_boundary = "Only exercised source-prefix and package-file inventory cases; no registry/archive installation, complete Windows matrix, actual provider, accuracy, witness or release claim."
+affected_files = [".github/workflows/windows-qual.yml", ".github/scripts/installed_consumer_probe.py", ".github/scripts/test_qualification_receipt.py", "policy/workflow-allowlist.toml", "docs/handoffs/2026-10-05-installed-consumer-qualification.md"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0023", "UNSAFE-REVIEW-SPEC-0024", "UNSAFE-REVIEW-SPEC-0044"]
+
+[scope]
+included = ["Actual source/tree/lockfile/package/executable/toolchain receipt identity", "Content-specific help and actual init/foreign-root/repeat/no-write consumer probe", "Discriminating receipt tests", "Existing hosted nonpublishing source-prefix path and package inventory", "Narrow status/handoff"]
+excluded = ["Registry/archive installation or publication", "Package version/tag or toolchain/MSRV changes", "Detector/global parser or provider changes", "Unsafe allowances/security gates/credentials/runner/protection changes", "Local Cargo/compiler"]
+
+[[invariant]]
+id = "INV-1887-IDENTITY"
+text = "A receipt cannot silently record a version inconsistent with its candidate manifests or selected executable; all claims name exact source, binary and artifact identities."
+
+[[invariant]]
+id = "INV-1887-NONPUBLISHING"
+text = "Source-built clean-prefix, staged discovery and package inventory remain distinct from registry or archive installation; user installed0.3.8 is untouched."
+
+[[acceptance]]
+id = "AC-1887-RECEIPT"
+text = "Actual candidate0.3.8 is recorded as0.3.8; manifest/executable mismatch fails; source SHA and executable hash remain present."
+proof = ["python .github/scripts/test_qualification_receipt.py"]
+
+[[acceptance]]
+id = "AC-1887-CAPABILITY"
+text = "Exit-zero global help is insufficient. Actual init-specific help and schema_versionunsafe-review/init/v1 preview output are required; the preserved legacy0.3.8 control fails capability."
+proof = ["python .github/scripts/installed_consumer_probe.py --binary <exact-prefix-binary> --scratch <new-task-scratch> --provenance <actual-install-receipt> --candidate <exact-source-sha> --lockfile-sha256 <tracked-lock-hash> --expected-version <actual-manifest-version>"]
+
+[[acceptance]]
+id = "AC-1887-CONSUMER"
+text = "CallerA targetsB through literal path handoffs, selects only changed_byte rather than inherited/caller unsafe, preserves owner workflow and preview/no-write, confines output toB and repeats from a third cwd; missing base is an explicit prerequisite."
+proof = ["Hosted candidate source-prefix execution of installed_consumer_probe.py using the actual generated shell commands"]
+
+[[integration]]
+surface = "Existing manual Windows qualification"
+expected = "Actual identity/usable assertions replace historical hardcoded0.4.0; existing trigger, runner, permissions, toolchain and artifact action remain unchanged. Windows execution is separately reported."
+
+[[integration]]
+surface = "Normal draft-PR hosted observation"
+expected = "Temporary advisory step reuses the same workflow run blocks for an admitted Linux clean-prefix source candidate, then is removed before final exact-head review/current required CI/protected merge."
+
+[[risk]]
+id = "RISK-1887-PROVENANCE"
+mitigation = "Check exact requested source SHA, tracked and working lockfile identity, actual versions/binary hash and package-list hashes; keep source/artifact/input/run identities in receipts."
+
+[[risk]]
+id = "RISK-1887-FALSEPASS"
+mitigation = "Execute actual generated commands and parse actual output; reject global-help fallback, mismatches, zero-output changed-seam results and unsupported partial qualification."
+
+[rollback]
+strategy = "Revert this bounded harness/probe/docs slice; preserve historical receipts and source init repairs. No user installation or publication changes need rollback."
