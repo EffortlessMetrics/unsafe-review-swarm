@@ -21,6 +21,24 @@ The command above installs the public 0.4.0 release from crates.io. It does not
 install the unfrozen Swarm main candidate. A `v0.4.0` GitHub Release exists on
 the source repository; no `v1` or marketplace publication is implied.
 
+If `init` is unknown, check which executable your shell selected before
+retrying. Entering a source checkout does not change PATH.
+
+```bash
+command -v unsafe-review
+unsafe-review --version
+unsafe-review init --root . --format json
+```
+
+In PowerShell, use `Get-Command unsafe-review -All` to inspect competing
+commands. Run the preview from a known Rust checkout; a supported invocation
+returns an `unsafe-review/init/v1` proposal without writing files. Version
+text alone cannot identify a development build, and older 0.3.8 executables can
+print global help and exit zero for `init --help` while rejecting the actual
+command. Select the intended executable explicitly, or use the workspace
+command below for source behavior. Keep published-package and source-built
+qualification results separate.
+
 If you are working from a local checkout, keep the installed command and the
 workspace command separate. The installed command is the user path; `cargo run`
 is for development.
@@ -57,12 +75,18 @@ Command text uses PowerShell quoting on Windows and POSIX shell quoting elsewher
 If no base can be resolved, JSON `commands.first_pr` is `null` and
 `commands.first_pr_prerequisite` (also shown in human output) asks for an explicit
 `--base` or `--diff`; init does not offer a repository-wide scan as a PR review.
-If the resolved root cannot be represented as UTF-8, init still inspects the
-native path and preserves the preview. JSON marks `root` and unrepresentable
-commands/absolute destinations as null, labels `root_display` as display-only
-through the `unrepresentable_path` warning, and human output explains why
-handoffs are unavailable. Use a UTF-8 checkout path for generated commands;
-lossy display text never selects another repository.
+If the resolved root has no lossless command spelling, init still inspects the
+native path and preserves the preview. This includes non-UTF-8 Unix roots and
+Windows verbatim names whose normalized spelling selects a different directory,
+such as distinct `repo` and `repo.` or `repo ` directories. Windows command text
+must resolve to the same native canonical root before init offers it.
+JSON marks `root` and unavailable commands/absolute destinations as null, labels
+`root_display` as display-only through the `unrepresentable_path` warning, and
+human output explains why handoffs are unavailable. Use a UTF-8 checkout path
+whose command spelling preserves its filesystem identity for generated commands.
+Git checkout detection remains independent of path text: a null `git_root` from
+unrepresentable output does not imply a missing checkout. Lossy display text never
+selects another repository.
 Baseline creation remains a separate explicit action from the selected clean
 base/default branch.
 

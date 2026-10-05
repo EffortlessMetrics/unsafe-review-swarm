@@ -4,11 +4,11 @@ kind = "ux"
 objective = "Preserve the inspected repository, detected PR base and output destinations in preview-only init handoffs."
 user_outcome = "A maintainer or agent can follow setup commands from another directory without scanning or writing the wrong repository."
 claim_boundary = "Handoff scope and preview behavior only; no analyzer accuracy, safety, witness execution, installed qualification or publication claim."
-affected_files = ["crates/unsafe-review-cli/src/execute/init.rs", "crates/unsafe-review-cli/tests/e2e.rs", "docs/FIRST_USE.md", "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"]
+affected_files = ["crates/unsafe-review/tests/init_consumer.rs", "policy/source-sync.toml", "docs/handoffs/2026-10-05-source-init-native-sync.md", "docs/handoffs/README.md", "crates/unsafe-review-cli/src/execute/init.rs", "crates/unsafe-review-cli/tests/e2e.rs", "docs/FIRST_USE.md", "docs/specs/UNSAFE-REVIEW-SPEC-0023-first-hour-experience.md"]
 linked_specs = ["UNSAFE-REVIEW-SPEC-0023", "UNSAFE-REVIEW-SPEC-0044"]
 
 [scope]
-included = ["Init command and destination generation", "Literal platform shell arguments", "Foreign-root, base-priority, no-base and preview regression cases", "Narrow first-use documentation"]
+included = ["Narrow source PR576 native identity absorption and checkpoint reconciliation", "Source-built facade discovery and repeated foreign-root handoff", "Init command and destination generation", "Literal platform shell arguments", "Foreign-root, base-priority, no-base and preview regression cases", "Narrow first-use documentation"]
 excluded = ["Global PR parser or analyzer changes", "General effect-plan schema from issue2321", "Workflow application, permissions, security gates, witness execution", "Toolchain or package versions, source promotion and publication"]
 
 [[invariant]]
@@ -41,16 +41,34 @@ proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_"]
 
 [[acceptance]]
 id = "AC-1885-ENCODING"
-text = "A native Unix cwd with non-UTF8 bytes retains preview/conflict inspection and explicit proposal output, while unrepresentable commands and absolute identities are null with typed guidance; a lossy-name alias is never selected."
+text = "A native Unix cwd with non-UTF8 bytes retains preview/conflict inspection and explicit proposal output, while unrepresentable commands and absolute identities are null with typed guidance; a lossy-name alias is never selected and an existing checkout never gains a false missing_git warning."
 proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_unrepresentable_root_retains_preview_without_lossy_handoffs"]
+
+[[acceptance]]
+id = "AC-1885-NATIVE-IDENTITY"
+text = "Native Windows trailing-period and trailing-space roots inspect their own manifest and owner workflow, refuse every ambiguous command/absolute destination, preserve both target and ordinary alias, and remain deterministic. An ordinary root retains executable handoffs; Git/no-Git controls retain truthful diagnostics."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e init_native_identity_windows_", "cargo test --locked -p unsafe-review-cli --test e2e init_missing_base_requires_input_instead_of_repo_scan"]
+[[acceptance]]
+id = "AC-1885-FACADE"
+text = "The source-built facade staged in a disposable PATH prefix discovers real init capability, follows generated foreign-root commands and repeats from another cwd without modifying the existing installation or owner files."
+proof = ["cargo test --locked -p unsafe-review --test init_consumer"]
+
+[[acceptance]]
+id = "AC-1885-SOURCE-SYNC"
+text = "Swarm absorbs the exact selected source-native behavior and records source main735fb without overwriting newer Swarm tests, features or release receipts; the advisory report identifies zero commits after the acknowledged checkpoint."
+proof = ["cargo run --locked -p xtask -- source-divergence"]
 
 [[integration]]
 surface = "CLI human and JSON init proposals"
-expected = "Representable platform shell commands share exact target scope and destination identities; absent commands are explicit null with prerequisite guidance. Non-UTF8 native paths retain inspection and display-only preview without lossy handoffs."
+expected = "Representable platform shell commands share exact target scope and destination identities; absent commands are explicit null with prerequisite guidance. Native paths retain inspection and display-only preview without lossy handoffs; encoding and Windows aliasing both require lossless identity."
+
+[[integration]]
+surface = "Source-to-swarm reconciliation"
+expected = "The dated handoff accounts for all six final source paths, retained source RED/GREEN evidence and the deliberately preserved workbench/source differences. It acknowledges absorption rather than publication or equal whole-tree history."
 
 [[integration]]
 surface = "Hosted CI and review"
-expected = "Test-only red head precedes implementation; existing CI proves the final head, with independent exact-head consumer review before protected merge. No local Cargo under the128MiB allocation."
+expected = "Test-only red head precedes implementation; existing CI proves the final head, with independent exact-head consumer review before protected merge. Actual hosted Linux/Windows execution is required for native refusal and positive controls; cfg-skipped Windows tests do not qualify. No local Cargo under the 128 MiB allocation."
 
 [[risk]]
 id = "RISK-1885-QUOTING"

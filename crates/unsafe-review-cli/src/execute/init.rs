@@ -49,22 +49,25 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
 
     let resolved_root = fs::canonicalize(root)
         .map_err(|err| format!("failed to resolve init root {}: {err}", root.display()))?;
-    let root_text = init_path_text(&resolved_root).ok();
-    // Repository inspection uses the native path even when a command cannot
-    // represent it. Lossy text is display-only, never a filesystem identity.
-    let root = root_text
-        .as_deref()
-        .map(Path::new)
-        .unwrap_or(&resolved_root);
+    // Inspection always retains the native canonical identity. Windows command
+    // spelling must round-trip before it can identify a repository or output.
+    let root = resolved_root.as_path();
+    let root_text = init_path_text(root).ok().filter(|text| {
+        !cfg!(windows) || fs::canonicalize(text).is_ok_and(|candidate| candidate == resolved_root)
+    });
+    let command_root = root_text.as_deref().map(Path::new);
+    let command_path =
+        |relative: &str| command_root.and_then(|root| init_path_text(&root.join(relative)).ok());
 
     let git_root = git_output(root, &["rev-parse", "--show-toplevel"]);
+    let git_checkout =
+        git_output(root, &["rev-parse", "--is-inside-work-tree"]).as_deref() == Some("true");
     let base_ref = detect_base_ref(root);
     let root_arg = root_text.as_deref().map(init_shell_arg);
-    let artifact_dir = init_path_text(&root.join("target/unsafe-review")).ok();
-    let badge_dir = init_path_text(&root.join("badges")).ok();
-    let baseline_ledger = init_path_text(&root.join("policy/unsafe-review-baseline.toml")).ok();
-    let baseline_snapshot =
-        init_path_text(&root.join("policy/unsafe-review-baseline-snapshot.toml")).ok();
+    let artifact_dir = command_path("target/unsafe-review");
+    let badge_dir = command_path("badges");
+    let baseline_ledger = command_path("policy/unsafe-review-baseline.toml");
+    let baseline_snapshot = command_path("policy/unsafe-review-baseline-snapshot.toml");
     let baseline_command =
         root_arg
             .as_deref()
@@ -87,7 +90,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             )
         });
     let command_prerequisite = root_text.is_none().then_some(
-        "The resolved root is not representable as UTF-8 command text. Preview paths are display-only; copyable commands and absolute output identities are unavailable. Use a checkout path representable as UTF-8 for generated handoffs.",
+        "The resolved root has no lossless command spelling. Preview paths are display-only; copyable commands and absolute output identities are unavailable. Use a UTF-8 checkout path whose command spelling preserves its filesystem identity for generated handoffs.",
     );
     let first_pr_prerequisite = command_prerequisite.or_else(|| {
         base_ref.is_none().then_some(
@@ -101,6 +104,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
     let workflow_path = root.join(WORKFLOW_PATH);
     let workflow = file_proposal(
         root,
+        command_root,
         WORKFLOW_PATH,
         &workflow_content(),
         "A minimal read-only pull-request workflow proposal; replace its action reference only after a verified public release exists.",
@@ -117,7 +121,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             "message": message,
         }));
     }
-    if git_root.is_none() {
+    if !git_checkout {
         warnings.push(json!({
             "code": "missing_git",
             "severity": "warning",
@@ -131,7 +135,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             "message": "This checkout is shallow. The generated workflow is read-only, but local unsafe-review pr may need an explicit base or deeper history."
         }));
     }
-    if git_root.is_some() && base_ref.is_none() {
+    if git_checkout && base_ref.is_none() {
         warnings.push(json!({
             "code": "missing_base",
             "severity": "warning",
@@ -237,7 +241,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             {
                 "kind": "ub_review",
                 "status": "optional_pointer_only",
-                "artifact": init_path_text(&root.join("target/unsafe-review/unsafe-review-gate.json")).ok(),
+                "artifact": command_path("target/unsafe-review/unsafe-review-gate.json"),
                 "existing_files": ub_review_files,
                 "reason": "Pass the canonical gate-manifest artifact to ub-review if that integration is already adopted; init does not duplicate ub-review policy or make it mandatory."
             },
@@ -309,7 +313,13 @@ fn init_shell_arg(value: &str) -> String {
     }
 }
 
-fn file_proposal(root: &Path, relative: &str, content: &str, reason: &str) -> Value {
+fn file_proposal(
+    root: &Path,
+    command_root: Option<&Path>,
+    relative: &str,
+    content: &str,
+    reason: &str,
+) -> Value {
     let path = root.join(relative);
     let exists = path.exists();
     let existing = fs::read_to_string(&path).ok();
@@ -331,7 +341,7 @@ fn file_proposal(root: &Path, relative: &str, content: &str, reason: &str) -> Va
     let diff = proposal_diff(relative, existing.as_deref(), content);
     json!({
         "path": relative,
-        "absolute_path": init_path_text(&path).ok(),
+        "absolute_path": command_root.and_then(|root| init_path_text(&root.join(relative)).ok()),
         "exists": exists,
         "status": status,
         "operation": if status == "create" { "create" } else { "review_before_update" },

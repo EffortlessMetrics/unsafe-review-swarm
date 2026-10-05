@@ -106,11 +106,18 @@ than JSON-escaped strings; Windows uses PowerShell quoting, other platforms
 use POSIX quoting. This does not alter global PR auto-detection or apply any
 proposal.
 
-An unrepresentable native root does not suppress inspection or conflict
-preview. Init emits `unrepresentable_path`, retains display-only `root_display`,
-and sets `root` plus unrepresentable executable handoffs and absolute output
-identities to null. Human output explains the unavailable handoffs. Lossy
-display text must never be used to inspect a different path or build a command.
+A native root without a lossless command spelling does not suppress inspection
+or conflict preview. Inspection and Git subprocess arguments retain the native
+canonical path. Normalized Windows command spelling must resolve to that same
+canonical identity; distinct trailing-period/space names and their ordinary
+aliases must never share a handoff. Init emits `unrepresentable_path`, retains
+display-only `root_display`, and sets `root` plus unavailable executable handoffs
+and absolute output identities to null. Human output explains the unavailable
+handoffs. Lossy display text must never inspect a different path or build a command.
+
+Checkout presence is detected independently using Git's ASCII work-tree status.
+A null `repository.git_root` caused by non-UTF-8 path output must not emit
+`missing_git` for an existing checkout; genuine non-checkouts retain that warning.
 
 ## 4. Non-goals
 

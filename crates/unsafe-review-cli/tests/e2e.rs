@@ -1268,6 +1268,13 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
         );
     }
     let warnings = proposal["warnings"].as_array().ok_or("warnings")?;
+    assert!(proposal["repository"]["git_root"].is_null());
+    assert!(
+        !warnings
+            .iter()
+            .any(|warning| warning["code"] == "missing_git"),
+        "non-UTF-8 checkout identity is unavailable, not absent"
+    );
     assert!(
         warnings
             .iter()
@@ -1318,6 +1325,132 @@ fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<
         assert!(!lossy_alias.join(destination).exists());
     }
     assert_eq!(work_tree_state(&root)?, before);
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_ordinary_control() -> Result<(), Box<dyn Error>> {
+    let mut temp = TempDir::new("unsafe-review-init-windows-control")?;
+    temp.path = fs::canonicalize(temp.path())?;
+    let root = temp.path().join("ordinary-control");
+    fs::create_dir_all(&root)?;
+    let proposal = init_handoff_proposal(temp.path(), &root)?;
+    assert!(proposal["root"].is_string());
+    assert!(proposal["commands"]["doctor"].is_string());
+    assert!(proposal["commands"]["first_pr_artifacts"].is_string());
+    assert!(proposal["proposed_files"][0]["absolute_path"].is_string());
+    assert!(
+        !proposal["warnings"]
+            .as_array()
+            .ok_or("warnings")?
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_period() -> Result<(), Box<dyn Error>> {
+    init_native_identity_windows_refusal(".")
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_space() -> Result<(), Box<dyn Error>> {
+    init_native_identity_windows_refusal(" ")
+}
+
+#[cfg(windows)]
+fn init_native_identity_windows_refusal(suffix: &str) -> Result<(), Box<dyn Error>> {
+    let mut temp = TempDir::new("unsafe-review-init-windows-identity")?;
+    // Keep creation, inspection and cleanup in the native Windows namespace.
+    temp.path = fs::canonicalize(temp.path())?;
+    let stem = "repo";
+    let alias = temp.path().join(&stem);
+    let root = temp.path().join(format!("{stem}{suffix}"));
+    for path in [&root, &alias] {
+        fs::create_dir_all(path.join(".github/workflows"))?;
+    }
+    assert_ne!(fs::canonicalize(&root)?, fs::canonicalize(&alias)?);
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"native-root\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    let alias_workflow = alias.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::write(&workflow, "name: native-owner-workflow\n")?;
+    fs::write(&alias_workflow, "name: alias-owner-workflow\n")?;
+
+    let proposal = init_handoff_proposal(temp.path(), &root)?;
+    assert_eq!(proposal["mode"], "preview_only");
+    assert_eq!(proposal["writes_repository"], false);
+    assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert!(proposal["root"].is_null());
+    assert_eq!(
+        Path::new(proposal["root_display"].as_str().ok_or("root display")?),
+        fs::canonicalize(&root)?
+    );
+    let file = &proposal["proposed_files"][0];
+    assert_eq!(file["status"], "conflict");
+    assert!(file["absolute_path"].is_null());
+    let diff = file["diff"].as_str().ok_or("native conflict diff")?;
+    assert_contains(diff, "native-owner-workflow");
+    assert!(!diff.contains("alias-owner-workflow"));
+    for key in [
+        "doctor",
+        "first_pr",
+        "first_pr_artifacts",
+        "review_baseline_separately",
+    ] {
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands")?
+                .contains_key(key)
+        );
+        assert!(
+            proposal["commands"][key].is_null(),
+            "ambiguous identity: {key}"
+        );
+    }
+    for recommendation in proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?
+    {
+        for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
+            assert!(
+                recommendation[key].is_null(),
+                "ambiguous recommendation: {key}"
+            );
+        }
+    }
+    assert!(
+        proposal["warnings"]
+            .as_array()
+            .ok_or("warnings")?
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    assert_eq!(
+        proposal,
+        init_handoff_proposal(temp.path(), &root)?,
+        "native preview must remain deterministic"
+    );
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: native-owner-workflow\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&alias_workflow)?,
+        "name: alias-owner-workflow\n"
+    );
+    assert!(!alias.join("Cargo.toml").exists());
+    for destination in ["target", "policy", "badges", "unsafe-review-init.json"] {
+        assert!(!root.join(destination).exists());
+        assert!(!alias.join(destination).exists());
+    }
     Ok(())
 }
 
