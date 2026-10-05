@@ -36,7 +36,7 @@ proof = ["Hosted candidate source-prefix execution of installed_consumer_probe.p
 
 [[acceptance]]
 id = "AC-1887-TEST-FIRST-VERIFIER"
-text = "Under #2302, the unchanged real safe-to-unsafe function with no reaching test passes bundle verification with canonical test-first cues; reached legacy cues pass; missing, stale or contradictory cues, wrong command/subject/boundary and inconsistent owner/obligation reach evidence fail. Ownerless and commandless cards retain existing posture."
+text = "Under #2302, the unchanged real safe-to-unsafe function with no reaching test passes bundle verification with canonical test-first cues; reached legacy cues pass; missing, stale or contradictory cues, wrong command/subject/boundary and inconsistent owner/obligation reach evidence fail. Ownerless and commandless cards retain existing posture. Canonical body labels bind the full step; current legacy witness prose is checked against its distinct producer contract, with actual renderer controls. Its prose alignment remains a #2302 follow-up."
 proof = ["Hosted unchanged Source 735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1 first-pr fixture and check-first-pr-artifacts", "cargo test --locked -p xtask confirmation_verifier_"]
 
 [[integration]]

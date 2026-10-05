@@ -7724,7 +7724,10 @@ fn require_comment_body_card_projection(
             "{context} body must project structured hypothesis_to_confirm `{expected_hypothesis}`"
         ));
     }
-    let expected_confirmation_step = expected_comment_confirmation_step(card);
+    let expected_confirmation_step = format!(
+        "Confirmation step: {}",
+        expected_comment_confirmation_step(card)
+    );
     if !body.contains(&expected_confirmation_step) {
         return Err(format!(
             "{context} body must project structured confirmation_step `{expected_confirmation_step}`"
@@ -9541,8 +9544,21 @@ fn require_witness_plan_common_card_projection(
         path,
         card_id,
         "confirmation step",
-        &expected_confirmation_step_fragment(card),
+        &expected_witness_confirmation_step_fragment(card),
     )
+}
+
+// This existing producer surface uses its own legacy formatter. Keep that
+// exact contract here; JSON, comments and PR summaries require the newer
+// test-first cue. Producer prose alignment remains tracked under issue #2302.
+fn expected_witness_confirmation_step_fragment(card: &CardProjection) -> String {
+    if let Some(command) = card.verify_commands.first() {
+        return format!("- Confirmation step: build/run `{command}` first");
+    }
+    if let Some(route) = card.witness_routes.first() {
+        return format!("- Confirmation step: use the `{}` route", route.kind);
+    }
+    "- Confirmation step: derive a focused confirmation".to_string()
 }
 
 fn expected_confirmation_step_fragment(card: &CardProjection) -> String {
@@ -11452,7 +11468,7 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
     }
 
     #[test]
-    fn confirmation_verifier_projects_comment_and_witness_test_first_prefixes() -> Result<(), String>
+    fn confirmation_verifier_distinguishes_comment_and_legacy_witness_steps() -> Result<(), String>
     {
         for unreached in [true, false] {
             let (card, cue) = command_confirmation_fixture(unreached);
@@ -11470,8 +11486,17 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                 "`unsafe-review` found `contract_missing` for `raw_pointer_read` (`raw_pointer_read`).\nMissing evidence: contract\nProof path: `contract`.\nNext action: add safety contract\nHypothesis to confirm: {hypothesis}\nBuild/run this first: {summary}\nConfirmation step: {step}\nVerify command: `cargo +nightly miri test f`"
             );
             require_comment_body_card_projection(&body, &card, "test body")?;
-            let line = format!("- Confirmation step: {step}");
-            let expected = expected_confirmation_step_fragment(&card);
+            let forged_label = body.replace(
+                &format!("Confirmation step: {step}"),
+                &format!("Confirmation step: forged\nNote: {step}"),
+            );
+            err_text(require_comment_body_card_projection(
+                &forged_label,
+                &card,
+                "test body",
+            ))?;
+            let line = "- Confirmation step: build/run `cargo +nightly miri test f` first for this card, then attach a matching receipt if it confirms the route".to_string();
+            let expected = expected_witness_confirmation_step_fragment(&card);
             require_witness_plan_card_line(
                 &line,
                 Path::new("witness-plan.md"),
@@ -11516,7 +11541,7 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                     Path::new("witness-plan.md"),
                     &card.id,
                     "confirmation step",
-                    &expected,
+                    &expected_confirmation_step_fragment(&card),
                 ))?;
             }
         }
@@ -11528,12 +11553,93 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
         let (mut card, cue) = command_confirmation_fixture(false);
         card.reach =
             Some("External integration reach receipt imported: test integration".to_string());
+        card.obligation_evidence[0]["reach"]["summary"] = serde_json::json!(card.reach);
         require_unreached_confirmation_evidence(&card)?;
         require_card_confirmation_cue_projection(&cue, &card, "receipt-backed cue")?;
         if unreached_confirmation_owner(&card).is_some() {
             return Err("receipt-backed reach gained an unreached prerequisite".to_string());
         }
         Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_checks_actual_witness_renderer() -> Result<(), String> {
+        use unsafe_review_core::{AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope};
+        let nonce = std::time::SystemTime::now()
+            .duration_since(std::time::UNIX_EPOCH)
+            .map_err(|err| err.to_string())?
+            .as_nanos();
+        let root = std::env::temp_dir().join(format!(
+            "unsafe-review-cue-renderer-{}-{nonce}",
+            std::process::id()
+        ));
+        std::fs::create_dir(&root).map_err(|err| err.to_string())?;
+        let result = (|| -> Result<(), String> {
+            std::fs::create_dir(root.join("src")).map_err(|err| err.to_string())?;
+            std::fs::write(
+                root.join("Cargo.toml"),
+                "[package]\nname = \"cue-renderer\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+            )
+            .map_err(|err| err.to_string())?;
+            std::fs::write(
+                root.join("src/lib.rs"),
+                "pub fn f() -> i32 { unsafe { core::mem::zeroed() } }\n",
+            )
+            .map_err(|err| err.to_string())?;
+            for reached in [false, true] {
+                if reached {
+                    std::fs::create_dir(root.join("tests")).map_err(|err| err.to_string())?;
+                    std::fs::write(
+                        root.join("tests/reach.rs"),
+                        "#[test]\nfn calls_f() { let _ = cue_renderer::f(); }\n",
+                    )
+                    .map_err(|err| err.to_string())?;
+                }
+                let output = unsafe_review_core::analyze(AnalyzeInput {
+                    root: root.clone(),
+                    scope: Scope::Repo,
+                    diff: DiffSource::NoneRepoScan,
+                    mode: AnalysisMode::Repo,
+                    policy: PolicyMode::Advisory,
+                    include_unchanged_tests: false,
+                    max_cards: None,
+                })?;
+                let json: serde_json::Value =
+                    serde_json::from_str(&unsafe_review_core::render_json(&output))
+                        .map_err(|err| err.to_string())?;
+                let cards = advisory_card_projections(&json)?;
+                let witness = unsafe_review_core::render_witness_plan(&output);
+                let mut checked = 0;
+                for card in cards
+                    .values()
+                    .filter(|card| card.owner == "f" && !card.verify_commands.is_empty())
+                {
+                    if unreached_confirmation_owner(card).is_some() == reached {
+                        return Err("actual fixture did not discriminate test reach".to_string());
+                    }
+                    let sections = witness_plan_card_sections(&witness, &card.id);
+                    if sections.is_empty() {
+                        return Err("actual witness renderer omitted the command card".to_string());
+                    }
+                    for section in sections {
+                        require_witness_plan_common_card_projection(
+                            section,
+                            Path::new("witness-plan.md"),
+                            &card.id,
+                            card,
+                        )?;
+                    }
+                    checked += 1;
+                }
+                if checked == 0 {
+                    return Err("actual fixture emitted no command card".to_string());
+                }
+            }
+            Ok(())
+        })();
+        let cleanup = std::fs::remove_dir_all(&root).map_err(|err| err.to_string());
+        result?;
+        cleanup
     }
 
     fn minimal_comment_card_projection(
