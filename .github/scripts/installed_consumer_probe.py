@@ -107,7 +107,11 @@ def main():
                 raise RuntimeError("executable version contradicts the candidate receipt")
         # A successful global-help fallback must not count as init capability.
         result, elapsed = run([binary, "init", "--help"])
-        real_help = result.returncode == 0 and b"unsafe-review init [--root .]" in result.stdout
+        help_lines = result.stdout.splitlines()
+        real_help = (result.returncode == 0 and bool(help_lines)
+                     and help_lines[0].startswith(b"unsafe-review init:")
+                     and b"Usage:" in result.stdout
+                     and b"unsafe-review init [--root .]" in result.stdout)
         row("init-specific-help", real_help, result, elapsed)
         control = scratch / "control"
         (control / "src").mkdir(parents=True)
@@ -130,7 +134,7 @@ def main():
         git(control, "init", "-q")
         result, elapsed = run([binary, "init", "--root", control, "--format", "json"])
         proposal = json.loads(result.stdout)
-        no_base = proposal.get("commands", {}).get("first_pr") is None
+        no_base = "first_pr" in proposal.get("commands", {}) and proposal["commands"]["first_pr"] is None
         required = proposal.get("commands", {}).get("first_pr_prerequisite", "")
         row("missing-base-explicit-recovery", result.returncode == 0 and no_base
             and "--base" in required and "--diff" in required, result, elapsed)
@@ -188,7 +192,6 @@ def main():
         repeated = json.loads(cards_path.read_bytes()) if fresh_cards else {}
         row("repeat-from-third-cwd", result.returncode == 0 and fresh_cards
             and repeated.get("cards") == cards, result, elapsed)
-        row("caller-and-third-cwd-no-output", all(not (root / name).exists() for root in (caller, scratch) for name in ("target", "policy", "badges")))
         row("owner-workflow-preserved", workflow.read_text() == "name: owner-managed\n")
         quiet = scratch / "quiet"
         repo(quiet)
@@ -198,11 +201,17 @@ def main():
         git(quiet, "commit", "-qm", "safe-only change")
         result, _ = run([binary, "init", "--root", quiet, "--format", "json"])
         quiet_proposal = json.loads(result.stdout)
-        result, elapsed = run([*shell, quiet_proposal["commands"]["first_pr"]], cwd=caller, env=env)
         quiet_output = Path(quiet_proposal["commands"]["first_pr_artifacts"])
+        quiet_destination = quiet_output.resolve() == (quiet / "target/unsafe-review").resolve()
+        row("quiet-target-local-artifact-destination", quiet_destination)
+        if not quiet_destination:
+            raise RuntimeError("quiet artifact destination escapes the task-owned target")
+        result, elapsed = run([*shell, quiet_proposal["commands"]["first_pr"]], cwd=caller, env=env)
         quiet_cards = json.loads((quiet_output / "cards.json").read_bytes())
         row("safe-only-diff-no-sites-control", result.returncode == 0
             and quiet_cards["cards"] == [], result, elapsed)
+        row("caller-and-third-cwd-no-output", all(not (root / name).exists()
+            for root in (caller, scratch) for name in ("target", "policy", "badges")))
     except Exception as error:
         failed = True
         receipt["stop_reason"] = str(error)[:500]
