@@ -144,7 +144,13 @@ jobs:
           BASE=$(git rev-parse HEAD~1)
           if "$B" first-pr --base-sha "$BASE" --out-dir "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:exit" 0 -; else rec "bundle:exit" 1 -; fi
           cd "$QUALIFICATION_VERIFIER_WORKSPACE"
-          if cargo run --locked -p xtask -- check-first-pr-artifacts "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:verifier" 0 -; else rec "bundle:verifier" 1 -; fi
+          VERIFIER_LOG="$GITHUB_WORKSPACE/bundle-verifier.log"
+          if cargo run --locked -p xtask -- check-first-pr-artifacts "$GITHUB_WORKSPACE/rebind-bundle" > "$VERIFIER_LOG" 2>&1; then
+            rec "bundle:verifier" 0 -
+          else
+            rec "bundle:verifier" 1 "see bounded verifier diagnostic"
+            tail -n 20 "$VERIFIER_LOG" | head -c 4096 || true
+          fi
           cd "$GITHUB_WORKSPACE"
           "$B" --bogus-flag >/dev/null 2>&1 && code=0 || code=$?
           if [ "$code" = 2 ]; then rec "fail:invalid-flag" 0 -; else rec "fail:invalid-flag" 1 "exit=$code"; fi

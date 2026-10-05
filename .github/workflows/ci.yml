@@ -527,12 +527,20 @@ jobs:
                  'QUALIFICATION_VERIFIER_WORKSPACE': str(workspace),
                  'CARGO_TARGET_DIR': str(workspace / 'target/installed-qualification'),
                  'CARGO_BUILD_JOBS': '1'}
+          observed_failures = []
           for name in names:
               block = next(b for b in blocks if b.splitlines()[0] == name)
               run_lines = block.split('        run: |\n', 1)[1].splitlines()
               script = '\n'.join(line[10:] if line.startswith('          ') else '' for line in run_lines)
               print('qualification-step=' + name, flush=True)
-              subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root, env=env, check=True)
+              outcome = subprocess.run(['bash', '-euo', 'pipefail', '-c', script], cwd=root, env=env)
+              if outcome.returncode:
+                  if name not in ['Write bounded receipt', 'Probe the actual source-prefix consumer']:
+                      raise SystemExit(outcome.returncode)
+                  observed_failures.append({'step': name, 'exit': outcome.returncode})
+          if observed_failures:
+              print('QUALIFICATION_SOURCE_PREFIX_FAILED ' + str(observed_failures), flush=True)
+              raise SystemExit(1)
           print('QUALIFICATION_SOURCE_PREFIX_COMPLETE root=' + str(root), flush=True)
           EOF
       - name: Upload bounded qualification observation (temporary)
