@@ -199,19 +199,19 @@ const MINIMAL_REPRO_LIMITATION: &str = "Minimal repro cue only; unsafe-review di
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
-    // Gap-specific reasons (SPEC-0032): "<slot>: <state> — actionable <signal> card"
-    "contract_coverage: missing — actionable high-confidence card",
-    "contract_coverage: missing — actionable high-priority card",
-    "guard_coverage: missing — actionable high-confidence card",
-    "guard_coverage: missing — actionable high-priority card",
-    "guard_coverage: weak — actionable high-confidence card",
-    "guard_coverage: weak — actionable high-priority card",
-    "test_reach_coverage: missing — actionable high-confidence card",
-    "test_reach_coverage: missing — actionable high-priority card",
-    "test_reach_coverage: weak — actionable high-confidence card",
-    "test_reach_coverage: weak — actionable high-priority card",
-    "witness_receipt_coverage: missing — actionable high-confidence card",
-    "witness_receipt_coverage: missing — actionable high-priority card",
+    // Gap-specific reasons (SPEC-0032): "<slot>: <state> - actionable <signal> card"
+    "contract_coverage: missing - actionable high-confidence card",
+    "contract_coverage: missing - actionable high-priority card",
+    "guard_coverage: missing - actionable high-confidence card",
+    "guard_coverage: missing - actionable high-priority card",
+    "guard_coverage: weak - actionable high-confidence card",
+    "guard_coverage: weak - actionable high-priority card",
+    "test_reach_coverage: missing - actionable high-confidence card",
+    "test_reach_coverage: missing - actionable high-priority card",
+    "test_reach_coverage: weak - actionable high-confidence card",
+    "test_reach_coverage: weak - actionable high-priority card",
+    "witness_receipt_coverage: missing - actionable high-confidence card",
+    "witness_receipt_coverage: missing - actionable high-priority card",
 ];
 const COMMENT_PLAN_SELECTION_REASON_CODES: &[&str] = &["top_actionable_card"];
 const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
@@ -8371,8 +8371,10 @@ fn expected_comment_hypothesis(card: &CardProjection) -> String {
 // Obligation reach uses missing/present, so missing alone cannot mean unreached.
 fn unreached_confirmation_owner(card: &CardProjection) -> Option<&str> {
     let claim = super::parse_fixture_reach_claim(card.reach.as_deref()?)?;
-    if !matches!(claim.kind, super::FixtureReachClaimKind::NoStaticTestMention)
-        || claim.owner != card.owner
+    if !matches!(
+        claim.kind,
+        super::FixtureReachClaimKind::NoStaticTestMention
+    ) || claim.owner != card.owner
         || card.verify_commands.is_empty()
     {
         return None;
@@ -8388,21 +8390,32 @@ fn require_unreached_confirmation_evidence(card: &CardProjection) -> Result<(), 
     else {
         return Ok(());
     };
-    if !matches!(claim.kind, super::FixtureReachClaimKind::NoStaticTestMention) {
+    if !matches!(
+        claim.kind,
+        super::FixtureReachClaimKind::NoStaticTestMention
+    ) {
         return Ok(());
     }
     if claim.owner != card.owner {
         return Err("cards.json card unreached reach owner must match site.owner".to_string());
     }
     for evidence in &card.obligation_evidence {
-        if evidence.pointer("/reach/state").and_then(serde_json::Value::as_str)
+        if evidence
+            .pointer("/reach/state")
+            .and_then(serde_json::Value::as_str)
             != Some("missing")
-            || evidence.pointer("/reach/present").and_then(serde_json::Value::as_bool)
+            || evidence
+                .pointer("/reach/present")
+                .and_then(serde_json::Value::as_bool)
                 != Some(false)
-            || evidence.pointer("/reach/summary").and_then(serde_json::Value::as_str)
+            || evidence
+                .pointer("/reach/summary")
+                .and_then(serde_json::Value::as_str)
                 != card.reach.as_deref()
         {
-            return Err("cards.json card unreached reach must match obligation reach evidence".to_string());
+            return Err(
+                "cards.json card unreached reach must match obligation reach evidence".to_string(),
+            );
         }
     }
     Ok(())
@@ -8792,14 +8805,14 @@ fn expected_selection_reason(card: &CardProjection) -> String {
     } else {
         "high-priority"
     };
-    format!("{gap} — actionable {signal} card")
+    format!("{gap} - actionable {signal} card")
 }
 
 /// Derive the expected `coverage_gap` string for a card from its SPEC-0029
 /// coverage block slots. Mirrors `selection::coverage_gap` in unsafe-review-core.
 ///
-/// Priority: contract_coverage → guard_coverage → test_reach_coverage →
-/// witness_receipt_coverage → fallback.
+/// Priority: contract_coverage  guard_coverage  test_reach_coverage 
+/// witness_receipt_coverage  fallback.
 fn expected_coverage_gap(card: &CardProjection) -> String {
     if card.contract_coverage != "present" {
         return format!("contract_coverage: {}", card.contract_coverage);
@@ -11301,15 +11314,18 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
         )
     }
 
-
     fn command_confirmation_fixture(unreached: bool) -> (CardProjection, serde_json::Value) {
-        let mut card = minimal_comment_card_projection("card-1", "unsafe_operation", "f", "raw_pointer_read");
+        let mut card =
+            minimal_comment_card_projection("card-1", "unsafe_operation", "f", "raw_pointer_read");
         card.verify_commands = vec!["cargo +nightly miri test f".to_string()];
-        card.reach = Some(if unreached {
-            "No static test mention of owner `f` was found"
-        } else {
-            "1 related test file mentions owner `f`"
-        }.to_string());
+        card.reach = Some(
+            if unreached {
+                "No static test mention of owner `f` was found"
+            } else {
+                "1 related test file mentions owner `f`"
+            }
+            .to_string(),
+        );
         card.obligation_evidence = vec![serde_json::json!({
             "reach": {"present": !unreached, "state": if unreached { "missing" } else { "present" },
                       "summary": card.reach}
@@ -11341,7 +11357,8 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
     }
 
     #[test]
-    fn confirmation_verifier_accepts_unreached_test_first_and_reached_legacy() -> Result<(), String> {
+    fn confirmation_verifier_accepts_unreached_test_first_and_reached_legacy() -> Result<(), String>
+    {
         for unreached in [true, false] {
             let (card, cue) = command_confirmation_fixture(unreached);
             require_unreached_confirmation_evidence(&card)?;
@@ -11351,28 +11368,45 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
     }
 
     #[test]
-    fn confirmation_verifier_rejects_missing_or_contradictory_test_first_cues() -> Result<(), String> {
+    fn confirmation_verifier_rejects_missing_or_contradictory_test_first_cues() -> Result<(), String>
+    {
         let (card, cue) = command_confirmation_fixture(true);
         let (_, old) = command_confirmation_fixture(false);
-        for path in ["/confirmation_cue/build_this_first/summary",
-                     "/confirmation_cue/minimal_repro/steps/1",
-                     "/confirmation_cue/confirmation_step"] {
+        for path in [
+            "/confirmation_cue/build_this_first/summary",
+            "/confirmation_cue/minimal_repro/steps/1",
+            "/confirmation_cue/confirmation_step",
+        ] {
             let mut bad = cue.clone();
-            *bad.pointer_mut(path).ok_or("fixture cue path missing")? =
-                old.pointer(path).ok_or("old fixture cue path missing")?.clone();
-            err_text(require_card_confirmation_cue_projection(&bad, &card, "test cue"))?;
+            *bad.pointer_mut(path).ok_or("fixture cue path missing")? = old
+                .pointer(path)
+                .ok_or("old fixture cue path missing")?
+                .clone();
+            err_text(require_card_confirmation_cue_projection(
+                &bad, &card, "test cue",
+            ))?;
         }
-        for path in ["/confirmation_cue/build_this_first/command",
-                     "/confirmation_cue/minimal_repro/command",
-                     "/confirmation_cue/hypothesis_to_confirm",
-                     "/confirmation_cue/trust_boundary"] {
+        for path in [
+            "/confirmation_cue/build_this_first/command",
+            "/confirmation_cue/minimal_repro/command",
+            "/confirmation_cue/hypothesis_to_confirm",
+            "/confirmation_cue/trust_boundary",
+        ] {
             let mut bad = cue.clone();
             *bad.pointer_mut(path).ok_or("fixture cue path missing")? = serde_json::json!("forged");
-            err_text(require_card_confirmation_cue_projection(&bad, &card, "test cue"))?;
+            err_text(require_card_confirmation_cue_projection(
+                &bad, &card, "test cue",
+            ))?;
         }
-        err_text(require_card_confirmation_cue_projection(&serde_json::json!({}), &card, "test cue"))?;
+        err_text(require_card_confirmation_cue_projection(
+            &serde_json::json!({}),
+            &card,
+            "test cue",
+        ))?;
         let (reached, _) = command_confirmation_fixture(false);
-        err_text(require_card_confirmation_cue_projection(&cue, &reached, "test cue"))?;
+        err_text(require_card_confirmation_cue_projection(
+            &cue, &reached, "test cue",
+        ))?;
         Ok(())
     }
 
@@ -11382,9 +11416,14 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
         card.owner = "other".to_string();
         err_text(require_unreached_confirmation_evidence(&card))?;
         card.owner = "f".to_string();
-        for (field, value) in [("state", serde_json::json!("present")),
-                               ("present", serde_json::json!(true)),
-                               ("summary", serde_json::json!("No static test mention of owner `other` was found"))] {
+        for (field, value) in [
+            ("state", serde_json::json!("present")),
+            ("present", serde_json::json!(true)),
+            (
+                "summary",
+                serde_json::json!("No static test mention of owner `other` was found"),
+            ),
+        ] {
             let saved = card.obligation_evidence[0]["reach"][field].clone();
             card.obligation_evidence[0]["reach"][field] = value;
             err_text(require_unreached_confirmation_evidence(&card))?;
@@ -11394,7 +11433,8 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
     }
 
     #[test]
-    fn confirmation_verifier_distinguishes_ownerless_unknown_and_no_command() -> Result<(), String> {
+    fn confirmation_verifier_distinguishes_ownerless_unknown_and_no_command() -> Result<(), String>
+    {
         let (mut card, _) = command_confirmation_fixture(false);
         card.owner = "unknown".to_string();
         card.reach = Some("No owner function could be inferred".to_string());
@@ -11407,7 +11447,8 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
         }
         card.verify_commands.clear();
         if unreached_confirmation_owner(&card).is_some()
-            || expected_comment_build_this_first(&card).kind != "human_review" {
+            || expected_comment_build_this_first(&card).kind != "human_review"
+        {
             return Err("commandless card gained a build/run prerequisite".to_string());
         }
         Ok(())

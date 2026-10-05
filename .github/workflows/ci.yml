@@ -503,6 +503,7 @@ jobs:
           INPUT_SOURCE_SHA: "735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1"
         run: |
           set -euo pipefail
+          cargo test --locked -p xtask confirmation_verifier_
           python .github/scripts/test_qualification_receipt.py
           python - <<'EOF'
           import os, re, shutil, subprocess
