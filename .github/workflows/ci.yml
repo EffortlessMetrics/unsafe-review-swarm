@@ -496,6 +496,15 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           ) || true
           test "${core_exit}" = "0"
+      # Temporary advisory oracle observation, removed before final review.
+      - name: Observe qualification receipt oracle (temporary)
+        continue-on-error: true
+        run: |
+          set +e
+          python .github/scripts/test_qualification_receipt.py
+          rc=$?
+          echo "qualification-receipt-oracle-exit=$rc"
+          exit "$rc"
       - name: Upload bounded core-gate failure evidence
         if: >-
           ${{ always() &&
