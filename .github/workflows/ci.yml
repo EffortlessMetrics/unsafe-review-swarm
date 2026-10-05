@@ -496,16 +496,6 @@ jobs:
               >> "$GITHUB_STEP_SUMMARY"
           ) || true
           test "${core_exit}" = "0"
-      # Temporary read-only observation for the narrow source absorption.
-      # This is advisory and cannot change the required core verdict.
-      - name: Observe init source absorption (temporary)
-        continue-on-error: true
-        run: |
-          set -euo pipefail
-          echo "source-sync-observer: checkout=$(git rev-parse HEAD)"
-          cargo test --locked -p unsafe-review-cli --test e2e init_ -- --test-threads=1
-          cargo test --locked -p unsafe-review --test init_consumer -- --test-threads=1
-          cargo run --locked -p xtask -- source-divergence
       - name: Upload bounded core-gate failure evidence
         if: >-
           ${{ always() &&
