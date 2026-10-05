@@ -36,9 +36,8 @@ proof = ["Hosted candidate source-prefix execution of installed_consumer_probe.p
 
 [[acceptance]]
 id = "AC-1887-TEST-FIRST-VERIFIER"
-text = "The unchanged real safe-to-unsafe function with no reaching test passes bundle verification with canonical test-first cues; reached legacy cues pass; missing, stale or contradictory cues, wrong command/subject/boundary and inconsistent owner/obligation reach evidence fail. Ownerless and commandless cards retain existing posture."
+text = "Under #2302, the unchanged real safe-to-unsafe function with no reaching test passes bundle verification with canonical test-first cues; reached legacy cues pass; missing, stale or contradictory cues, wrong command/subject/boundary and inconsistent owner/obligation reach evidence fail. Ownerless and commandless cards retain existing posture."
 proof = ["Hosted unchanged Source 735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1 first-pr fixture and check-first-pr-artifacts", "cargo test --locked -p xtask confirmation_verifier_"]
-canonical_issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2302"
 
 [[integration]]
 surface = "Existing manual Windows qualification"

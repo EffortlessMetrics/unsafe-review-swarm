@@ -199,19 +199,19 @@ const MINIMAL_REPRO_LIMITATION: &str = "Minimal repro cue only; unsafe-review di
 const COMMENT_PLAN_REVIEW_BUDGET_REASON: &str = "bounded reviewer noise";
 const COMMENT_PLAN_REVIEW_BUDGET_REASON_CODE: &str = "bounded_reviewer_noise";
 const COMMENT_PLAN_SELECTION_REASONS: &[&str] = &[
-    // Gap-specific reasons (SPEC-0032): "<slot>: <state> - actionable <signal> card"
-    "contract_coverage: missing - actionable high-confidence card",
-    "contract_coverage: missing - actionable high-priority card",
-    "guard_coverage: missing - actionable high-confidence card",
-    "guard_coverage: missing - actionable high-priority card",
-    "guard_coverage: weak - actionable high-confidence card",
-    "guard_coverage: weak - actionable high-priority card",
-    "test_reach_coverage: missing - actionable high-confidence card",
-    "test_reach_coverage: missing - actionable high-priority card",
-    "test_reach_coverage: weak - actionable high-confidence card",
-    "test_reach_coverage: weak - actionable high-priority card",
-    "witness_receipt_coverage: missing - actionable high-confidence card",
-    "witness_receipt_coverage: missing - actionable high-priority card",
+    // Gap-specific reasons (SPEC-0032): "<slot>: <state> — actionable <signal> card"
+    "contract_coverage: missing — actionable high-confidence card",
+    "contract_coverage: missing — actionable high-priority card",
+    "guard_coverage: missing — actionable high-confidence card",
+    "guard_coverage: missing — actionable high-priority card",
+    "guard_coverage: weak — actionable high-confidence card",
+    "guard_coverage: weak — actionable high-priority card",
+    "test_reach_coverage: missing — actionable high-confidence card",
+    "test_reach_coverage: missing — actionable high-priority card",
+    "test_reach_coverage: weak — actionable high-confidence card",
+    "test_reach_coverage: weak — actionable high-priority card",
+    "witness_receipt_coverage: missing — actionable high-confidence card",
+    "witness_receipt_coverage: missing — actionable high-priority card",
 ];
 const COMMENT_PLAN_SELECTION_REASON_CODES: &[&str] = &["top_actionable_card"];
 const COMMENT_PLAN_NON_SELECTION_REASONS: &[&str] = &[
@@ -8805,14 +8805,14 @@ fn expected_selection_reason(card: &CardProjection) -> String {
     } else {
         "high-priority"
     };
-    format!("{gap} - actionable {signal} card")
+    format!("{gap} — actionable {signal} card")
 }
 
 /// Derive the expected `coverage_gap` string for a card from its SPEC-0029
 /// coverage block slots. Mirrors `selection::coverage_gap` in unsafe-review-core.
 ///
-/// Priority: contract_coverage  guard_coverage  test_reach_coverage 
-/// witness_receipt_coverage  fallback.
+/// Priority: contract_coverage → guard_coverage → test_reach_coverage →
+/// witness_receipt_coverage → fallback.
 fn expected_coverage_gap(card: &CardProjection) -> String {
     if card.contract_coverage != "present" {
         return format!("contract_coverage: {}", card.contract_coverage);
