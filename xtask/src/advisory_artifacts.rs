@@ -7998,6 +7998,7 @@ fn advisory_card_projections(
             comment_plan_status,
             agent_lsp_readiness,
         };
+        require_unreached_confirmation_evidence(&projection)?;
         require_card_confirmation_cue_projection(
             card,
             &projection,
@@ -8365,11 +8366,58 @@ fn expected_comment_hypothesis(card: &CardProjection) -> String {
     )
 }
 
+// cards.json projects ReachEvidence.state as its canonical summary. Reuse the
+// existing exact summary parser, not coverage status or arbitrary cue prose.
+// Obligation reach uses missing/present, so missing alone cannot mean unreached.
+fn unreached_confirmation_owner(card: &CardProjection) -> Option<&str> {
+    let claim = super::parse_fixture_reach_claim(card.reach.as_deref()?)?;
+    if !matches!(claim.kind, super::FixtureReachClaimKind::NoStaticTestMention)
+        || claim.owner != card.owner
+        || card.verify_commands.is_empty()
+    {
+        return None;
+    }
+    Some(&card.owner)
+}
+
+fn require_unreached_confirmation_evidence(card: &CardProjection) -> Result<(), String> {
+    let Some(claim) = card
+        .reach
+        .as_deref()
+        .and_then(super::parse_fixture_reach_claim)
+    else {
+        return Ok(());
+    };
+    if !matches!(claim.kind, super::FixtureReachClaimKind::NoStaticTestMention) {
+        return Ok(());
+    }
+    if claim.owner != card.owner {
+        return Err("cards.json card unreached reach owner must match site.owner".to_string());
+    }
+    for evidence in &card.obligation_evidence {
+        if evidence.pointer("/reach/state").and_then(serde_json::Value::as_str)
+            != Some("missing")
+            || evidence.pointer("/reach/present").and_then(serde_json::Value::as_bool)
+                != Some(false)
+            || evidence.pointer("/reach/summary").and_then(serde_json::Value::as_str)
+                != card.reach.as_deref()
+        {
+            return Err("cards.json card unreached reach must match obligation reach evidence".to_string());
+        }
+    }
+    Ok(())
+}
+
 fn expected_comment_confirmation_step(card: &CardProjection) -> String {
     if let Some(command) = card.verify_commands.first() {
-        return format!(
-            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
-        );
+        return match unreached_confirmation_owner(card) {
+            Some(owner) => format!(
+                "write or identify a focused test for `{owner}` first (no test reaches it yet), then build/run `{command}` first, then attach a matching receipt if it confirms the route"
+            ),
+            None => format!(
+                "build/run `{command}` first, then attach a matching receipt if it confirms the route"
+            ),
+        };
     }
     if let Some(route) = card.witness_routes.first() {
         return format!(
@@ -8386,9 +8434,14 @@ fn expected_comment_build_this_first(card: &CardProjection) -> CommentBuildFirst
             kind: "verify_command",
             command: Some(command.clone()),
             route_kind: card.witness_routes.first().map(|route| route.kind.clone()),
-            summary: format!(
-                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
-            ),
+            summary: match unreached_confirmation_owner(card) {
+                Some(owner) => format!(
+                    "No test reaches `{owner}` yet; write or identify a focused test for `{owner}` first, then build/run `{command}` for this card; attach a matching receipt only if it confirms the route"
+                ),
+                None => format!(
+                    "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
+                ),
+            },
         };
     }
     if let Some(route) = card.witness_routes.first() {
@@ -8426,7 +8479,12 @@ fn expected_comment_minimal_repro(card: &CardProjection) -> CommentMinimalReproP
             route_kind: card.witness_routes.first().map(|route| route.kind.clone()),
             steps: vec![
                 identity_step,
-                format!("Build/run `{command}` as the smallest available command for this card."),
+                match unreached_confirmation_owner(card) {
+                    Some(owner) => format!(
+                        "Write or identify a focused test for `{owner}` first (no test reaches it yet), then build/run `{command}` as the smallest available command for this card."
+                    ),
+                    None => format!("Build/run `{command}` as the smallest available command for this card."),
+                },
                 "Attach a matching receipt only if that run confirms the same route and ReviewCard identity.".to_string(),
             ],
             limitation: MINIMAL_REPRO_LIMITATION,
@@ -11241,6 +11299,118 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
             Path::new("target/test/witness-plan.md"),
             &card_ids,
         )
+    }
+
+
+    fn command_confirmation_fixture(unreached: bool) -> (CardProjection, serde_json::Value) {
+        let mut card = minimal_comment_card_projection("card-1", "unsafe_operation", "f", "raw_pointer_read");
+        card.verify_commands = vec!["cargo +nightly miri test f".to_string()];
+        card.reach = Some(if unreached {
+            "No static test mention of owner `f` was found"
+        } else {
+            "1 related test file mentions owner `f`"
+        }.to_string());
+        card.obligation_evidence = vec![serde_json::json!({
+            "reach": {"present": !unreached, "state": if unreached { "missing" } else { "present" },
+                      "summary": card.reach}
+        })];
+        let (summary, run_step, confirmation_step) = if unreached {
+            (
+                "No test reaches `f` yet; write or identify a focused test for `f` first, then build/run `cargo +nightly miri test f` for this card; attach a matching receipt only if it confirms the route",
+                "Write or identify a focused test for `f` first (no test reaches it yet), then build/run `cargo +nightly miri test f` as the smallest available command for this card.",
+                "write or identify a focused test for `f` first (no test reaches it yet), then build/run `cargo +nightly miri test f` first, then attach a matching receipt if it confirms the route",
+            )
+        } else {
+            (
+                "Build/run `cargo +nightly miri test f` first for this card; attach a matching receipt only if it confirms the route",
+                "Build/run `cargo +nightly miri test f` as the smallest available command for this card.",
+                "build/run `cargo +nightly miri test f` first, then attach a matching receipt if it confirms the route",
+            )
+        };
+        let cue = serde_json::json!({"confirmation_cue": {
+            "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `raw_pointer_read`; confirm with external evidence before treating it as observed runtime behavior",
+            "build_this_first": {"kind": "verify_command", "command": "cargo +nightly miri test f", "route_kind": null, "summary": summary},
+            "minimal_repro": {"kind": "verify_command", "command": "cargo +nightly miri test f", "route_kind": null,
+                "steps": ["Confirm ReviewCard `card-1` still maps to `raw_pointer_read` at `src/lib.rs:1:1` before upgrading confidence.", run_step,
+                          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."],
+                "limitation": MINIMAL_REPRO_LIMITATION},
+            "confirmation_step": confirmation_step,
+            "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+        }});
+        (card, cue)
+    }
+
+    #[test]
+    fn confirmation_verifier_accepts_unreached_test_first_and_reached_legacy() -> Result<(), String> {
+        for unreached in [true, false] {
+            let (card, cue) = command_confirmation_fixture(unreached);
+            require_unreached_confirmation_evidence(&card)?;
+            require_card_confirmation_cue_projection(&cue, &card, "test cue")?;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_rejects_missing_or_contradictory_test_first_cues() -> Result<(), String> {
+        let (card, cue) = command_confirmation_fixture(true);
+        let (_, old) = command_confirmation_fixture(false);
+        for path in ["/confirmation_cue/build_this_first/summary",
+                     "/confirmation_cue/minimal_repro/steps/1",
+                     "/confirmation_cue/confirmation_step"] {
+            let mut bad = cue.clone();
+            *bad.pointer_mut(path).ok_or("fixture cue path missing")? =
+                old.pointer(path).ok_or("old fixture cue path missing")?.clone();
+            err_text(require_card_confirmation_cue_projection(&bad, &card, "test cue"))?;
+        }
+        for path in ["/confirmation_cue/build_this_first/command",
+                     "/confirmation_cue/minimal_repro/command",
+                     "/confirmation_cue/hypothesis_to_confirm",
+                     "/confirmation_cue/trust_boundary"] {
+            let mut bad = cue.clone();
+            *bad.pointer_mut(path).ok_or("fixture cue path missing")? = serde_json::json!("forged");
+            err_text(require_card_confirmation_cue_projection(&bad, &card, "test cue"))?;
+        }
+        err_text(require_card_confirmation_cue_projection(&serde_json::json!({}), &card, "test cue"))?;
+        let (reached, _) = command_confirmation_fixture(false);
+        err_text(require_card_confirmation_cue_projection(&cue, &reached, "test cue"))?;
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_rejects_unreached_evidence_drift() -> Result<(), String> {
+        let (mut card, _) = command_confirmation_fixture(true);
+        card.owner = "other".to_string();
+        err_text(require_unreached_confirmation_evidence(&card))?;
+        card.owner = "f".to_string();
+        for (field, value) in [("state", serde_json::json!("present")),
+                               ("present", serde_json::json!(true)),
+                               ("summary", serde_json::json!("No static test mention of owner `other` was found"))] {
+            let saved = card.obligation_evidence[0]["reach"][field].clone();
+            card.obligation_evidence[0]["reach"][field] = value;
+            err_text(require_unreached_confirmation_evidence(&card))?;
+            card.obligation_evidence[0]["reach"][field] = saved;
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn confirmation_verifier_distinguishes_ownerless_unknown_and_no_command() -> Result<(), String> {
+        let (mut card, _) = command_confirmation_fixture(false);
+        card.owner = "unknown".to_string();
+        card.reach = Some("No owner function could be inferred".to_string());
+        if unreached_confirmation_owner(&card).is_some() {
+            return Err("ownerless card gained a test-first prerequisite".to_string());
+        }
+        card.reach = Some("No static test mention of owner `unknown` was found".to_string());
+        if unreached_confirmation_owner(&card) != Some("unknown") {
+            return Err("real function named unknown lost its prerequisite".to_string());
+        }
+        card.verify_commands.clear();
+        if unreached_confirmation_owner(&card).is_some()
+            || expected_comment_build_this_first(&card).kind != "human_review" {
+            return Err("commandless card gained a build/run prerequisite".to_string());
+        }
+        Ok(())
     }
 
     fn minimal_comment_card_projection(
