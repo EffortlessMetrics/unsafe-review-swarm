@@ -8394,6 +8394,9 @@ fn require_unreached_confirmation_evidence(card: &CardProjection) -> Result<(), 
     if claim.owner != card.owner {
         return Err("cards.json card unreached reach owner must match site.owner".to_string());
     }
+    if card.obligation_evidence.is_empty() {
+        return Err("cards.json card unreached reach requires obligation evidence".to_string());
+    }
     for evidence in &card.obligation_evidence {
         if evidence
             .pointer("/reach/state")
@@ -11616,6 +11619,26 @@ RUSTFLAGS='-Z sanitizer=address' cargo +nightly test fill_inner
                 {
                     if unreached_confirmation_owner(card).is_some() == reached {
                         return Err("actual fixture did not discriminate test reach".to_string());
+                    }
+                    if !reached {
+                        let mut missing_evidence = json.clone();
+                        let selected = missing_evidence
+                            .pointer_mut("/cards")
+                            .and_then(serde_json::Value::as_array_mut)
+                            .and_then(|items| {
+                                items.iter_mut().find(|item| {
+                                    item.get("id").and_then(serde_json::Value::as_str)
+                                        == Some(card.id.as_str())
+                                })
+                            })
+                            .ok_or_else(|| format!("actual cards.json lost card `{}`", card.id))?;
+                        selected["obligation_evidence"] = serde_json::json!([]);
+                        let err = err_text(advisory_card_projections(&missing_evidence))?;
+                        if err != "cards.json card unreached reach requires obligation evidence" {
+                            return Err(format!(
+                                "empty obligation evidence failed for the wrong reason: {err}"
+                            ));
+                        }
                     }
                     let sections = witness_plan_card_sections(&witness, &card.id);
                     if sections.is_empty() {
