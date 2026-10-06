@@ -8394,6 +8394,9 @@ fn require_unreached_confirmation_evidence(card: &CardProjection) -> Result<(), 
     if claim.owner != card.owner {
         return Err("cards.json card unreached reach owner must match site.owner".to_string());
     }
+    if card.obligation_evidence.is_empty() {
+        return Err("cards.json card unreached reach requires obligation evidence".to_string());
+    }
     for evidence in &card.obligation_evidence {
         if evidence
             .pointer("/reach/state")
