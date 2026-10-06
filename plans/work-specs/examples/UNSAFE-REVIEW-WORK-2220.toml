@@ -1,0 +1,133 @@
+# UNSAFE-REVIEW-WORK-2220
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2220"
+kind = "maintenance"
+objective = "Correct repository authority and execution guidance so agents preserve forward progress across waits, review, capability discovery, ordinary integration, and named owner boundaries."
+user_outcome = "A selected lane advances through authorized reversible work without singleton-goal routing, false global blockers, invented human-only review or merge gates, or publication boundaries applied to the wrong object."
+claim_boundary = "This contract governs repository instructions, adapters, skills, and deterministic guidance checks. It does not alter analyzer behavior, authorize publication or other reserved irreversible operations, or prove that every runtime will follow the guidance."
+dependencies = ["#1899 portfolio semantics", "#1877 .rails retirement", "#1905 runtime-neutral orchestration", "#1900 issue-linked work contracts"]
+blockers = []
+affected_files = [
+    "AGENTS.md",
+    "docs/contributing/AGENT-ORCHESTRATION.md",
+    "docs/contributing/LIFECYCLE_SURFACE_MAP.md",
+    "docs/specs/UNSAFE-REVIEW-SPEC-START-HERE.md",
+    ".rails/goals/README.md",
+    ".claude/agents",
+    ".opencode/agents/coordinator.md",
+    ".opencode/skills",
+    "policy/docs-automation.toml",
+    "xtask/src/docs_automation_check.rs",
+]
+affected_symbols = ["check-docs-automation", "check_committed_agent_guidance"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0020", "UNSAFE-REVIEW-SPEC-0025", "UNSAFE-REVIEW-SPEC-0044"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Selected live GitHub issue or PR and accepted work contract as the execution authority",
+    "Forward-progress state vocabulary for active, in-progress, waiting, blocked, owner-decision, and complete",
+    "Attempted-operation evidence before incapability or permission claims",
+    "Agentic independent exact-head review and ordinary internal merge continuation",
+    "Object-specific source, publication, credential, and external-commitment boundaries",
+    "Machine checks retaining decisive guidance and rejecting stale singleton-goal routing",
+]
+excluded = [
+    "A repository-global scheduler, runtime goal database, queue, dashboard, or agent event stream",
+    "Automatic issue prioritization or persistent current-task state",
+    "Analyzer, ReviewCard, release artifact, source candidate, publication, branch-protection, tag, release, deployment, or public-ref changes",
+    "Relaxation of one-writer ownership, exact-head review, deterministic proof, cleanup, or named irreversible-action controls",
+]
+
+[[invariant]]
+id = "INV-2220-AUTHORITY"
+text = "The selected live GitHub issue or PR and its accepted work contract control the lane; neutral .allow and archived .rails goal files never select or block current work."
+
+[[invariant]]
+id = "INV-2220-PROGRESS"
+text = "Running or automatically advancing transitions remain in-progress or waiting, and blocked is used only after an attempted concrete failure, exhausted alternatives, and no independent work."
+
+[[invariant]]
+id = "INV-2220-REVIEW"
+text = "Independent review requires a distinct lens, fresh evidence, and an exact-head boundary but does not require a human identity."
+
+[[invariant]]
+id = "INV-2220-BOUNDARY"
+text = "Authority remains attached to the named object so source merge, publication, tags, releases, deployments, credentials, and moving public refs do not silently prohibit ordinary internal reversible work."
+
+[[acceptance]]
+id = "AC-2220-ROUTING"
+text = "No live runtime adapter selects or controls work from .allow/goals/active.toml or .rails/goals/active.toml; the legacy .rails goals surface is archive-only."
+proof = ["cargo run --locked -p xtask -- check-docs-automation", "cargo run --locked -p xtask -- check-docs"]
+
+[[acceptance]]
+id = "AC-2220-STATES"
+text = "The root operating contract and runtime-neutral protocol define active, in-progress, waiting, blocked, owner-decision, and complete so a running hosted check cannot become a global blocker."
+proof = ["cargo run --locked -p xtask -- check-docs-automation"]
+
+[[acceptance]]
+id = "AC-2220-CAPABILITY"
+text = "Committed guidance requires capability discovery, a bounded attempted operation, exact rejection evidence, and alternative checking before incapability or permission work is externalized."
+proof = ["cargo run --locked -p xtask -- check-docs-automation"]
+
+[[acceptance]]
+id = "AC-2220-REVIEW"
+text = "Committed review and feedback guidance permits independent agentic exact-head challenge and does not invent a human-only merge requirement for ordinary internal PRs."
+proof = ["cargo run --locked -p xtask -- check-docs-automation", "cargo run --locked -p xtask -- check-docs"]
+
+[[acceptance]]
+id = "AC-2220-BOUNDARY"
+text = "Committed guidance retains object-specific owner boundaries and defines stop-for-decision as completing the preparatory lane before the reserved operation."
+proof = ["cargo run --locked -p xtask -- check-docs-automation"]
+
+[[acceptance]]
+id = "AC-2220-REGRESSION"
+text = "The deterministic docs-automation test accepts the forward-progress contract and rejects the exact stale singleton-goal routing phrases."
+proof = ["cargo test --locked -p xtask docs_automation"]
+
+[[acceptance]]
+id = "AC-2220-INTEGRATION"
+text = "The complete repository gate passes on the exact PR head without product, release, or publication state changes."
+proof = ["cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-pr", "git diff --check"]
+
+[[integration]]
+surface = "agent_operating_contract"
+expected = "AGENTS.md and the runtime-neutral orchestration protocol carry the normative forward-progress, state, review, capability, and authority rules."
+
+[[integration]]
+surface = "runtime_adapters"
+expected = "Claude and Opencode adapters consume the selected issue/work contract and cannot treat neutral charter or archived goal files as live task state."
+
+[[integration]]
+surface = "docs_automation"
+expected = "The existing docs-automation ledger and checker retain decisive phrases and reject stale singleton-goal routing without inspecting private runtime state."
+
+[[integration]]
+surface = "pr_body"
+expected = "PR #2221 reports stable AC-2220 acceptance obligations, exact-head proof, scope, and claim boundary."
+
+[[risk]]
+id = "RISK-2220-OVERBROAD-AUTONOMY"
+mitigation = "Keep publication, source-candidate merge, tags, releases, deployments, credentials, destructive changes, and moving public refs explicitly object-bound and separately authorized."
+
+[[risk]]
+id = "RISK-2220-PROSE-ONLY"
+mitigation = "Extend the existing docs-automation gate with required and forbidden guidance checks plus accepted/rejected unit tests."
+
+[[risk]]
+id = "RISK-2220-SECOND-SCHEDULER"
+mitigation = "Persist no runtime goal, current task, priority, queue, rank, schedule, or portfolio mirror; GitHub remains the live portfolio."
+
+[[risk]]
+id = "RISK-2220-STALE-ADAPTER"
+mitigation = "Check the committed Claude adapter phrases directly and keep the lifecycle surface map as the adapter ownership inventory."
+
+[compatibility]
+posture = "Additive repository-governance correction. Existing manual, Claude, Opencode, and future runtimes remain compatible when they preserve the same authority, proof, review, and object boundaries."
+
+[delivery]
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2221"
+closeout = ""
+
+[rollback]
+strategy = "Revert PR #2221 to restore the prior guidance and checker behavior. No analyzer, source-candidate, publication, tag, release, deployment, branch-protection, or public-ref state is changed by this lane."

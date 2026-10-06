@@ -1,9 +1,10 @@
 # Repository lifecycle surface map
 
 Status: inventory and migration map for issue
-[#1923](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1923).
+[#1923](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1923),
+updated by [#2220](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2220).
 Audited against swarm commit
-`d20b851312b5f5364b2087418efe3763894d99b3`.
+`9b532bbe37f23d2fddf43d4ca4a0560f86fdfb6f`.
 
 This document names the owner of each repository lifecycle responsibility. It
 does not introduce a new lifecycle, runtime adapter, agent role, command, hook,
@@ -15,8 +16,8 @@ precedence in `AGENTS.md` still applies.
 The repository protocol and a runtime implementation of that protocol are
 different things:
 
-- `AGENTS.md` owns the repository operating contract and source-of-truth
-  precedence.
+- `AGENTS.md` owns the repository operating contract, forward-progress
+  semantics, and source-of-truth precedence.
 - `.allow`, linked specs and plans, and issue-linked work specs own durable
   contracts. They may describe zero, one, or many concurrent work items; they
   do not select the next task.
@@ -24,6 +25,8 @@ different things:
   disposition.
 - Deterministic tests and gates own pass/fail. A model, agent role, label,
   assignee, current session, task list, or locally selected lane is never proof.
+- Runtime goal and progress state is descriptive only. It does not create
+  repository authority, reserve operations, or convert a wait into a blocker.
 - Runtime adapters such as `CLAUDE.md` and `.claude/agents/*.md` may explain how
   one tool carries out the protocol. They do not redefine repository authority
   or promise that another runtime has the same models, tools, lifecycle, or
@@ -48,13 +51,15 @@ The disposition vocabulary in this map is:
 
 | Transition | Trigger | Durable artifact owned | Actual authority | Primary consumers | Existing execution surfaces | Disposition |
 |---|---|---|---|---|---|---|
-| Prepare and research an issue | A user-selected issue/PR, or a bounded candidate selected from current GitHub state | Evidence-backed issue context; no repository-wide active-task record | GitHub issue/PR plus the source-of-truth precedence in `AGENTS.md` | Maintainer, planner, builder | `repo-preflight`, `issue-factcheck`, `source-divergence`, read-only Git/GitHub inspection | `RENAME_OR_ALIAS` the runtime roles as `preflight` and `issue-factcheck`; preserve manual inspection |
-| Compile the accepted work contract | The premise is current and the proposed seam is review-forward | Issue-linked work spec, linked spec/ADR/plan where needed, acceptance IDs, proof commands, non-goals, risk, rollback, claim boundary | SPEC-0044 defines the contract, `docs/schemas/issue-work-spec.schema.json` defines its version-one shape, and the issue plus live GitHub disposition supplies current context; `.allow` registers graph visibility but is not a scheduler | Builder, reviewer, PR author | `xtask check-work-specs`, `plan-refuter`, spec/doc gates | `REUSE` the work-spec contract and checker; `RENAME_OR_ALIAS` the refuter as a runtime-neutral plan review |
-| Admit or resume one writer | The contract is verified, prerequisites are satisfied, and no live writer owns the branch | Branch/worktree identity and a bounded handoff; no durable scheduler record | Live branch/worktree/PR state and controller decision within the accepted contract | Writer and coordinator | Git/worktree inspection, runtime implementer adapter | `RENAME_OR_ALIAS` the implementer adapter; do not encode session ownership in `.allow` |
+| Prepare and research an issue | A user-selected issue/PR, an adopted workplan, or a bounded candidate selected from current GitHub state | Evidence-backed issue context; no repository-wide active-task record | GitHub issue/PR plus the source-of-truth precedence in `AGENTS.md` | Maintainer, planner, builder | `repo-preflight`, `issue-factcheck`, `source-divergence`, read-only Git/GitHub inspection | `REUSE` the corrected adapters: selected issue/work contract first, neutral charter only as durable context |
+| Compile the accepted work contract | The premise is current and the proposed seam is review-forward | Issue-linked work spec, linked spec/ADR/plan where needed, acceptance IDs, proof commands, non-goals, risk, rollback, claim boundary | SPEC-0044 defines the contract, `docs/schemas/issue-work-spec.schema.json` defines its version-one shape, and the issue plus live GitHub disposition supplies current context; `.allow` registers graph visibility but is not a scheduler | Builder, reviewer, PR author | `xtask check-work-specs`, `plan-refuter`, spec/doc gates | `REUSE` the work-spec contract and checker; the refuter reviews the selected contract rather than a singleton goal |
+| Admit or resume one writer | The contract is verified, prerequisites are satisfied, and no live writer owns the branch | Branch/worktree identity and a bounded handoff; no durable scheduler record | Live branch/worktree/PR state and coordinator decision within the accepted contract | Writer and coordinator | Git/worktree inspection, runtime implementer adapter | `REUSE` the corrected writer adapter; do not encode session ownership in `.allow` |
 | Build and prove | A writer receives an accepted contract | Scoped commit, tests, generated artifacts or receipts required by the contract | Code/spec/policy plus deterministic proof commands | Reviewer, CI, maintainers | Targeted tests, `check-local`, artifact validators, `check-pr` | `REUSE`; `check-local` stays partial and `check-pr` stays the comprehensive local gate |
-| Review the exact head | A scoped commit or PR head exists | Review findings tied to exact base/head and artifacts | Actual diff, controlling contract, tests, hosted checks, and repository policy | Writer, maintainer, merge controller | Claim scan, artifact verification, focused review, GitHub checks | `RENAME_OR_ALIAS` runtime reviewer roles; no agent verdict becomes authority |
+| Review the exact head | A scoped commit or PR head exists | Review findings tied to exact base/head and artifacts | Actual diff, controlling contract, tests, hosted checks, and repository policy | Writer, maintainer, merge controller | Claim scan, artifact verification, focused agentic or human review, GitHub checks | `REUSE`; independent means a distinct lens and fresh exact-head evidence, not necessarily a human identity |
+| Wait for a known transition | A command, review, runner, or hosted check is active | No new durable scheduler state; retain exact run/head identity and next automatic transition | The running process and live GitHub/check state | Coordinator and writer | Workflow/job polling, background process tracking, independent seam work | `REUSE`; classify as in progress or waiting, keep the lane active, and never promote it to blocked merely because time passes |
 | Respond to feedback | A current-head review or hosted check has an actionable finding | New scoped commit or an evidence-backed disposition reply | Current review thread/check plus the accepted contract | Writer, reviewer, maintainer | Warm writer callback where supported; manual patch/review loop everywhere else | `REUSE` the loop, but keep messaging APIs and warm-context economics as runtime examples |
-| Publish or merge | Exact head is scoped, reviewed, green, and allowed | PR body, hosted check record, merge commit, or source-owned publication receipt | GitHub merge state and repository policy; source repository owns release/publication | Maintainers, downstream source-promotion work | PR template, hosted CI, normal squash merge | `REUSE`; release, tagging, deployment, and source promotion remain separately authorized |
+| Integrate an ordinary internal PR | Exact head is scoped, independently challenged, green, and allowed | PR body, hosted check record, and merge commit | GitHub merge state, selected lane, and repository policy | Maintainers and downstream work | PR template, hosted CI, normal squash merge | `REUSE`; do not invent a human-only merge gate when agentic exact-head review and live policy permit integration |
+| Perform a separately reserved operation | Preparatory lane is complete and the named decision has been presented | Source-owned publication receipt, release/tag/deployment record, credentialed settings change, or other named external commitment | Explicit owner decision plus live repository/service policy | Maintainers and release operators | Source promotion, publication, tag/release, deployment, moving public refs | `REUSE`; authority applies only to the named object. Completing the preparatory lane does not wait for the later decision |
 | Reconcile and clean | Merge or explicit disposition is confirmed | Issue/PR closeout, follow-up issue where needed, clean lane-owned worktree/branch state | Merged `origin/main`, GitHub disposition, closeout/receipt artifacts | Maintainers and future agents | `cleanup-audit`, Git/worktree checks, post-merge proof | `REUSE` the advisory audit; deletion stays an explicit controller action limited to known lane-owned residue |
 
 The transitions are ordered for one work item, but they are not a repository
@@ -67,9 +72,9 @@ and zero admitted writers is valid.
 
 | Surface | Trigger and owned artifact | Consumers | Overlap or known drift | Disposition and replacement proof |
 |---|---|---|---|---|
-| `AGENTS.md` | Every repository operation; owns the operating contract, precedence, product boundary, and lane rules | All contributors and runtime adapters | Now acts as the thin coordinator/worker router and intentionally repeats only the repository, product, worktree, proof, claim, and cleanup invariants needed at entry | `REUSE`: keep the root router thin and link detailed lifecycle guidance rather than restoring runtime choreography. Proof: doc gates plus review that each invariant remains reachable |
+| `AGENTS.md` | Every repository operation; owns the operating contract, precedence, forward-progress state vocabulary, product boundary, and lane rules | All contributors and runtime adapters | Includes the decisive rules for user-carried plans, descriptive runtime state, capability receipts, agentic independent review, object-specific authority, and decision-stop semantics | `REUSE`: keep the root router concise enough for entry while retaining the checked forward-progress contract. Proof: docs-automation required text plus current-head review |
 | `CLAUDE.md` | Claude Code entry; owns no durable repository state | Claude Code sessions | Repeats product, command, architecture, and routing doctrine from `AGENTS.md` and specs | `THIN`: retain runtime startup guidance and links; do not make its commands or capability claims repository authority. Proof: Claude entry still routes to `AGENTS.md`, source truth, build gate, and trust boundary |
-| `docs/contributing/AGENT-ORCHESTRATION.md` | Detailed runtime-neutral orchestration protocol and reusable evidence patterns | Maintainers and adapter authors | Now defines repository touchpoints without fixed models, counts, personas, messaging topology, cache figures, or mandatory internal sequence; runtime adapters may still carry host-specific implementation choices | `REUSE`: keep it runtime-neutral and linked to this inventory plus SPEC-0044 rather than duplicating their tables or contract schema |
+| `docs/contributing/AGENT-ORCHESTRATION.md` | Detailed runtime-neutral orchestration protocol and reusable evidence patterns | Maintainers and adapter authors | Defines the active/in-progress/waiting/blocked/owner-decision/complete distinctions and separates ordinary integration from reserved external operations | `REUSE`: keep it runtime-neutral and checked by docs automation rather than duplicating a runtime goal state machine |
 | `docs/README.md` | Documentation discovery | Contributors and doc gates | Navigation only; it must not become lifecycle authority | `REUSE` as the index linking this map and the detailed orchestration guide |
 | `.github/PULL_REQUEST_TEMPLATE.md` | PR creation; owns the review-forward reporting shape | PR authors and reviewers | Some command/checklist guidance repeats root docs, intentionally close to delivery | `REUSE`: the template remains the delivery checklist and claim-boundary prompt; it does not decide readiness by itself |
 | `docs/handoffs/` and closeout artifacts | A completed, blocked, or transferred lane needs durable evidence | Maintainers and future agents | Historical records can look like current routing if read without live GitHub checks | `REUSE`: retain as evidence/history; always reconcile with current refs, issues, and PRs before action |
@@ -100,21 +105,22 @@ or helper is absent.
 
 ### Runtime role adapters
 
-Every file below is an executable Claude-oriented adapter, not a new source of
-repository truth. The durable artifact column therefore names what the role may
-inspect or help produce; the accepted issue/spec and deterministic tools still
-own the contract.
+Every file below is an executable runtime adapter, not a new source of repository
+truth. The durable artifact column therefore names what the role may inspect or
+help produce; the accepted issue/spec and deterministic tools still own the
+contract.
 
 | Surface | Trigger | Durable artifact involved | Consumers | Overlap or known drift | Disposition and replacement proof |
 |---|---|---|---|---|---|
-| `.claude/agents/repo-preflight.md` | Before non-trivial work | Read-only evidence packet about refs, worktrees, portfolio, and source sync | Coordinator | Still directs readers through `.allow/goals/active.toml` as a controlling lane, which can be mistaken for a scheduler | `RENAME_OR_ALIAS` to runtime-neutral `preflight`; replace the active-goal instruction with `.allow` graph plus selected GitHub contract. Proof: zero/one/many work items remain valid and no task is auto-selected |
-| `.claude/agents/issue-factcheck.md` | Before assigning a writer | Premise/buildability evidence packet | Coordinator and planner | Correctly separates issue validity from repository preflight; model/tool declarations are Claude-specific | `RENAME_OR_ALIAS` to `issue-factcheck`; preserve the explicit current-code checks and evidence format |
-| `.claude/agents/plan-refuter.md` | After drafting a plan, before implementation | Refutations tied to paths, commands, acceptance, and cleanup | Planner and coordinator | Also names `.allow/goals/active.toml` as a controlling artifact; overlaps fact-check only where stale assumptions are relevant | `RENAME_OR_ALIAS` to `plan-review`; use the selected work contract and graph without a singleton scheduler. Proof: stale-path, command, acceptance, scope, and cleanup checks remain |
-| `.claude/agents/implementer.md` | After writer admission | Scoped commit and proof packet | Coordinator and reviewer | Uses the legacy active-goal read order; pins a provider model and assumes isolated-agent tooling | `RENAME_OR_ALIAS` to `writer`; retain isolation, scope, proof, commit, and report requirements while making model/tool choice adapter-local |
+| `.claude/agents/repo-preflight.md` | Before non-trivial work | Read-only evidence packet about refs, worktrees, portfolio, source sync, and capability probes | Coordinator | Corrected by #2220: selected issue/PR and work contract control the task; neutral `.allow` charter is context only | `REUSE` as a Claude adapter alias for runtime-neutral preflight. Proof: no singleton active-goal routing; attempted-operation evidence required before an incapability verdict |
+| `.claude/agents/issue-factcheck.md` | Before assigning a writer | Premise/buildability evidence packet | Coordinator and planner | Corrected by #2220: separates a real owner stance from an unattempted operational unknown | `REUSE`; preserve current-code checks and require a capability receipt before `blocked-external` |
+| `.claude/agents/plan-refuter.md` | After drafting a plan, before implementation | Refutations tied to paths, commands, acceptance, and cleanup | Planner and coordinator | Corrected by #2220: contradictions are tested against the selected contract and live authority, not the neutral charter as scheduler | `REUSE` as plan review. Proof: stale-path, command, acceptance, scope, and cleanup checks remain |
+| `.claude/agents/implementer.md` | After writer admission | Scoped commit and proof packet | Coordinator and reviewer | Corrected by #2220: selected issue/work contract first; no legacy active-goal read order | `REUSE` as writer adapter; retain isolation, scope, proof, commit, and report requirements while keeping model/tool choice adapter-local |
 | `.claude/agents/claim-boundary.md` | User-facing wording, output, spec, PR, or release review | Read-only forbidden-claim findings | Writer, reviewer, release maintainer | Project-specific and intentionally overlaps deterministic claim gates as an independent semantic scan | `RENAME_OR_ALIAS` to `claim-review`; deterministic gates outrank its verdict |
 | `.claude/agents/artifact-verifier.md` | Generated advisory artifact review | Artifact-contract evidence packet | Writer and reviewer | Correctly defers to deterministic validators; assumes named Claude tools | `RENAME_OR_ALIAS` to `artifact-review`; preserve no-patch/no-regenerate boundary |
 | `.claude/agents/ci-log-triage.md` | Large hosted or local failure log | Bounded failure classification | Writer and coordinator | Runtime role is useful; its closed vocabulary is advisory and cannot replace the check result | `RENAME_OR_ALIAS` to `ci-triage`; preserve bounded excerpts and no-rerun/no-push boundary |
 | `.claude/agents/cleanup-auditor.md` | End of a task/session | Read-only cleanup candidates with ownership class | Coordinator | Name overlaps `xtask cleanup-audit`, but the role additionally classifies branches, artifacts, and processes; neither may delete | `RENAME_OR_ALIAS` to `cleanup-review`; keep `cleanup-audit` as the deterministic advisory command. Proof: uncertain/user-owned residue can never be classified safe by default |
+| `.opencode/agents/coordinator.md` | Primary runtime coordination | Session-local selection, bounded briefs/results, merge/reconciliation actions | Opencode primary agent | Corrected by #2220: explicitly owns reversible execution and cannot use runtime goal state as authority | `REUSE`; docs automation checks its decisive forward-progress language while runtime-local state remains outside repository truth |
 
 Runtime adapters may pin a model or enumerate tools because their host requires
 that configuration. Such pins describe one implementation, not a repository
@@ -131,6 +137,7 @@ claim boundaries above.
 | `cargo run --locked -p xtask -- check-work-specs` | Contract compilation or change | Offline validation of the SPEC-0044/schema contract: issue URL, scope, invariants, acceptance/proof, integration, risk, rollback, and no scheduling fields | Planner, writer, CI | Validates shape, not factual correctness or live issue state; cargo-allow registration supplies graph visibility only | `REUSE` |
 | `cargo run --locked -p xtask -- check-spec-status` | Spec or command-reference change | Spec-status consistency result | Contributors and CI | Does not establish implementation correctness | `REUSE` |
 | `cargo run --locked -p xtask -- check-docs` | Documentation change | Required-doc and wording result | Contributors and CI | Does not validate every external link or runtime claim | `REUSE` |
+| `cargo run --locked -p xtask -- check-docs-automation` | Operating-contract or governed-doc change | Required source/phrase and adapter-guidance contract | Contributors, adapter authors, and CI | Checks committed guidance only; does not inspect private runtime state | `REUSE`; #2220 adds forward-progress retention and singleton-goal rejection coverage |
 | `cargo run --locked -p xtask -- check-doc-artifacts` | Governed doc-artifact change | Doc-artifact ledger consistency result | Contributors and CI | Checks registered surfaces, not live GitHub state | `REUSE` |
 | `cargo run --locked -p xtask -- check-local` | Shift-left proof before the full gate | Machine-readable partial-proof receipt under `target/check-local/` | Writer | Diff-selected and explicitly not merge readiness | `REUSE` |
 | Targeted crate/fixture tests | Build and improve loop | Test result for the named seam | Writer and reviewer | Proves only exercised cases | `REUSE` |
@@ -147,48 +154,58 @@ or check owns the result.
 
 ## Drift and overlap findings
 
-1. The runtime role files `repo-preflight`, `plan-refuter`, and `implementer`
-   still route through `.allow/goals/active.toml`. The repository contract now
-   treats GitHub as the concurrent portfolio and `.allow` as a non-scheduling
-   durable graph. A later adapter PR should replace only those routing phrases;
-   this inventory does not change the adapter files.
-2. The fixed-tier/cache drift in `AGENTS.md` and `AGENT-ORCHESTRATION.md` is
+1. **Singleton active-goal adapter drift is corrected by #2220.** The Claude
+   preflight, plan-review, and writer adapters now start from the selected live
+   issue/PR and accepted contract. The neutral `.allow/goals/active.toml`
+   remains a cargo-allow compatibility charter only. The legacy
+   `.rails/goals/README.md` is archive-only and no longer describes an execution
+   flow.
+2. **Forward-progress semantics are explicit.** `AGENTS.md` and the detailed
+   protocol distinguish in-progress work and waiting from an evidenced blocker,
+   require attempted-operation receipts before incapability claims, permit
+   agentic independent review, preserve object-specific authority boundaries,
+   and define completion at the named owner-decision stop.
+3. The fixed-tier/cache drift in `AGENTS.md` and `AGENT-ORCHESTRATION.md` is
    resolved: the root is a thin role router and the detailed guide now defines
    runtime-neutral repository touchpoints. Provider/model pins and tool lists
    remain adapter-local implementation details, never repository correctness
    rules.
-3. `CLAUDE.md` repeats repository doctrine as a convenience summary. Its own
+4. `CLAUDE.md` repeats repository doctrine as a convenience summary. Its own
    conflict rule already points back to `AGENTS.md`; future edits should reduce
    duplicated normative prose rather than create another authority.
-4. The `cleanup-auditor` role and `cleanup-audit` command have similar names but
+5. The `cleanup-auditor` role and `cleanup-audit` command have similar names but
    different coverage. The command reports deterministic disk/worktree facts;
    the role adds an advisory provenance classification. Neither authorizes
    deletion.
-5. The orchestration guide now presents lifecycle touchpoints as evidence
+6. The orchestration guide presents lifecycle touchpoints as evidence
    dependencies rather than a fixed issue-file/spec/build sequence. Existing
-   accepted contracts are verified and reused instead of recreating every
-   stage ceremonially.
+   accepted contracts are verified and reused instead of recreating every stage
+   ceremonially.
 
-These findings are dispositions, not authorization to edit runtime adapters or
-root instructions in this docs-only slice.
+These findings describe the checked-in protocol and adapters. They do not claim
+that wording alone makes every runtime reliable; exact-head evidence and live
+policy remain load-bearing.
 
 ## Smallest progressive-disclosure surface
 
 The intended steady state has five layers:
 
-1. **Root router:** `AGENTS.md` states repository authority, product boundaries,
-   required preflight, worktree safety, proof/merge rules, and links onward.
+1. **Root router:** `AGENTS.md` states repository authority, forward-progress
+   semantics, product boundaries, required preflight, worktree safety,
+   proof/merge rules, and links onward.
 2. **Lifecycle map:** this document says which existing surface owns each
    transition and which overlaps should be thinned.
 3. **Detailed doctrine:** `AGENT-ORCHESTRATION.md` explains orchestration,
-   verification, and economics, with runtime-specific examples labeled as such.
+   verification, state classification, and authority boundaries, with
+   runtime-specific examples labeled as such.
 4. **Accepted work packet:** the selected GitHub issue plus a SPEC-0044/schema
    conforming work spec and its `.allow`-linked spec/plan carries objective,
    scope, acceptance, proof, non-goals, risk, rollback, and claim boundary for
    one lane. `UNSAFE-REVIEW-WORK-1900.toml` is the canonical version-one
    example; `.allow` registration is graph visibility, not contract semantics.
-5. **Runtime adapter:** `CLAUDE.md`, `.claude/agents/*`, a Codex adapter, or a
-   manual checklist translates the protocol into available runtime operations.
+5. **Runtime adapter:** `CLAUDE.md`, `.claude/agents/*`, an Opencode/Codex
+   adapter, or a manual checklist translates the protocol into available
+   runtime operations.
 
 No layer mirrors the whole layer above it. A runtime adapter links to durable
 contracts; it does not copy the portfolio, persist current session state, or
@@ -197,21 +214,21 @@ declare itself proof.
 ## Removal and rollback rules
 
 - Do not remove a root rule until its replacement is linked, discoverable, and
-  passes `check-docs`, `check-doc-artifacts`, and `check-spec-status` where
-  applicable.
+  passes `check-docs`, `check-docs-automation`, `check-doc-artifacts`, and
+  `check-spec-status` where applicable.
 - Do not retire `.rails` compatibility checks until the governing migration has
   recorded bounded parity and the `.allow` replacement is authoritative.
 - Do not rename a runtime role without an alias or coordinated consumer update.
 - Manual issue inspection, isolated Git worktrees, direct proof commands,
   GitHub review, and explicit cleanup remain supported rollback routes if an
   agent/config/skill adapter is absent or broken.
-- Reverting this document and its documentation-map link fully rolls back this
-  inventory; it changes no runtime or product behavior.
+- Reverting the #2220 front-door/adapters change restores the prior guidance;
+  it changes no product, release, or publication state.
 
 ## Claim boundary
 
-This map establishes ownership and proposed disposition for the inspected
-lifecycle surfaces. It does not implement packet schemas, runtime configuration,
-skills, hooks, commands, workflows, product behavior, or publication. It does
-not prove an implementation correct, establish merge or release readiness, or
-make a safety, UB-free, Miri-clean, site-execution, or calibrated-accuracy claim.
+This map establishes ownership and disposition for the inspected lifecycle
+surfaces. It does not launch agents, persist runtime goals, change merge
+protection, alter product behavior, or authorize publication. It does not prove
+an implementation correct, establish merge or release readiness, or make a
+safety, UB-free, Miri-clean, site-execution, or calibrated-accuracy claim.
