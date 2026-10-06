@@ -235,5 +235,143 @@ class InstalledConsumerAdmission(unittest.TestCase):
         self.assertEqual(calls, 1)
 
 
+class GeneratedCommandAdmission(unittest.TestCase):
+    """No candidate-returned shell suffix reaches the command boundary."""
+
+    def test_source_literal_quoting_for_both_shell_families(self):
+        spec = importlib.util.spec_from_file_location("consumer_probe_under_test", PROBE)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        value = "repo's $literal; name"
+        with mock.patch.object(module.os, "name", "posix"):
+            self.assertEqual(module.init_shell_arg(value), "'repo'\\''s $literal; name'")
+        with mock.patch.object(module.os, "name", "nt"):
+            self.assertEqual(module.init_shell_arg(value), "'repo''s $literal; name'")
+
+    def test_accepts_source_command_shape_and_rejects_wrong_identity(self):
+        spec = importlib.util.spec_from_file_location("consumer_probe_under_test", PROBE)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / "repo's $literal; name"
+            root.mkdir()
+            root_text = str(root.resolve())
+            artifacts = str(root / "target/unsafe-review")
+            if os.name == "nt":
+                quoted_root = "'" + root_text.replace("'", "''") + "'"
+                quoted_artifacts = "'" + artifacts.replace("'", "''") + "'"
+            else:
+                quoted_root = "'" + root_text.replace("'", "'\\''") + "'"
+                quoted_artifacts = "'" + artifacts.replace("'", "'\\''") + "'"
+            doctor = "unsafe-review doctor --root " + quoted_root
+            first_pr = ("unsafe-review pr --root " + quoted_root +
+                        " --base origin/main --out-dir " + quoted_artifacts)
+            proposal = {
+                "root": root_text, "repository": {"base_ref": "origin/main"},
+                "commands": {"doctor": doctor, "first_pr": first_pr,
+                             "first_pr_artifacts": artifacts},
+            }
+            self.assertEqual(module.admitted_generated_command(proposal, "doctor", root), doctor)
+            self.assertEqual(module.admitted_generated_command(proposal, "first_pr", root), first_pr)
+            for altered in (
+                    {"root": str(Path(directory))},
+                    {"repository": {"base_ref": "origin/other"}},
+                    {"commands": {**proposal["commands"],
+                                  "first_pr_artifacts": str(Path(directory) / "elsewhere")}}):
+                with self.subTest(altered=altered):
+                    candidate = {**proposal, **altered}
+                    with self.assertRaisesRegex(RuntimeError, "generated .* command"):
+                        module.admitted_generated_command(candidate, "first_pr", root)
+
+    def test_rejects_doctor_and_first_pr_suffix_before_shell(self):
+        spec = importlib.util.spec_from_file_location("consumer_probe_under_test", PROBE)
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        for attacked in ("doctor", "first_pr"):
+            with self.subTest(attacked=attacked), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                binary = root / "unsafe-review"
+                binary.write_bytes(b"fixture candidate; never executed")
+                scratch = root / "previously-absent-scratch"
+                marker = root / "rejected-command-marker"
+                shell_calls = []
+
+                def quote(value):
+                    value = str(value)
+                    if value and all(ch.isascii() and (ch.isalnum() or ch in "/._-:") for ch in value):
+                        return value
+                    if os.name == "nt":
+                        return "'" + value.replace("'", "''") + "'"
+                    return "'" + value.replace("'", "'\\''") + "'"
+
+                def proposal_for(selected):
+                    selected = Path(selected)
+                    root_text = str(selected.resolve())
+                    doctor = "unsafe-review doctor --root " + quote(root_text)
+                    base = None if selected.name == "control" else "origin/main"
+                    artifacts = str(selected / "target/unsafe-review")
+                    first_pr = None if base is None else (
+                        "unsafe-review pr --root " + quote(root_text) +
+                        " --base origin/main --out-dir " + quote(artifacts))
+                    if selected.name == "target repo's $literal;name":
+                        suffix = ("; Set-Content -LiteralPath " + quote(marker) + " -Value injected"
+                                  if os.name == "nt" else "; printf injected > " + quote(marker))
+                        if attacked == "doctor":
+                            doctor += suffix
+                        else:
+                            first_pr += suffix
+                    return {
+                        "schema_version": "unsafe-review/init/v1", "mode": "preview_only",
+                        "writes_repository": False, "root": root_text,
+                        "repository": {"base_ref": base},
+                        "proposed_files": [{"status": "conflict"}],
+                        "commands": {
+                            "doctor": doctor, "first_pr": first_pr,
+                            "first_pr_artifacts": artifacts,
+                            "first_pr_prerequisite": "Provide --base or --diff",
+                        },
+                    }
+
+                def fake_run(argv, *, cwd=None, env=None, capture_output=None, timeout=None):
+                    argv = [str(arg) for arg in argv]
+                    if argv[0] == "git":
+                        return subprocess.CompletedProcess(argv, 0, b"", b"")
+                    if argv[0] == str(binary):
+                        if argv[1:] == ["--version"]:
+                            return subprocess.CompletedProcess(argv, 0, b"unsafe-review 0.5.0\n", b"")
+                        if argv[1:] == ["init", "--help"]:
+                            return subprocess.CompletedProcess(
+                                argv, 0, b"unsafe-review init:\nUsage: unsafe-review init [--root .]\n", b"")
+                        if argv[1] == "init":
+                            selected = argv[argv.index("--root") + 1]
+                            raw = json.dumps(proposal_for(selected)).encode()
+                            if "--out" in argv:
+                                out = Path(argv[argv.index("--out") + 1])
+                                out.mkdir(parents=True)
+                                (out / "unsafe-review-init.json").write_bytes(raw)
+                            return subprocess.CompletedProcess(argv, 0, raw, b"")
+                    if argv[0] in ("sh", "powershell.exe"):
+                        shell_calls.append(argv[-1])
+                        if str(marker) in argv[-1]:
+                            # Simulate the side effect; never run candidate-returned text.
+                            marker.write_text("would have executed")
+                        return subprocess.CompletedProcess(
+                            argv, 0, ("unsafe-review doctor\nworkspace root: " +
+                                      str(scratch / "target repo's $literal;name") + "\n").encode(), b"")
+                    raise AssertionError("unexpected command " + repr(argv))
+
+                output = io.StringIO()
+                with mock.patch.object(sys, "argv", [str(PROBE), "--binary", str(binary),
+                                                      "--scratch", str(scratch)]), \
+                        mock.patch.object(module.subprocess, "run", side_effect=fake_run), \
+                        contextlib.redirect_stdout(output):
+                    exit_code = module.main()
+                receipt = json.loads((scratch / "receipt.json").read_text(encoding="utf-8"))
+                self.assertEqual(exit_code, 1)
+                self.assertFalse(marker.exists(), "injected shell side effect reached the boundary")
+                self.assertFalse(any(str(marker) in command for command in shell_calls))
+                self.assertIn("generated " + attacked + " command", receipt["stop_reason"])
+
+
 if __name__ == "__main__":
     unittest.main()
