@@ -282,16 +282,36 @@ class GeneratedCommandAdmission(unittest.TestCase):
                     candidate = {**proposal, **altered}
                     with self.assertRaisesRegex(RuntimeError, "generated .* command"):
                         module.admitted_generated_command(candidate, "first_pr", root)
+            for malformed in ([], None, "not an object"):
+                with self.subTest(malformed=malformed):
+                    with self.assertRaisesRegex(RuntimeError, "generated doctor command"):
+                        module.admitted_generated_command(malformed, "doctor", root)
+            relative_root = os.path.relpath(root, Path.cwd())
+            relative_doctor = {**proposal, "root": relative_root,
+                               "commands": {**proposal["commands"],
+                                            "doctor": "unsafe-review doctor --root " +
+                                                      module.init_shell_arg(relative_root)}}
+            with self.assertRaisesRegex(RuntimeError, "generated doctor command"):
+                module.admitted_generated_command(relative_doctor, "doctor", root)
+            relative_artifacts = os.path.relpath(artifacts, Path.cwd())
+            relative_output = {**proposal, "commands": {**proposal["commands"],
+                               "first_pr_artifacts": relative_artifacts,
+                               "first_pr": ("unsafe-review pr --root " + quoted_root +
+                                            " --base origin/main --out-dir " +
+                                            module.init_shell_arg(relative_artifacts))}}
+            with self.assertRaisesRegex(RuntimeError, "generated first_pr command"):
+                module.admitted_generated_command(relative_output, "first_pr", root)
 
     def test_rejects_doctor_and_first_pr_suffix_before_shell(self):
         spec = importlib.util.spec_from_file_location("consumer_probe_under_test", PROBE)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        for attacked in ("doctor", "first_pr"):
+        for attacked in ("doctor", "first_pr", "executable"):
             with self.subTest(attacked=attacked), tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                binary = root / "unsafe-review"
+                binary = root / ("unsafe-review.exe" if os.name == "nt" else "unsafe-review")
                 binary.write_bytes(b"fixture candidate; never executed")
+                binary.chmod(0o755)
                 scratch = root / "previously-absent-scratch"
                 marker = root / "rejected-command-marker"
                 shell_calls = []
@@ -313,12 +333,12 @@ class GeneratedCommandAdmission(unittest.TestCase):
                     first_pr = None if base is None else (
                         "unsafe-review pr --root " + quote(root_text) +
                         " --base origin/main --out-dir " + quote(artifacts))
-                    if selected.name == "target repo's $literal;name":
+                    if selected.name == "target repo's $literal;name" and attacked != "executable":
                         suffix = ("; Set-Content -LiteralPath " + quote(marker) + " -Value injected"
                                   if os.name == "nt" else "; printf injected > " + quote(marker))
                         if attacked == "doctor":
                             doctor += suffix
-                        else:
+                        elif attacked == "first_pr":
                             first_pr += suffix
                     return {
                         "schema_version": "unsafe-review/init/v1", "mode": "preview_only",
@@ -361,16 +381,23 @@ class GeneratedCommandAdmission(unittest.TestCase):
                     raise AssertionError("unexpected command " + repr(argv))
 
                 output = io.StringIO()
+                selection = (mock.patch.object(module.shutil, "which",
+                                               return_value=str(root / "other-executable"))
+                             if attacked == "executable" else contextlib.nullcontext())
                 with mock.patch.object(sys, "argv", [str(PROBE), "--binary", str(binary),
                                                       "--scratch", str(scratch)]), \
                         mock.patch.object(module.subprocess, "run", side_effect=fake_run), \
-                        contextlib.redirect_stdout(output):
+                        contextlib.redirect_stdout(output), selection:
                     exit_code = module.main()
                 receipt = json.loads((scratch / "receipt.json").read_text(encoding="utf-8"))
                 self.assertEqual(exit_code, 1)
                 self.assertFalse(marker.exists(), "injected shell side effect reached the boundary")
                 self.assertFalse(any(str(marker) in command for command in shell_calls))
-                self.assertIn("generated " + attacked + " command", receipt["stop_reason"])
+                if attacked == "executable":
+                    self.assertEqual(shell_calls, [], "wrong PATH executable reached the shell")
+                    self.assertIn("generated-command executable selection", receipt["stop_reason"])
+                else:
+                    self.assertIn("generated " + attacked + " command", receipt["stop_reason"])
 
 
 if __name__ == "__main__":

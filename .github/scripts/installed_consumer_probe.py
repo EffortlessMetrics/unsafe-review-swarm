@@ -84,12 +84,14 @@ def admitted_generated_command(proposal, name, selected_root):
     def reject():
         raise RuntimeError("generated " + name + " command does not match the selected fixture invocation")
 
+    if not isinstance(proposal, dict):
+        reject()
     commands = proposal.get("commands")
     root_text = proposal.get("root")
     if not isinstance(commands, dict) or not isinstance(root_text, str):
         reject()
     try:
-        if Path(root_text).resolve(strict=True) != selected_root.resolve(strict=True):
+        if not Path(root_text).is_absolute() or Path(root_text).resolve(strict=True) != selected_root.resolve(strict=True):
             reject()
     except (OSError, ValueError):
         reject()
@@ -105,7 +107,8 @@ def admitted_generated_command(proposal, name, selected_root):
                 or not isinstance(artifacts, str)):
             reject()
         try:
-            if Path(artifacts).resolve() != (selected_root / "target/unsafe-review").resolve():
+            if (not Path(artifacts).is_absolute()
+                    or Path(artifacts).resolve() != (selected_root / "target/unsafe-review").resolve()):
                 reject()
         except (OSError, ValueError):
             reject()
@@ -278,7 +281,10 @@ def main():
             raise RuntimeError("generated artifact destination escapes the task-owned target")
         env = os.environ.copy()
         env["PATH"] = str(binary.parent) + os.pathsep + env.get("PATH", "")
-        row("generated-command-executable-selection", Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary)
+        executable_selected = Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary
+        row("generated-command-executable-selection", executable_selected)
+        if not executable_selected:
+            raise RuntimeError("generated-command executable selection does not match the supplied binary")
         shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["sh", "-c"]
         doctor_command = admitted_generated_command(proposal, "doctor", target)
         result, elapsed = run([*shell, doctor_command], cwd=caller, env=env)
