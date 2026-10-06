@@ -70,6 +70,58 @@ def snapshot(root):
             if p.is_file() and ".git" not in p.relative_to(root).parts}
 
 
+def init_shell_arg(value):
+    """Mirror Source init.rs quoting for its copyable POSIX/PowerShell commands."""
+    if value and value.isascii() and all(ch.isalnum() or ch in "/._-:" for ch in value):
+        return value
+    if os.name == "nt":
+        return "'" + value.replace("'", "''") + "'"
+    return "'" + value.replace("'", "'\\''") + "'"
+
+
+def admitted_generated_command(proposal, name, selected_root):
+    """Bind a displayed init command to this probe's fixture before shell use."""
+    def reject():
+        raise RuntimeError("generated " + name + " command does not match the selected fixture invocation")
+
+    if not isinstance(proposal, dict):
+        reject()
+    commands = proposal.get("commands")
+    root_text = proposal.get("root")
+    if not isinstance(commands, dict) or not isinstance(root_text, str):
+        reject()
+    try:
+        if not Path(root_text).is_absolute() or Path(root_text).resolve(strict=True) != selected_root.resolve(strict=True):
+            reject()
+    except (OSError, ValueError):
+        reject()
+    root_arg = init_shell_arg(root_text)
+    if name == "doctor":
+        expected = "unsafe-review doctor --root " + root_arg
+    elif name == "first_pr":
+        # This fixture creates only refs/remotes/origin/main. Other bases are
+        # outside the selected consumer case and must not gain shell authority.
+        repository = proposal.get("repository")
+        artifacts = commands.get("first_pr_artifacts")
+        if (not isinstance(repository, dict) or repository.get("base_ref") != "origin/main"
+                or not isinstance(artifacts, str)):
+            reject()
+        try:
+            if (not Path(artifacts).is_absolute()
+                    or Path(artifacts).resolve() != (selected_root / "target/unsafe-review").resolve()):
+                reject()
+        except (OSError, ValueError):
+            reject()
+        expected = ("unsafe-review pr --root " + root_arg
+                    + " --base origin/main --out-dir " + init_shell_arg(artifacts))
+    else:
+        reject()
+    command = commands.get(name)
+    if not isinstance(command, str) or command != expected:
+        reject()
+    return command
+
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--binary", type=Path, required=True)
@@ -229,15 +281,19 @@ def main():
             raise RuntimeError("generated artifact destination escapes the task-owned target")
         env = os.environ.copy()
         env["PATH"] = str(binary.parent) + os.pathsep + env.get("PATH", "")
-        row("generated-command-executable-selection", Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary)
+        executable_selected = Path(shutil.which("unsafe-review", path=env["PATH"]) or "").resolve() == binary
+        row("generated-command-executable-selection", executable_selected)
+        if not executable_selected:
+            raise RuntimeError("generated-command executable selection does not match the supplied binary")
         shell = ["powershell.exe", "-NoProfile", "-NonInteractive", "-Command"] if os.name == "nt" else ["sh", "-c"]
-        result, elapsed = run([*shell, commands["doctor"]], cwd=caller, env=env)
+        doctor_command = admitted_generated_command(proposal, "doctor", target)
+        result, elapsed = run([*shell, doctor_command], cwd=caller, env=env)
         doctor_roots = [line[len("workspace root: "):] for line in result.stdout.decode().splitlines()
                         if line.startswith("workspace root: ")]
         row("generated-doctor-usable", result.returncode == 0
             and b"unsafe-review doctor" in result.stdout and len(doctor_roots) == 1
             and Path(doctor_roots[0]).resolve() == target.resolve(), result, elapsed)
-        command = commands["first_pr"]
+        command = admitted_generated_command(proposal, "first_pr", target)
         result, elapsed = run([*shell, command], cwd=caller, env=env)
         first = json.loads((output / "cards.json").read_bytes())
         cards = first["cards"]
@@ -264,7 +320,8 @@ def main():
         row("quiet-target-local-artifact-destination", quiet_destination)
         if not quiet_destination:
             raise RuntimeError("quiet artifact destination escapes the task-owned target")
-        result, elapsed = run([*shell, quiet_proposal["commands"]["first_pr"]], cwd=caller, env=env)
+        quiet_command = admitted_generated_command(quiet_proposal, "first_pr", quiet)
+        result, elapsed = run([*shell, quiet_command], cwd=caller, env=env)
         quiet_cards = json.loads((quiet_output / "cards.json").read_bytes())
         row("safe-only-diff-no-sites-control", result.returncode == 0
             and quiet_cards["cards"] == [], result, elapsed)
