@@ -252,7 +252,8 @@ class GeneratedCommandAdmission(unittest.TestCase):
         spec = importlib.util.spec_from_file_location("consumer_probe_under_test", PROBE)
         module = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(module)
-        with tempfile.TemporaryDirectory() as directory:
+        # Keep the relative-path negative controls on the checkout's drive.
+        with tempfile.TemporaryDirectory(dir=Path.cwd()) as directory:
             root = Path(directory) / "repo's $literal; name"
             root.mkdir()
             root_text = str(root.resolve())
