@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "mentions_extend_from_bytes",
+        "file": "src/lib.rs",
+        "line": 26
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

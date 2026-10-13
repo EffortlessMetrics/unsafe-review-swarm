@@ -61,6 +61,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation for restricted-visibility unsafe fn (in-crate callers need the contract)",
       "Missing visible local guard for inferred safety obligations",

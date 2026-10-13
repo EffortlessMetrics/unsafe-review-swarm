@@ -170,6 +170,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "writes_header",
+        "file": "src/lib.rs",
+        "line": 17
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"

@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "clear_vec_resets_length",
+        "file": "src/lib.rs",
+        "line": 14
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

@@ -99,6 +99,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "mentions_zstd_overlap_handoff",
+        "file": "src/lib.rs",
+        "line": 51
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
@@ -205,6 +212,13 @@
         "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "mentions_zstd_overlap_handoff",
+        "file": "src/lib.rs",
+        "line": 51
       }
     ],
     "missing": [

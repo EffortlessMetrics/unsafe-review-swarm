@@ -68,6 +68,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "assumes_mut_new",
+        "file": "src/lib.rs",
+        "line": 14
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

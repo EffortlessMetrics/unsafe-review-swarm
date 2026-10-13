@@ -170,6 +170,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "reads_both_headers",
+        "file": "src/lib.rs",
+        "line": 16
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
@@ -384,6 +391,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test read_headers",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "reads_both_headers",
+        "file": "src/lib.rs",
+        "line": 16
       }
     ],
     "missing": [

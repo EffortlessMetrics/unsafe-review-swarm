@@ -69,6 +69,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "counts_slice_distance",
+        "file": "src/lib.rs",
+        "line": 20
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

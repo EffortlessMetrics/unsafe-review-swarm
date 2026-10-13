@@ -61,6 +61,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "reaches_contract",
+        "file": "src/lib.rs",
+        "line": 13
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

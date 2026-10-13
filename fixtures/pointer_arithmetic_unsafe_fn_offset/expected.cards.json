@@ -61,6 +61,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "No related test path was found by static search",
       "No witness receipt imported for this card"
@@ -173,6 +174,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",

@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "pop_shrinks_len",
+        "file": "src/lib.rs",
+        "line": 19
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],
