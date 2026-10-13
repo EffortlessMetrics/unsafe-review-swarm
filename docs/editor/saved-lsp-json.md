@@ -71,7 +71,10 @@ Open `target/unsafe-review/lsp.json` and look for:
 - `status`: advisory mode and trust-boundary text,
 - `diagnostics`: one entry per ReviewCard site with operation, missing
   evidence, required safety conditions, obligation-level evidence, witness
-  routes, and verify commands,
+  routes, and verify commands. Each entry carries an `actionable` flag from
+  the card class: the live server publishes only `actionable: true` entries,
+  while this saved file keeps every card, so consumers should filter on the
+  flag to match the live set,
 - `hovers`: compact card explanations with required conditions, evidence
   summaries, missing evidence, next action, witness route, and trust boundary,
 - `code_actions`: command-shaped copy/open actions with stable object

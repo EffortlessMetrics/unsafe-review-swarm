@@ -21,6 +21,7 @@
   },
   "diagnostics": [
     {
+      "actionable": true,
       "card_id": "UR-public-unsafe-fn-safety-comment-not-docs-src-lib-rs-caller-must-read-docs-unsafe_fn-unsafe_declaration-caller-must-read-docs-eebb9e79df09-unknown-c1",
       "code": "contract_missing",
       "coverage": {

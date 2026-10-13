@@ -21,6 +21,7 @@
   },
   "diagnostics": [
     {
+      "actionable": true,
       "card_id": "UR-public-unsafe-fn-missing-safety-src-lib-rs-caller-must-uphold-contract-unsafe_fn-unsafe_declaration-caller-must-uphold-contract-6e7a12b59ca0-unknown-c1",
       "code": "contract_missing",
       "coverage": {
