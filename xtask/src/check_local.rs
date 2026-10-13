@@ -215,6 +215,13 @@ pub(crate) const CATALOG: &[CheckSpec] = &[
         triggers: &[PathCategory::Corpus],
     },
     CheckSpec {
+        id: "seam-batch",
+        name: "accuracy seam batches",
+        command: Some("check-seam-batch"),
+        always: false,
+        triggers: &[PathCategory::Docs, PathCategory::Corpus],
+    },
+    CheckSpec {
         id: "evidence-loss-challenges",
         name: "evidence-loss challenges",
         command: Some("check-evidence-loss-challenges"),
@@ -787,11 +794,12 @@ mod tests {
 
     #[test]
     fn catalog_matches_check_pr_component_count() {
-        // check-pr runs exactly 15 deterministic catalog components; the
-        // proof-map must enumerate all of them so none is silently unmapped.
-        // The final LSP smoke operation is separately dispatched and is not a
-        // catalog entry.
-        assert_eq!(CATALOG.len(), 15);
+        // check-pr runs 17 deterministic components; the proof-map must
+        // enumerate every catalog component so none is silently unmapped.
+        // The final LSP smoke operation takes a workspace root (unlike the
+        // fn-pointer dispatch) and is separately dispatched, so it is not a
+        // catalog entry: 16 catalog entries plus LSP smoke.
+        assert_eq!(CATALOG.len(), 16);
     }
 
     #[test]
@@ -811,6 +819,7 @@ mod tests {
                 "surface-determinism",
                 "real-pr-corpus",
                 "corpus-partitions",
+                "seam-batch",
                 "evidence-loss-challenges",
                 "external-pilots",
                 "dogfood",
@@ -955,6 +964,16 @@ mod tests {
             assert!(selected.contains(&id), "corpus diff must select {id}");
         }
         assert!(skipped_ids(&plan).contains(&"fixtures"));
+    }
+
+    #[test]
+    fn accuracy_batch_diff_selects_seam_batch() {
+        let plan = plan(&paths(&["docs/accuracy/batches/2224-pr1/batch.toml"]));
+        assert!(!plan.conservative_full);
+        assert!(
+            selected_ids(&plan).contains(&"seam-batch"),
+            "accuracy batch diff must select seam-batch"
+        );
     }
 
     #[test]
