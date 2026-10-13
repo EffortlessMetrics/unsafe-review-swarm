@@ -863,6 +863,28 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn explain_help_names_markdown_as_default_format() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("explain")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("- --format <name> markdown (default) or json"),
+        "explain help must name markdown as the default format\nstdout:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("json (default)"),
+        "explain help must not claim json is the default format\nstdout:\n{stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn pr_setup_prints_read_only_external_pr_commands() -> Result<(), Box<dyn Error>> {
     let diff_out = std::env::current_dir()?.join("target/external-pilots/bytes-pr827.diff");
     let out_dir = std::env::current_dir()?.join("target/external-pilots/bytes-pr827/first-pr");
