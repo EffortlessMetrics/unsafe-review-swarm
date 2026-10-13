@@ -138,7 +138,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `allocation` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
@@ -361,7 +361,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `allocation` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
