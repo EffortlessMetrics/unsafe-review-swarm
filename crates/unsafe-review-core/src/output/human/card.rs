@@ -34,6 +34,15 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
     out.push_str(&format!("  discharge: {}\n", card.discharge.summary));
     out.push_str(&format!("  reach: {}\n", card.reach.summary));
     out.push_str("  reach note: static reach evidence only; it does not prove site execution.\n");
+    if !card.related_tests.is_empty() {
+        out.push_str("  related tests:\n");
+        for test in &card.related_tests {
+            out.push_str(&format!(
+                "    - {} at {}:{}\n",
+                test.name, test.file, test.line
+            ));
+        }
+    }
     if !card.obligation_evidence.is_empty() {
         out.push_str("  obligation evidence:\n");
         for evidence in &card.obligation_evidence {

@@ -191,6 +191,15 @@ mod tests {
             "reach note",
             "static reach evidence only; it does not prove site execution.",
         )?;
+        expect_section(
+            rendered_card,
+            "related tests",
+            source_card
+                .related_tests
+                .iter()
+                .map(|test| format!("{} at {}:{}", test.name, test.file, test.line))
+                .collect(),
+        )?;
         Ok(())
     }
 
@@ -687,6 +696,9 @@ mod tests {
         }
         if !source.routes.is_empty() {
             expected_sections.insert("witness routes");
+        }
+        if !source.related_tests.is_empty() {
+            expected_sections.insert("related tests");
         }
         if !source.next_action.verify_commands.is_empty() {
             expected_sections.insert("verify");
