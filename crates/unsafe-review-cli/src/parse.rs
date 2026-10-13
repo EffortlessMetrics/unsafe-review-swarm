@@ -4130,6 +4130,20 @@ mod tests {
     }
 
     #[test]
+    fn explain_defaults_to_markdown_format() -> Result<(), String> {
+        let explain = parse(args(["unsafe-review", "explain", "UR-card"]))?;
+        assert_eq!(
+            explain,
+            Command::Explain {
+                root: PathBuf::from("."),
+                id: "UR-card".to_string(),
+                format: Format::Markdown,
+            }
+        );
+        Ok(())
+    }
+
+    #[test]
     fn parses_equals_style_explain_and_context_flags() -> Result<(), String> {
         let explain = parse(args([
             "unsafe-review",
