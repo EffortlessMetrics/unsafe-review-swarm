@@ -2507,6 +2507,9 @@ fn doctor(root: &Path) -> Result<(), String> {
     );
     println!("kani: {}", yes_no(tool_available("kani")));
     println!("crux: {}", yes_no(tool_available("crux")));
+    println!(
+        "missing witness tools are informational only: review and witness routing still work without them; install a tool only to run its opt-in witness"
+    );
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
