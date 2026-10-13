@@ -6,7 +6,24 @@
     "staged-diff (waits for #2308 input identity)",
     "file-range (no file input exists yet)"
   ],
-  "proposed_budgets": {},
+  "proposed_budgets": {
+    "basis": "4x the row maximum recorded total_ms, rounded up to 100ms, minimum 1000ms; recorded on the linux debug baseline. Timings are machine-dependent diagnostics: exceeding a budget is a prompt to investigate, never a merge failure.",
+    "rows": {
+      "fixture-m-check": {
+        "recorded_max_total_ms": 332,
+        "total_ms_ceiling": 1400
+      },
+      "fixture-m-pr-bundle": {
+        "recorded_max_total_ms": 343,
+        "total_ms_ceiling": 1400
+      },
+      "fixture-s-check": {
+        "recorded_max_total_ms": 326,
+        "total_ms_ceiling": 1400
+      }
+    },
+    "status": "provisional_not_a_gate"
+  },
   "rows": [
     {
       "id": "fixture-s-check",
