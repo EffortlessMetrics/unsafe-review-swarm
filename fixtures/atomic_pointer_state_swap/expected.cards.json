@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "discard_head_returns_old_pointer",
+        "file": "src/lib.rs",
+        "line": 21
+      }
+    ],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",

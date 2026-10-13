@@ -68,6 +68,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "No related test path was found by static search",
       "No witness receipt imported for this card"

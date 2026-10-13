@@ -69,6 +69,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",

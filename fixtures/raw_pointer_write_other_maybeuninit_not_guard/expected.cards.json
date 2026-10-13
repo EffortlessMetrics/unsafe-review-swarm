@@ -170,6 +170,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",

@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "tagged_pointer_fetches_preserve_pointer_shape",
+        "file": "src/lib.rs",
+        "line": 35
+      }
+    ],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
@@ -233,6 +240,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
@@ -374,6 +382,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",

@@ -61,6 +61,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "reaches_private_helper",
+        "file": "src/lib.rs",
+        "line": 9
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"

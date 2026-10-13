@@ -93,6 +93,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "shrink_vec_keeps_prefix",
+        "file": "src/lib.rs",
+        "line": 17
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

@@ -67,6 +67,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "reserves_infallibly",
+        "file": "src/lib.rs",
+        "line": 25
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

@@ -69,6 +69,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "ctrl_reassigns_index_after_guard",
+        "file": "src/lib.rs",
+        "line": 28
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"

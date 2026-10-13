@@ -99,6 +99,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "mentions_zstd_overlap_handoff",
+        "file": "src/lib.rs",
+        "line": 48
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"
