@@ -216,6 +216,7 @@ pub(crate) fn run(workspace_root: &Path, args: &LatencyBaselineArgs) -> Result<(
         )?);
     }
 
+    let budgets = proposed_budgets(&rows);
     let receipt = json!({
         "schema_version": RECEIPT_SCHEMA,
         "tool": "unsafe-review latency-baseline",
@@ -228,7 +229,7 @@ pub(crate) fn run(workspace_root: &Path, args: &LatencyBaselineArgs) -> Result<(
         "trust_boundary": "Phase-latency baseline only; wall-clock times are machine- and load-dependent diagnostics, not performance guarantees, coverage claims, proofs, or UB-free/Miri-clean status. Deterministic counts (cards, bytes, sites) are comparable across machines; timings are not.",
         "pending_inputs": ["staged-diff (waits for #2308 input identity)", "file-range (no file input exists yet)"],
         "rows": rows,
-        "proposed_budgets": {},
+        "proposed_budgets": budgets,
     });
     let out_abs = if args.out.is_absolute() {
         args.out.clone()
@@ -247,6 +248,59 @@ pub(crate) fn run(workspace_root: &Path, args: &LatencyBaselineArgs) -> Result<(
         .map_err(|err| format!("write {} failed: {err}", out_abs.display()))?;
     println!("latency-baseline: ok ({})", out_abs.display());
     Ok(())
+}
+
+/// Provisional diff-scope budgets derived from the recorded rows (#2363).
+///
+/// A row earns a budget only when every run is diff-scoped with a recorded
+/// `total_ms`; repo-scope and skipped rows are excluded. The ceiling is 4x
+/// the row maximum, rounded up to 100ms with a 1000ms floor. These are
+/// expectations to investigate when exceeded, never a merge gate: timings
+/// are machine-dependent diagnostics (#2309).
+fn proposed_budgets(rows: &[Value]) -> Value {
+    let mut budgets = serde_json::Map::new();
+    for row in rows {
+        let Some(id) = row.get("id").and_then(Value::as_str) else {
+            continue;
+        };
+        let Some(runs) = row.get("runs").and_then(Value::as_array) else {
+            continue;
+        };
+        if runs.is_empty() {
+            continue;
+        }
+        let mut max_total: Option<u64> = None;
+        let mut diff_scoped = true;
+        for run in runs {
+            let scope = run.get("scope").and_then(Value::as_str);
+            let total = run.get("total_ms").and_then(Value::as_u64);
+            match (scope, total) {
+                (Some("diff"), Some(total)) => {
+                    max_total = Some(max_total.map_or(total, |max: u64| max.max(total)));
+                }
+                _ => {
+                    diff_scoped = false;
+                    break;
+                }
+            }
+        }
+        let Some(max_total) = max_total.filter(|_| diff_scoped) else {
+            continue;
+        };
+        let ceiling = (max_total.saturating_mul(4)).div_ceil(100) * 100;
+        budgets.insert(
+            id.to_string(),
+            json!({
+                "total_ms_ceiling": ceiling.max(1000),
+                "recorded_max_total_ms": max_total,
+            }),
+        );
+    }
+    json!({
+        "status": "provisional_not_a_gate",
+        "basis": "4x the row maximum recorded total_ms, rounded up to 100ms, minimum 1000ms; recorded on the linux debug baseline. Timings are machine-dependent diagnostics: exceeding a budget is a prompt to investigate, never a merge failure.",
+        "rows": budgets,
+    })
 }
 
 fn build_binaries(workspace_root: &Path) -> Result<(), String> {
@@ -923,6 +977,29 @@ mod tests {
             Ok(()) => Err(format!("expected rejection, accepted: {case}")),
             Err(_) => Ok(()),
         }
+    }
+
+    #[test]
+    fn proposed_budgets_cover_diff_rows_and_exclude_repo_scope() {
+        let rows = vec![
+            json!({"id": "diff-row", "runs": [
+                {"scope": "diff", "total_ms": 200},
+                {"scope": "diff", "total_ms": 326},
+            ]}),
+            json!({"id": "repo-row", "runs": [
+                {"scope": "repo", "total_ms": 176756},
+            ]}),
+            json!({"id": "skipped-row", "runs": [], "skipped": "absent"}),
+        ];
+        let budgets = proposed_budgets(&rows);
+        assert_eq!(budgets["status"], json!("provisional_not_a_gate"));
+        assert_eq!(
+            budgets["rows"]["diff-row"]["recorded_max_total_ms"],
+            json!(326)
+        );
+        assert_eq!(budgets["rows"]["diff-row"]["total_ms_ceiling"], json!(1400));
+        assert!(budgets["rows"].get("repo-row").is_none());
+        assert!(budgets["rows"].get("skipped-row").is_none());
     }
 
     #[test]
