@@ -39,7 +39,9 @@ pub(super) fn render_card(out: &mut String, card: &ReviewCard) {
         for test in &card.related_tests {
             out.push_str(&format!(
                 "    - {} at {}:{}\n",
-                test.name, test.file, test.line
+                test.name,
+                path_display(std::path::Path::new(&test.file)),
+                test.line
             ));
         }
     }

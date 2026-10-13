@@ -197,7 +197,14 @@ mod tests {
             source_card
                 .related_tests
                 .iter()
-                .map(|test| format!("{} at {}:{}", test.name, test.file, test.line))
+                .map(|test| {
+                    format!(
+                        "{} at {}:{}",
+                        test.name,
+                        path_display(std::path::Path::new(&test.file)),
+                        test.line
+                    )
+                })
                 .collect(),
         )?;
         Ok(())
