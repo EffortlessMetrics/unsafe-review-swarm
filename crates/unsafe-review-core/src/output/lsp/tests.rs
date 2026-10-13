@@ -528,6 +528,25 @@ fn diagnostic_actionable_flag_matches_live_filter() -> Result<(), String> {
 }
 
 #[test]
+fn hover_lists_every_witness_route() -> Result<(), String> {
+    let output = fixture_output("raw_pointer_alignment")?;
+    let card = &output.cards[0];
+    assert!(
+        card.routes.len() > 1,
+        "fixture card must carry multiple routes for this test"
+    );
+    let hover = super::render_hover(card);
+    for route in &card.routes {
+        assert!(
+            hover.contains(&format!("`{}`", route.kind.as_str())),
+            "hover must name route {}\n{hover}",
+            route.kind.as_str()
+        );
+    }
+    Ok(())
+}
+
+#[test]
 fn canonical_editor_diagnostic_exposes_card_semantics() -> Result<(), String> {
     let output = fixture_output("raw_pointer_alignment")?;
     let card = &output.cards[0];
