@@ -178,7 +178,9 @@ fn discharge_state_for(
         "target-feature" => target_feature_discharge_state(family, contract),
         "utf8" => utf8_discharge_state(site, family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),
-        _ => EvidenceState::missing("No obligation-specific guard code was detected"),
+        _ => EvidenceState::missing(format!(
+            "No obligation-specific guard code was detected for the `{key}` obligation (no guard pattern is recognized for this obligation)"
+        )),
     }
 }
 
@@ -1467,6 +1469,33 @@ mod tests {
         assert_eq!(
             raw_read_evidence[0].discharge.summary,
             "No obligation-specific guard code was detected"
+        );
+    }
+
+    #[test]
+    fn unhandled_obligation_key_names_itself_in_discharge_summary() {
+        let obligations = vec![SafetyObligation::new(
+            "asm",
+            "inline assembly operands and clobbers are valid",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let site = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["pub unsafe fn run(ptr: *const u8) -> u8 {"],
+            "ptr.read()",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&site, &obligations, &contract, &reach);
+
+        assert!(!evidence[0].discharge.present);
+        assert_eq!(
+            evidence[0].discharge.summary,
+            "No obligation-specific guard code was detected for the `asm` obligation (no guard pattern is recognized for this obligation)"
         );
     }
 
