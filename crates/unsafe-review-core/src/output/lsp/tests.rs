@@ -495,6 +495,39 @@ fn lsp_non_actionable_classes_produce_hint_severity() {
 }
 
 #[test]
+fn diagnostic_actionable_flag_matches_live_filter() -> Result<(), String> {
+    // Fixture classes span actionable and (via baseline fixtures) closed
+    // cards; the saved set filtered by the new flag must equal the live set.
+    for fixture in [
+        "raw_pointer_alignment",
+        "raw_pointer_deref_brownfield_inherited",
+    ] {
+        let output = fixture_output(fixture)?;
+        let saved = super::project_editor_diagnostics(&output);
+        let live = super::project_actionable_editor_diagnostics(&output);
+        let filtered: Vec<&str> = saved
+            .iter()
+            .filter(|diagnostic| diagnostic.actionable)
+            .map(|diagnostic| diagnostic.card_id.as_str())
+            .collect();
+        let live_ids: Vec<&str> = live
+            .iter()
+            .map(|diagnostic| diagnostic.card_id.as_str())
+            .collect();
+        assert_eq!(filtered, live_ids, "fixture {fixture}");
+        for diagnostic in &saved {
+            let card = output
+                .cards
+                .iter()
+                .find(|card| card.id.0 == diagnostic.card_id)
+                .ok_or("diagnostic must name a card")?;
+            assert_eq!(diagnostic.actionable, card.class.is_actionable());
+        }
+    }
+    Ok(())
+}
+
+#[test]
 fn canonical_editor_diagnostic_exposes_card_semantics() -> Result<(), String> {
     let output = fixture_output("raw_pointer_alignment")?;
     let card = &output.cards[0];

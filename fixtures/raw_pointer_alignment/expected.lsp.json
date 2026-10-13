@@ -21,6 +21,7 @@
   },
   "diagnostics": [
     {
+      "actionable": true,
       "card_id": "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
       "code": "guard_missing",
       "coverage": {
