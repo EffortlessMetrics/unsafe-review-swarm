@@ -1,0 +1,59 @@
+# Issue-linked work specification for the asm-options contradiction discharger.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2291"
+kind = "correctness"
+objective = "Name self-contradictory asm! option declarations (nomem/readonly versus a memory template) in the asm obligation discharge summary instead of the generic missing note."
+user_outcome = "A maintainer whose asm! template addresses memory while declaring nomem (or writes through its destination operand while declaring readonly) sees that definite-UB contradiction named on the card; sound asm keeps the existing generic missing note with no new noise."
+claim_boundary = "This slice proves the two named contradiction patterns with unit tests, a BDD fixture, and re-blessed goldens; it does not claim general asm analysis, AT&T-syntax coverage, calibrated accuracy, safety, execution, or policy readiness."
+
+[scope]
+included = [
+    "New asm-options discharger on the existing `asm` obligation key in analysis/evidence",
+    "nomem plus any bracketed memory operand in the template yields a missing state with a contradiction-specific summary",
+    "readonly plus a bracketed destination (first-operand) template operand yields a missing state with a contradiction-specific summary",
+    "Unit tests for both contradictions and for sound neighbours (pure nomem, readonly read, output-operand, absent options)",
+    "One BDD fixture pinning the named summaries end to end; regenerate only affected goldens with an explained diff",
+]
+excluded = [
+    "AT&T parenthesised memory syntax (documented non-goal in the issue)",
+    "Multi-line templates whose options fall outside the scanner context window (they keep the generic note)",
+    "next_action routing for contradiction cards (follow-up #2293) and Markdown/SARIF projection of discharge notes (follow-up #2292)",
+    "Any change to card class, priority, or the binary present/missing evidence model",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Contradiction is expressed as a named missing state, not a new evidence state; the binary present/missing slot keeps working."
+
+[[invariant]]
+id = "INV-2"
+text = "No new noise: both patterns are definite UB, and absent or sound options keep the exact existing generic missing summary."
+
+[[invariant]]
+id = "INV-3"
+text = "The discharger anchors at the site's own asm! occurrence (snippet plus after-context), never at an earlier asm! in the context window."
+
+[[acceptance]]
+id = "AC-2291-PR1-1"
+text = "nomem with a bracketed memory template operand yields a missing asm discharge whose summary names the nomem contradiction."
+proof = ["cargo test -p unsafe-review-core --locked asm_nomem_contradiction"]
+
+[[acceptance]]
+id = "AC-2291-PR1-2"
+text = "readonly with a bracketed destination operand yields a missing asm discharge whose summary names the readonly contradiction."
+proof = ["cargo test -p unsafe-review-core --locked asm_readonly_contradiction"]
+
+[[acceptance]]
+id = "AC-2291-PR1-3"
+text = "Sound neighbours (pure nomem, readonly memory read, output-operand write, no options) keep the generic missing summary unchanged."
+proof = ["cargo test -p unsafe-review-core --locked asm_sound"]
+
+[[acceptance]]
+id = "AC-2291-PR1-4"
+text = "Complete cards carry the named summaries and only affected goldens change."
+proof = ["cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2291-pr1-asm-options-discharge"
+notes = "Summary wording is the marker consumed later by #2293 (next-action routing) and projected by #2292; keep both summaries sharing the `while options declare ...` shape."
