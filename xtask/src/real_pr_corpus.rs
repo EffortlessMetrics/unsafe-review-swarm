@@ -14,7 +14,6 @@
 use std::ffi::OsString;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::process::Command;
 
 const PR_CORPUS_LEDGER: &str = "policy/pr-corpus.toml";
 const PR_CORPUS_SCHEMA_VERSION: &str = "1.0";
@@ -420,8 +419,7 @@ fn run_unsafe_review_capture(args: impl IntoIterator<Item = OsString>) -> Result
         .collect::<Vec<_>>()
         .join(" ");
 
-    let output = Command::new("cargo")
-        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+    let output = crate::cli_command::command()
         .args(&args)
         .output()
         .map_err(|err| format!("failed to spawn unsafe-review {display}: {err}"))?;
@@ -448,8 +446,7 @@ fn run_unsafe_review_silent(args: impl IntoIterator<Item = OsString>) -> Result<
         .collect::<Vec<_>>()
         .join(" ");
 
-    let output = Command::new("cargo")
-        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+    let output = crate::cli_command::command()
         .args(&args)
         .output()
         .map_err(|err| format!("failed to spawn unsafe-review {display}: {err}"))?;
@@ -475,8 +472,7 @@ fn run_unsafe_review_exit_code(args: impl IntoIterator<Item = OsString>) -> Resu
         .collect::<Vec<_>>()
         .join(" ");
 
-    let status = Command::new("cargo")
-        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+    let status = crate::cli_command::command()
         .args(&args)
         .status()
         .map_err(|err| format!("failed to spawn unsafe-review {display}: {err}"))?;
