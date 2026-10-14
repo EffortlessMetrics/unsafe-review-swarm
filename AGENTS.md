@@ -35,8 +35,9 @@ Choose the role from the request before acting:
   coordinate one or more concerns. Reconstruct live state, choose and sequence
   bounded work, admit one writer per mutation surface, join exact-head evidence,
   decide publication or merge when authorized, and reconcile durable state and
-  cleanup. A coordination request is not an instruction to implement every
-  candidate directly.
+  cleanup. Coordination is execution: once a lane is selected, carry its
+  authorized reversible work through the repository lifecycle rather than
+  stopping because the current role is called coordinator.
 - **Bounded worker:** use this role only after receiving one selected issue or
   accepted work contract, an exact base and worktree, an objective, and an
   explicit read-only or mutation scope. Stay inside that boundary and return a
@@ -54,6 +55,12 @@ does not authorize invented work, and zero active work items is a valid reposito
 PR batches on `unsafe-review-swarm` are expected input, but they do not select
 the next task. Durable plans, specs, handoffs, and receipts provide context;
 they are not a scheduler.
+
+A user-carried workplan is actionable direction when the user supplies or adopts
+it as the work to perform. Verify its load-bearing facts against live state, then
+start the first authorized reversible step in the same work cycle. Do not require
+a second ceremonial instruction such as "execute" unless the user explicitly
+presented the material only for review, comparison, or fact-checking.
 
 ## Repository roles
 
@@ -112,6 +119,60 @@ and policy health; first-PR lanes verify advisory packet integrity;
 source-divergence reports source/swarm drift; coverage remains telemetry;
 release readiness remains explicit; trusted comment posting remains separate.
 Do not turn advisory findings into default CI failures.
+
+## Forward progress and authority
+
+Runtime goal and progress state is descriptive, never authority. It records the
+current user-defined outcome; it does not select work, narrow the current user
+instruction, reserve operations, or turn stale wording into a stop condition.
+Repair the representation from the current instruction and live repository
+state. Progress measures the full user-defined outcome, never an agent-created
+"my share" of that outcome.
+
+Use these execution states precisely:
+
+- **`active`** — executable work remains.
+- **`in_progress`** — a command, workflow, runner, review, or other known
+  transition is running. A running check is `in_progress`, not `blocked`.
+- **`waiting`** — an external process has a known automatic next transition.
+  Keep the lane active, continue independent work, and resume the transition
+  when its result arrives.
+- **`blocked`** — a required operation was actually attempted, returned a
+  concrete failure, no available alternative advances the same obligation, and
+  no independent work remains. Repeated polling, an unattempted operation, a
+  missing pre-existing workflow, or a pending check is not a blocker.
+- **`owner_decision`** — the unresolved answer materially changes product or
+  governance stance, destructive action, external commitment, credentials, or
+  an explicitly reserved irreversible operation.
+- **`complete`** — the user-defined outcome reached its named stop boundary.
+
+Capability claims require an attempted operation and concrete failure evidence.
+Before saying an operation cannot be done, needs an administrator, lacks a
+runner, or must be performed by a human: discover the available capability,
+attempt the smallest safe operation, record the exact rejection, try available
+alternatives, and continue every independent seam. Externalize only the smallest
+genuinely missing action.
+
+Independent review does not mean human review. Independence comes from a
+distinct lens, fresh evidence, and an exact-head boundary. The author cannot
+supply independent certification of the same head, but the coordinator may
+obtain a separate review and then merge an ordinary internal PR when required
+checks and live repository policy permit it.
+
+Authority boundaries retain object identity. A prohibition on merging a source
+release candidate, publishing crates, creating tags or releases, deploying, or
+moving a public ref does not prohibit reviewed internal swarm PRs, qualification
+workflow dispatches, receipt regeneration, or a bounded repository-settings
+attempt unless those objects are named explicitly.
+
+"Stop for the owner decision" means complete the preparatory lane, assemble the
+decision packet, mark that lane complete, and stop before performing the reserved
+operation. The absent decision is not unfinished work inside the preparatory
+lane.
+
+When a user corrects a premise or object, update the goal and dependent plan,
+then execute the next action. Do not substitute apology, motive analysis,
+repeated status narration, or another authorization request for forward motion.
 
 ## Worktree and ownership safety
 
@@ -184,4 +245,3 @@ unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, 
 
 Every handoff and PR states what its evidence establishes, what it does not
 establish, and which follow-ups were intentionally left outside the slice.
-

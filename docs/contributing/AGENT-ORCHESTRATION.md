@@ -27,8 +27,9 @@ useful live issue
 -> proportional local proof
 -> reviewable PR with a bounded claim
 -> exact-head review and hosted integration
--> merge under current policy
+-> ordinary internal merge under current policy
 -> reconciliation and cleanup
+-> separately authorized publication or external commitment, when applicable
 ```
 
 The arrows describe evidence dependencies, not mandatory personas or a fixed
@@ -55,11 +56,85 @@ artifacts it links. Before planning or writing:
 
 GitHub owns the concurrent portfolio. `.allow` and linked repository artifacts
 own durable contracts and graph visibility. Neither a local runtime queue nor a
-cached planning summary selects the repository's next task.
+cached planning summary selects the repository's next task. The compatibility
+charter at `.allow/goals/active.toml` is durable context, not a lane selector.
+
+A plan, checklist, or quoted workplan supplied or adopted by the user is active
+direction unless the user explicitly presents it only for review, comparison,
+or fact-checking. Verify load-bearing facts against live authority, then begin
+the first authorized reversible step without requiring a ceremonial second
+instruction.
 
 If live state contradicts a plan, reconcile the contradiction before building.
 Do not recreate an issue, spec, or plan merely because an example lifecycle
 contains that step.
+
+## 2A. Preserve forward progress across transitions
+
+Coordination is execution. The accountable coordinator does not stop at
+sequencing advice: it carries the selected lane through writer admission,
+proof, exact-head challenge, PR publication, ordinary internal merge,
+reconciliation, and cleanup. Delegation is optional and does not transfer
+accountability for the integrated result.
+
+Runtime goal, status, and progress surfaces are descriptive only. They do not
+create authority, narrow the current instruction, reserve operations, or turn
+stale wording into a stop condition. Repair them from the current user request
+and live repository state. Progress measures the complete user-defined outcome,
+not an agent-invented share of the work.
+
+Classify execution state precisely:
+
+- **active** — executable work remains;
+- **in progress** — a command, workflow, runner, review, or other known
+  transition is running;
+- **waiting** — an external process has a known automatic next transition;
+  the lane remains active and independent work continues;
+- **blocked** — a required operation was actually attempted, returned a
+  concrete failure, no available alternative advances the same obligation,
+  and no independent work remains;
+- **owner decision** — the unresolved answer materially changes product or
+  governance stance, destructive action, external commitment, credentials, or
+  an explicitly reserved irreversible operation;
+- **complete** — the user-defined outcome reached its named stop boundary.
+
+A pending or running hosted check is in progress, not blocked. An unattempted
+workflow dispatch, missing pre-existing runner configuration, presumed
+permission boundary, or absent review participant is work to investigate, not
+evidence of incapability.
+
+Capability claims require receipts. Before saying an operation cannot be done,
+needs an administrator, lacks a runner, or must be performed by a human:
+
+1. discover the available capability;
+2. attempt the smallest safe bounded operation;
+3. capture the exact rejection or limitation;
+4. try available alternatives;
+5. continue every independent seam;
+6. externalize only the smallest genuinely missing action.
+
+Independent review does not mean human review. It requires a distinct lens,
+fresh evidence, and an exact-head boundary. Author self-report remains author
+evidence, but a separate agentic or human reviewer can provide the independent
+challenge. Once that review and current repository policy are satisfied, the
+coordinator may merge an ordinary internal PR when the selected lane authorizes
+it.
+
+Authority boundaries retain object identity. A prohibition on merging a source
+release candidate, publishing packages, tagging, releasing, deploying, moving a
+public ref, or using credentials applies to those objects. It does not silently
+prohibit internal swarm PRs, qualification workflow dispatches, receipt
+regeneration, or a bounded repository-settings attempt.
+
+"Stop for the owner decision" means complete the preparatory lane, assemble the
+decision packet, mark the preparatory lane complete, and stop before the
+reserved operation. The missing decision is not unfinished work inside that
+lane.
+
+When the user corrects an object or premise, update the active representation
+and dependent conclusions, then execute the next action. Do not replace forward
+motion with apology, motive analysis, repeated status narration, or another
+authorization request.
 
 ## 3. Compile a bounded work contract
 
@@ -172,6 +247,11 @@ challenge for the changed head. A reviewer-to-fixer transition does not preserve
 the old head's approval merely because the same participant understands the
 change.
 
+Independent challenge may come from another agent or a human. The durable
+requirements are a distinct lens, fresh evidence, and the exact head—not a
+particular identity class. The branch author cannot turn author evidence into
+independent certification merely by restating it.
+
 ## 8. Publish, integrate, and merge
 
 A PR is review-forward when its title, body, diff, and evidence describe one
@@ -189,8 +269,13 @@ Before merge, verify live GitHub state:
 
 Merge only through the repository's current policy and authorized style. A
 green check subset, stale review, bot verdict, or local command does not grant
-merge authority. Release publication, tags, deployments, credentials, and
-direct source-repository promotion remain separately authorized actions.
+merge authority. Conversely, do not invent a human-only merge requirement when
+an independent exact-head challenge and live policy permit the coordinator to
+merge the ordinary internal PR.
+
+Release publication, source-candidate merge, tags, deployments, credentials,
+and moving public refs remain separately authorized actions. Their authority
+does not automatically extend backward to routine swarm integration.
 
 ## 9. Reconcile and clean
 
@@ -297,6 +382,11 @@ Other feedback changes product or governance stance: detector behavior,
 support posture, public claims, dependency trust, merge policy, self-unsafe
 acceptance, release identity, or publication. Preserve those as explicit owner
 or issue decisions. Do not disguise a stance change as cleanup.
+
+Do not promote an operational unknown into an owner decision before attempting
+the available operation. Missing configuration, a runner that has not yet been
+searched for, a merge not yet attempted, or a pending check is not a product or
+governance stance.
 
 When uncertain, state the competing contracts and the evidence each would
 require. Keep the current behavior and claim boundary until the decision is

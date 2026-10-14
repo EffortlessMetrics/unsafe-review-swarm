@@ -2,7 +2,9 @@ schema_version = "1.0"
 
 [scope]
 owned_roots = [
+  ".claude/agents",
   ".rails",
+  ".opencode",
   "docs",
   "policy",
   "plans",
@@ -13,7 +15,6 @@ owned_roots = [
 external_awareness_only = [
   ".codex",
   ".spec",
-  ".claude",
   ".jules",
 ]
 
@@ -47,11 +48,14 @@ sources = [
   "docs/specs",
 ]
 must_include = [
+  "The selected GitHub issue or PR",
+  "linked issue-work specification",
   ".allow/goals/active.toml",
   "cargo-allow worklist",
-  "linked plan",
-  "linked spec",
-  "linked proposal",
+  "neither selects, blocks, or schedules the task",
+  "user-carried or explicitly adopted workplan",
+  "current GitHub issue/PR/check",
+  "Runtime goal state is descriptive only.",
 ]
 
 [[generated_or_checked]]
@@ -63,6 +67,7 @@ sources = [
   "docs/contributing/SWARM_TO_MAIN.md",
   "docs/contributing/spec-rails.md",
   "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md",
+  "docs/contributing/AGENT-ORCHESTRATION.md",
 ]
 must_include = [
   "unsafe-review-swarm develops.",
@@ -78,6 +83,196 @@ must_include = [
   "Spec rails are meant to make routine progress easier, not ceremonial.",
   "Do not reject a useful generated PR just because it references missing but",
   "Do not stop at \"human merge required\"",
+  "Coordination is execution",
+  "A user-carried workplan is actionable direction",
+  "Runtime goal and progress state is descriptive, never authority",
+  "A running check is `in_progress`, not `blocked`",
+  "Capability claims require an attempted operation and concrete failure evidence",
+  "Independent review does not mean human review",
+  "Authority boundaries retain object identity",
+  "Stop for the owner decision",
+  "Progress measures the full user-defined outcome",
+]
+
+[[generated_or_checked]]
+id = "agent-orchestration-protocol"
+kind = "agent_operating_contract"
+path = "docs/contributing/AGENT-ORCHESTRATION.md"
+mode = "check"
+sources = [
+  "AGENTS.md",
+  "docs/contributing/LIFECYCLE_SURFACE_MAP.md",
+  "docs/specs/UNSAFE-REVIEW-SPEC-0044-issue-linked-work-specs.md",
+]
+must_include = [
+  "Coordination is execution",
+  "Runtime goal, status, and progress surfaces are descriptive only",
+  "A pending or running hosted check is in progress, not blocked",
+  "Capability claims require receipts",
+  "Independent review does not mean human review",
+  "Authority boundaries retain object identity",
+  "Stop for the owner decision",
+  "do not invent a human-only merge requirement",
+]
+
+[[generated_or_checked]]
+id = "claude-repo-preflight-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/repo-preflight.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "neutral charter/graph context only",
+  "A pending hosted check is `in-progress`, not blocked.",
+  "attempt the smallest safe read-only capability probe",
+  "controlling_contract:",
+]
+
+[[generated_or_checked]]
+id = "claude-issue-factcheck-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/issue-factcheck.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Separate a real stance decision from an operational unknown",
+  "blocked-external-evidenced",
+  "capability_receipt:",
+  "One blocked substep does not block independent seams.",
+]
+
+[[generated_or_checked]]
+id = "claude-plan-refuter-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/plan-refuter.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "neutral charter",
+  "False terminal states",
+  "Boundary-object drift",
+  "Review externalization",
+  "Wrong stop semantics",
+]
+
+[[generated_or_checked]]
+id = "claude-implementer-adapter"
+kind = "agent_operating_contract"
+path = ".claude/agents/implementer.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "selected live GitHub issue or PR",
+  "blocked-evidenced",
+  "A running command, workflow, review, or hosted check is `in-progress`",
+  "capability_receipts:",
+]
+
+[[generated_or_checked]]
+id = "opencode-coordinator-adapter"
+kind = "agent_operating_contract"
+path = ".opencode/agents/coordinator.md"
+mode = "check"
+sources = [
+  "AGENTS.md",
+  "docs/contributing/AGENT-ORCHESTRATION.md",
+]
+must_include = [
+  "Coordination is execution",
+  "Runtime goal/progress state is descriptive only",
+  "Use `blocked` only after a required operation was attempted",
+  "Independent review may be agentic or human",
+  "Authority remains object-specific",
+  "Stop for the owner decision",
+]
+
+[[generated_or_checked]]
+id = "prepare-issue-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/prepare-issue/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "A plan, checklist, or quoted workplan supplied or adopted by the user is active direction",
+  "Preparation is not a mandatory pause or authorization ceremony",
+  "continue every independent reversible seam",
+]
+
+[[generated_or_checked]]
+id = "build-from-work-spec-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/build-from-work-spec/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Once admission is settled, this skill moves into execution",
+  "attempt the smallest safe operation",
+  "Use `blocked-evidenced` only after an attempted",
+]
+
+[[generated_or_checked]]
+id = "review-current-head-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/review-current-head/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Independent review does not mean human review",
+  "the coordinator may merge an ordinary internal PR",
+  "do not invent a human sign-off requirement",
+]
+
+[[generated_or_checked]]
+id = "publish-pr-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/publish-pr/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "classify them as `in-progress` or `waiting`, not blocked",
+  "Do not manufacture a new owner approval requirement",
+  "return control to the coordinator for ordinary internal merge",
+]
+
+[[generated_or_checked]]
+id = "respond-to-feedback-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/respond-to-feedback/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "Do not externalize that work to the user",
+  "Use `blocked` only after an attempted failure",
+  "ordinary internal merge and reconciliation",
+]
+
+[[generated_or_checked]]
+id = "reconcile-merge-forward-progress"
+kind = "agent_operating_contract"
+path = ".opencode/skills/reconcile-merge/SKILL.md"
+mode = "check"
+sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
+must_include = [
+  "stop for the owner decision",
+  "The absent decision is not a blocker",
+  "mark that lane complete",
+]
+
+[[generated_or_checked]]
+id = "legacy-goals-archive"
+kind = "operator_front_door"
+path = ".rails/goals/README.md"
+mode = "check"
+sources = [
+  ".rails/README.md",
+  "AGENTS.md",
+]
+must_include = [
+  "Legacy goals archive",
+  "not a current execution front door",
+  "Do not begin work by reading `.rails/goals/active.toml`",
+  "selected live GitHub issue or PR",
+  "projected into runtime goal state",
 ]
 
 [[generated_or_checked]]
