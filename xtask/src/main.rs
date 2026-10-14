@@ -25,6 +25,7 @@ mod ci_lanes;
 mod ci_routing_contract;
 mod ci_test;
 mod cleanup_auditor;
+mod cli_command;
 mod command_args;
 mod commands;
 mod corpus_backstop;
@@ -2363,8 +2364,7 @@ fn run_unsafe_review(args: impl IntoIterator<Item = OsString>) -> Result<(), Str
         .map(|arg| arg.to_string_lossy())
         .collect::<Vec<_>>()
         .join(" ");
-    let output = Command::new("cargo")
-        .args(["run", "--locked", "-p", "unsafe-review", "--"])
+    let output = cli_command::command()
         .args(&args)
         .output()
         .map_err(|err| format!("failed to run unsafe-review {display_args}: {err}"))?;
