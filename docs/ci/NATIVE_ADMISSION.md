@@ -110,14 +110,15 @@ No native Actions or pool qualification was executed. The active central pin and
 its honest failure-artifact readiness refusal remain unchanged and parent-owned.
 
 
-The source caller retains `contents: read`; no scope expansion was performed.
-The active central definition also statically requests Actions/Checks/PR read
-scopes in its optional repository-policy job, even when no result script is
-selected. The automatic draft CI run on `3cc4e5f5` reported startup failure and
-zero jobs; exact startup annotations were unavailable through the connector.
-This caller/central permission-contract mismatch is another qualification
-prerequisite. Resolve it in the parent-owned central dependency or through a
-separately authorized scope decision; do not broaden access in this repair.
+The governed reusable proof caller now declares exactly `contents: read`,
+`actions: read`, `checks: read` and `pull-requests: read`. The three additional
+read scopes were explicitly approved for this caller; the metadata jobs retain
+contents-only access. There are no write grants or inherited secrets. This
+matches the active central repository-policy job's declared read requirements,
+even while that optional job is skipped. The earlier automatic draft CI run on
+`3cc4e5f5` reported startup failure and zero jobs; post-change native cheap
+metadata is used to diagnose startup, not to qualify product execution.
+The pre-Cargo admission and diagnostic-retention blockers remain unchanged.
 
 
 The parent confirmed the same pre-proof gap in active `a3125de` and public

@@ -153,3 +153,17 @@ source currently emits no admission authority and cannot replace this gate.
 Native auto-merge request support requires an observable transition by the
 existing authenticated actor; no GITHUB_TOKEN transition or label is assumed
 sufficient. No live request/label/dispatch or permission expansion occurred.
+
+
+### Approved caller read-scope repair
+
+Continuing from reviewed `e68e64ed72ce8c76a70fc89817b4002aae9f482e`, the user
+explicitly approved the three required read scopes for the governed caller:
+actions, checks and pull-requests. Only the reusable proof job adds those read
+scopes, retaining contents: read. Metadata jobs retain contents-only permissions;
+no write scope, credential, pin or live settings change is included. The policy
+ledger and discriminating missing/extra/write-scope tests reflect that exact
+contract. Earlier permission-compatibility observations above retain their
+original proof epoch; this repair addresses that source mismatch only.
+The actual admission driver still refuses before outputs or product allocation,
+and the central pre-Cargo/diagnostic-retention readiness refusals remain.

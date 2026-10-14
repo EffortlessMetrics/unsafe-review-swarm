@@ -6,6 +6,7 @@ No live admission request, label, review approval or product run is produced.
 import copy
 import datetime as dt
 import json
+import tomllib
 from pathlib import Path
 import types
 import unittest
@@ -66,6 +67,23 @@ class AdmissionTests(unittest.TestCase):
     def rewrite_request(self):
         self.pr['body'] = marker('admission-v1', self.request)
         self.event['pull_request']['body'] = self.pr['body']
+
+    def test_read_scope_expansion_is_only_on_governed_proof(self):
+        before, after = WORKFLOW.split('\n  proof:\n', 1)
+        proof, result = after.split('\n  unsafe-review-rust-result:\n', 1)
+        expected = ('    permissions:\n      contents: read\n      actions: read\n'
+                    '      checks: read\n      pull-requests: read\n')
+        self.assertIn(expected, proof)
+        self.assertEqual(proof.count('    permissions:'), 1)
+        self.assertNotIn('    permissions:', before)
+        self.assertNotIn('    permissions:', result)
+        self.assertIn('permissions:\n  contents: read\n', before)
+        self.assertNotIn(': write', WORKFLOW)
+        with (ROOT / 'policy/workflow-allowlist.toml').open('rb') as stream:
+            policies = tomllib.load(stream)['workflow']
+        entry = next(p for p in policies if p['path'] == '.github/workflows/ci.yml')
+        self.assertEqual(set(entry['permissions'].split(', ')),
+                         {'contents: read', 'actions: read', 'checks: read', 'pull-requests: read'})
 
     def test_positive_exact_coordinator_review_and_integration(self):
         self.assertEqual(self.run_admission(), self.request)

@@ -221,6 +221,28 @@ fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
         .and_then(|(_, tail)| tail.split_once("\n  unsafe-review-rust-result:\n"))
         .map(|(proof, _)| proof)
         .ok_or_else(|| format!("{path} missing proof/result boundary"))?;
+    let permissions: Vec<&str> = proof
+        .split_once("\n    permissions:\n")
+        .map(|(_, tail)| {
+            tail.lines()
+                .take_while(|line| line.starts_with("      "))
+                .map(str::trim)
+                .collect()
+        })
+        .ok_or_else(|| format!("{path} missing governed caller read permissions"))?;
+    if proof.matches("    permissions:").count() != 1
+        || permissions
+            != [
+                "contents: read",
+                "actions: read",
+                "checks: read",
+                "pull-requests: read",
+            ]
+    {
+        return Err(format!(
+            "{path} caller permissions must contain only the four approved read scopes"
+        ));
+    }
     check_lane_markers(
         path,
         proof,
@@ -525,6 +547,48 @@ mod tests {
         .is_ok()
         {
             return Err("accepted an unreviewed profile".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_requires_each_approved_read_scope() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        super::check_central_caller_contract("ci.yml", text)?;
+        for scope in ["contents", "actions", "checks", "pull-requests"] {
+            let missing = text.replace(&format!("      {scope}: read\n"), "");
+            if super::check_central_caller_contract("ci.yml", &missing).is_ok() {
+                return Err(format!("accepted missing caller read scope: {scope}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_rejects_extra_or_write_scopes() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for extra in [
+            "      issues: read\n",
+            "      packages: write\n",
+            "      id-token: write\n",
+            "      actions: read\n",
+        ] {
+            let expanded = text.replace(
+                "      contents: read\n",
+                &format!("      contents: read\n{extra}"),
+            );
+            if super::check_central_caller_contract("ci.yml", &expanded).is_ok() {
+                return Err(format!("accepted unapproved caller permission: {extra}"));
+            }
+        }
+        for scope in ["contents", "actions", "checks", "pull-requests"] {
+            let write = text.replace(
+                &format!("      {scope}: read"),
+                &format!("      {scope}: write"),
+            );
+            if super::check_central_caller_contract("ci.yml", &write).is_ok() {
+                return Err(format!("accepted caller write scope: {scope}"));
+            }
         }
         Ok(())
     }

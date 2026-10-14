@@ -180,6 +180,11 @@ jobs:
     name: Admitted Rust proof
     needs: admission
     if: needs.admission.result == 'success' && needs.admission.outputs.admitted == 'true'
+    permissions:
+      contents: read
+      actions: read
+      checks: read
+      pull-requests: read
     uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@a3125de962a74e7ec2e127d41d7532f66c69334d
     with:
       profile: standard
