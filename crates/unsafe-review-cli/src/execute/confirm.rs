@@ -1314,12 +1314,30 @@ mod tests {
     #[cfg(windows)]
     #[test]
     fn execute_with_timeout_marks_killed_capture_incomplete() -> Result<(), String> {
+        const CHILD_MODE: &str = "UNSAFE_REVIEW_TIMEOUT_FIXTURE_CHILD";
+        const STARTED: &str = "timeout fixture entered sleep";
+        if std::env::var(CHILD_MODE).as_deref() == Ok("sleep") {
+            use std::io::Write;
+            println!("{STARTED}");
+            std::io::stdout().flush().map_err(|err| err.to_string())?;
+            thread::sleep(Duration::from_secs(30));
+            return Err("timeout fixture survived without being killed".to_string());
+        }
+
+        // Re-enter this exact test as a direct child: timeout.exe rejects null stdin.
+        let executable = std::env::current_exe().map_err(|err| err.to_string())?;
+        let executable = executable
+            .to_str()
+            .ok_or_else(|| "test executable path must be UTF-8".to_string())?;
+        let started = Instant::now();
         let run = execute_with_timeout(
-            &[],
+            &[(CHILD_MODE.to_string(), "sleep".to_string())],
             &[
-                "cmd".to_string(),
-                "/C".to_string(),
-                "timeout /T 30 /NOBREAK > NUL".to_string(),
+                executable.to_string(),
+                "--exact".to_string(),
+                "execute::confirm::tests::execute_with_timeout_marks_killed_capture_incomplete"
+                    .to_string(),
+                "--nocapture".to_string(),
             ],
             Path::new("."),
             Duration::from_secs(1),
@@ -1327,6 +1345,12 @@ mod tests {
 
         assert!(run.timed_out);
         assert!(!run.terminal.captured_complete);
+        assert!(run.output.contains(STARTED), "output: {}", run.output);
+        assert_eq!(run.terminal.exit_code, None);
+        assert!(
+            started.elapsed() < Duration::from_secs(2),
+            "timed-out direct child should be killed and reaped promptly"
+        );
         Ok(())
     }
 
@@ -1430,14 +1454,20 @@ mod tests {
 
     #[test]
     fn receipt_install_note_names_discovery_dir_for_outside_paths() -> Result<(), String> {
-        let root = Path::new("/repo");
-        let note = receipt_install_note(root, Path::new("/tmp/stray-receipt.json"))
-            .ok_or_else(|| "outside path must produce a note".to_string())?;
-        assert!(
-            note.contains("/repo/.unsafe-review/receipts"),
-            "note must name the install dir: {note}"
+        let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
+        let relative_root = Path::new("receipt note repo");
+        let absolute_root = cwd.join(relative_root);
+        let written = cwd.join("stray-receipt.json");
+        let discovery = absolute_root.join(".unsafe-review").join("receipts");
+        let expected = format!(
+            "note: receipt written outside the discovery dir; copy it to {} so re-running check or first-pr imports it automatically",
+            discovery.display(),
         );
-        assert!(note.contains("imports it automatically"), "{note}");
+        for root in [relative_root, absolute_root.as_path()] {
+            let note = receipt_install_note(root, &written)
+                .ok_or_else(|| "outside path must produce a note".to_string())?;
+            assert_eq!(note, expected, "root: {}", root.display());
+        }
         Ok(())
     }
 
