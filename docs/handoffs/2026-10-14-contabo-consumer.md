@@ -38,7 +38,7 @@ cargo test --locked -p xtask ci_routing_contract
 cargo run --locked -p xtask -- check-policy
 ```
 
-Bash syntax, six orchestration tests, 12 admission tests, 36 scoped Rust tests, formatting, scoped
+Bash syntax, six orchestration tests, 16 admission tests, 36 scoped Rust tests, formatting, scoped
 `cargo clippy --locked -p xtask --all-targets -- -D warnings` and `git diff
 --check` passed locally. Full product proof and native runner qualification
 were not run. The existing policy aggregate is not claimed green.
@@ -121,3 +121,35 @@ network/API behavior on native Actions remains unqualified. Fixtures exercise
 the actual shipped program; they are not live admission or required-check proof.
 No central source or pin changed. The diagnostic publisher is a separate
 parent-owned preparation/activation dependency; its readiness refusal remains.
+
+
+### Queue-wait authority boundary
+
+Independent challenge reproduced review revocation during control admission;
+review authority is now refreshed at the final control check and after proof.
+The request ID is explicitly a body-transition identifier, not a globally
+unused grant; intentional restoration still requires current actor/time/review.
+Neither fix prevents authority becoming stale while an owned job waits in the
+central queue. Active `a3125de` has no authenticated immutable pre-Cargo hook.
+The native driver therefore refuses before producing `admitted=true` or
+allocating product proof. There is no label/Boolean override. The parent-owned
+central dependency must securely revalidate current review/request and exact
+head/base/native merge/tree immediately before compilation, after queue wait.
+Keep this source unqualified until that contract is reviewed and activated.
+
+The automatic native CI run on `3cc4e5f5` failed startup with zero jobs. Static
+inspection shows the active central repository-policy job requests read scopes
+beyond the caller's contents-only declaration. No permission was expanded;
+startup annotations were not available through permitted connector endpoints.
+The compatible scope/central-contract disposition remains parent-owned.
+
+
+Central minimum prerequisite (parent independently confirmed): central-owned,
+read-only revalidation at every pre-proof/recovery entry after queue wait,
+protected-base semantic-currentness/convergence owner contracts, current
+request/actor/head/base/integration binding, credential isolated from Cargo,
+and refusal failing the aggregate without fallback normalization. The consumer
+source currently emits no admission authority and cannot replace this gate.
+Native auto-merge request support requires an observable transition by the
+existing authenticated actor; no GITHUB_TOKEN transition or label is assumed
+sufficient. No live request/label/dispatch or permission expansion occurred.

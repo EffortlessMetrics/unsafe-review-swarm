@@ -98,6 +98,44 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_admission(lambda _: self.fail('must reject before API'))
 
+    def test_current_native_driver_refuses_before_api_or_product_authority(self):
+        import os, subprocess, tempfile
+        with tempfile.TemporaryDirectory(prefix='unsafe-admission-refusal-') as temp:
+            event_path = Path(temp) / 'event.json'
+            event_path.write_text(json.dumps(self.event))
+            output_path = Path(temp) / 'output'
+            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output_path))
+            result = subprocess.run(['python3', '-c', SOURCE], env=env, capture_output=True, text=True)
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('pre-Cargo authority hook NOT_PROVEN', result.stderr)
+            self.assertFalse(output_path.exists())
+
+    def test_explicit_restoration_is_not_a_global_nonce_grant(self):
+        # No global nonce registry: deliberate restoration remains subject to
+        # authenticated coordinator intent, fresh time and current exact review.
+        self.event['changes']['body']['from'] = 'marker was removed'
+        self.assertEqual(self.run_admission(), self.request)
+        self.env['GITHUB_ACTOR'] = 'other'
+        with self.assertRaises(ValueError):
+            self.run_admission()
+        self.env['GITHUB_ACTOR'] = ADMISSION.COORDINATOR
+        self.review['state'] = 'DISMISSED'
+        with self.assertRaises(ValueError):
+            self.run_admission()
+
+    def test_review_dismissal_during_admission_is_refreshed(self):
+        def racing(path):
+            value = self.api(path)
+            if self.reads == 2 and '/reviews?' not in path and '/git/commits/' not in path:
+                self.review['state'] = 'DISMISSED'
+            return value
+        with self.assertRaises(ValueError):
+            self.run_admission(racing)
+
+    def test_shared_review_helpers_do_not_drift(self):
+        shared = SOURCE[:SOURCE.index('def admit(')] + SOURCE[SOURCE.index('def public_api('):SOURCE.index("if __name__ == '__main__':")]
+        self.assertTrue(RESULT.startswith(shared.rstrip()))
+
     def test_missing_or_persistent_request_is_not_authority(self):
         for old in (self.pr['body'], self.pr['body'] + '\nunrelated edit'):
             self.event['changes']['body']['from'] = old
@@ -207,15 +245,26 @@ class AdmissionTests(unittest.TestCase):
                         run_id='7', run_attempt='1', profile='standard', result='success',
                         proof_outcome='success', proof_entered_at='2026-10-14T12:00:30Z')
         env = dict(self.env, ADMISSION_RESULT='success', ADMITTED='true', PROOF_RESULT='success',
-                   EVIDENCE=json.dumps(evidence), RECEIPT_NAME='native-central-receipt', GITHUB_RUN_ID='7')
+                   EVIDENCE=json.dumps(evidence), RECEIPT_NAME='native-central-receipt', GITHUB_RUN_ID='7',
+                   ADMISSION_REQUEST=json.dumps(self.request))
         with patch.dict(os.environ, env, clear=True):
-            exec(compile(RESULT, 'ci.yml/result', 'exec'), {})
+            exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+        with patch.dict(os.environ, env, clear=True):
+            self.review['state'] = 'DISMISSED'
+            with self.assertRaises(ValueError):
+                exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+            self.review['state'] = 'COMMENTED'
+            saved = self.pr['body']
+            self.pr['body'] = 'request revoked'
+            with self.assertRaises(ValueError):
+                exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+            self.pr['body'] = saved
         for changed in (dict(ADMISSION_RESULT='skipped'), dict(ADMITTED=''), dict(PROOF_RESULT='skipped'),
                         dict(RECEIPT_NAME=''), dict(GITHUB_SHA='f' * 40), dict(GITHUB_RUN_ID='8'),
                         dict(GITHUB_RUN_ATTEMPT='2')):
             with patch.dict(os.environ, dict(env, **changed), clear=True):
                 with self.assertRaises(AssertionError):
-                    exec(compile(RESULT, 'ci.yml/result', 'exec'), {})
+                    exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
 
 
 if __name__ == '__main__':

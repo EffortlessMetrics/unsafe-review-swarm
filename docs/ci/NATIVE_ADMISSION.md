@@ -5,9 +5,11 @@ A dispatch or a merge-group check alone does not establish that PR result.
 [GitHub's PR event contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
 uses the native PR merge commit as `GITHUB_SHA`.
 
-The CI workflow therefore observes ordinary PR lifecycle events cheaply. Only
-an **edited body containing a newly replaced coordinator request** can admit the
-central product call. Open, Ready, synchronize, draft transitions, close, title
+The CI workflow therefore observes ordinary PR lifecycle events cheaply. The proposed protocol admits only
+an **explicitly edited coordinator body request**, with current exact review.
+The executable driver presently refuses every admission because the active
+central pin cannot securely revalidate authority after queue wait and before
+Cargo. The protocol is locally prepared, not activated. Open, Ready, synchronize, draft transitions, close, title
 edits and unrelated body edits provide no product authority. Lifecycle changes
 cancel obsolete proof; an unrelated body edit does not silently cancel a valid
 proof. The metadata-only `Unsafe Review Rust Result` fails when admission or
@@ -62,13 +64,28 @@ The coordinator then explicitly replaces the PR body's request record:
 <!-- unsafe-review-admission-v1: {"repository":"EffortlessMetrics/unsafe-review-swarm","pr":PR_NUMBER,"head":"HEAD_SHA","base":"BASE_SHA","integration":"NATIVE_MERGE_SHA","tree":"MERGE_TREE_SHA","coordinator":"EffortlessSteven","request_id":"NEW_32_HEX_NONCE","review_id":NATIVE_REVIEW_ID,"issued_at":"UTC_YYYY-MM-DDTHH:MM:SSZ"} -->
 ```
 
-Use a new request nonce. The review must precede the request; the body edit must
+Use a distinct request ID for ordinary re-requests. The ID detects changes
+relative to the immediately previous body; it is not a global single-use grant.
+A deliberately restored record is still subject to the authenticated actor,
+short freshness window and current exact review. No persistent marker alone
+provides authority. The review must precede the request; the body edit must
 follow within 60 seconds, and admission must begin within ten minutes. The
 previous event body must not contain the same nonce. Unknown/duplicate fields,
 ambiguous records and missing body changes are refused. Leaving a request in
 the body does not authorize later Ready/synchronize or unrelated edits. A new
 explicit request remains subject to current exact-source review and all checks;
 a label or Boolean is never sufficient.
+
+The prepared validator refreshes reviews at the final admission check; the
+prepared final result also refreshes current review/request authority after
+proof. These checks do not close the queue-wait race. An approval can be
+withdrawn after control admission while the central proof waits for a runner.
+The immutable central workflow must perform authenticated current-authority
+revalidation after allocation and immediately before candidate compilation,
+without handing that authority to candidate code. Missing/dismissed/adverse
+approval, changed head/base/native merge/tree or revoked request must refuse
+entry and propagate failure. The current native driver emits no admitted output
+until that separately reviewed, published and activated contract exists.
 
 The final metadata result requires the entire central call to succeed and its
 successful result/receipt to match the native repository, SHA, run, attempt and
@@ -91,3 +108,26 @@ The public review endpoint supports anonymous public-resource reads, as
 [documented by GitHub](https://docs.github.com/en/rest/pulls/reviews#list-reviews-for-a-pull-request).
 No native Actions or pool qualification was executed. The active central pin and
 its honest failure-artifact readiness refusal remain unchanged and parent-owned.
+
+
+The source caller retains `contents: read`; no scope expansion was performed.
+The active central definition also statically requests Actions/Checks/PR read
+scopes in its optional repository-policy job, even when no result script is
+selected. The automatic draft CI run on `3cc4e5f5` reported startup failure and
+zero jobs; exact startup annotations were unavailable through the connector.
+This caller/central permission-contract mismatch is another qualification
+prerequisite. Resolve it in the parent-owned central dependency or through a
+separately authorized scope decision; do not broaden access in this repair.
+
+
+The parent confirmed the same pre-proof gap in active `a3125de` and public
+`15f2c4d`/internal `ab217deb`. The minimum central prerequisite is a central-owned
+read-only recheck immediately before every proof-entry path, including recovery:
+native semantic-currentness and convergence owners from trusted protected-base
+source; current request/actor/head/base/integration validation; credential
+isolation from Cargo; and refusal failing the aggregate without fallback
+normalization. Consumer body-record fixtures cannot substitute for those owner
+contracts or create authority. Native `auto_merge_enabled` is a supported future
+request event, but the existing authenticated requesting actor must generate an
+observable event; a GITHUB_TOKEN transition is not assumed observable. No such
+transition was attempted here. The parent owns that dependency and activation.

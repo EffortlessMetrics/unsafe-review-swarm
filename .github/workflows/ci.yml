@@ -21,6 +21,7 @@ jobs:
     timeout-minutes: 5
     outputs:
       admitted: ${{ steps.request.outputs.admitted }}
+      request: ${{ steps.request.outputs.request }}
     steps:
       - name: Verify coordinator request and exact independent review
         id: request
@@ -74,6 +75,39 @@ jobs:
               return dict(repository=REPO, pr=pr['number'], head=pr['head']['sha'], base=pr['base']['sha'])
 
 
+          def review_authority(api, path, request):
+              reviews = []
+              for page in range(1, 11):
+                  batch = api(path + '/reviews?per_page=100&page=' + str(page))
+                  require(isinstance(batch, list), 'unavailable review list')
+                  reviews.extend(batch)
+                  if len(batch) < 100:
+                      break
+              else:
+                  raise ValueError('review pagination exceeds bound')
+              receipts = []
+              for review in reviews:
+                  if review['user']['login'] != COORDINATOR or review['commit_id'] != request['head']:
+                      continue
+                  if '<!-- unsafe-review-independent-review-v1: ' not in (review.get('body') or ''):
+                      continue
+                  receipt = record(review['body'], 'independent-review-v1')
+                  if all(receipt.get(k) == request[k] for k in {'repository', 'pr', 'head', 'base'} | {'integration', 'tree'}):
+                      receipts.append((review, receipt))
+              require(receipts, 'missing independent exact-subject review')
+              review, receipt = max(receipts, key=lambda pair: (pair[0]['submitted_at'], pair[0]['id']))
+              require(set(receipt) == {'repository', 'pr', 'head', 'base'} | {'integration', 'tree', 'verdict', 'review_kind'}, 'invalid review schema')
+              require(review['id'] == request['review_id'] and review['state'] in ('APPROVED', 'COMMENTED')
+                      and review['user']['type'] == 'User' and receipt['review_kind'] == 'independent'
+                      and receipt['verdict'] == 'approved-for-proof', 'missing, stale, dismissed or adverse approval')
+              require(stamp(review['submitted_at']) <= stamp(request['issued_at']), 'request precedes review')
+              require(not any(r['user']['login'] == COORDINATOR and r['commit_id'] == request['head']
+                              and r['state'] == 'CHANGES_REQUESTED'
+                              and stamp(r['submitted_at']) >= stamp(review['submitted_at']) for r in reviews),
+                      'native review requests changes')
+              return review, receipt
+
+
           def admit(event, env, api, now):
               # This is the reviewed workflow program: no caller checkout or shell interpolation.
               require(env['GITHUB_EVENT_NAME'] == 'pull_request' and event.get('action') == 'edited',
@@ -116,40 +150,13 @@ jobs:
               require(merge['sha'] == request['integration'] and merge['tree']['sha'] == request['tree']
                       and [parent['sha'] for parent in merge['parents']] == [request['base'], request['head']],
                       'integration tree or parents mismatch')
-              reviews = []
-              for page in range(1, 11):
-                  batch = api(path + '/reviews?per_page=100&page=' + str(page))
-                  require(isinstance(batch, list), 'unavailable review list')
-                  reviews.extend(batch)
-                  if len(batch) < 100:
-                      break
-              else:
-                  raise ValueError('review pagination exceeds bound')
-              receipts = []
-              for review in reviews:
-                  if review['user']['login'] != COORDINATOR or review['commit_id'] != request['head']:
-                      continue
-                  if '<!-- unsafe-review-independent-review-v1: ' not in (review.get('body') or ''):
-                      continue
-                  receipt = record(review['body'], 'independent-review-v1')
-                  if all(receipt.get(k) == request[k] for k in set(expected) | {'integration', 'tree'}):
-                      receipts.append((review, receipt))
-              require(receipts, 'missing independent exact-subject review')
-              review, receipt = max(receipts, key=lambda pair: (pair[0]['submitted_at'], pair[0]['id']))
-              require(set(receipt) == set(expected) | {'integration', 'tree', 'verdict', 'review_kind'}, 'invalid review schema')
-              require(review['id'] == request['review_id'] and review['state'] in ('APPROVED', 'COMMENTED')
-                      and review['user']['type'] == 'User' and receipt['review_kind'] == 'independent'
-                      and receipt['verdict'] == 'approved-for-proof', 'missing, stale, dismissed or adverse approval')
-              require(stamp(review['submitted_at']) <= issued, 'request precedes review')
-              require(not any(r['user']['login'] == COORDINATOR and r['commit_id'] == request['head']
-                              and r['state'] == 'CHANGES_REQUESTED'
-                              and stamp(r['submitted_at']) >= stamp(review['submitted_at']) for r in reviews),
-                      'native review requests changes')
+              review_authority(api, path, request)
               # Refresh after metadata reads; queued/racing edits cannot retain authority.
               refreshed = api(path)
               require(subject(refreshed) == expected and refreshed['body'] == current['body']
                       and refreshed['merge_commit_sha'] == request['integration'] and refreshed['mergeable'] is True,
                       'subject changed during admission')
+              review_authority(api, path, request)
               return request
 
 
@@ -164,16 +171,9 @@ jobs:
 
 
           if __name__ == '__main__':
-              try:
-                  event = json.loads(Path(os.environ['GITHUB_EVENT_PATH']).read_text(encoding='utf-8'))
-                  approved = admit(event, os.environ, public_api, dt.datetime.now(dt.timezone.utc))
-                  with open(os.environ['GITHUB_OUTPUT'], 'a', encoding='utf-8') as output:
-                      output.write('admitted=true\n')
-                      for key in ('head', 'base', 'integration', 'tree', 'request_id', 'review_id'):
-                          output.write(key + '=' + str(approved[key]) + '\n')
-              except Exception:
-                  # Missing/malformed/unavailable metadata is refusal, never green proof.
-                  raise SystemExit('::error::native PR admission refused; metadata/approval NOT_PROVEN')
+              # The active pin cannot revalidate authority after its queue wait.
+              # Refuse before any product allocation; no Boolean override exists.
+              raise SystemExit('::error::central authenticated pre-Cargo authority hook NOT_PROVEN')
           PYTHON
 
   proof:
@@ -201,10 +201,102 @@ jobs:
           PROOF_RESULT: ${{ needs.proof.result }}
           EVIDENCE: ${{ needs.proof.outputs.evidence }}
           RECEIPT_NAME: ${{ needs.proof.outputs.receipt_name }}
+          ADMISSION_REQUEST: ${{ needs.admission.outputs.request }}
         shell: bash
         run: |
           python3 - <<'PYTHON'
-          import json, os
+          import datetime as dt
+          import json
+          import os
+          import re
+          import urllib.request
+          from pathlib import Path
+
+          REPO = 'EffortlessMetrics/unsafe-review-swarm'
+          COORDINATOR = 'EffortlessSteven'
+          SHA = re.compile(r'[0-9a-f]{40}')
+
+
+          def require(ok, reason):
+              if not ok:
+                  raise ValueError(reason)
+
+
+          def stamp(value):
+              require(isinstance(value, str), 'missing timestamp')
+              return dt.datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=dt.timezone.utc)
+
+
+          def record(body, kind):
+              require(isinstance(body, str), 'missing body')
+              prefix = '<!-- unsafe-review-' + kind + ': '
+              matches = re.findall(re.escape(prefix) + r'([^\n]+) -->', body)
+              require(body.count(prefix) == 1 and len(matches) == 1, 'missing or ambiguous ' + kind)
+              def unique(pairs):
+                  result = {}
+                  for key, value in pairs:
+                      require(key not in result, 'duplicate record field')
+                      result[key] = value
+                  return result
+              value = json.loads(matches[0], object_pairs_hook=unique)
+              require(isinstance(value, dict), 'invalid record')
+              return value
+
+
+          def subject(pr):
+              require(pr['state'] == 'open' and pr['draft'] is False, 'PR is not open and ready')
+              require(pr['head']['repo']['full_name'] == REPO and pr['head']['repo']['fork'] is False,
+                      'untrusted head repository')
+              require(pr['base']['repo']['full_name'] == REPO and pr['base']['ref'] == 'main', 'unexpected base')
+              require(pr['user']['type'] == 'User', 'bot source')
+              return dict(repository=REPO, pr=pr['number'], head=pr['head']['sha'], base=pr['base']['sha'])
+
+
+          def review_authority(api, path, request):
+              reviews = []
+              for page in range(1, 11):
+                  batch = api(path + '/reviews?per_page=100&page=' + str(page))
+                  require(isinstance(batch, list), 'unavailable review list')
+                  reviews.extend(batch)
+                  if len(batch) < 100:
+                      break
+              else:
+                  raise ValueError('review pagination exceeds bound')
+              receipts = []
+              for review in reviews:
+                  if review['user']['login'] != COORDINATOR or review['commit_id'] != request['head']:
+                      continue
+                  if '<!-- unsafe-review-independent-review-v1: ' not in (review.get('body') or ''):
+                      continue
+                  receipt = record(review['body'], 'independent-review-v1')
+                  if all(receipt.get(k) == request[k] for k in {'repository', 'pr', 'head', 'base'} | {'integration', 'tree'}):
+                      receipts.append((review, receipt))
+              require(receipts, 'missing independent exact-subject review')
+              review, receipt = max(receipts, key=lambda pair: (pair[0]['submitted_at'], pair[0]['id']))
+              require(set(receipt) == {'repository', 'pr', 'head', 'base'} | {'integration', 'tree', 'verdict', 'review_kind'}, 'invalid review schema')
+              require(review['id'] == request['review_id'] and review['state'] in ('APPROVED', 'COMMENTED')
+                      and review['user']['type'] == 'User' and receipt['review_kind'] == 'independent'
+                      and receipt['verdict'] == 'approved-for-proof', 'missing, stale, dismissed or adverse approval')
+              require(stamp(review['submitted_at']) <= stamp(request['issued_at']), 'request precedes review')
+              require(not any(r['user']['login'] == COORDINATOR and r['commit_id'] == request['head']
+                              and r['state'] == 'CHANGES_REQUESTED'
+                              and stamp(r['submitted_at']) >= stamp(review['submitted_at']) for r in reviews),
+                      'native review requests changes')
+              return review, receipt
+
+
+          def public_api(path):
+              # Public metadata only. No token, secret, credential or permission expansion.
+              request = urllib.request.Request('https://api.github.com' + path,
+                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  raw = response.read(2_000_001)
+              require(len(raw) <= 2_000_000, 'oversized API response')
+              return json.loads(raw)
+
+
+          # Final result refreshes authority without reapplying the short admission TTL:
+          # product proof can legitimately take up to 65 minutes after prompt admission.
           assert os.environ['ADMISSION_RESULT'] == 'success'
           assert os.environ['ADMITTED'] == 'true'
           assert os.environ['PROOF_RESULT'] == 'success'
@@ -217,4 +309,13 @@ jobs:
           assert evidence['profile'] == 'standard'
           assert evidence['result'] == 'success' and evidence['proof_outcome'] == 'success'
           assert evidence['proof_entered_at'] and os.environ['RECEIPT_NAME']
+          request = json.loads(os.environ['ADMISSION_REQUEST'])
+          path = '/repos/' + REPO + '/pulls/' + str(request['pr'])
+          current = public_api(path)
+          expected = {k: request[k] for k in ('repository', 'pr', 'head', 'base')}
+          require(subject(current) == expected and current['merge_commit_sha'] == request['integration']
+                  and current['mergeable'] is True and request['integration'] == os.environ['GITHUB_SHA'],
+                  'final subject drift')
+          require(record(current['body'], 'admission-v1') == request, 'request was revoked')
+          review_authority(public_api, path, request)
           PYTHON

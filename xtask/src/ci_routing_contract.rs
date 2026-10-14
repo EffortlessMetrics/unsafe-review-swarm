@@ -254,6 +254,7 @@ fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
             "assert evidence['sha'] == os.environ['GITHUB_SHA']",
             "receipt['review_kind'] == 'independent'",
             "receipt['verdict'] == 'approved-for-proof'",
+            "central authenticated pre-Cargo authority hook NOT_PROVEN",
             "uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@a3125de962a74e7ec2e127d41d7532f66c69334d",
             "profile: standard",
             "force_hosted: false",
