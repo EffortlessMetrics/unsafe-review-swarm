@@ -33,7 +33,7 @@ sys.exit(0)
 
 class ProofContract(unittest.TestCase):
     def run_case(self, fail='', docs=False, bad_target=False, bad_sha=False,
-                 reject_diagnostics=False):
+                 reject_diagnostics=False, fail_staging=False):
         temp = tempfile.TemporaryDirectory(prefix='unsafe-proof-test-')
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
@@ -57,6 +57,13 @@ class ProofContract(unittest.TestCase):
         cargo = binary / 'cargo'
         cargo.write_text(CARGO)
         cargo.chmod(0o755)
+        if fail_staging:
+            tool = binary / 'mktemp'
+            tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
+                            "with open(os.environ['STAGING_CALLS'], 'a') as f: f.write('called\\n')\n"
+                            "if any('staging-' in arg for arg in sys.argv): sys.exit(1)\n"
+                            "os.execv('/usr/bin/mktemp', ['mktemp', *sys.argv[1:]])\n")
+            tool.chmod(0o755)
         calls = root / 'calls'
         output = root / 'output'
         summary = root / 'summary'
@@ -66,7 +73,7 @@ class ProofContract(unittest.TestCase):
                    GITHUB_EVENT_NAME='merge_group', GITHUB_RUN_ID='123',
                    GITHUB_RUN_ATTEMPT='2', EM_CI_EXECUTION_SELF_HOSTED='true',
                    GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary),
-                   CALLS=str(calls), FAIL_STEP=fail)
+                   CALLS=str(calls), FAIL_STEP=fail, STAGING_CALLS=str(root / 'staging-calls'))
         if bad_target:
             env['CARGO_TARGET_DIR'] = str(root / 'target')
         if reject_diagnostics:
@@ -122,6 +129,15 @@ class ProofContract(unittest.TestCase):
         root, result, _ = self.run_case(fail='ci-test', reject_diagnostics=True)
         self.assertEqual(result.returncode, 17)
         self.assertNotIn('diagnostics_path=', (root / 'output').read_text())
+
+    def test_staging_setup_failure_cannot_expose_artifacts_or_mask_failure(self):
+        root, result, _ = self.run_case(fail='ci-test', fail_staging=True)
+        self.assertEqual(result.returncode, 17)
+        self.assertFalse((root / 'output').exists())
+        # One selector allocation and the failing staging allocation, with no
+        # subsequent mktemp attempt after the setup failure.
+        self.assertEqual((root / 'staging-calls').read_text().count('called'), 2)
+        self.assertEqual((root / 'target/ci-core/core_exit-123-2').read_text(), '17\n')
 
     def test_runtime_and_source_mismatch_reject_before_cargo(self):
         for settings in [{'bad_target': True}, {'bad_sha': True}]:

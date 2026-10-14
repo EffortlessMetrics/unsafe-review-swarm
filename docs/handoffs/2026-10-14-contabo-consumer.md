@@ -37,7 +37,7 @@ cargo test --locked -p xtask ci_routing_contract
 cargo run --locked -p xtask -- check-policy
 ```
 
-Bash syntax, five Python tests, 35 scoped Rust tests, formatting, scoped
+Bash syntax, six Python tests, 35 scoped Rust tests, formatting, scoped
 `cargo clippy --locked -p xtask --all-targets -- -D warnings` and `git diff
 --check` passed locally. Full product proof and native runner qualification
 were not run. The existing policy aggregate is not claimed green.
@@ -46,7 +46,7 @@ The Python tests execute the shipped Bash scripts with controlled Cargo
 responses: exact command/argument preservation, Markdown-only skip, each
 product step failing with short-circuit propagation, stale success replacement,
 JSON metadata escaping, exclusion of raw output, diagnostic rejection without
-result masking, and source/runtime mismatch refusal. They do not execute the
+result masking, source/runtime mismatch refusal, and failed staging allocation without artifact-output exposure. They do not execute the
 product assertions or qualify the pool.
 
 The Rust tests retain the advisory identity controls, diff selector and private

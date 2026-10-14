@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-set -uo pipefail
+set -euo pipefail
 core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
 core_exit="$(cat "$core_exit_path")"
 echo "core_exit=${core_exit}"
@@ -106,7 +106,7 @@ import json, pathlib, sys
 path, commit, command, code, step, result, summary = sys.argv[1:]
 pathlib.Path(path).write_text(json.dumps(dict(schema_version="1.0", commit=commit,
     command=command, exit_code=int(code), failed_step=step, result_path=result,
-    summary_path=summary)) + "\n")
+    summary_path=summary)) + "\n", encoding="utf-8")
 PYTHON
   rm -f "$failure_summary_source"
   mv "$failure_summary_tmp" "$failure_summary_path"
