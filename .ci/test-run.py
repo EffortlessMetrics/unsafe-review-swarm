@@ -1,0 +1,134 @@
+#!/usr/bin/env python3
+"""Execute the shipped Bash entrypoint with fault-controlled Cargo commands.
+
+These are orchestration tests, not product or runner qualification.
+"""
+import json
+import os
+from pathlib import Path
+import shutil
+import subprocess
+import tempfile
+import unittest
+
+ROOT = Path(__file__).resolve().parents[1]
+CARGO = '''#!/usr/bin/env python3
+import json, os, pathlib, sys
+args = sys.argv[1:]
+step = args[0] if args[0] != 'run' else args[args.index('--') + 1]
+with open(os.environ['CALLS'], 'a') as stream:
+    stream.write(json.dumps(args) + '\\n')
+if step == 'ci-test':
+    root = pathlib.Path(os.environ['UNSAFE_REVIEW_CI_HANDOFF_DIR'])
+    root.mkdir(parents=True, exist_ok=True)
+    (root / 'test-diagnostics.json').write_text('{"schema":"fixture"}')
+if step == 'ci-test-validate' and os.environ.get('REJECT_DIAGNOSTICS'):
+    sys.exit(4)
+if step == os.environ.get('FAIL_STEP'):
+    print('RAW_SECRET_FIXTURE_DO_NOT_RETAIN')
+    sys.exit(17)
+sys.exit(0)
+'''
+
+
+class ProofContract(unittest.TestCase):
+    def run_case(self, fail='', docs=False, bad_target=False, bad_sha=False,
+                 reject_diagnostics=False):
+        temp = tempfile.TemporaryDirectory(prefix='unsafe-proof-test-')
+        self.addCleanup(temp.cleanup)
+        root = Path(temp.name)
+        shutil.copytree(ROOT / '.ci', root / '.ci')
+        shutil.copytree(ROOT / '.github/scripts', root / '.github/scripts')
+        def git(*args):
+            return subprocess.check_output(['git', *args], cwd=root, text=True).strip()
+        git('init', '-q')
+        git('config', 'user.name', 'CI fixture')
+        git('config', 'user.email', 'ci@example.invalid')
+        git('add', '.')
+        git('commit', '-qm', 'base')
+        git('update-ref', 'refs/remotes/origin/main', 'HEAD')
+        (root / ('notes.md' if docs else 'proof.rs')).write_text('fixture\n')
+        git('add', '.')
+        git('commit', '-qm', 'candidate')
+        runtime = root / 'runtime'
+        runtime.mkdir()
+        binary = root / 'bin'
+        binary.mkdir()
+        cargo = binary / 'cargo'
+        cargo.write_text(CARGO)
+        cargo.chmod(0o755)
+        calls = root / 'calls'
+        output = root / 'output'
+        summary = root / 'summary'
+        env = dict(os.environ, PATH=str(binary) + os.pathsep + os.environ['PATH'],
+                   RUNNER_TEMP=str(runtime), CARGO_TARGET_DIR=str(runtime / 'cargo-target'),
+                   GITHUB_SHA='0' * 40 if bad_sha else git('rev-parse', 'HEAD'),
+                   GITHUB_EVENT_NAME='merge_group', GITHUB_RUN_ID='123',
+                   GITHUB_RUN_ATTEMPT='2', EM_CI_EXECUTION_SELF_HOSTED='true',
+                   GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary),
+                   CALLS=str(calls), FAIL_STEP=fail)
+        if bad_target:
+            env['CARGO_TARGET_DIR'] = str(root / 'target')
+        if reject_diagnostics:
+            env['REJECT_DIAGNOSTICS'] = '1'
+        # Seed stale success and raw output; the current run must replace both.
+        receipts = root / 'target/ci-core'
+        receipts.mkdir(parents=True)
+        (receipts / 'core_exit-123-2').write_text('0\n')
+        result = subprocess.run(['bash', '.ci/run.sh'], cwd=root, env=env,
+                                text=True, capture_output=True, timeout=15)
+        commands = [json.loads(line) for line in calls.read_text().splitlines()] if calls.exists() else []
+        return root, result, commands
+
+    def test_full_chain_and_central_target(self):
+        root, result, commands = self.run_case()
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(commands, [
+            ['fmt', '--all', '--check'],
+            ['clippy', '--workspace', '--all-targets', '--locked', '--', '-D', 'warnings'],
+            ['run', '--locked', '-p', 'xtask', '--', 'ci-test'],
+            ['doc', '--workspace', '--no-deps', '--locked'],
+            ['run', '--locked', '-p', 'xtask', '--', 'check-pr'],
+        ])
+        self.assertFalse((root / 'output').exists())
+        self.assertEqual((root / 'target/ci-core/core_exit-123-2').read_text(), '0\n')
+
+    def test_every_product_failure_is_authoritative_and_short_circuits(self):
+        for step, count in [('fmt', 1), ('clippy', 2), ('ci-test', 3), ('doc', 4), ('check-pr', 5)]:
+            with self.subTest(step=step):
+                root, result, commands = self.run_case(fail=step)
+                self.assertEqual(result.returncode, 17, result.stderr)
+                product = [cmd for cmd in commands if cmd[-2:-1] != ['ci-test-validate']]
+                self.assertEqual(len(product), count)
+                self.assertEqual((root / 'target/ci-core/core_exit-123-2').read_text(), '17\n')
+                paths = dict(line.split('=', 1) for line in (root / 'output').read_text().splitlines())
+                self.assertIn('summary_path', paths)
+                self.assertIn('metadata_path', paths)
+                metadata = json.loads(Path(paths['metadata_path']).read_text())
+                self.assertEqual(metadata['exit_code'], 17)
+                for path in paths.values():
+                    self.assertTrue(Path(path).is_relative_to(root / 'runtime'))
+                    self.assertFalse(Path(path).is_symlink())
+                    self.assertNotIn('RAW_SECRET_FIXTURE', Path(path).read_text())
+
+    def test_markdown_only_skip_keeps_rustdoc_and_policy(self):
+        _, result, commands = self.run_case(docs=True)
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertEqual(len(commands), 4)
+        self.assertEqual(commands[2][0], 'doc')
+        self.assertEqual(commands[-1][-1], 'check-pr')
+
+    def test_rejected_diagnostics_do_not_hide_product_failure(self):
+        root, result, _ = self.run_case(fail='ci-test', reject_diagnostics=True)
+        self.assertEqual(result.returncode, 17)
+        self.assertNotIn('diagnostics_path=', (root / 'output').read_text())
+
+    def test_runtime_and_source_mismatch_reject_before_cargo(self):
+        for settings in [{'bad_target': True}, {'bad_sha': True}]:
+            _, result, commands = self.run_case(**settings)
+            self.assertEqual(result.returncode, 78)
+            self.assertEqual(commands, [])
+
+
+if __name__ == '__main__':
+    unittest.main()

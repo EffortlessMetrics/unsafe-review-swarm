@@ -41,27 +41,27 @@ Upstream tools produce bounded evidence for that decision.
 That keeps tool churn out of the user-facing CI contract and prevents direct
 upstream-tool invocations from silently becoming new blocking policy.
 
-## Default workspace gate
+## Admitted workspace gate
 
-Default PR CI runs the cheap repository policy gate on the pinned Rust
-toolchain. The full workspace proof set remains:
+Swarm product proof is admitted only by `merge_group(checks_requested)` or
+owner dispatch with `admit=true` (default false). Draft, Ready, synchronize,
+push and schedule do not run this product lane. The immutable public central
+Rust caller selects `standard`; the source requires Rust 1.98 and pins exact
+1.98.1. It uses full history for the existing Markdown-only test skip.
 
-```text
-cargo fmt --check
-cargo check --workspace --all-targets --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --all-targets --locked
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
-cargo run --locked -p xtask -- check-pr
-```
+The repository proof preserves fmt, clippy, `xtask ci-test` (pinned nextest and
+explicit doctest parity), rustdoc with warnings denied, and `check-pr`.
+The first product failure remains authoritative even when diagnostic staging
+fails. Cargo output uses `$RUNNER_TEMP/cargo-target`; `target/ci-core` remains
+a runtime receipt path. Central owns runner lifecycle and the 75-minute limit.
 
-This lane protects repository correctness: formatting, build, lint, tests,
-rustdoc, and repo policy checks. The live swarm workflow runs the required
-`Unsafe Review Rust Result` aggregate as fmt + clippy + test + rustdoc
-(`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked`) +
-`check-pr`; broader workspace checks such as `cargo check` and the full
-`cargo test --workspace --all-targets` remain local, release, or future
-full-lane proof until a live workflow explicitly promotes them.
+This is an unqualified draft migration. The active central pin has no consumer
+failure-upload hook; bounded staging and summaries are retained locally but do
+not constitute the existing seven-day failure artifact. the internal `check_ci_routing_contract` (via `xtask check-policy`)
+keeps this obligation blocking. See [the migration handoff](../handoffs/2026-10-14-contabo-consumer.md)
+for evidence, remaining gates and rollback. Existing protection is unchanged;
+the new nested native check must be qualified before a binding transition.
+Advisory ub-review remains independent and unchanged.
 
 It must not run:
 

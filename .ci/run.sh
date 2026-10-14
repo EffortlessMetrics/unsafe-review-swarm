@@ -1,0 +1,45 @@
+#!/usr/bin/env bash
+# Repository proof for the admitted central Rust standard workflow.
+set -uo pipefail
+: "${RUNNER_TEMP:?central disposable runtime is required}"
+: "${CARGO_TARGET_DIR:?central Cargo target directory is required}"
+: "${GITHUB_SHA:?exact event source is required}"
+: "${GITHUB_RUN_ID:?native run identity is required}"
+: "${GITHUB_RUN_ATTEMPT:?native attempt identity is required}"
+[[ "$CARGO_TARGET_DIR" == "$RUNNER_TEMP/cargo-target" ]] || exit 78
+[[ "$GITHUB_RUN_ID" =~ ^[0-9]+$ && "$GITHUB_RUN_ATTEMPT" =~ ^[1-9][0-9]*$ ]] || exit 78
+[[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || exit 78
+export CORE_RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}"
+export CARGO_INCREMENTAL=0 CARGO_TERM_COLOR=always
+case "${EM_CI_EXECUTION_SELF_HOSTED:-}" in
+  true) export RUNNER_KIND=self-hosted ;;
+  false) export RUNNER_KIND=github ;;
+  *) exit 78 ;;
+esac
+export RUST_CACHE_HIT=unknown
+# target/ci-core is a runtime receipt directory; compiled outputs stay in the
+# central CARGO_TARGET_DIR. Never redirect or collect the entire Cargo target.
+mkdir -p target/ci-core || exit 78
+core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
+rm -f target/ci-core/core_exit "$core_exit_path" "${core_exit_path}.tmp" \
+  target/ci-core/step-status.tsv target/ci-core/core_mode
+base_ref="${GITHUB_BASE_REF:-main}"
+core_mode="$(bash .github/scripts/select-core-mode.sh "origin/${base_ref}")"
+printf '%s\n' "$core_mode" > target/ci-core/core_mode
+printf 'unknown\n' > target/ci-core/cache_hit_state
+{
+  printf '# Deterministic core-gate context\n\n'
+  printf 'event: %s\nsha: %s\nmode: %s\n' "$GITHUB_EVENT_NAME" "$GITHUB_SHA" "$core_mode"
+} > target/ci-core/precontext.md
+# The 65-minute proof budget leaves room inside the central 75-minute job for
+# toolchain admission, bounded diagnostic validation, finalization and cleanup.
+date +%s > target/ci-core/gate_start
+timeout --kill-after=30s 3900s bash .ci/core.sh > target/ci-core/core.log 2>&1
+core_exit=$?
+# The synchronous process status is authoritative even if it died before
+# recording its own receipt. Timeout/cancellation can never become success.
+printf '%s\n' "$core_exit" > "${core_exit_path}.tmp"
+mv "${core_exit_path}.tmp" "$core_exit_path"
+# Diagnostic failure must not overwrite the original product result.
+timeout --kill-after=10s 240s bash .ci/finalize.sh || true
+exit "$core_exit"

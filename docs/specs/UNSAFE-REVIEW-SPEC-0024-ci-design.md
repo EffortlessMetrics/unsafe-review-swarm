@@ -122,16 +122,12 @@ and which claims it does not make.
 
 ## 3. Default CI contract
 
-The default workflow runs on:
-
-```text
-pull_request
-push to main/master
-workflow_dispatch
-```
-
-It uses read-only repository permissions, cancels superseded pull request runs,
-disables persisted checkout credentials, and bounds Rust jobs with timeouts.
+The swarm product proof is admitted on `merge_group(checks_requested)` or
+an explicit owner `workflow_dispatch` with `admit=true` (default false).
+Draft, Ready and synchronize do not execute the product suite. The central
+caller has read-only permissions, no inherited secrets and a full-SHA pin.
+This supersedes the former PR/push inventory-router placement; it does not
+change protection or other workflows' existing obligations.
 
 The full workspace proof set is:
 
@@ -146,11 +142,10 @@ cargo run --locked -p xtask -- check-pr
 
 That is the baseline.
 
-The live swarm workflow may route a cheaper Rust Small lane through
-`cargo run --locked -p xtask -- check-pr` while broader workspace checks remain
-local, release, or future full-lane proof. That routing must stay explicit and
-must not smuggle witnesses, publishing, comment posting, or source edits into
-the default gate.
+The admitted swarm proof retains fmt, clippy, `xtask ci-test`, rustdoc and
+`check-pr`; it is not replaced by a generic test list. Broader local and
+release obligations stay separate. The migration remains draft until its
+failure-artifact contract and exact consumer/pool qualification are proven.
 
 ### 3.1 Upstream substrate policy
 
@@ -239,175 +234,49 @@ Every live or planned CI lane must have a named purpose. High-cost or
 write-token lanes must not be folded into the default workspace gate by
 convenience.
 
-### 4.1 `ci.yml` - single tight CI gate
+### 4.1 `ci.yml` - admitted central product proof
 
-Purpose:
+The caller pins the activated public Rust workflow at
+`a3125de962a74e7ec2e127d41d7532f66c69334d`, selects `standard`, disables
+forced hosted execution and fetches full history for the existing diff selector.
+It contains no physical runner label, inventory API call, read-token secret,
+host setup, scratch cleanup or cache action. Central owns trust classification,
+native queueing, runner admission, disposable paths and aggregate failure.
 
-```text
-protect the Rust workspace and repo policy checks with one tight gate, and
-layer advisory LLM review on top without expanding the hard gate
-```
+`.ci/run.sh` verifies the exact checkout and central Cargo target path, keys
+receipts to the native run/attempt, removes stale verdicts and executes
+`.ci/core.sh` synchronously with a 65-minute timeout. The proof retains both
+existing command chains: fmt, clippy, `xtask ci-test`, rustdoc and `check-pr`;
+only a non-empty all-Markdown diff may skip `ci-test`. Unknown/unavailable
+comparisons run tests. The first failure short-circuits and remains the exit
+status even when diagnostic staging fails. Timeout cannot observe stale success.
 
-The live swarm `ci.yml` is one tight CI gate, not a pile of parallel required
-checks. It is a single gate job whose runner is chosen by a minimal capacity
-router (self-hosted primary, `ubuntu-latest` overflow — see section 7); the
-router is advisory and not a required check, so there is still exactly one job
-that gates the merge and one required status check. The gate job carries only
-the deterministic layer; the advisory LLM layer runs as its own standalone
-workflow:
+`.ci/finalize.sh` retains the closed step vocabulary, bounded status/summary,
+private unpredictable staging and copy-before-validation-before-output
+ordering for structured diagnostics. Raw core logs, extra workspace files,
+symlinks and arbitrary output have no path into the retained evidence selection.
+`target/ci-core` remains a runtime receipt path; compiled outputs use the
+central `$RUNNER_TEMP/cargo-target`. Advisory floor-time records are non-fatal.
+The same-run hostile-writer limitation of private same-user staging remains.
 
-```text
-mandatory deterministic core floor (the hard gate, ci.yml)
-  cargo run --locked -p xtask -- check-pr
+**Qualification blocker:** the active central pin has no consumer failure-upload
+input. Script output paths alone do not upload an artifact. The existing
+seven-day, non-fatal, exact-file failure-evidence obligation remains blocking
+in the internal `check_ci_routing_contract` (via `xtask check-policy`). The draft must not be admitted or used
+for a protection transition until a reviewed central contract publishes the
+bounded summary, metadata and optional validated diagnostics. No direct-runner
+or runtime-token workaround is introduced.
 
-advisory LLM layer (standalone non-blocking workflow, ub-review.yml)
-  EffortlessMetrics/ub-review review (gh-runner profile)
-```
+The reusable final check is nested under the caller and cannot be assumed to
+retain the old native `Unsafe Review Rust Result` binding. Existing protection
+stays unchanged; exact native result/source binding, required-check liveness
+and rollback need qualification before a separate settings transaction.
 
-The deterministic core floor is the only hard blocker and the only required
-status check. ub-review wraps it as an additive layer: it does not replace the
-deterministic tools, it reviews on top of their evidence in a separate
-workflow that never gates the merge (see "Standalone advisory ub-review lane"
-below). The value is strong gating from a tight central set plus advisory LLM
-review that costs the gate nothing.
-
-Single required check:
-
-```text
-The job is named "Unsafe Review Rust Result" for branch-protection continuity.
-Its conclusion reflects ONLY the deterministic core verdict (the final assert
-step fails iff `xtask check-pr` exited non-zero). ub-review runs in a separate
-advisory workflow and can never flip that result.
-```
-
-Step shape inside the one gate job:
-
-```text
-0. route (advisory, ubuntu-latest, not a required check): pick the gate runner —
-   idle trusted self-hosted em-ci runner else ubuntu-latest overflow — and emit a
-   runs-on value plus runner_kind (see section 7)
-1. shared setup once: checkout (fetch-depth 0), dtolnay/rust-toolchain@1.98
-   with rustfmt + clippy, Swatinem/rust-cache@v2
-2. fast precontext: runner-kind-aware disk/scratch handling, then cargo fmt
-   --check plus repo/PR facts written to target/ci-core/precontext.md as a
-   durable run record, and the core gate launched in the background sharing the
-   workspace target dir (cargo's target-lock serialises overlap safely); diff
-   scoping reads the quoted runner-provided `GITHUB_BASE_REF` with a `main`
-   default, and an unavailable base comparison forces the full test path.
-   The test step is skipped only for an all-Markdown diff via the shared
-   `.github/scripts/select-core-mode.sh`; manifests, unknown, empty, and
-   unavailable diffs all run the full path
-3. final assert: wait for the current run/attempt's background core gate,
-   surface its closed-vocabulary step-status summary, and fail the job iff its
-   exit code != 0; stale `core_exit` files are removed before launch and cannot
-   satisfy the run-keyed wait
-4. failure evidence: when the core exit is non-zero, create only a bounded,
-   allowlisted step-status summary, machine-readable command/commit/exit/path
-   metadata, and (when the structured test step produced it) the exact regular
-   `test-diagnostics.json` projection; always attempt a non-fatal upload with
-   seven-day retention and never read or upload the raw core log
-```
-
-The failure-evidence upload does not create a second lane or verdict. The final
-assert remains the only authority: artifact preparation or upload failure must
-not make a failed core gate pass, and artifact upload must not make a passing
-core gate fail. On success no evidence paths are exposed, so the
-`always()`-guarded upload step is skipped. After a non-zero verdict, staging is removed
-and recreated as a private unpredictable directory under the per-job
-`RUNNER_TEMP`: cleanup is followed immediately by `mkdir -m 700` for the
-private parent and then `mktemp -d` for unpredictable staging. The upload action receives only the exact `summary.md` and
-`metadata.json`, and optional `test-diagnostics.json` regular-file paths, never
-a workspace or staging directory. `test-diagnostics.json` is capped at 16 KiB
-and contains no raw output, panic text, backtrace, source snippet, environment
-value, secret, or arbitrary path. It is a diagnostic projection only and can
-never alter the run/attempt-keyed `core_exit` verdict. The workflow invokes
-`cargo run --locked -p xtask -- ci-test-validate <path>` immediately after the
-private copy and before exposing the optional path as an upload output; that
-validator rejects schema drift, malformed JSON, unknown fields, authority drift,
-unsorted/duplicate records, hostile values, and symlinks.
-Pre-populated workspace extras and `core.log` symlinks are therefore outside the
-artifact selection. The intermediate closed-vocabulary step-status excerpt is
-also created atomically inside that private staging directory and verified as a
-regular non-symlink before any read; the workflow never uses the predictable
-workspace `target/ci-core/redacted-excerpt.txt` path, and a failed write or move
-suppresses evidence outputs rather than falling through to a stale read. The retained status summary
-accepts only the fixed step ids `fmt`, `clippy`, `test`, and `check-pr`, decimal
-timing/exit fields, and the literal `skipped`; it is capped at 80 lines and 16
-KiB. Arbitrary stdout/stderr, bare tokens, PEM blocks, and other `core.log`
-content have no projection into the artifact.
-
-This same-job design cannot fully isolate staging from a deliberately persistent
-hostile process running as the runner user after the core command returns. The
-fresh unpredictable runner-temp directory, owner-only permissions, atomic file
-replacement, regular-file/no-symlink checks, and exact two-or-three-file upload selection
-bound that residual risk. Strong isolation would require a separately trusted
-job that downloads and validates a prior artifact, which is outside this
-diagnostic-only lane.
-
-Standalone advisory ub-review lane (`.github/workflows/ub-review.yml`):
-
-```text
-- pull_request (opened, reopened, ready_for_review, synchronize), same-repo
-  non-draft PRs only: fork PRs cannot read the MINIMAX_API_KEY org secret,
-  drafts would burn advisory LLM budget early, and the deterministic core
-  gate still runs for forks and drafts
-- superseded runs are cancelled per PR (concurrency cancel-in-progress) so
-  rapid pushes do not stack redundant paid reviews
-- the EffortlessMetrics/ub-review action is pinned to an immutable commit SHA
-  (gh-runner profile, posting: review, fail-on-gate 'false')
-- the job is continue-on-error with a bounded timeout, and no
-  branch-protection rule names this workflow: it is NEVER a required check,
-  so LLM availability or opinion can never block the merge
-- workflow-level permissions are contents: read; pull-requests: write is
-  granted at the job level only, solely so ub-review can post its grouped
-  advisory PR review; the run also uploads its artifact bundle
-- pin bumps update policy/workflow-allowlist.toml in the same PR (a dependabot
-  pin bump alone cannot pass the deterministic gate, because the allowlist
-  pins the action SHA)
-- xtask check-ci-routing-contract enforces this shape: the advisory posture
-  markers must stay present in ub-review.yml, and an in-job ub-review step in
-  ci.yml is a forbidden marker (it would double-run the advisory review)
-```
-
-May fail on:
-
-```text
-repo policy failure surfaced by xtask check-pr
-```
-
-The deterministic core gate (`xtask check-pr`) is the merge-blocking floor.
-`cargo fmt --check` runs as advisory precontext only; full clippy, test, and
-rustdoc proof stay in the local validation loop and release lanes, as in section
-3. ub-review findings, ub-review gate manifest conclusions, and ub-review/model
-availability never fail the merge.
-
-Must not run as part of the hard gate:
-
-```text
-Miri
-cargo-careful
-sanitizers
-Loom
-Kani
-mutation testing
-source edits
-publish
-```
-
-The advisory ub-review lane may post one grouped PR review (posting:review),
-but it must not edit source, run witnesses, publish, or make blocking
-unsafe-correctness claims.
-
-Gate job permissions:
-
-```yaml
-permissions:
-  contents: read
-```
-
-The gate job grants no write token. `pull-requests: write` lives only in the
-standalone advisory ub-review workflow, for one reason only: so ub-review can
-post its grouped advisory PR review.
+`.github/workflows/ub-review.yml` stays unchanged and separate: same-repository
+non-draft PRs, SHA-pinned action, bounded timeout, `continue-on-error`, and
+`fail-on-gate: 'false'`. Its findings and model availability cannot change the
+product result. It runs no witness, source edit or publication. Product findings
+remain advisory; deterministic artifact and repository failures remain blocking.
 
 ### 4.2 `policy-contracts.yml` - source-of-truth gate
 
@@ -820,78 +689,30 @@ or immutable SHA.
 
 ## 7. Toolchain, runner, and cost posture
 
-The repo toolchain is Rust 1.98.
+The source manifest requires Rust 1.98. Pin `rust-toolchain.toml` to exact
+`1.98.1`, accepted by the active central workflow; do not lower the manifest's
+requirement to the central compatibility toolchain 1.95.0. Central verifies the
+exact toolchain before repository proof. Other workflows retain their existing
+independent pins and obligations in this bounded migration.
 
-CI should install the pinned toolchain and Rust components:
+The caller selects the reviewed `standard` capability. The central job budget
+is 75 minutes. Source extraction alone does not prove the product fits that
+CPU, memory, disk or timeout envelope. Proof gets 65 minutes; bounded diagnostic
+finalization gets four minutes, leaving room for central admission and cleanup.
+The entire central job remains the hard outer bound. Product failure cannot
+be repaired by changing hardware or silently selecting hosted execution.
 
-```yaml
-- uses: dtolnay/rust-toolchain@1.98
-  with:
-    components: rustfmt, clippy
-```
+`CARGO_TARGET_DIR` stays `$RUNNER_TEMP/cargo-target`. Runtime receipts and
+xtask tools retain their established repository-relative paths. Central owns
+cleanup; the consumer does not clean shared host scratch paths. Cache warming
+and telemetry workflows are outside this source slice; no cache benefit is
+claimed for the new disposable target.
 
-Rust version drift must be caught by repo checks and docs.
-
-If the repo later introduces an MSRV matrix, it should be an explicit
-compatibility lane, not a surprise expansion of default PR cost.
-
-Default PR CI must stay cheap enough to run on every pull request without
-turning advisory unsafe-review into a heavy witness system.
-
-The default posture is:
-
-```text
-ubuntu-latest runners
-bounded job timeouts
-no default matrix
-no default nightly-only tools
-no default witness execution
-no publish or release side effects
-```
-
-Runner posture: self-hosted primary with GitHub-hosted overflow. A minimal
-`route` job (NOT a required check) decides where the single tight gate runs. It
-reads org runner state via `gh api orgs/EffortlessMetrics/actions/runners` using
-the `EM_RUNNER_READ_TOKEN` secret (a secret on a `run:` step, not a new external
-action) and emits a `runs-on` value plus a `runner_kind`:
-
-```text
-self-hosted (primary): an idle trusted runner exists in the owned em-ci fleet —
-  online, !busy, carrying the shared self-hosted/linux/x64/em-ci/trusted-pr
-  label set. The router matches the shared group labels only (any idle size
-  catches it); it never size-routes to cpx42/cx43/cx53. The gate consumes a JSON
-  label array via fromJSON(needs.route.outputs.runner).
-
-github (overflow): no idle trusted self-hosted capacity, missing runner-read
-  token, org-runner API failure, or a fork PR. The router emits the JSON string
-  "ubuntu-latest"; the gate consumes it via the same fromJSON wiring (a JSON
-  string and a JSON array are both valid runs-on shapes).
-```
-
-The owned fleet absorbs the bulk; gh-hosted only handles bursts, capacity gaps,
-and forks. Fork PRs always overflow to gh-hosted (untrusted code can never run
-on trusted self-hosted runners); the standalone advisory ub-review workflow is
-separately guarded to same-repo PRs (no org secrets for forks), and the
-deterministic core gate still runs for forks. There
-is still exactly ONE job that gates the merge and ONE required check
-(`Unsafe Review Rust Result`); the router is advisory and never blocks. The gate
-branches disk/scratch handling on `runner_kind`: on gh-hosted overflow it frees
-the big preinstalled SDKs (android/dotnet/ghc/CodeQL) when headroom is low; on
-self-hosted it leaves those gh-only paths alone, reports `df -h` headroom, and
-reuses the shared workspace target dir (cargo's target-lock serialises overlap),
-with shared-fleet scratch hygiene tracked in unsafe-review-swarm #1519.
-
-Advisory LLM layer cost posture: ub-review runs in the standalone
-`ub-review.yml` workflow on `ubuntu-latest` with the `gh-runner` profile and
-the `MINIMAX_API_KEY` org secret. It is bounded by its own job timeout and is
-advisory (`fail-on-gate: 'false'`, `continue-on-error`, never a required
-check), so it never blocks the merge and its runtime never extends the
-deterministic gate's wall-clock.
-
-Swarm may carry experimental, scheduled, or workflow-dispatch lanes while they
-are being proven, but a lane must be listed in
-`policy/ci-lane-whitelist.toml` with its cost estimate and trigger policy
-before it becomes a live workflow.
+No expensive product proof runs on Draft, Ready, synchronize, push or unchanged
+source schedules. Explicit dispatch is default-denied and merge-group proof
+belongs to pre-merge admission. Actual consumer/pool qualification requires
+reviewed exact source, native run/attempt/job identities, real product assertions,
+result receipt and cleanup before cutover.
 
 ## 8. Artifact integrity checks
 
@@ -1282,146 +1103,13 @@ current branch differs
 
 Runtime/session state is a handoff fact, not a repository fact.
 
-## 16. Example default workflow
+## 16. Example admitted caller
 
-A drop-in default workflow can run the full deterministic proof set directly:
-
-```yaml
-name: CI
-
-on:
-  pull_request:
-  push:
-    branches: [main, master]
-  workflow_dispatch:
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-jobs:
-  rust:
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.98
-        with:
-          components: rustfmt, clippy
-      - run: cargo fmt --check
-      - run: cargo check --workspace --all-targets --locked
-      - run: cargo clippy --workspace --all-targets --locked -- -D warnings
-      - run: cargo test --workspace --all-targets --locked
-      - run: cargo doc --workspace --no-deps --locked
-        env:
-          RUSTDOCFLAGS: -D warnings
-      - run: cargo run --locked -p xtask -- check-pr
-```
-
-The live swarm `ci.yml` instead uses the single tight gate of section 4.1: one
-gate job whose mandatory deterministic floor is the fmt + clippy + test +
-rustdoc + `cargo run --locked -p xtask -- check-pr` chain (the only required
-check, named "Unsafe Review Rust Result"). Its shape is:
-
-```yaml
-jobs:
-  unsafe-review-rust-result:
-    name: Unsafe Review Rust Result
-    runs-on: ubuntu-latest
-    timeout-minutes: 60
-    permissions:
-      contents: read
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: dtolnay/rust-toolchain@1.98
-        with:
-          components: rustfmt, clippy
-      - uses: Swatinem/rust-cache@v2
-      - name: Fast precontext and launch core gate
-        run: |
-          # cargo fmt --check + repo/PR facts -> target/ci-core/precontext.md,
-          # then launch `cargo run --locked -p xtask -- check-pr` in the
-          # background on the shared workspace target dir.
-          ...
-      - name: Assert core gate verdict
-        id: core-verdict
-        if: ${{ always() }}
-        run: |
-          # fail iff the background core gate exited non-zero
-          ...
-      - name: Upload bounded core-gate failure evidence
-        if: >-
-          ${{ always() &&
-              steps.core-verdict.outputs.summary_path != '' &&
-              steps.core-verdict.outputs.metadata_path != '' }}
-        continue-on-error: true
-        uses: actions/upload-artifact@v7
-        with:
-          path: |
-            ${{ steps.core-verdict.outputs.summary_path }}
-            ${{ steps.core-verdict.outputs.metadata_path }}
-          if-no-files-found: ignore
-          retention-days: 7
-```
-
-The advisory ub-review lane is the separate standalone workflow of section
-4.1 ("Standalone advisory ub-review lane"):
-
-```yaml
-name: UB Review
-
-on:
-  pull_request:
-    types: [opened, reopened, ready_for_review, synchronize]
-
-permissions:
-  contents: read
-
-concurrency:
-  group: ub-review-${{ github.event.pull_request.number }}
-  cancel-in-progress: true
-
-jobs:
-  review:
-    name: UB Review (advisory)
-    if: >-
-      github.event.pull_request.head.repo.full_name == github.repository &&
-      github.event.pull_request.draft == false
-    runs-on: ubuntu-latest
-    timeout-minutes: 25
-    continue-on-error: true
-    permissions:
-      contents: read
-      # Only so ub-review can post its grouped advisory PR review.
-      pull-requests: write
-    steps:
-      - uses: actions/checkout@v7
-        with:
-          fetch-depth: 0
-          persist-credentials: false
-      - uses: EffortlessMetrics/ub-review@<pinned-commit-sha>
-        with:
-          profile: gh-runner
-          posting: review
-          fail-on-gate: 'false'
-          minimax-api-key: ${{ secrets.MINIMAX_API_KEY }}
-          base: origin/${{ github.base_ref }}
-          head: HEAD
-          out: target/ub-review
-      - uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: ub-review-artifacts
-          path: target/ub-review
-```
+The shipped [CI workflow](../../.github/workflows/ci.yml) is the authoritative
+example: immutable central Rust workflow, standard profile, `.ci/run.sh`,
+full checkout history and explicit pre-merge admission. It forwards no secrets
+and declares no `runs-on` or inline shell. The diagnostic publisher blocker
+in section 4.1 must be resolved before this draft can qualify.
 
 ## 17. Example advisory first-pr workflow
 
