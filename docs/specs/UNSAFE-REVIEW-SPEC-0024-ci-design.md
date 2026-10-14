@@ -122,8 +122,9 @@ and which claims it does not make.
 
 ## 3. Default CI contract
 
-The swarm product proof is admitted on `merge_group(checks_requested)` or
-an explicit owner `workflow_dispatch` with `admit=true` (default false).
+The swarm product proof is admitted by an explicit coordinator PR-body edit,
+with a fresh independent review receipt bound to current head/base/native merge
+and tree. [Native admission](../ci/NATIVE_ADMISSION.md) owns the request protocol.
 Draft, Ready and synchronize do not execute the product suite. The central
 caller has read-only permissions, no inherited secrets and a full-SHA pin.
 This supersedes the former PR/push inventory-router placement; it does not
@@ -709,8 +710,9 @@ and telemetry workflows are outside this source slice; no cache benefit is
 claimed for the new disposable target.
 
 No expensive product proof runs on Draft, Ready, synchronize, push or unchanged
-source schedules. Explicit dispatch is default-denied and merge-group proof
-belongs to pre-merge admission. Actual consumer/pool qualification requires
+source schedules. A native PR coordinator request must bind independent review
+to the exact head/base/native integration/tree; neither dispatch nor a queue is
+required for this supported preparation. Actual consumer/pool qualification requires
 reviewed exact source, native run/attempt/job identities, real product assertions,
 result receipt and cleanup before cutover.
 
@@ -1106,9 +1108,9 @@ Runtime/session state is a handoff fact, not a repository fact.
 ## 16. Example admitted caller
 
 The shipped [CI workflow](../../.github/workflows/ci.yml) is the authoritative
-example: immutable central Rust workflow, standard profile, `.ci/run.sh`,
-full checkout history and explicit pre-merge admission. It forwards no secrets
-and declares no `runs-on` or inline shell. The diagnostic publisher blocker
+example: cheap metadata admission, immutable central Rust workflow, standard
+profile, `.ci/run.sh`, full checkout history and a native result aggregate. The product call forwards no secrets and declares no `runs-on` or inline shell.
+Separate cheap metadata jobs perform admission and native result aggregation. The diagnostic publisher blocker
 in section 4.1 must be resolved before this draft can qualify.
 
 ## 17. Example advisory first-pr workflow

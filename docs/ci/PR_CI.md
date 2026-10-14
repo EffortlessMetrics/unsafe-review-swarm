@@ -43,9 +43,11 @@ upstream-tool invocations from silently becoming new blocking policy.
 
 ## Admitted workspace gate
 
-Swarm product proof is admitted only by `merge_group(checks_requested)` or
-owner dispatch with `admit=true` (default false). Draft, Ready, synchronize,
-push and schedule do not run this product lane. The immutable public central
+Swarm product proof is admitted only by an explicit coordinator PR-body edit
+with a fresh exact-source independent review receipt and current native merge
+subject. See [native admission](NATIVE_ADMISSION.md). Draft, Ready, synchronize,
+push and schedule do not run product proof. Cheap native metadata/result checks
+keep absent or skipped product proof from appearing successful. The immutable public central
 Rust caller selects `standard`; the source requires Rust 1.98 and pins exact
 1.98.1. It uses full history for the existing Markdown-only test skip.
 

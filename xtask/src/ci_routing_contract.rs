@@ -199,17 +199,61 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
 }
 
 fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
+    let jobs: Vec<&str> = text
+        .lines()
+        .filter_map(|line| line.strip_prefix("  "))
+        .filter(|line| !line.starts_with(' ') && line.ends_with(':'))
+        .collect();
+    if jobs
+        != [
+            "pull_request:",
+            "admission:",
+            "proof:",
+            "unsafe-review-rust-result:",
+        ]
+    {
+        return Err(format!(
+            "{path} has unexpected or duplicate native admission jobs/events"
+        ));
+    }
+    let proof = text
+        .split_once("\n  proof:\n")
+        .and_then(|(_, tail)| tail.split_once("\n  unsafe-review-rust-result:\n"))
+        .map(|(proof, _)| proof)
+        .ok_or_else(|| format!("{path} missing proof/result boundary"))?;
+    check_lane_markers(
+        path,
+        proof,
+        "gated reusable proof",
+        &[],
+        &["runs-on:", "steps:", "secrets:"],
+    )?;
     check_lane_markers(
         path,
         text,
         "central pre-merge caller",
         &[
             "name: Unsafe Review Rust Result",
-            "merge_group:",
-            "types: [checks_requested]",
-            "workflow_dispatch:",
-            "default: false",
-            "if: github.event_name == 'merge_group' || (github.event_name == 'workflow_dispatch' && inputs.admit)",
+            "pull_request:",
+            "types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]",
+            "needs: [admission, proof]",
+            "name: Require admitted exact native product result",
+            "PROOF_RESULT: ${{ needs.proof.result }}",
+            "RECEIPT_NAME: ${{ needs.proof.outputs.receipt_name }}",
+            "name: Verify native PR admission",
+            "needs: admission",
+            "if: needs.admission.result == 'success' && needs.admission.outputs.admitted == 'true'",
+            "request['integration'] == env['GITHUB_SHA']",
+            "review['id'] == request['review_id']",
+            "event['sender']['login'] == COORDINATOR",
+            "env['GITHUB_RUN_ATTEMPT'] == '1'",
+            "old.get('request_id') != request.get('request_id')",
+            "current['mergeable'] is True and current['merge_commit_sha'] == request['integration']",
+            "refreshed['merge_commit_sha'] == request['integration']",
+            "assert os.environ['PROOF_RESULT'] == 'success'",
+            "assert evidence['sha'] == os.environ['GITHUB_SHA']",
+            "receipt['review_kind'] == 'independent'",
+            "receipt['verdict'] == 'approved-for-proof'",
             "uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@a3125de962a74e7ec2e127d41d7532f66c69334d",
             "profile: standard",
             "force_hosted: false",
@@ -218,11 +262,12 @@ fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
             "contents: read",
         ],
         &[
-            "pull_request:",
+            "merge_group:",
+            "workflow_dispatch:",
             "push:",
             "schedule:",
-            "runs-on:",
-            "steps:",
+            "runs-on: [self-hosted]",
+            "actions/checkout@",
             "secrets:",
             "EM_RUNNER_READ_TOKEN",
             "/actions/runners",
@@ -462,9 +507,9 @@ mod tests {
         let text = include_str!("../../.github/workflows/ci.yml");
         super::check_central_caller_contract("ci.yml", text)?;
         for bad in [
-            "pull_request:",
+            "workflow_dispatch:",
             "push:",
-            "runs-on: ubuntu-latest",
+            "runs-on: [self-hosted]",
             "secrets: inherit",
             "EM_RUNNER_READ_TOKEN",
         ] {
@@ -505,6 +550,23 @@ mod tests {
         .is_ok()
         {
             return Err("accepted masked core result".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shipped_native_admission_and_result_controls() -> Result<(), String> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let output = Command::new("python3")
+            .arg(".ci/test-admission.py")
+            .current_dir(root)
+            .output()
+            .map_err(|err| format!("failed to run native admission controls: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "native admission controls failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
         }
         Ok(())
     }

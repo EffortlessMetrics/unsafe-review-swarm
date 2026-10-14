@@ -32,12 +32,13 @@ Reproduction:
 ```bash
 bash -n .ci/run.sh .ci/core.sh .ci/finalize.sh
 python3 .ci/test-run.py
+python3 .ci/test-admission.py
 cargo fmt --all --check
 cargo test --locked -p xtask ci_routing_contract
 cargo run --locked -p xtask -- check-policy
 ```
 
-Bash syntax, six Python tests, 35 scoped Rust tests, formatting, scoped
+Bash syntax, six orchestration tests, 12 admission tests, 36 scoped Rust tests, formatting, scoped
 `cargo clippy --locked -p xtask --all-targets -- -D warnings` and `git diff
 --check` passed locally. Full product proof and native runner qualification
 were not run. The existing policy aggregate is not claimed green.
@@ -83,8 +84,8 @@ remains NOT_PROVEN because organization-variable/package reads are unavailable.
 
 No workflow dispatch, expensive native execution, release or deployment was
 performed. Product execution is absent from Draft/Ready/synchronize and ordinary
-push; only merge-group admission or default-denied explicit owner dispatch can
-enter this lane. Other workflows and their existing obligations are unchanged.
+push; only a fresh coordinator body-edit request with exact independent
+review and native integration binding can enter this lane. Other workflows and their existing obligations are unchanged.
 
 ## Rollback and claim boundary
 
@@ -99,3 +100,24 @@ not establish a complete migration, pool fit, product qualification, retained
 failure artifacts, native required-status success, full configuration audit,
 publication readiness or unsafe-correctness claims. Keep the draft open with
 the central artifact seam as the next bounded owner action.
+
+
+## Admission repair continuation
+
+Executor and custody were recovered on the existing clean writer branch at
+`07da55115fe93c41e54ac3662b556a09a034838a`; no competing writer was created.
+The merge-group/Boolean-dispatch-only proposal did not supply a native PR check
+without a queue and did not independently bind reviewed source. It is replaced
+by [explicit native PR admission](../ci/NATIVE_ADMISSION.md). A changed body
+request, authorized coordinator, native review identity and current
+head/base/merge/tree are all required. Drafts, routine lifecycle events,
+stale/persistent requests and missing approval allocate no product proof.
+A cheap aggregate refuses absent/skipped proof and requires the exact central
+native result receipt. Workflow permissions remain contents: read.
+
+The coordinator's current admin permission was verified read-only. Local
+anonymous public-API probing was unavailable in this executor (URLError), so
+network/API behavior on native Actions remains unqualified. Fixtures exercise
+the actual shipped program; they are not live admission or required-check proof.
+No central source or pin changed. The diagnostic publisher is a separate
+parent-owned preparation/activation dependency; its readiness refusal remains.

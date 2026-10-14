@@ -6,7 +6,7 @@ owner = "repo-infra / ci"
 intent = "Preserve the deterministic product proof on the approved central standard caller at explicit pre-merge admission"
 proof_obligation = "The pinned central caller runs the repository proof: fmt, clippy, xtask ci-test (pinned nextest and doctest parity except the retained Markdown-only skip), rustdoc and check-pr. Every product failure short-circuits and propagates; diagnostics remain bounded, private, schema-validated and non-authoritative. Central owns runtime Cargo targets and runner lifecycle. Consumer failure-artifact upload remains NOT_PROVEN and blocking inside check-policy until a qualified central publisher retains only summary/metadata/optional validated diagnostics for seven days without changing the product result. No protection or required-check transition is included."
 cost_estimate = "medium"
-trigger_policy = "merge_group(checks_requested), workflow_dispatch(admit=true); no pull_request, push or schedule product proof"
+trigger_policy = "Native PR metadata/result checks on lifecycle events; product proof only on a fresh coordinator body-edit request with independent review bound to current head/base/native merge/tree. No ordinary Draft/Ready/synchronize, dispatch, push or schedule product execution."
 status = "required"
 review_after = "2026-10-14"
 
