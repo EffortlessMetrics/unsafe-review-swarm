@@ -277,7 +277,10 @@ mod tests {
                 let mut badge = crate::parse_json_file(&endpoint)?;
                 badge[field] = serde_json::json!(value);
                 fs::write(&endpoint, badge.to_string()).map_err(|err| err.to_string())?;
-                let err = check().expect_err("stale endpoint must fail");
+                let err = match check() {
+                    Err(err) => err,
+                    Ok(()) => return Err("stale endpoint must fail".to_string()),
+                };
                 assert!(
                     err.contains(path.rsplit('/').next().unwrap_or(path)),
                     "{err}"
@@ -298,7 +301,10 @@ mod tests {
             "pub unsafe fn load(p: *const u8) -> u8 { unsafe { *p } }\n",
         )
         .map_err(|err| err.to_string())?;
-        let err = check().expect_err("changed source must invalidate old badges");
+        let err = match check() {
+            Err(err) => err,
+            Ok(()) => return Err("changed source must invalidate old badges".to_string()),
+        };
         assert!(err.contains("is stale"), "{err}");
         assert!(err.contains("checked-in message 0"), "{err}");
         assert!(!err.contains("generated message 0"), "{err}");
@@ -306,8 +312,10 @@ mod tests {
             .map_err(|err| err.to_string())?;
         check()?;
 
-        let err = check_generated_projection_at(root, Duration::ZERO)
-            .expect_err("timeout must propagate instead of accepting old badges");
+        let err = match check_generated_projection_at(root, Duration::ZERO) {
+            Err(err) => err,
+            Ok(()) => return Err("timeout must not accept old badges".to_string()),
+        };
         assert!(err.contains("exceeded 0s"), "{err}");
         Ok(())
     }

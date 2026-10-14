@@ -15041,10 +15041,12 @@ Snapshot reports:
             public_badges::check_fixture_projection()
         })?;
         assert_eq!(calls.get(), 1);
-        let err = public_surfaces::check_impl_with_projection(|| {
+        let err = match public_surfaces::check_impl_with_projection(|| {
             Err("badge projection failed".to_string())
-        })
-        .expect_err("projection failure must fail the public surface checker");
+        }) {
+            Err(err) => err,
+            Ok(_) => return Err("projection failure must fail public surfaces".to_string()),
+        };
         assert_eq!(err, "badge projection failed");
         Ok(())
     }
