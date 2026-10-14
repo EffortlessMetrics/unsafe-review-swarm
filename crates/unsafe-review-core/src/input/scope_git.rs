@@ -504,7 +504,7 @@ pub(crate) fn git_output(dir: &Path, args: &[&str], step: &str) -> Result<String
     Ok(String::from_utf8_lossy(&output.stdout).trim().to_string())
 }
 
-#[cfg(test)]
+#[cfg(all(test, unix))]
 mod tests {
     use super::*;
     use std::collections::BTreeSet;
