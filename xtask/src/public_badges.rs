@@ -1,3 +1,4 @@
+use std::path::Path;
 use std::time::{Duration, Instant};
 
 use unsafe_review_core::{
@@ -57,10 +58,14 @@ pub(crate) fn check_generated_projection() -> Result<(), String> {
 }
 
 fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), String> {
+    check_generated_projection_at(&crate::repo_path("."), timeout)
+}
+
+fn check_generated_projection_at(root: &Path, timeout: Duration) -> Result<(), String> {
     let started = Instant::now();
     let output = unsafe_review_core::analyze_with_discovery_and_repo_events(
         AnalyzeInput {
-            root: crate::repo_path("."),
+            root: root.to_path_buf(),
             scope: Scope::Repo,
             diff: DiffSource::NoneRepoScan,
             mode: AnalysisMode::Repo,
@@ -81,7 +86,7 @@ fn check_generated_projection_with_timeout(timeout: Duration) -> Result<(), Stri
         ("badges/unsafe-review.json", main),
         ("badges/unsafe-review-plus.json", plus),
     ] {
-        check_generated_endpoint_json(path, &expected_text)?;
+        check_generated_endpoint_json(root, path, &expected_text)?;
     }
     Ok(())
 }
@@ -185,8 +190,12 @@ fn reject_forbidden_message_terms(path: &str, message: &str) -> Result<(), Strin
     Ok(())
 }
 
-fn check_generated_endpoint_json(path: &str, expected_text: &str) -> Result<(), String> {
-    let actual = crate::parse_json_file(&crate::workspace_path(path))?;
+fn check_generated_endpoint_json(
+    root: &Path,
+    path: &str,
+    expected_text: &str,
+) -> Result<(), String> {
+    let actual = crate::parse_json_file(&root.join(path))?;
     let expected = generated_json(path, expected_text)?;
     if actual == expected {
         Ok(())
@@ -219,9 +228,99 @@ fn message_or_missing(value: &serde_json::Value) -> &str {
         .unwrap_or("<missing>")
 }
 
+// Unit consumers use the real analyzer/renderer/comparator on a tiny repository.
+// The mandatory public-surface producer above still scans the current workspace.
+#[cfg(test)]
+pub(crate) fn check_fixture_projection() -> Result<(), String> {
+    tests::fixture_projection_contract()
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::fs;
+    use std::path::PathBuf;
+    use std::time::{SystemTime, UNIX_EPOCH};
+
+    struct Fixture(PathBuf);
+
+    impl Drop for Fixture {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+
+    pub(super) fn fixture_projection_contract() -> Result<(), String> {
+        let nonce = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| err.to_string())?
+            .as_nanos();
+        let root =
+            std::env::temp_dir().join(format!("badge-projection-{}-{nonce}", std::process::id()));
+        fs::create_dir(&root).map_err(|err| err.to_string())?;
+        let fixture = Fixture(root);
+        let root = &fixture.0;
+        fs::create_dir(root.join("badges")).map_err(|err| err.to_string())?;
+        fs::write(root.join("lib.rs"), "pub fn value() -> u8 { 0 }\n")
+            .map_err(|err| err.to_string())?;
+        for (path, label) in ENDPOINTS {
+            write_zero_endpoint(&root.join(path), label)?;
+        }
+        let check = || check_generated_projection_at(root, Duration::from_secs(10));
+        check()?;
+
+        // Independently corrupt each endpoint; full JSON equality also protects
+        // non-count fields. Invalid/missing files must not become cached success.
+        for (path, label) in ENDPOINTS {
+            let endpoint = root.join(path);
+            for (field, value) in [("message", "1"), ("color", "orange")] {
+                let mut badge = crate::parse_json_file(&endpoint)?;
+                badge[field] = serde_json::json!(value);
+                fs::write(&endpoint, badge.to_string()).map_err(|err| err.to_string())?;
+                let err = check().expect_err("stale endpoint must fail");
+                assert!(
+                    err.contains(path.rsplit('/').next().unwrap_or(path)),
+                    "{err}"
+                );
+                assert!(err.contains("is stale"), "{err}");
+                write_zero_endpoint(&endpoint, label)?;
+            }
+            fs::write(&endpoint, "{").map_err(|err| err.to_string())?;
+            assert!(check().is_err(), "malformed endpoint must fail");
+            fs::remove_file(&endpoint).map_err(|err| err.to_string())?;
+            assert!(check().is_err(), "missing endpoint must fail");
+            write_zero_endpoint(&endpoint, label)?;
+        }
+        check()?;
+
+        fs::write(
+            root.join("lib.rs"),
+            "pub unsafe fn load(p: *const u8) -> u8 { unsafe { *p } }\n",
+        )
+        .map_err(|err| err.to_string())?;
+        let err = check().expect_err("changed source must invalidate old badges");
+        assert!(err.contains("is stale"), "{err}");
+        assert!(err.contains("checked-in message 0"), "{err}");
+        assert!(!err.contains("generated message 0"), "{err}");
+        fs::write(root.join("lib.rs"), "pub fn value() -> u8 { 0 }\n")
+            .map_err(|err| err.to_string())?;
+        check()?;
+
+        let err = check_generated_projection_at(root, Duration::ZERO)
+            .expect_err("timeout must propagate instead of accepting old badges");
+        assert!(err.contains("exceeded 0s"), "{err}");
+        Ok(())
+    }
+
+    fn write_zero_endpoint(path: &Path, label: &str) -> Result<(), String> {
+        let badge = serde_json::json!({
+            "schemaVersion": 1,
+            "label": label,
+            "message": "0",
+            "color": "green"
+        });
+        fs::write(path, badge.to_string()).map_err(|err| err.to_string())
+    }
 
     #[test]
     fn endpoint_url_uses_public_source_repo() {

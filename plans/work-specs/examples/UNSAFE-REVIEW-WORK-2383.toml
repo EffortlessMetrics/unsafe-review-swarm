@@ -1,0 +1,50 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2383"
+kind = "maintenance"
+objective = "Remove redundant whole-repository badge scans from unit tests without weakening mandatory freshness validation."
+user_outcome = "Warm author-session tests exercise badge freshness on a tiny real repository; check-policy still validates current source once."
+claim_boundary = "Scoped duplicate test-work reduction; no cold Linux qualification, whole-run twenty-minute fit, hosted integration or safety claim."
+affected_files = ["xtask/src/public_badges.rs", "xtask/src/public_surfaces.rs", "xtask/src/main.rs", "docs/BADGE_POLICY.md"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0024"]
+
+[scope]
+included = ["Exact base b5355e2f917cad5132f5e1b72e2d8d43510b7d8a", "Two duplicate full-projection unit smoke tests", "Real analyzer, renderer and checked-in endpoint comparison on tiny fixtures", "Comparable base/candidate timing and independent source review"]
+excluded = ["Workflow or admission changes", "PRs #2380 and #2394", "Caching or memoizing successful freshness checks", "Changing analyzer, renderer, badge counts or negative-claim policy", "Host, storage, runner, credentials, protections or release changes"]
+
+[[invariant]]
+id = "INV-1"
+text = "Mandatory check-policy and standalone check-public-surfaces regenerate both badge endpoints from the current full repository and propagate failures."
+
+[[invariant]]
+id = "INV-2"
+text = "Fixture proof uses the production analyzer-renderer-comparison path with explicit roots and no process-global cwd or environment mutation."
+
+[[invariant]]
+id = "INV-3"
+text = "Stale counts, non-count drift, malformed/missing endpoints, source changes, and timeout failures remain distinguishable from valid projections."
+
+[[acceptance]]
+id = "AC-1"
+text = "Focused public badge/surface tests pass with valid and invalid fixture controls and measurably less duplicate scan demand on comparable inputs."
+proof = ["cargo test --locked -p xtask public_ -- --test-threads=2 --nocapture", "Compare the same two test entrypoints at base and candidate, excluding compilation"]
+
+[[acceptance]]
+id = "AC-2"
+text = "The actual mandatory freshness path still passes and its existing full scan is retained without cache bypass."
+proof = ["cargo run --locked -p xtask -- check-policy", "Independent exact-source caller and failure-propagation review"]
+
+[[acceptance]]
+id = "AC-3"
+text = "Formatting, scoped lint and work-spec/docs checks are verified; unrelated existing Windows baseline failures are reported rather than bundled."
+proof = ["cargo fmt --all --check", "cargo clippy --locked -p xtask --all-targets -- -D warnings", "cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-docs"]
+
+[[integration]]
+surface = "Public badge freshness producer and unit-test consumers"
+expected = "One mandatory whole-source producer remains; unit tests discriminate its contract using bounded tiny fixtures."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Verify real source-change and stale-badge rejection plus exact production wiring; no cached success or test-only replacement of the analyzer."
+
+[rollback]
+strategy = "Revert the scoped test/seam/documentation change; no workflow transition or settings change is involved."
