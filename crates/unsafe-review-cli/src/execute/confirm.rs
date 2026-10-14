@@ -1430,14 +1430,20 @@ mod tests {
 
     #[test]
     fn receipt_install_note_names_discovery_dir_for_outside_paths() -> Result<(), String> {
-        let root = Path::new("/repo");
-        let note = receipt_install_note(root, Path::new("/tmp/stray-receipt.json"))
-            .ok_or_else(|| "outside path must produce a note".to_string())?;
-        assert!(
-            note.contains("/repo/.unsafe-review/receipts"),
-            "note must name the install dir: {note}"
+        let cwd = std::env::current_dir().map_err(|err| err.to_string())?;
+        let relative_root = Path::new("receipt note repo");
+        let absolute_root = cwd.join(relative_root);
+        let written = cwd.join("stray-receipt.json");
+        let discovery = absolute_root.join(".unsafe-review").join("receipts");
+        let expected = format!(
+            "note: receipt written outside the discovery dir; copy it to {} so re-running check or first-pr imports it automatically",
+            discovery.display(),
         );
-        assert!(note.contains("imports it automatically"), "{note}");
+        for root in [relative_root, absolute_root.as_path()] {
+            let note = receipt_install_note(root, &written)
+                .ok_or_else(|| "outside path must produce a note".to_string())?;
+            assert_eq!(note, expected, "root: {}", root.display());
+        }
         Ok(())
     }
 
