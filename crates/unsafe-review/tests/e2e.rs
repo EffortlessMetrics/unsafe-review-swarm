@@ -4479,6 +4479,16 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
     assert!(text.contains("route: miri"));
     assert!(text.contains(&format!("command: {command_text}")));
     assert!(text.contains("command provenance: --command override (author-controlled)"));
+    let expected_program = if cfg!(windows) {
+        ".\\miri_confirm_helper.exe"
+    } else {
+        "./miri_confirm_helper"
+    };
+    assert!(
+        text.lines()
+            .any(|line| line.strip_prefix("parsed program: ") == Some(expected_program)),
+        "dry run must preserve the fixture executable token: {text}"
+    );
     assert!(text.contains("expected evidence: a `miri` witness receipt"));
     assert!(text.contains("dry run only; nothing was executed"));
     assert!(!receipt_path.exists(), "dry run must not write a receipt");
@@ -9099,7 +9109,8 @@ fn main() {
 
 fn confirm_helper_command(mode: &str) -> String {
     let executable = if cfg!(windows) {
-        ".\\miri_confirm_helper.exe"
+        // The no-shell command grammar treats unquoted backslashes as escapes.
+        r"'.\miri_confirm_helper.exe'"
     } else {
         "./miri_confirm_helper"
     };
