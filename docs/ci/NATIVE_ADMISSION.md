@@ -190,19 +190,21 @@ API availability are not qualified by fixtures; absence refuses rather than
 falling back to a fresh local origin.
 
 The script subtracts elapsed setup/control/queue time from the 1200-second
-whole-run origin and reserves 180 seconds before proof. GNU timeout bounds the
+whole-run origin and reserves 180 seconds before proof. The consumer supervisor bounds the
 real proof process group and allows 30 seconds of termination grace within that
 reserve. Before finalization it fetches the same native origin again, caps
 finalization at 110 seconds plus ten seconds termination grace. Its helper
-reserves 50 seconds, accounting for that ten-second grace while preserving
-40 seconds for external phases even when proof uses its full termination grace. A final fresh deadline check refuses success
+now reserves 56 seconds: ten for termination grace, six for the final metadata
+query including its grace, and forty for external phases. A boundary control
+charges both post-proof metadata queries as well as both termination graces. A final fresh deadline check refuses success
 if the origin has expired. Existing product failures remain primary when
 metadata or finalization fails. No candidate metadata outputs can admit proof.
 
 This is bounded consumer-entrypoint enforcement, not a whole-run watchdog. It
 cannot stop central checkout/toolchain installation before entry, enforce
-central uploads/cleanup after return, or terminate a stalled metadata read
-within a total wall deadline. Runtime clock and native API behavior are still
+central uploads/cleanup after return, or enforce the immutable central workflow
+within a total wall deadline. Each metadata query is now separately supervised
+for five seconds plus one second termination grace. Runtime clock and native API behavior are still
 qualification assumptions. Reserve accounting does not prove those external
 phases fit their reserves. The immutable central contract must own an absolute
 whole-run cancellation/cleanup bound and authenticated review authority before
@@ -215,3 +217,37 @@ Focused controls: `python3 scripts/ci/test_qualification_deadline.py`,
 mismatch, setup already spent, expiry/reserves, entry refusal, post-proof
 metadata failure and original product failure propagation. Fixtures make no
 native runtime fit, cancellation or cleanup claim.
+
+
+### Bounded metadata transport repair
+
+A loopback transport reproduced the inactivity-timeout gap: streamed bytes can
+keep `urlopen(timeout=5)` and response reading alive beyond the socket timeout.
+The source regression executes the shipped adapter against a local trickling or
+stalled HTTP server, redirecting only its transport in the fixture. On the
+predecessor all six phase/fault combinations exceeded the test's total-time
+guard. No GitHub request or native failure injection is involved.
+
+`metadata_budget` in `.ci/run.sh` now supervises the complete metadata adapter
+process group for five seconds plus one second of termination grace, including
+connection, headers, body read, parsing and output drain. All proof, finalization
+and result boundaries use that same function with no caller override. The
+2,000,000-byte response limit and original native `created_at` identity binding
+remain. Socket inactivity timeout is defense in depth, not the total-time bound.
+Timeout/cancellation returns 124/143; other adapter refusal remains 78. Before
+proof these statuses prevent any Cargo producer. After proof they cannot replace
+an earlier product failure, and cannot turn an otherwise successful proof green.
+
+The finalization reserve increases from 50 to 56 seconds to account for the
+last metadata query's complete six-second allowance while retaining forty for
+external phases. The post-proof metadata query is charged before finalization
+budget calculation; the boundary test includes that six-second allowance too.
+This reserve is accounting, not proof that central cleanup fits.
+
+`python3 scripts/ci/test_metadata_transport.py` covers trickle, stalled headers,
+cancellation, oversized responses and ordinary native-shaped responses across
+all three phases. `python3 .ci/test-run.py` covers phase timeout/cancellation
+statuses and original-failure preservation through the shipped entrypoint.
+These controlled-process checks do not establish native cancellation, runtime
+fit or supervision of setup/uploads/cleanup outside this entrypoint. Admission
+continues to refuse; central pin, scopes and protection are unchanged.

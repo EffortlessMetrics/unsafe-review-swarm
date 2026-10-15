@@ -40,7 +40,7 @@ class ProofContract(unittest.TestCase):
     def run_case(self, fail='', docs=False, bad_target=False, bad_sha=False,
                  reject_diagnostics=False, fail_staging=False,
                  fail_receipt=False, slow_core=False, signal_core=False,
-                 deadline_failure=''):
+                 deadline_failure='', deadline_status=78):
         temp = tempfile.TemporaryDirectory(prefix='unsafe-proof-test-')
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
@@ -71,7 +71,7 @@ class ProofContract(unittest.TestCase):
                           "if len(sys.argv) > 1 and sys.argv[1] == '.ci/native_deadline.py':\n"
                           "    phase = sys.argv[2]\n"
                           "    with open(os.environ['DEADLINE_CALLS'], 'a') as f: f.write(phase + '\\n')\n"
-                          "    if phase == os.environ.get('DEADLINE_FAILURE'): sys.exit(78)\n"
+                          "    if phase == os.environ.get('DEADLINE_FAILURE'): sys.exit(int(os.environ['DEADLINE_STATUS']))\n"
                           "    print(1000 if phase == 'proof' else 100)\n"
                           "    sys.exit(0)\n"
                           "if len(sys.argv) > 1 and sys.argv[1] == '.ci/supervise.py' and os.environ.get('SLOW_CORE') and sys.argv[-1] == '.ci/core.sh':\n"
@@ -102,7 +102,8 @@ class ProofContract(unittest.TestCase):
                    GITHUB_RUN_ATTEMPT='2', EM_CI_EXECUTION_SELF_HOSTED='true',
                    GITHUB_OUTPUT=str(output), GITHUB_STEP_SUMMARY=str(summary),
                    CALLS=str(calls), FAIL_STEP=fail, STAGING_CALLS=str(root / 'staging-calls'),
-                   DEADLINE_CALLS=str(root / 'deadline-calls'), DEADLINE_FAILURE=deadline_failure)
+                   DEADLINE_CALLS=str(root / 'deadline-calls'), DEADLINE_FAILURE=deadline_failure,
+                   DEADLINE_STATUS=str(deadline_status))
         if bad_target:
             env['CARGO_TARGET_DIR'] = str(root / 'target')
         if reject_diagnostics:
@@ -195,6 +196,20 @@ class ProofContract(unittest.TestCase):
                     self.assertEqual(commands, [])
                 _, result, _ = self.run_case(fail='clippy', deadline_failure=phase)
                 self.assertEqual(result.returncode, 78 if phase == 'proof' else 17)
+
+
+    def test_metadata_timeout_and_cancellation_preserve_primary_failure(self):
+        for phase in ('proof', 'finalize', 'result'):
+            for status in (124, 143):
+                for primary in ('', 'clippy'):
+                    with self.subTest(phase=phase, status=status, primary=primary):
+                        root, result, commands = self.run_case(
+                            fail=primary, deadline_failure=phase, deadline_status=status)
+                        self.assertEqual(result.returncode, 17 if primary and phase != 'proof' else status)
+                        if phase == 'proof':
+                            self.assertEqual(commands, [])
+                        calls = (root / 'deadline-calls').read_text().splitlines()
+                        self.assertEqual(calls, ['proof', 'finalize', 'result'][:['proof', 'finalize', 'result'].index(phase)+1])
 
 
     def test_real_timeout_cannot_reuse_stale_success_or_continue_producers(self):

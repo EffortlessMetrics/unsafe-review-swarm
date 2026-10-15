@@ -36,7 +36,7 @@ class NativeDeadlineTests(unittest.TestCase):
         self.assertEqual(self.budget().proof_seconds, 720)
 
     def test_phases_keep_deadline_and_reserves(self):
-        self.assertEqual(self.budget(900, 'finalize').proof_seconds, 250)
+        self.assertEqual(self.budget(900, 'finalize').proof_seconds, 244)
         self.assertEqual(self.budget(900, 'result').proof_seconds, 299)
         self.assertEqual(self.budget(900).deadline, self.budget(1000, 'result').deadline)
         with self.assertRaises(ValueError):
@@ -45,8 +45,9 @@ class NativeDeadlineTests(unittest.TestCase):
     def test_finalizer_termination_grace_stays_inside_reserved_time(self):
         # Proof timeout may take 30 extra seconds to terminate its process group.
         proof_end = self.budget(0).proof_seconds + 30
-        finalize = min(self.budget(proof_end, 'finalize').proof_seconds, 110)
-        self.assertGreaterEqual(1200 - (proof_end + finalize + 10), 40)
+        # Charge six seconds for each post-proof metadata query and its grace.
+        finalize = min(self.budget(proof_end + 6, 'finalize').proof_seconds, 110)
+        self.assertGreaterEqual(1200 - (proof_end + 6 + finalize + 10 + 6), 40)
 
 
     def test_environment_identity_event_and_retries_refused(self):

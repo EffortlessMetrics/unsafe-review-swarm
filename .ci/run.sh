@@ -31,10 +31,18 @@ printf 'unknown\n' > target/ci-core/cache_hit_state
   printf '# Deterministic core-gate context\n\n'
   printf 'event: %s\nsha: %s\nmode: %s\n' "$GITHUB_EVENT_NAME" "$GITHUB_SHA" "$core_mode"
 } > target/ci-core/precontext.md
+# Socket inactivity timeouts do not bound DNS/connect/body elapsed time. Own
+# each complete metadata process group, including output drain, for at most
+# five seconds plus one second of termination grace. No caller time override.
+metadata_budget() {
+  python3 .ci/supervise.py --seconds 5 --grace 1 -- python3 .ci/native_deadline.py "$1"
+}
 # Subtract all time since native run creation, including queue/setup. Reserve
 # 180 seconds for termination grace, finalization and external cleanup; this
 # entrypoint cannot itself enforce phases owned by the immutable central job.
-proof_seconds="$(python3 .ci/native_deadline.py proof)" || exit 78
+proof_seconds="$(metadata_budget proof)"
+metadata_exit=$?
+[[ "$metadata_exit" == 0 ]] || exit "$metadata_exit"
 [[ "$proof_seconds" =~ ^[1-9][0-9]*$ && "$proof_seconds" -le 1020 ]] || exit 78
 date +%s > target/ci-core/gate_start
 python3 .ci/supervise.py --seconds "$proof_seconds" --grace 30 -- bash .ci/core.sh > target/ci-core/core.log 2>&1
@@ -51,11 +59,13 @@ if ! { printf '%s\n' "$core_exit" > "${core_exit_path}.tmp" \
 fi
 # Refresh native origin and remaining time after proof. Metadata failure cannot
 # make a successful proof green; an earlier product failure remains primary.
-finalize_seconds="$(python3 .ci/native_deadline.py finalize)" || {
-  [[ "$core_exit" != 0 ]] || core_exit=78
+finalize_seconds="$(metadata_budget finalize)"
+metadata_exit=$?
+if [[ "$metadata_exit" != 0 ]]; then
+  [[ "$core_exit" != 0 ]] || core_exit="$metadata_exit"
   exit "$core_exit"
-}
-[[ "$finalize_seconds" =~ ^[1-9][0-9]*$ && "$finalize_seconds" -le 1150 ]] || {
+fi
+[[ "$finalize_seconds" =~ ^[1-9][0-9]*$ && "$finalize_seconds" -le 1144 ]] || {
   [[ "$core_exit" != 0 ]] || core_exit=78
   exit "$core_exit"
 }
@@ -63,7 +73,9 @@ finalize_seconds="$(python3 .ci/native_deadline.py finalize)" || {
 # Diagnostic failure must not overwrite the original product result.
 python3 .ci/supervise.py --seconds "$finalize_seconds" --grace 10 -- bash .ci/finalize.sh || true
 # Never report success after the absolute deadline, even if diagnostics timed out.
-python3 .ci/native_deadline.py result >/dev/null || {
-  [[ "$core_exit" != 0 ]] || core_exit=78
-}
+metadata_budget result >/dev/null
+metadata_exit=$?
+if [[ "$metadata_exit" != 0 ]]; then
+  [[ "$core_exit" != 0 ]] || core_exit="$metadata_exit"
+fi
 exit "$core_exit"

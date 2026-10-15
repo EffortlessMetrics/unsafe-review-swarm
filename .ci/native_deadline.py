@@ -15,9 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/ci'))
 from qualification_deadline import calculate_budget
 
 REPO = 'EffortlessMetrics/unsafe-review-swarm'
-# Finalization reserves its ten-second termination grace plus forty seconds
-# for external phases; GNU timeout's --kill-after is additional to its duration.
-RESERVES = {'proof': 180, 'finalize': 50, 'result': 1}
+# Finalization reserves ten seconds termination grace, six seconds for the
+# final metadata query (including its grace), and forty for external phases.
+RESERVES = {'proof': 180, 'finalize': 56, 'result': 1}
 
 
 def require(value, message):
@@ -63,6 +63,8 @@ def main():
         f'https://api.github.com/repos/{REPO}/actions/runs/{run_id}/attempts/{attempt}',
         headers={'Accept': 'application/vnd.github+json', 'Cache-Control': 'no-cache',
                  'X-GitHub-Api-Version': '2022-11-28'})
+    # The socket timeout is only an inactivity limit. run.sh supervises this
+    # entire adapter process with an independent total elapsed-time bound.
     with urllib.request.urlopen(request, timeout=5) as response:
         raw = response.read(2_000_001)
     require(len(raw) <= 2_000_000, 'oversized native metadata')

@@ -101,7 +101,7 @@ if len(sys.argv) > 1 and sys.argv[1] == '.ci/native_deadline.py':
     with open('deadline-calls', 'a') as stream: stream.write(sys.argv[2] + '\\n')
     print(1000 if sys.argv[2] == 'proof' else 100)
     sys.exit(0)
-if len(sys.argv) > 1 and sys.argv[1] == '.ci/supervise.py':
+if len(sys.argv) > 1 and sys.argv[1] == '.ci/supervise.py' and sys.argv[-1] in ('.ci/core.sh', '.ci/finalize.sh'):
     import json, subprocess
     args = sys.argv[1:]
     phase = 'proof' if args[-1] == '.ci/core.sh' else 'finalize'

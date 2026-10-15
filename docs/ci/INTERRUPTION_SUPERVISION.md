@@ -1,7 +1,9 @@
 # Consumer interruption supervision
 
 `.ci/supervise.py` supervises the proof and finalizer process groups launched by
-`.ci/run.sh`. The existing native deadline adapter still owns origin and budget
+`.ci/run.sh`. The same supervisor also bounds every native metadata query to
+five seconds plus one second of termination grace. The existing native deadline
+adapter still owns origin and budget
 calculation. Proof gets its existing 30-second grace; finalization gets its
 existing 10-second grace. Cleanup does not receive another budget window.
 
@@ -23,6 +25,7 @@ Focused Linux checks:
     python3 .ci/test-run.py -v
     python3 scripts/ci/test_interrupted_receipts.py -v
     python3 scripts/ci/test_supervise.py -v
+    python3 scripts/ci/test_metadata_transport.py -v
 
 The interruption fixtures substitute Cargo and native metadata transport, and
 shorten duration/grace for fault cases. The production scripts are unchanged in
