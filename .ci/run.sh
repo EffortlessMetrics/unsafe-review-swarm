@@ -38,8 +38,14 @@ timeout --kill-after=30s 3900s bash .ci/core.sh > target/ci-core/core.log 2>&1
 core_exit=$?
 # The synchronous process status is authoritative even if it died before
 # recording its own receipt. Timeout/cancellation can never become success.
-printf '%s\n' "$core_exit" > "${core_exit_path}.tmp"
-mv "${core_exit_path}.tmp" "$core_exit_path"
+if ! { printf '%s\n' "$core_exit" > "${core_exit_path}.tmp" \
+    && mv "${core_exit_path}.tmp" "$core_exit_path"; }; then
+  echo '::error::core result receipt publication failed' >&2
+  # Missing result evidence must never turn a successful command into a green
+  # proof. Preserve an existing product/timeout failure as the primary status.
+  [[ "$core_exit" != 0 ]] || core_exit=78
+  exit "$core_exit"
+fi
 # Diagnostic failure must not overwrite the original product result.
 timeout --kill-after=10s 240s bash .ci/finalize.sh || true
 exit "$core_exit"

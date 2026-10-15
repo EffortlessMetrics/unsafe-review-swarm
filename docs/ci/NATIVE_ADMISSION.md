@@ -132,3 +132,39 @@ contracts or create authority. Native `auto_merge_enabled` is a supported future
 request event, but the existing authenticated requesting actor must generate an
 observable event; a GITHUB_TOKEN transition is not assumed observable. No such
 transition was attempted here. The parent owns that dependency and activation.
+
+## Twenty-minute qualification and ownership
+
+The late qualification requested under [#2393](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2393)
+requires an explicit non-draft, merge-ready, independently reviewed current
+native subject and at most twenty minutes for the whole run. This includes
+setup, routing/control, cold compilation, product proof, diagnostic validation,
+finalization and cleanup. The existing 65-minute script limit inside the pinned
+75-minute central job does not implement that contract. A timeout-only edit
+cannot establish workload fit. The warm local 17m06 span excludes setup, cold
+build and cleanup and is not native twenty-minute qualification.
+
+Before activation, the CI owner must reconcile a trusted native run start and
+absolute deadline with the immutable central caller, including queue/recovery
+paths and bounded cancellation/cleanup. Candidate-provided timestamps or a
+deadline reset at product entry cannot establish a whole-run bound. Central
+publication alone does not establish protected-base semantic-currentness and
+convergence owners in this consumer, reviewed pin/adapter adoption, or runtime
+prerequisites. The current admission driver remains unconditionally refused;
+no product dispatch or live pin change is part of this source repair.
+
+[#2380](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2380)
+retains sole ownership of `ci.yml`, `.ci/**` and
+`xtask/src/ci_routing_contract.rs`.
+[#2394](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2394)
+owns the separate Windows baseline aggregate and does not edit those surfaces.
+Any combined integration must consume both reviewed sources explicitly and
+receive fresh review of their seams before proposing qualification. Preserve
+the native `Unsafe Review Rust Result` producer and existing protections.
+
+The bounded local repair makes failure to publish the core result receipt
+fail closed (78 after successful commands, otherwise the original failure).
+`python3 .ci/test-run.py` exercises that failure, real GNU timeout with only
+the fixture duration shortened, and a SIGTERM-terminated producer. Each must
+prevent success and later producer execution as applicable. These controls do
+not qualify native Actions cancellation, cleanup or the whole-run deadline.

@@ -13,11 +13,15 @@ import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
 CARGO = '''#!/usr/bin/env python3
-import json, os, pathlib, sys
+import json, os, pathlib, signal, sys, time
 args = sys.argv[1:]
 step = args[0] if args[0] != 'run' else args[args.index('--') + 1]
 with open(os.environ['CALLS'], 'a') as stream:
     stream.write(json.dumps(args) + '\\n')
+if step == 'fmt' and os.environ.get('SLOW_CORE'):
+    time.sleep(5)
+if step == 'fmt' and os.environ.get('SIGNAL_CORE'):
+    os.kill(os.getpid(), signal.SIGTERM)
 if step == 'ci-test':
     root = pathlib.Path(os.environ['UNSAFE_REVIEW_CI_HANDOFF_DIR'])
     root.mkdir(parents=True, exist_ok=True)
@@ -33,7 +37,8 @@ sys.exit(0)
 
 class ProofContract(unittest.TestCase):
     def run_case(self, fail='', docs=False, bad_target=False, bad_sha=False,
-                 reject_diagnostics=False, fail_staging=False):
+                 reject_diagnostics=False, fail_staging=False,
+                 fail_receipt=False, slow_core=False, signal_core=False):
         temp = tempfile.TemporaryDirectory(prefix='unsafe-proof-test-')
         self.addCleanup(temp.cleanup)
         root = Path(temp.name)
@@ -57,6 +62,20 @@ class ProofContract(unittest.TestCase):
         cargo = binary / 'cargo'
         cargo.write_text(CARGO)
         cargo.chmod(0o755)
+        if fail_receipt:
+            tool = binary / 'mv'
+            tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
+                            "if sys.argv[-1].endswith('/core_exit-123-2'): sys.exit(1)\n"
+                            "os.execv('/usr/bin/mv', ['mv', *sys.argv[1:]])\n")
+            tool.chmod(0o755)
+        if slow_core:
+            # Exercise GNU timeout against the real shipped core process group,
+            # changing only the test's wall duration, never the candidate file.
+            tool = binary / 'timeout'
+            tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
+                            "args = ['0.2s' if a == '3900s' else a for a in sys.argv[1:]]\n"
+                            "os.execv('/usr/bin/timeout', ['timeout', *args])\n")
+            tool.chmod(0o755)
         if fail_staging:
             tool = binary / 'mktemp'
             tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
@@ -78,6 +97,10 @@ class ProofContract(unittest.TestCase):
             env['CARGO_TARGET_DIR'] = str(root / 'target')
         if reject_diagnostics:
             env['REJECT_DIAGNOSTICS'] = '1'
+        if slow_core:
+            env['SLOW_CORE'] = '1'
+        if signal_core:
+            env['SIGNAL_CORE'] = '1'
         # Seed stale success and raw output; the current run must replace both.
         receipts = root / 'target/ci-core'
         receipts.mkdir(parents=True)
@@ -144,6 +167,26 @@ class ProofContract(unittest.TestCase):
             _, result, commands = self.run_case(**settings)
             self.assertEqual(result.returncode, 78)
             self.assertEqual(commands, [])
+
+    def test_receipt_publication_failure_cannot_report_success(self):
+        for failure, expected in [('', 78), ('clippy', 17)]:
+            with self.subTest(failure=failure):
+                root, result, _ = self.run_case(fail=failure, fail_receipt=True)
+                self.assertEqual(result.returncode, expected, result.stderr)
+                self.assertFalse((root / 'target/ci-core/core_exit-123-2').exists())
+                self.assertFalse((root / 'output').exists())
+
+    def test_real_timeout_cannot_reuse_stale_success_or_continue_producers(self):
+        root, result, commands = self.run_case(slow_core=True)
+        self.assertEqual(result.returncode, 124, result.stderr)
+        self.assertEqual(commands, [['fmt', '--all', '--check']])
+        self.assertEqual((root / 'target/ci-core/core_exit-123-2').read_text(), '124\n')
+
+    def test_terminated_producer_cannot_report_success_or_continue(self):
+        root, result, commands = self.run_case(signal_core=True)
+        self.assertEqual(result.returncode, 143, result.stderr)
+        self.assertEqual(commands, [['fmt', '--all', '--check']])
+        self.assertEqual((root / 'target/ci-core/core_exit-123-2').read_text(), '143\n')
 
 
 if __name__ == '__main__':
