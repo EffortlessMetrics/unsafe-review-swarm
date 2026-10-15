@@ -31,10 +31,13 @@ printf 'unknown\n' > target/ci-core/cache_hit_state
   printf '# Deterministic core-gate context\n\n'
   printf 'event: %s\nsha: %s\nmode: %s\n' "$GITHUB_EVENT_NAME" "$GITHUB_SHA" "$core_mode"
 } > target/ci-core/precontext.md
-# The 65-minute proof budget leaves room inside the central 75-minute job for
-# toolchain admission, bounded diagnostic validation, finalization and cleanup.
+# Subtract all time since native run creation, including queue/setup. Reserve
+# 180 seconds for termination grace, finalization and external cleanup; this
+# entrypoint cannot itself enforce phases owned by the immutable central job.
+proof_seconds="$(python3 .ci/native_deadline.py proof)" || exit 78
+[[ "$proof_seconds" =~ ^[1-9][0-9]*$ && "$proof_seconds" -le 1020 ]] || exit 78
 date +%s > target/ci-core/gate_start
-timeout --kill-after=30s 3900s bash .ci/core.sh > target/ci-core/core.log 2>&1
+timeout --kill-after=30s "${proof_seconds}s" bash .ci/core.sh > target/ci-core/core.log 2>&1
 core_exit=$?
 # The synchronous process status is authoritative even if it died before
 # recording its own receipt. Timeout/cancellation can never become success.
@@ -46,6 +49,21 @@ if ! { printf '%s\n' "$core_exit" > "${core_exit_path}.tmp" \
   [[ "$core_exit" != 0 ]] || core_exit=78
   exit "$core_exit"
 fi
+# Refresh native origin and remaining time after proof. Metadata failure cannot
+# make a successful proof green; an earlier product failure remains primary.
+finalize_seconds="$(python3 .ci/native_deadline.py finalize)" || {
+  [[ "$core_exit" != 0 ]] || core_exit=78
+  exit "$core_exit"
+}
+[[ "$finalize_seconds" =~ ^[1-9][0-9]*$ && "$finalize_seconds" -le 1160 ]] || {
+  [[ "$core_exit" != 0 ]] || core_exit=78
+  exit "$core_exit"
+}
+[[ "$finalize_seconds" -le 110 ]] || finalize_seconds=110
 # Diagnostic failure must not overwrite the original product result.
-timeout --kill-after=10s 240s bash .ci/finalize.sh || true
+timeout --kill-after=10s "${finalize_seconds}s" bash .ci/finalize.sh || true
+# Never report success after the absolute deadline, even if diagnostics timed out.
+python3 .ci/native_deadline.py result >/dev/null || {
+  [[ "$core_exit" != 0 ]] || core_exit=78
+}
 exit "$core_exit"

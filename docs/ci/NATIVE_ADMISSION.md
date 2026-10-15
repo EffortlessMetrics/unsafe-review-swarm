@@ -139,8 +139,8 @@ The late qualification requested under [#2393](https://github.com/EffortlessMetr
 requires an explicit non-draft, merge-ready, independently reviewed current
 native subject and at most twenty minutes for the whole run. This includes
 setup, routing/control, cold compilation, product proof, diagnostic validation,
-finalization and cleanup. The existing 65-minute script limit inside the pinned
-75-minute central job does not implement that contract. A timeout-only edit
+finalization and cleanup. The previous 65-minute script limit did not implement that contract; the
+remaining pinned 75-minute central job limit still does not implement it. A timeout-only edit
 cannot establish workload fit. The warm local 17m06 span excludes setup, cold
 build and cleanup and is not native twenty-minute qualification.
 
@@ -162,9 +162,55 @@ Any combined integration must consume both reviewed sources explicitly and
 receive fresh review of their seams before proposing qualification. Preserve
 the native `Unsafe Review Rust Result` producer and existing protections.
 
-The bounded local repair makes failure to publish the core result receipt
+The result-publication repair makes failure to publish the core result receipt
 fail closed (78 after successful commands, otherwise the original failure).
 `python3 .ci/test-run.py` exercises that failure, real GNU timeout with only
 the fixture duration shortened, and a SIGTERM-terminated producer. Each must
 prevent success and later producer execution as applicable. These controls do
 not qualify native Actions cancellation, cleanup or the whole-run deadline.
+
+
+### Native deadline adapter source checkpoint
+
+The pure helper from `d7e5f5ffffc0456520e8b60b0650a5ac4d5924ad`
+(base `b5355e2f917cad5132f5e1b72e2d8d43510b7d8a`, tree
+`b432f2cc08ae41dff00947ab33a194d4f714881c`) was fetched from
+`fix/ci-whole-run-deadline`, verified as exactly the two owner-scoped files,
+reviewed and cherry-picked unchanged. It is consumed by
+`.ci/native_deadline.py`; #2394 source remains separate and unmodified.
+
+Before Cargo, the adapter fetches the fixed public GitHub API native
+run/attempt endpoint over TLS without credentials or a candidate URL override.
+It requires this repository, CI workflow path, in-progress PR run, first attempt,
+and matching native run ID and PR head/base subject against the runtime event.
+It uses native `created_at`, never `run_started_at`, request-body time, a supplied
+environment timestamp or product-entry time. Missing/unavailable/oversized
+metadata or mismatches refuse with 78. Actual Actions payload shapes and public
+API availability are not qualified by fixtures; absence refuses rather than
+falling back to a fresh local origin.
+
+The script subtracts elapsed setup/control/queue time from the 1200-second
+whole-run origin and reserves 180 seconds before proof. GNU timeout bounds the
+real proof process group and allows 30 seconds of termination grace within that
+reserve. Before finalization it fetches the same native origin again, caps
+finalization at 110 seconds plus ten seconds termination grace, and preserves
+40 seconds of remaining budget. A final fresh deadline check refuses success
+if the origin has expired. Existing product failures remain primary when
+metadata or finalization fails. No candidate metadata outputs can admit proof.
+
+This is bounded consumer-entrypoint enforcement, not a whole-run watchdog. It
+cannot stop central checkout/toolchain installation before entry, enforce
+central uploads/cleanup after return, or terminate a stalled metadata read
+within a total wall deadline. Runtime clock and native API behavior are still
+qualification assumptions. Reserve accounting does not prove those external
+phases fit their reserves. The immutable central contract must own an absolute
+whole-run cancellation/cleanup bound and authenticated review authority before
+admission can activate. Native result/protection requirements are unchanged;
+the actual driver still refuses and no pin or permissions changed.
+
+Focused controls: `python3 scripts/ci/test_qualification_deadline.py`,
+`python3 .ci/test-native-deadline.py`, `python3 .ci/test-run.py` and
+`python3 .ci/test-admission.py`. They distinguish origin reset, native identity
+mismatch, setup already spent, expiry/reserves, entry refusal, post-proof
+metadata failure and original product failure propagation. Fixtures make no
+native runtime fit, cancellation or cleanup claim.
