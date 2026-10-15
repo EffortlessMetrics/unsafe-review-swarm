@@ -15,7 +15,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts/ci'))
 from qualification_deadline import calculate_budget
 
 REPO = 'EffortlessMetrics/unsafe-review-swarm'
-RESERVES = {'proof': 180, 'finalize': 40, 'result': 1}
+# Finalization reserves its ten-second termination grace plus forty seconds
+# for external phases; GNU timeout's --kill-after is additional to its duration.
+RESERVES = {'proof': 180, 'finalize': 50, 'result': 1}
 
 
 def require(value, message):

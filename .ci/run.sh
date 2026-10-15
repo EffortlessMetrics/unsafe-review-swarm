@@ -55,7 +55,7 @@ finalize_seconds="$(python3 .ci/native_deadline.py finalize)" || {
   [[ "$core_exit" != 0 ]] || core_exit=78
   exit "$core_exit"
 }
-[[ "$finalize_seconds" =~ ^[1-9][0-9]*$ && "$finalize_seconds" -le 1160 ]] || {
+[[ "$finalize_seconds" =~ ^[1-9][0-9]*$ && "$finalize_seconds" -le 1150 ]] || {
   [[ "$core_exit" != 0 ]] || core_exit=78
   exit "$core_exit"
 }

@@ -193,8 +193,9 @@ The script subtracts elapsed setup/control/queue time from the 1200-second
 whole-run origin and reserves 180 seconds before proof. GNU timeout bounds the
 real proof process group and allows 30 seconds of termination grace within that
 reserve. Before finalization it fetches the same native origin again, caps
-finalization at 110 seconds plus ten seconds termination grace, and preserves
-40 seconds of remaining budget. A final fresh deadline check refuses success
+finalization at 110 seconds plus ten seconds termination grace. Its helper
+reserves 50 seconds, accounting for that ten-second grace while preserving
+40 seconds for external phases even when proof uses its full termination grace. A final fresh deadline check refuses success
 if the origin has expired. Existing product failures remain primary when
 metadata or finalization fails. No candidate metadata outputs can admit proof.
 
