@@ -74,6 +74,9 @@ class ProofContract(unittest.TestCase):
                           "    if phase == os.environ.get('DEADLINE_FAILURE'): sys.exit(78)\n"
                           "    print(1000 if phase == 'proof' else 100)\n"
                           "    sys.exit(0)\n"
+                          "if len(sys.argv) > 1 and sys.argv[1] == '.ci/supervise.py' and os.environ.get('SLOW_CORE') and sys.argv[-1] == '.ci/core.sh':\n"
+                          "    sys.argv[sys.argv.index('--seconds') + 1] = '0.2'\n"
+                          "    sys.argv[sys.argv.index('--grace') + 1] = '0.2'\n"
                           "os.execv(" + repr(sys.executable) + ", [" + repr(sys.executable) + ", *sys.argv[1:]])\n")
         python.chmod(0o755)
         if fail_receipt:
@@ -81,14 +84,6 @@ class ProofContract(unittest.TestCase):
             tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
                             "if sys.argv[-1].endswith('/core_exit-123-2'): sys.exit(1)\n"
                             "os.execv('/usr/bin/mv', ['mv', *sys.argv[1:]])\n")
-            tool.chmod(0o755)
-        if slow_core:
-            # Exercise GNU timeout against the real shipped core process group,
-            # changing only the test's wall duration, never the candidate file.
-            tool = binary / 'timeout'
-            tool.write_text("#!/usr/bin/env python3\nimport os, sys\n"
-                            "args = ['0.2s' if a == '1000s' else a for a in sys.argv[1:]]\n"
-                            "os.execv('/usr/bin/timeout', ['timeout', *args])\n")
             tool.chmod(0o755)
         if fail_staging:
             tool = binary / 'mktemp'

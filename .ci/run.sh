@@ -37,7 +37,7 @@ printf 'unknown\n' > target/ci-core/cache_hit_state
 proof_seconds="$(python3 .ci/native_deadline.py proof)" || exit 78
 [[ "$proof_seconds" =~ ^[1-9][0-9]*$ && "$proof_seconds" -le 1020 ]] || exit 78
 date +%s > target/ci-core/gate_start
-timeout --kill-after=30s "${proof_seconds}s" bash .ci/core.sh > target/ci-core/core.log 2>&1
+python3 .ci/supervise.py --seconds "$proof_seconds" --grace 30 -- bash .ci/core.sh > target/ci-core/core.log 2>&1
 core_exit=$?
 # The synchronous process status is authoritative even if it died before
 # recording its own receipt. Timeout/cancellation can never become success.
@@ -61,7 +61,7 @@ finalize_seconds="$(python3 .ci/native_deadline.py finalize)" || {
 }
 [[ "$finalize_seconds" -le 110 ]] || finalize_seconds=110
 # Diagnostic failure must not overwrite the original product result.
-timeout --kill-after=10s "${finalize_seconds}s" bash .ci/finalize.sh || true
+python3 .ci/supervise.py --seconds "$finalize_seconds" --grace 10 -- bash .ci/finalize.sh || true
 # Never report success after the absolute deadline, even if diagnostics timed out.
 python3 .ci/native_deadline.py result >/dev/null || {
   [[ "$core_exit" != 0 ]] || core_exit=78
