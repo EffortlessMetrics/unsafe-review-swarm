@@ -112,3 +112,33 @@ Live allowance for the migration's exact 8ff77e58 pin is still unverified.
 Immutable runtime tools, cold product fit, artifacts/result binding and cleanup
 qualification remain separate gates. There is no dispatch, settings/access,
 image activation, main merge, release or deployment in this source handoff.
+
+
+## Guard replacement and metadata availability
+
+This guard intentionally governs all PRs while installed, including after the
+bootstrap lands; landing the owner files alone does not disable admission.
+[Migration #2380](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2380)
+owns its replacement. Remove the legacy guard when that migration, or an
+explicitly reviewed successor, lands through the normal review and required
+product-check gates after refreshing its protected base to include these owners
+and qualifying its replacement admission/result path. Until then, retain this
+guard and use fresh exact-subject admission for eligible PRs. Do not restore
+automatic product execution or bypass the required result to unblock a PR.
+
+Main ruleset 16664870 had no merge-queue rule when checked on 2026-10-16. This
+interim workflow therefore does not support merge groups; adding a merge queue
+requires a separately reviewed and qualified merge-group admission/result path
+before activation. Merely adding a trigger would not satisfy the PR-bound guard.
+
+The four metadata-control steps authenticate with the existing contents-only
+job token; product steps do not receive this token in their environment.
+Metadata Python uses isolated mode so candidate workspace modules and
+`PYTHONPATH` cannot replace its standard-library imports. This is import
+isolation, not a sandbox against hostile same-user background processes.
+GitHub's [review endpoint documentation](https://docs.github.com/en/rest/pulls/reviews)
+allows public-resource reads without the listed pull-request permission. No
+`pull-requests` grant or additional credential is introduced. Authentication
+avoids the shared anonymous-IP budget; missing credentials, rate limiting and
+unavailable metadata still fail closed without an anonymous fallback. Native
+qualification must verify this existing-token path on the exact candidate.

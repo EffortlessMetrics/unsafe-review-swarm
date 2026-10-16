@@ -13,7 +13,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[2]
 WORKFLOW = (ROOT / '.github/workflows/ci.yml').read_text()
 SCRIPTS = [part.split('          PYTHON', 1)[0]
-           for part in WORKFLOW.split("          python3 - <<'PYTHON'\n")[1:]]
+           for part in WORKFLOW.split("          python3 -I - <<'PYTHON'\n")[1:]]
 SOURCE = '\n'.join(line[10:] for line in SCRIPTS[0].splitlines())
 RESULT = '\n'.join(line[10:] for line in SCRIPTS[1].splitlines())
 ADMISSION = types.ModuleType('admission')
@@ -305,6 +305,52 @@ class AdmissionTests(unittest.TestCase):
                 finally:
                     signal.alarm(0)
 
+    def test_metadata_token_is_required_without_permission_expansion(self):
+        import os
+        from unittest.mock import patch
+        with patch.dict(os.environ, {}, clear=True), patch('urllib.request.urlopen') as transport:
+            with self.assertRaisesRegex(ValueError, 'missing metadata token'):
+                ADMISSION.public_api('/repos/' + ADMISSION.REPO + '/pulls/2396/reviews')
+            transport.assert_not_called()
+        self.assertEqual(WORKFLOW.count('GITHUB_TOKEN: ${{ github.token }}'), 4)
+        self.assertNotIn('pull-requests:', WORKFLOW)
+        self.assertNotIn(': write', WORKFLOW)
+        admission = WORKFLOW.split('  admission:\n', 1)[1].split('  route:\n', 1)[0]
+        gate = WORKFLOW.split('  unsafe-review-rust-result:\n', 1)[1]
+        self.assertNotIn('    permissions:', admission)
+        self.assertIn('    permissions:\n      contents: read\n', gate)
+        expected = {
+            'Verify coordinator request and exact independent review',
+            'Require explicit native bootstrap admission',
+            'Refresh native authority immediately before product proof',
+            'Revalidate exact native subject after product proof',
+        }
+        actual = set()
+        for step in WORKFLOW.split('      - name: ')[1:]:
+            if '          GITHUB_TOKEN: ${{ github.token }}' in step:
+                actual.add(step.splitlines()[0])
+        self.assertEqual(actual, expected)
+        self.assertFalse(any(line.startswith('      GITHUB_TOKEN:') for line in WORKFLOW.splitlines()))
+
+    def test_metadata_python_ignores_candidate_import_paths(self):
+        import os, subprocess, tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            poison = "raise RuntimeError('candidate import executed')\n"
+            (directory / 'json.py').write_text(poison)
+            (directory / 'urllib').mkdir()
+            (directory / 'urllib' / '__init__.py').write_text(poison)
+            env = dict(os.environ, PYTHONPATH=temporary)
+            probe = 'import json, urllib.request; print("isolated")'
+            negative = subprocess.run(['python3', '-'], input=probe, cwd=directory,
+                                      env=env, capture_output=True, text=True)
+            self.assertNotEqual(negative.returncode, 0)
+            isolated = subprocess.run(['python3', '-I', '-'], input=probe, cwd=directory,
+                                      env=env, capture_output=True, text=True)
+            self.assertEqual(isolated.returncode, 0, isolated.stderr)
+            self.assertEqual(isolated.stdout.strip(), 'isolated')
+        self.assertEqual(WORKFLOW.count("python3 -I - <<'PYTHON'"), 2)
+
     def test_actual_driver_emits_only_after_authority_checks(self):
         import os, tempfile, urllib.request
         from unittest.mock import patch
@@ -318,12 +364,13 @@ class AdmissionTests(unittest.TestCase):
             def __exit__(self, *args): pass
             def read(self, limit): return self.raw[:limit]
         def transport(request, timeout):
+            self.assertEqual(request.get_header('Authorization'), 'Bearer fixture-token')
             self.assertTrue(request.full_url.startswith('https://api.github.com/repos/' + ADMISSION.REPO))
             return Response(self.api(request.full_url.removeprefix('https://api.github.com')))
         with tempfile.TemporaryDirectory() as temporary:
             event, output = Path(temporary)/'event', Path(temporary)/'output'
             event.write_text(json.dumps(self.event))
-            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event), GITHUB_OUTPUT=str(output))
+            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event), GITHUB_OUTPUT=str(output), GITHUB_TOKEN='fixture-token')
             with patch.dict(os.environ, env, clear=True), patch.object(dt, 'datetime', Clock), patch.object(urllib.request, 'urlopen', transport):
                 self.review['state'] = 'DISMISSED'
                 with self.assertRaises(SystemExit):
@@ -336,3 +383,4 @@ class AdmissionTests(unittest.TestCase):
 
 if __name__ == '__main__':
     unittest.main()
+
