@@ -25,9 +25,11 @@ jobs:
     steps:
       - name: Verify coordinator request and exact independent review
         id: request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
         shell: bash
         run: |
-          python3 - <<'PYTHON'
+          python3 -I - <<'PYTHON'
           import datetime as dt
           import json
           import os
@@ -172,9 +174,13 @@ jobs:
 
 
           def public_api(path):
-              # Public metadata only. No token, secret, credential or permission expansion.
+              # Public metadata uses the existing contents-only job token.
+              # Missing credentials or unavailable metadata fail closed.
+              token = os.environ.get('GITHUB_TOKEN')
+              require(bool(token), 'missing metadata token')
               request = urllib.request.Request('https://api.github.com' + path,
-                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+                           'Authorization': 'Bearer ' + token})
               with urllib.request.urlopen(request, timeout=20) as response:
                   raw = response.read(2_000_001)
               require(len(raw) <= 2_000_000, 'oversized API response')
@@ -230,6 +236,7 @@ jobs:
     steps:
       - name: Require admitted exact native product result
         env:
+          GITHUB_TOKEN: ${{ github.token }}
           ADMISSION_RESULT: ${{ needs.admission.result }}
           ADMITTED: ${{ needs.admission.outputs.admitted }}
           PROOF_RESULT: ${{ needs.proof.result }}
@@ -238,7 +245,7 @@ jobs:
           ADMISSION_REQUEST: ${{ needs.admission.outputs.request }}
         shell: bash
         run: |
-          python3 - <<'PYTHON'
+          python3 -I - <<'PYTHON'
           import datetime as dt
           import json
           import os
@@ -321,9 +328,13 @@ jobs:
 
 
           def public_api(path):
-              # Public metadata only. No token, secret, credential or permission expansion.
+              # Public metadata uses the existing contents-only job token.
+              # Missing credentials or unavailable metadata fail closed.
+              token = os.environ.get('GITHUB_TOKEN')
+              require(bool(token), 'missing metadata token')
               request = urllib.request.Request('https://api.github.com' + path,
-                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28'})
+                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+                           'Authorization': 'Bearer ' + token})
               with urllib.request.urlopen(request, timeout=20) as response:
                   raw = response.read(2_000_001)
               require(len(raw) <= 2_000_000, 'oversized API response')

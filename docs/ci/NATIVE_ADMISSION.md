@@ -34,11 +34,23 @@ as bounded file blobs at the exact protected-base SHA:
 - `scripts/ci/check-pr-review-convergence`
 - `scripts/ci/check-pr-review-convergence-core`
 
-They are absent from current main `b5355e2f917cad5132f5e1b72e2d8d43510b7d8a`.
-Readiness therefore refuses before product allocation. Candidate-supplied tools
-cannot replace protected-base authority. Bootstrapping these tools requires
-its own reviewed source and normal landing gates; this PR does not merge or
-bypass the missing dependency.
+All three owners landed through bootstrap #2396 in protected main
+`1f99630ade468378c54057ed09635e4183ecaae8` (tree
+`33f7e289f4a0e0e1a96ab80bb71f1e0fe7d033f4`). Its native product run
+[38970363541](https://github.com/EffortlessMetrics/unsafe-review-swarm/actions/runs/38970363541)
+and final review establish the bootstrap's landing, not this migration's proof.
+The migration incorporates that base and preserves the accepted owner bytes and
+modes. Readiness still checks the actual protected base on every request;
+candidate-supplied tools cannot replace protected-base authority.
+
+This source replaces the temporary legacy guard only when the migration lands
+through its own required checks and review gates. The two metadata controls
+retain the bootstrap repair: existing contents-only token authentication,
+missing-token refusal, and isolated Python imports. The token is step-scoped
+and is not forwarded to the proof script. The obsolete legacy-router test suite
+is replaced by `.ci/test-admission.py`, including authenticated driver, import
+isolation, draft/event refusal, partial-rerun/result-binding and review-drift
+controls. The three owner suites remain unchanged.
 
 After allocation the immutable central `native-review-v1` hook independently
 rechecks authenticated coordinator/admin authority, current protected base,
@@ -49,7 +61,7 @@ Credentials remain isolated from Cargo. The consumer metadata precheck is not a
 substitute for that central check and cannot establish reviewer independence.
 
 Before proposing one qualification, verify live allowance for this exact pin,
-land the protected-base owner dependency through normal gates, confirm immutable
+recheck the landed protected-base owners, confirm immutable
 runner tools/runtime eligibility, and obtain exact-candidate independent review.
 No dispatch is authorized by this source checkpoint. Actual runtime/artifacts,
 required-result liveness/binding, cleanup and resource fit remain unproven.

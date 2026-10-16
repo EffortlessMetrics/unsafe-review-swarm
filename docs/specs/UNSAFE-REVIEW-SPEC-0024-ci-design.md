@@ -271,8 +271,9 @@ publication/retention. The internal routing check validates this actual source
 contract without retaining the obsolete missing-hook failure.
 
 **Qualification prerequisites:** verify the live allowance for this exact pin,
-bootstrap the three review owners into protected base through normal review and
-merge gates, and execute the exact reviewed native subject. This source change
+recheck the three review owners landed by bootstrap #2396 at protected base
+`1f99630ade468378c54057ed09635e4183ecaae8`, and execute the exact reviewed
+native subject. Bootstrap success does not qualify this replacement caller. This source change
 performs no dispatch, protection transition or image activation.
 
 The reusable final check is nested under the caller and cannot be assumed to

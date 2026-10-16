@@ -14,7 +14,7 @@ import unittest
 ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / '.github/workflows/ci.yml').read_text()
 SCRIPTS = [part.split('          PYTHON', 1)[0]
-           for part in WORKFLOW.split("          python3 - <<'PYTHON'\n")[1:]]
+           for part in WORKFLOW.split("          python3 -I - <<'PYTHON'\n")[1:]]
 SOURCE = '\n'.join(line[10:] for line in SCRIPTS[0].splitlines())
 RESULT = '\n'.join(line[10:] for line in SCRIPTS[1].splitlines())
 ADMISSION = types.ModuleType('admission')
@@ -146,12 +146,13 @@ class AdmissionTests(unittest.TestCase):
             def __exit__(self, *args): pass
             def read(self, limit): return self.raw[:limit]
         def transport(request, timeout):
+            self.assertEqual(request.get_header('Authorization'), 'Bearer fixture-token')
             self.assertTrue(request.full_url.startswith('https://api.github.com/repos/' + ADMISSION.REPO))
             return Response(self.api(request.full_url.removeprefix('https://api.github.com')))
         with tempfile.TemporaryDirectory(prefix='unsafe-admission-driver-') as temporary:
             event_path, output_path = Path(temporary)/'event.json', Path(temporary)/'output'
             event_path.write_text(json.dumps(self.event))
-            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output_path))
+            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output_path), GITHUB_TOKEN='fixture-token')
             for fault in (dict(size=0), None):
                 self.owner_fault = fault
                 with patch.dict(os.environ, env, clear=True), patch.object(dt, 'datetime', Clock), \
@@ -329,6 +330,44 @@ class AdmissionTests(unittest.TestCase):
                 with self.assertRaises(AssertionError):
                     exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
 
+    def test_metadata_python_ignores_candidate_import_paths(self):
+        import os, subprocess, tempfile
+        with tempfile.TemporaryDirectory() as temporary:
+            directory = Path(temporary)
+            poison = "raise RuntimeError('candidate import executed')\n"
+            (directory / 'json.py').write_text(poison)
+            (directory / 'urllib').mkdir()
+            (directory / 'urllib' / '__init__.py').write_text(poison)
+            env = dict(os.environ, PYTHONPATH=temporary)
+            probe = 'import json, urllib.request; print("isolated")'
+            negative = subprocess.run(['python3', '-'], input=probe, cwd=directory,
+                                      env=env, capture_output=True, text=True)
+            self.assertNotEqual(negative.returncode, 0)
+            isolated = subprocess.run(['python3', '-I', '-'], input=probe, cwd=directory,
+                                      env=env, capture_output=True, text=True)
+            self.assertEqual(isolated.returncode, 0, isolated.stderr)
+            self.assertEqual(isolated.stdout.strip(), 'isolated')
+        self.assertEqual(WORKFLOW.count("python3 -I - <<'PYTHON'"), 2)
+
+
+    def test_metadata_token_is_required_and_scoped_to_controls(self):
+        import os
+        from unittest.mock import patch
+        for source in (SOURCE, RESULT[:RESULT.index("assert os.environ['ADMISSION_RESULT']")]):
+            program = {}
+            exec(compile(source, 'ci.yml/control', 'exec'), program)
+            with patch.dict(os.environ, {}, clear=True), patch('urllib.request.urlopen') as transport:
+                with self.assertRaisesRegex(ValueError, 'missing metadata token'):
+                    program['public_api']('/repos/' + ADMISSION.REPO + '/pulls/2380/reviews')
+                transport.assert_not_called()
+        expected = {'Verify coordinator request and exact independent review',
+                    'Require admitted exact native product result'}
+        actual = {step.splitlines()[0] for step in WORKFLOW.split('      - name: ')[1:]
+                  if '          GITHUB_TOKEN: ${{ github.token }}' in step}
+        self.assertEqual(actual, expected)
+        self.assertEqual(WORKFLOW.count('GITHUB_TOKEN: ${{ github.token }}'), 2)
+        self.assertNotIn('GITHUB_TOKEN:', WORKFLOW.split('  proof:\n')[1].split('  unsafe-review-rust-result:')[0])
+        self.assertFalse(any(line.startswith('      GITHUB_TOKEN:') for line in WORKFLOW.splitlines()))
 
 if __name__ == '__main__':
     unittest.main()

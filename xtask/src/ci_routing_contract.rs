@@ -1,6 +1,6 @@
 //! The central caller, retained repository proof and separate advisory lane.
 //! Consumer polling/physical routing is retired. Failure-evidence publication
-//! remains a blocking qualification gap in the currently activated central pin.
+//! still requires native qualification on the selected central pin.
 
 /// Check a workflow's text against a lane contract: every `required` marker
 /// must be present and every `forbidden` marker absent. `lane` names the

@@ -61,9 +61,10 @@ This is an unqualified draft migration. The prepared pin
 `8ff77e5876b4a7808a58e053aa6248b1020e02d0` selects closed native review
 admission, native-origin 1,200-second execution supervision and bounded
 seven-day non-fatal failure diagnostics. Source compatibility is not native
-artifact retention or runtime qualification. Current protected base lacks the
-three semantic/convergence review owners required by the central hook; the
-consumer readiness check refuses rather than substituting candidate code.
+artifact retention or runtime qualification. Bootstrap #2396 landed the three
+semantic/convergence review owners in protected main at `1f99630ade468378c54057ed09635e4183ecaae8`. The consumer still verifies their presence at the actual
+protected base and refuses rather than substituting candidate code. The
+bootstrap metadata authentication and isolated imports are retained.
 Live allowance for this exact pin must also be verified before qualification.
 See [native admission](NATIVE_ADMISSION.md). No dispatch, protection change or
 image activation is part of source preparation. Advisory ub-review stays separate.
