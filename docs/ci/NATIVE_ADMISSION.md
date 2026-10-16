@@ -1,45 +1,70 @@
 # Explicit native PR admission
 
-The consumer proof needs a native PR check when a merge queue is unavailable.
-A dispatch or a merge-group check alone does not establish that PR result.
-[GitHub's PR event contract](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#pull_request)
-uses the native PR merge commit as `GITHUB_SHA`.
+The draft caller prepares public central Rust workflow
+`8ff77e5876b4a7808a58e053aa6248b1020e02d0` (workflow blob
+`6107a7dbcb94ce6a5b44b2dbf063c3500eae9129`) with `profile: standard`,
+`.ci/run.sh`, full history and these closed selectors:
 
-The CI workflow therefore observes ordinary PR lifecycle events cheaply. The proposed protocol admits only
-an **explicitly edited coordinator body request**, with current exact review.
-The executable driver presently refuses every admission because the active
-central pin cannot securely revalidate authority after queue wait and before
-Cargo. The protocol is locally prepared, not activated. Open, Ready, synchronize, draft transitions, close, title
-edits and unrelated body edits provide no product authority. Lifecycle changes
-cancel obsolete proof; an unrelated body edit does not silently cancel a valid
-proof. The metadata-only `Unsafe Review Rust Result` fails when admission or
-proof is absent, so a skipped call cannot appear as a successful product verdict.
-The actual native check name/binding still requires qualification; no protection
-or required-check setting changes are included.
+```yaml
+proof_admission: native-review-v1
+whole_run_deadline: native-run-1200s
+upload_artifacts: true
+artifact_lane: failure-diagnostics
+```
+
+No secrets or additional permissions are introduced. The proof caller retains
+only the four previously approved read scopes; cheap metadata jobs retain
+contents-only access. This source selection does not prove or activate the live
+allowance for the new pin.
+
+## Actual admission and outstanding readiness
+
+The control driver now executes its real native request/review checks instead
+of the obsolete unconditional missing-central-hook refusal. It has a 120-second
+total metadata deadline and a bounded event size. Only a fresh explicit
+coordinator body edit on a non-draft same-repository PR can emit `admitted=true`.
+Draft, Ready, synchronize, push, schedule, unrelated edits, stale subjects,
+missing/dismissed/adverse exact review and API failures grant no product authority.
+No request or machine approval receipt was issued by this source preparation.
+
+The control driver also checks that all three central review-owner paths exist
+as bounded file blobs at the exact protected-base SHA:
+
+- `scripts/ci/check-pr-semantic-review-currentness.py`
+- `scripts/ci/check-pr-review-convergence`
+- `scripts/ci/check-pr-review-convergence-core`
+
+They are absent from current main `b5355e2f917cad5132f5e1b72e2d8d43510b7d8a`.
+Readiness therefore refuses before product allocation. Candidate-supplied tools
+cannot replace protected-base authority. Bootstrapping these tools requires
+its own reviewed source and normal landing gates; this PR does not merge or
+bypass the missing dependency.
+
+After allocation the immutable central `native-review-v1` hook independently
+rechecks authenticated coordinator/admin authority, current protected base,
+head/native merge/tree/parents, native request/review/thread state and run/attempt.
+It executes the three owner programs from protected-base Git objects in an
+isolated environment, then repeats native authority before proof entry.
+Credentials remain isolated from Cargo. The consumer metadata precheck is not a
+substitute for that central check and cannot establish reviewer independence.
+
+Before proposing one qualification, verify live allowance for this exact pin,
+land the protected-base owner dependency through normal gates, confirm immutable
+runner tools/runtime eligibility, and obtain exact-candidate independent review.
+No dispatch is authorized by this source checkpoint. Actual runtime/artifacts,
+required-result liveness/binding, cleanup and resource fit remain unproven.
 
 ## Subject and coordinator
 
-The sole coordinator is `EffortlessSteven`, whose current repository admin
-permission was verified during this source repair. This is an explicit source
-policy for the existing one-contributor operating model, not a new repository
-access grant. The authenticated event sender, original/triggering Actions actor
-and request coordinator must all match. Bot or fork source, draft/closed PRs,
-unexpected bases, unrelated events and rerun attempts are refused before the
-central call. Changing the coordinator requires a reviewed source change.
-
-Admission requires the current head, current main base, native integration SHA
-and integration tree. The gate checks both the event and current public PR
-metadata, the native integration commit's tree and ordered base/head parents,
-and refreshes PR metadata after reading reviews. New head/base/integration/body
-or draft state invalidates the request. Public API errors, rate limits, unknown
-mergeability and bounded-pagination exhaustion refuse admission; there is no
-permissive fallback and no credential or permission expansion.
+The sole coordinator remains `EffortlessSteven`; this is source policy, not an
+access grant. Native event sender, original/triggering actor and request actor
+must agree. Head, current main base, native integration SHA/tree and ordered
+parents must match current public metadata. Head/base/body/draft or review drift
+revokes the request. Native `Unsafe Review Rust Result` requires successful
+admission, successful central proof and a matching native receipt; absent or
+skipped proof cannot be green. Protection settings remain unchanged.
 
 ## Receipt and request protocol
-
-This protocol is source preparation only. **Do not issue an admission request
-while the central failure-diagnostic contract remains unresolved.** No request,
-label or dispatch was activated for this draft.
 
 After independent review of the actual head/base/native integration tree, the
 coordinator can preserve its disposition in a native GitHub PR review anchored
@@ -76,178 +101,61 @@ the body does not authorize later Ready/synchronize or unrelated edits. A new
 explicit request remains subject to current exact-source review and all checks;
 a label or Boolean is never sufficient.
 
-The prepared validator refreshes reviews at the final admission check; the
-prepared final result also refreshes current review/request authority after
-proof. These checks do not close the queue-wait race. An approval can be
-withdrawn after control admission while the central proof waits for a runner.
-The immutable central workflow must perform authenticated current-authority
-revalidation after allocation and immediately before candidate compilation,
-without handing that authority to candidate code. Missing/dismissed/adverse
-approval, changed head/base/native merge/tree or revoked request must refuse
-entry and propagate failure. The current native driver emits no admitted output
-until that separately reviewed, published and activated contract exists.
+## Deadline and interruption behavior
 
-The final metadata result requires the entire central call to succeed and its
-successful result/receipt to match the native repository, SHA, run, attempt and
-standard profile. It does not re-label a dispatch, cached proof or skipped job
-as a native PR success. Source updates cancel old runs and require fresh
-admission. This preparation does not prove runtime qualification or close every
-possible race after metadata admission; actual event/source/result bindings
-must be observed before cutover.
+Original native `created_at` plus 1,200 seconds is retained across stages;
+`run_started_at`, request time and product-entry time never reset the origin.
+The consumer binds the fixed public native run/attempt endpoint to the runtime
+repository/workflow/PR head/base/merge subject and refuses retries, expiry,
+missing metadata and identity mismatches. All three metadata phases are bounded
+by the process supervisor to five seconds plus one second termination grace.
+The response is capped at 2,000,000 bytes.
 
-## Focused verification
+Proof uses remaining time minus 180 seconds. Finalization is capped at 110
+seconds; its 56-second reserve accounts for ten seconds termination grace, six
+seconds for final metadata and forty for external phases. Boundary tests also
+charge the post-proof metadata query and proof termination grace. Original
+product failures survive metadata/finalizer failures. Owned process groups are
+killed even after leader exit and pipe draining is bounded; see
+[interruption supervision](INTERRUPTION_SUPERVISION.md).
 
-`python3 .ci/test-admission.py` executes the shipped inline workflow program,
-with positive exact-subject input and negative controls for events, actors,
-trust, drafts, persistence, timestamps, missing/dismissed/adverse reviews,
-head/base/integration/tree/parent drift, racing metadata, and wrong/skipped native
-results. The Rust routing-contract tests also execute this suite. Tests use
-fixtures and create no live approval or product execution.
+The new central selector supervises executing setup/proof/diagnostic bodies and
+checks original deadline around external actions. It does not establish
+termination of unallocated queued runs, external action post-steps, escaped
+sessions, host cleanup or GitHub terminal-status latency. Neither source guards
+nor reserves prove cold native product fit. Warm local 17m06 excluding setup,
+cold build and cleanup is not twenty-minute qualification.
 
-The public review endpoint supports anonymous public-resource reads, as
-[documented by GitHub](https://docs.github.com/en/rest/pulls/reviews#list-reviews-for-a-pull-request).
-No native Actions or pool qualification was executed. The active central pin and
-its honest failure-artifact readiness refusal remain unchanged and parent-owned.
+## Bounded failure diagnostics
 
+The selected central lane validates and publishes only exact private staged
+`summary.md`, `metadata.json` and optional validated `test-diagnostics.json`.
+Retention is seven days and publication failure is non-fatal to the original
+product result. Raw logs, unrelated workspace files and symlinks are excluded.
+This replaces the old missing-upload-contract source blocker; native upload,
+retention and cleanup still need actual qualification.
 
-The governed reusable proof caller now declares exactly `contents: read`,
-`actions: read`, `checks: read` and `pull-requests: read`. The three additional
-read scopes were explicitly approved for this caller; the metadata jobs retain
-contents-only access. There are no write grants or inherited secrets. This
-matches the active central repository-policy job's declared read requirements,
-even while that optional job is skipped. The earlier automatic draft CI run on
-`3cc4e5f5` reported startup failure and zero jobs; post-change native cheap
-metadata is used to diagnose startup, not to qualify product execution.
-The pre-Cargo admission and diagnostic-retention blockers remain unchanged.
+The pinned actual publisher accepts a real consumer-produced failure fixture
+and rejects tampered source identity. The compatibility test checks the exact
+central Git blob before executing its publisher/owner functions, with no API,
+credentials or product build:
 
+```bash
+python3 .ci/test-central-contract.py /path/to/exact/pinned/rust.yml
+```
 
-The parent confirmed the same pre-proof gap in active `a3125de` and public
-`15f2c4d`/internal `ab217deb`. The minimum central prerequisite is a central-owned
-read-only recheck immediately before every proof-entry path, including recovery:
-native semantic-currentness and convergence owners from trusted protected-base
-source; current request/actor/head/base/integration validation; credential
-isolation from Cargo; and refusal failing the aggregate without fallback
-normalization. Consumer body-record fixtures cannot substitute for those owner
-contracts or create authority. Native `auto_merge_enabled` is a supported future
-request event, but the existing authenticated requesting actor must generate an
-observable event; a GITHUB_TOKEN transition is not assumed observable. No such
-transition was attempted here. The parent owns that dependency and activation.
+The native admission suite executes the shipped workflow program, including its
+actual main driver. Positive fixtures produce outputs only after all checks;
+missing protected-base owners produce no output. Other focused controls cover
+metadata trickle/stall/cancellation/size limits, descendant interruption,
+original failure propagation and deadline arithmetic. They are local source
+evidence, not native execution receipts.
 
-## Twenty-minute qualification and ownership
+## Ownership and integration
 
-The late qualification requested under [#2393](https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2393)
-requires an explicit non-draft, merge-ready, independently reviewed current
-native subject and at most twenty minutes for the whole run. This includes
-setup, routing/control, cold compilation, product proof, diagnostic validation,
-finalization and cleanup. The previous 65-minute script limit did not implement that contract; the
-remaining pinned 75-minute central job limit still does not implement it. A timeout-only edit
-cannot establish workload fit. The warm local 17m06 span excludes setup, cold
-build and cleanup and is not native twenty-minute qualification.
-
-Before activation, the CI owner must reconcile a trusted native run start and
-absolute deadline with the immutable central caller, including queue/recovery
-paths and bounded cancellation/cleanup. Candidate-provided timestamps or a
-deadline reset at product entry cannot establish a whole-run bound. Central
-publication alone does not establish protected-base semantic-currentness and
-convergence owners in this consumer, reviewed pin/adapter adoption, or runtime
-prerequisites. The current admission driver remains unconditionally refused;
-no product dispatch or live pin change is part of this source repair.
-
-[#2380](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2380)
-retains sole ownership of `ci.yml`, `.ci/**` and
-`xtask/src/ci_routing_contract.rs`.
-[#2394](https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2394)
-owns the separate Windows baseline aggregate and does not edit those surfaces.
-Any combined integration must consume both reviewed sources explicitly and
-receive fresh review of their seams before proposing qualification. Preserve
-the native `Unsafe Review Rust Result` producer and existing protections.
-
-The result-publication repair makes failure to publish the core result receipt
-fail closed (78 after successful commands, otherwise the original failure).
-`python3 .ci/test-run.py` exercises that failure, real GNU timeout with only
-the fixture duration shortened, and a SIGTERM-terminated producer. Each must
-prevent success and later producer execution as applicable. These controls do
-not qualify native Actions cancellation, cleanup or the whole-run deadline.
-
-
-### Native deadline adapter source checkpoint
-
-The pure helper from `d7e5f5ffffc0456520e8b60b0650a5ac4d5924ad`
-(base `b5355e2f917cad5132f5e1b72e2d8d43510b7d8a`, tree
-`b432f2cc08ae41dff00947ab33a194d4f714881c`) was fetched from
-`fix/ci-whole-run-deadline`, verified as exactly the two owner-scoped files,
-reviewed and cherry-picked unchanged. It is consumed by
-`.ci/native_deadline.py`; #2394 source remains separate and unmodified.
-
-Before Cargo, the adapter fetches the fixed public GitHub API native
-run/attempt endpoint over TLS without credentials or a candidate URL override.
-It requires this repository, CI workflow path, in-progress PR run, first attempt,
-and matching native run ID and PR head/base subject against the runtime event.
-It uses native `created_at`, never `run_started_at`, request-body time, a supplied
-environment timestamp or product-entry time. Missing/unavailable/oversized
-metadata or mismatches refuse with 78. Actual Actions payload shapes and public
-API availability are not qualified by fixtures; absence refuses rather than
-falling back to a fresh local origin.
-
-The script subtracts elapsed setup/control/queue time from the 1200-second
-whole-run origin and reserves 180 seconds before proof. The consumer supervisor bounds the
-real proof process group and allows 30 seconds of termination grace within that
-reserve. Before finalization it fetches the same native origin again, caps
-finalization at 110 seconds plus ten seconds termination grace. Its helper
-now reserves 56 seconds: ten for termination grace, six for the final metadata
-query including its grace, and forty for external phases. A boundary control
-charges both post-proof metadata queries as well as both termination graces. A final fresh deadline check refuses success
-if the origin has expired. Existing product failures remain primary when
-metadata or finalization fails. No candidate metadata outputs can admit proof.
-
-This is bounded consumer-entrypoint enforcement, not a whole-run watchdog. It
-cannot stop central checkout/toolchain installation before entry, enforce
-central uploads/cleanup after return, or enforce the immutable central workflow
-within a total wall deadline. Each metadata query is now separately supervised
-for five seconds plus one second termination grace. Runtime clock and native API behavior are still
-qualification assumptions. Reserve accounting does not prove those external
-phases fit their reserves. The immutable central contract must own an absolute
-whole-run cancellation/cleanup bound and authenticated review authority before
-admission can activate. Native result/protection requirements are unchanged;
-the actual driver still refuses and no pin or permissions changed.
-
-Focused controls: `python3 scripts/ci/test_qualification_deadline.py`,
-`python3 .ci/test-native-deadline.py`, `python3 .ci/test-run.py` and
-`python3 .ci/test-admission.py`. They distinguish origin reset, native identity
-mismatch, setup already spent, expiry/reserves, entry refusal, post-proof
-metadata failure and original product failure propagation. Fixtures make no
-native runtime fit, cancellation or cleanup claim.
-
-
-### Bounded metadata transport repair
-
-A loopback transport reproduced the inactivity-timeout gap: streamed bytes can
-keep `urlopen(timeout=5)` and response reading alive beyond the socket timeout.
-The source regression executes the shipped adapter against a local trickling or
-stalled HTTP server, redirecting only its transport in the fixture. On the
-predecessor all six phase/fault combinations exceeded the test's total-time
-guard. No GitHub request or native failure injection is involved.
-
-`metadata_budget` in `.ci/run.sh` now supervises the complete metadata adapter
-process group for five seconds plus one second of termination grace, including
-connection, headers, body read, parsing and output drain. All proof, finalization
-and result boundaries use that same function with no caller override. The
-2,000,000-byte response limit and original native `created_at` identity binding
-remain. Socket inactivity timeout is defense in depth, not the total-time bound.
-Timeout/cancellation returns 124/143; other adapter refusal remains 78. Before
-proof these statuses prevent any Cargo producer. After proof they cannot replace
-an earlier product failure, and cannot turn an otherwise successful proof green.
-
-The finalization reserve increases from 50 to 56 seconds to account for the
-last metadata query's complete six-second allowance while retaining forty for
-external phases. The post-proof metadata query is charged before finalization
-budget calculation; the boundary test includes that six-second allowance too.
-This reserve is accounting, not proof that central cleanup fits.
-
-`python3 scripts/ci/test_metadata_transport.py` covers trickle, stalled headers,
-cancellation, oversized responses and ordinary native-shaped responses across
-all three phases. `python3 .ci/test-run.py` covers phase timeout/cancellation
-statuses and original-failure preservation through the shipped entrypoint.
-These controlled-process checks do not establish native cancellation, runtime
-fit or supervision of setup/uploads/cleanup outside this entrypoint. Admission
-continues to refuse; central pin, scopes and protection are unchanged.
+#2380 retains `ci.yml`, `.ci/**` and `xtask/src/ci_routing_contract.rs`.
+#2394 owns its separate Windows baseline aggregate; it is unmodified and not
+consumed here. Any combined candidate requires explicit integration and fresh
+seam review before qualification. #2395's interruption source was consumed
+unchanged; historical evidence is retained in the PR conversation and
+[migration handoff](../handoffs/2026-10-14-contabo-consumer.md).

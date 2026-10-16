@@ -32,6 +32,7 @@ jobs:
           import json
           import os
           import re
+          import signal
           import urllib.request
           from pathlib import Path
 
@@ -157,6 +158,16 @@ jobs:
                       and refreshed['merge_commit_sha'] == request['integration'] and refreshed['mergeable'] is True,
                       'subject changed during admission')
               review_authority(api, path, request)
+              # Readiness only: immutable central admission executes these exact
+              # protected-base owners after allocation, with isolated credentials.
+              for owner in ('scripts/ci/check-pr-semantic-review-currentness.py',
+                            'scripts/ci/check-pr-review-convergence',
+                            'scripts/ci/check-pr-review-convergence-core'):
+                  metadata = api(prefix + '/contents/' + owner + '?ref=' + request['base'])
+                  require(metadata.get('type') == 'file' and metadata.get('path') == owner
+                          and type(metadata.get('size')) is int and 0 < metadata['size'] <= 524288
+                          and isinstance(metadata.get('sha'), str) and SHA.fullmatch(metadata['sha']),
+                          'protected-base review owner unavailable')
               return request
 
 
@@ -171,9 +182,23 @@ jobs:
 
 
           if __name__ == '__main__':
-              # The active pin cannot revalidate authority after its queue wait.
-              # Refuse before any product allocation; no Boolean override exists.
-              raise SystemExit('::error::central authenticated pre-Cargo authority hook NOT_PROVEN')
+              def expired(signum, frame):
+                  raise TimeoutError('metadata admission deadline exceeded')
+              signal.signal(signal.SIGALRM, expired)
+              signal.alarm(120)
+              try:
+                  event_path = Path(os.environ['GITHUB_EVENT_PATH'])
+                  require(event_path.stat().st_size <= 1048576, 'oversized native event')
+                  request = admit(json.loads(event_path.read_text()), os.environ, public_api,
+                                  dt.datetime.now(dt.timezone.utc))
+                  # No result is emitted until every readiness and authority
+                  # check succeeds. The central hook must independently recheck.
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                      output.write('admitted=true\nrequest=' + json.dumps(request, separators=(',', ':')) + '\n')
+              except Exception:
+                  raise SystemExit('::error::native admission refused or protected-base prerequisite unavailable')
+              finally:
+                  signal.alarm(0)
           PYTHON
 
   proof:
@@ -185,12 +210,16 @@ jobs:
       actions: read
       checks: read
       pull-requests: read
-    uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@a3125de962a74e7ec2e127d41d7532f66c69334d
+    uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@8ff77e5876b4a7808a58e053aa6248b1020e02d0
     with:
       profile: standard
       force_hosted: false
       script: .ci/run.sh
       fetch_depth: 0
+      proof_admission: native-review-v1
+      whole_run_deadline: native-run-1200s
+      upload_artifacts: true
+      artifact_lane: failure-diagnostics
 
   unsafe-review-rust-result:
     name: Unsafe Review Rust Result
@@ -214,6 +243,7 @@ jobs:
           import json
           import os
           import re
+          import signal
           import urllib.request
           from pathlib import Path
 
@@ -301,7 +331,7 @@ jobs:
 
 
           # Final result refreshes authority without reapplying the short admission TTL:
-          # product proof can legitimately take up to 65 minutes after prompt admission.
+          # the bounded product phase can outlast the short request freshness window.
           assert os.environ['ADMISSION_RESULT'] == 'success'
           assert os.environ['ADMITTED'] == 'true'
           assert os.environ['PROOF_RESULT'] == 'success'

@@ -192,10 +192,9 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     let finalize = std::fs::read_to_string(".ci/finalize.sh").map_err(|err| err.to_string())?;
     check_repository_proof_contract(&run, &core, &finalize)?;
     check_ub_review_advisory_contract()?;
-    // Keep the existing retained-failure-evidence obligation visible. The active
-    // central pin exposes no consumer upload hook, and proof outputs alone do not
-    // upload the files. A successful script check is not a complete cutover.
-    Err("central Rust migration NOT_PROVEN: active pin has no consumer failure-artifact upload contract; preserve bounded summary/metadata/validated diagnostics with seven-day non-fatal retention before cutover".to_string())
+    // This exact caller selects the published bounded failure-diagnostics lane.
+    // Source compatibility does not establish native upload/retention qualification.
+    Ok(())
 }
 
 fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
@@ -221,6 +220,32 @@ fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
         .and_then(|(_, tail)| tail.split_once("\n  unsafe-review-rust-result:\n"))
         .map(|(proof, _)| proof)
         .ok_or_else(|| format!("{path} missing proof/result boundary"))?;
+    let inputs: Vec<&str> = proof
+        .split_once("\n    with:\n")
+        .map(|(_, tail)| {
+            tail.lines()
+                .take_while(|line| line.starts_with("      "))
+                .map(str::trim)
+                .collect()
+        })
+        .ok_or_else(|| format!("{path} missing closed central inputs"))?;
+    if proof.matches("    with:").count() != 1
+        || inputs
+            != [
+                "profile: standard",
+                "force_hosted: false",
+                "script: .ci/run.sh",
+                "fetch_depth: 0",
+                "proof_admission: native-review-v1",
+                "whole_run_deadline: native-run-1200s",
+                "upload_artifacts: true",
+                "artifact_lane: failure-diagnostics",
+            ]
+    {
+        return Err(format!(
+            "{path} must select exactly the reviewed closed central inputs"
+        ));
+    }
     let permissions: Vec<&str> = proof
         .split_once("\n    permissions:\n")
         .map(|(_, tail)| {
@@ -276,8 +301,12 @@ fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
             "assert evidence['sha'] == os.environ['GITHUB_SHA']",
             "receipt['review_kind'] == 'independent'",
             "receipt['verdict'] == 'approved-for-proof'",
-            "central authenticated pre-Cargo authority hook NOT_PROVEN",
-            "uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@a3125de962a74e7ec2e127d41d7532f66c69334d",
+            "protected-base review owner unavailable",
+            "proof_admission: native-review-v1",
+            "whole_run_deadline: native-run-1200s",
+            "upload_artifacts: true",
+            "artifact_lane: failure-diagnostics",
+            "uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@8ff77e5876b4a7808a58e053aa6248b1020e02d0",
             "profile: standard",
             "force_hosted: false",
             "script: .ci/run.sh",
@@ -550,6 +579,42 @@ mod tests {
         .is_ok()
         {
             return Err("accepted an unreviewed profile".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_requires_closed_admission_deadline_and_diagnostics() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for marker in [
+            "      proof_admission: native-review-v1\n",
+            "      whole_run_deadline: native-run-1200s\n",
+            "      upload_artifacts: true\n",
+            "      artifact_lane: failure-diagnostics\n",
+        ] {
+            if super::check_central_caller_contract("ci.yml", &text.replace(marker, "")).is_ok() {
+                return Err(format!("accepted missing central contract: {marker}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_rejects_extra_or_duplicate_inputs() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for extra in [
+            "result_script: .ci/other.sh",
+            "profile: heavy",
+            "upload_artifacts: false",
+            "artifact_lane: ripr",
+        ] {
+            let changed = text.replace(
+                "      fetch_depth: 0",
+                &format!("      fetch_depth: 0\n      {extra}"),
+            );
+            if super::check_central_caller_contract("ci.yml", &changed).is_ok() {
+                return Err(format!("accepted extra/duplicate central input: {extra}"));
+            }
         }
         Ok(())
     }

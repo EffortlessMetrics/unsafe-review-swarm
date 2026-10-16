@@ -57,13 +57,16 @@ The first product failure remains authoritative even when diagnostic staging
 fails. Cargo output uses `$RUNNER_TEMP/cargo-target`; `target/ci-core` remains
 a runtime receipt path. Central owns runner lifecycle and the 75-minute limit.
 
-This is an unqualified draft migration. The active central pin has no consumer
-failure-upload hook; bounded staging and summaries are retained locally but do
-not constitute the existing seven-day failure artifact. the internal `check_ci_routing_contract` (via `xtask check-policy`)
-keeps this obligation blocking. See [the migration handoff](../handoffs/2026-10-14-contabo-consumer.md)
-for evidence, remaining gates and rollback. Existing protection is unchanged;
-the new nested native check must be qualified before a binding transition.
-Advisory ub-review remains independent and unchanged.
+This is an unqualified draft migration. The prepared pin
+`8ff77e5876b4a7808a58e053aa6248b1020e02d0` selects closed native review
+admission, native-origin 1,200-second execution supervision and bounded
+seven-day non-fatal failure diagnostics. Source compatibility is not native
+artifact retention or runtime qualification. Current protected base lacks the
+three semantic/convergence review owners required by the central hook; the
+consumer readiness check refuses rather than substituting candidate code.
+Live allowance for this exact pin must also be verified before qualification.
+See [native admission](NATIVE_ADMISSION.md). No dispatch, protection change or
+image activation is part of source preparation. Advisory ub-review stays separate.
 
 It must not run:
 

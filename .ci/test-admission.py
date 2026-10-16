@@ -52,8 +52,16 @@ class AdmissionTests(unittest.TestCase):
         self.merge = dict(sha='c' * 40, tree=dict(sha='d' * 40), parents=[dict(sha='b' * 40), dict(sha='a' * 40)])
         self.reviews = [self.review]
         self.reads = 0
+        self.owner_fault = None
 
     def api(self, path):
+        if '/contents/' in path:
+            owner = path.split('/contents/', 1)[1].split('?ref=', 1)[0]
+            self.assertTrue(path.endswith('?ref=' + self.request['base']))
+            result = dict(type='file', path=owner, size=100, sha='f' * 40)
+            if self.owner_fault:
+                result.update(self.owner_fault)
+            return result
         if '/reviews?' in path:
             return copy.deepcopy(self.reviews)
         if '/git/commits/' in path:
@@ -116,17 +124,54 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_admission(lambda _: self.fail('must reject before API'))
 
-    def test_current_native_driver_refuses_before_api_or_product_authority(self):
-        import os, subprocess, tempfile
-        with tempfile.TemporaryDirectory(prefix='unsafe-admission-refusal-') as temp:
-            event_path = Path(temp) / 'event.json'
+    def test_protected_base_owner_readiness_is_required(self):
+        for fault in (dict(type='dir'), dict(path='candidate/owner'), dict(size=0),
+                      dict(size=524289), dict(sha='missing')):
+            self.owner_fault = fault
+            with self.subTest(fault=fault), self.assertRaises(ValueError):
+                self.run_admission()
+
+    def test_current_native_driver_emits_only_after_real_checks(self):
+        import os, tempfile, urllib.request
+        from unittest.mock import patch
+        now = self.now
+        class Clock(dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return now
+        class Response:
+            def __init__(self, value):
+                self.raw = json.dumps(value).encode()
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit): return self.raw[:limit]
+        def transport(request, timeout):
+            self.assertTrue(request.full_url.startswith('https://api.github.com/repos/' + ADMISSION.REPO))
+            return Response(self.api(request.full_url.removeprefix('https://api.github.com')))
+        with tempfile.TemporaryDirectory(prefix='unsafe-admission-driver-') as temporary:
+            event_path, output_path = Path(temporary)/'event.json', Path(temporary)/'output'
             event_path.write_text(json.dumps(self.event))
-            output_path = Path(temp) / 'output'
             env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output_path))
-            result = subprocess.run(['python3', '-c', SOURCE], env=env, capture_output=True, text=True)
-            self.assertNotEqual(result.returncode, 0)
-            self.assertIn('pre-Cargo authority hook NOT_PROVEN', result.stderr)
-            self.assertFalse(output_path.exists())
+            for fault in (dict(size=0), None):
+                self.owner_fault = fault
+                with patch.dict(os.environ, env, clear=True), patch.object(dt, 'datetime', Clock), \
+                     patch.object(urllib.request, 'urlopen', transport):
+                    if fault:
+                        with self.assertRaises(SystemExit):
+                            exec(compile(SOURCE, 'ci.yml/actual-main', 'exec'), {'__name__':'__main__'})
+                        self.assertFalse(output_path.exists())
+                    else:
+                        exec(compile(SOURCE, 'ci.yml/actual-main', 'exec'), {'__name__':'__main__'})
+                        lines = output_path.read_text().splitlines()
+                        self.assertEqual(lines[0], 'admitted=true')
+                        self.assertEqual(json.loads(lines[1].removeprefix('request=')), self.request)
+
+    def test_pinned_closed_selectors_cannot_be_omitted(self):
+        proof = WORKFLOW.split('\n  proof:\n')[1].split('\n  unsafe-review-rust-result:')[0]
+        for marker in ('@8ff77e5876b4a7808a58e053aa6248b1020e02d0',
+                       'proof_admission: native-review-v1', 'whole_run_deadline: native-run-1200s',
+                       'upload_artifacts: true', 'artifact_lane: failure-diagnostics'):
+            self.assertEqual(proof.count(marker), 1)
 
     def test_explicit_restoration_is_not_a_global_nonce_grant(self):
         # No global nonce registry: deliberate restoration remains subject to

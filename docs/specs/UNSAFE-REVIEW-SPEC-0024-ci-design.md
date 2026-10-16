@@ -237,8 +237,8 @@ convenience.
 
 ### 4.1 `ci.yml` - admitted central product proof
 
-The caller pins the activated public Rust workflow at
-`a3125de962a74e7ec2e127d41d7532f66c69334d`, selects `standard`, disables
+The draft caller prepares the reviewed public Rust workflow at
+`8ff77e5876b4a7808a58e053aa6248b1020e02d0`, selects `standard`, disables
 forced hosted execution and fetches full history for the existing diff selector.
 It contains no physical runner label, inventory API call, read-token secret,
 host setup, scratch cleanup or cache action. Central owns trust classification,
@@ -246,7 +246,7 @@ native queueing, runner admission, disposable paths and aggregate failure.
 
 `.ci/run.sh` verifies the exact checkout and central Cargo target path, keys
 receipts to the native run/attempt, removes stale verdicts and executes
-`.ci/core.sh` synchronously with a 65-minute timeout. The proof retains both
+`.ci/core.sh` synchronously under native-origin remaining-budget supervision. The proof retains both
 existing command chains: fmt, clippy, `xtask ci-test`, rustdoc and `check-pr`;
 only a non-empty all-Markdown diff may skip `ci-test`. Unknown/unavailable
 comparisons run tests. The first failure short-circuits and remains the exit
@@ -260,13 +260,20 @@ symlinks and arbitrary output have no path into the retained evidence selection.
 central `$RUNNER_TEMP/cargo-target`. Advisory floor-time records are non-fatal.
 The same-run hostile-writer limitation of private same-user staging remains.
 
-**Qualification blocker:** the active central pin has no consumer failure-upload
-input. Script output paths alone do not upload an artifact. The existing
-seven-day, non-fatal, exact-file failure-evidence obligation remains blocking
-in the internal `check_ci_routing_contract` (via `xtask check-policy`). The draft must not be admitted or used
-for a protection transition until a reviewed central contract publishes the
-bounded summary, metadata and optional validated diagnostics. No direct-runner
-or runtime-token workaround is introduced.
+The caller requires `proof_admission: native-review-v1` and
+`whole_run_deadline: native-run-1200s`, and selects the optional
+`failure-diagnostics` artifact lane. The reviewed central hook independently
+revalidates authenticated authority after queue wait and executes semantic
+currentness/convergence owners from the protected base. Missing owners refuse
+readiness before product allocation. The bounded seven-day non-fatal publisher
+now exists in this pin; script staging alone still does not prove native
+publication/retention. The internal routing check validates this actual source
+contract without retaining the obsolete missing-hook failure.
+
+**Qualification prerequisites:** verify the live allowance for this exact pin,
+bootstrap the three review owners into protected base through normal review and
+merge gates, and execute the exact reviewed native subject. This source change
+performs no dispatch, protection transition or image activation.
 
 The reusable final check is nested under the caller and cannot be assumed to
 retain the old native `Unsafe Review Rust Result` binding. Existing protection
@@ -697,10 +704,11 @@ exact toolchain before repository proof. Other workflows retain their existing
 independent pins and obligations in this bounded migration.
 
 The caller selects the reviewed `standard` capability. The central job budget
-is 75 minutes. Source extraction alone does not prove the product fits that
-CPU, memory, disk or timeout envelope. Proof gets 65 minutes; bounded diagnostic
-finalization gets four minutes, leaving room for central admission and cleanup.
-The entire central job remains the hard outer bound. Product failure cannot
+remains 75 minutes as an outer fallback; the closed opt-in additionally
+supervises execution against original native created_at plus 1,200 seconds.
+The consumer subtracts time already spent and reserves termination, metadata
+and finalization time. Source alone does not prove cold product fit, native
+cancellation, queued-run termination, action post-steps or host cleanup. Product failure cannot
 be repaired by changing hardware or silently selecting hosted execution.
 
 `CARGO_TARGET_DIR` stays `$RUNNER_TEMP/cargo-target`. Runtime receipts and
@@ -1110,8 +1118,8 @@ Runtime/session state is a handoff fact, not a repository fact.
 The shipped [CI workflow](../../.github/workflows/ci.yml) is the authoritative
 example: cheap metadata admission, immutable central Rust workflow, standard
 profile, `.ci/run.sh`, full checkout history and a native result aggregate. The product call forwards no secrets and declares no `runs-on` or inline shell.
-Separate cheap metadata jobs perform admission and native result aggregation. The diagnostic publisher blocker
-in section 4.1 must be resolved before this draft can qualify.
+Separate cheap metadata jobs perform admission and native result aggregation. The protected-base owner, live allowance and native qualification
+prerequisites in section 4.1 remain before this draft can qualify.
 
 ## 17. Example advisory first-pr workflow
 
