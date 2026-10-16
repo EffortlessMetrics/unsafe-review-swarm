@@ -204,9 +204,13 @@ fn check_bootstrap_admission_contract(path: &str, text: &str) -> Result<(), Stri
         ],
         &["workflow_dispatch:", "merge_group:"],
     )?;
-    let guard = text.find("run: &native_subject_check").unwrap();
+    let guard = text
+        .find("run: &native_subject_check")
+        .ok_or_else(|| format!("{path} missing native guard"))?;
     let checkout = text.find("uses: actions/checkout").unwrap_or(0);
-    let route_guard = text.find("no explicit native admission").unwrap();
+    let route_guard = text
+        .find("no explicit native admission")
+        .ok_or_else(|| format!("{path} missing router admission guard"))?;
     let inventory = text.find("RESP=\"$(gh api").unwrap_or(0);
     if guard >= checkout || route_guard >= inventory {
         return Err(format!(
@@ -1315,9 +1319,9 @@ clippy\t4\t0\tbare-secret-material\n";
 #[cfg(test)]
 mod bootstrap_admission_tests {
     #[test]
-    fn missing_guard_is_rejected() {
+    fn missing_guard_is_rejected() -> Result<(), String> {
         let workflow = include_str!("../../.github/workflows/ci.yml");
-        super::check_bootstrap_admission_contract("ci.yml", workflow).unwrap();
+        super::check_bootstrap_admission_contract("ci.yml", workflow)?;
         for marker in [
             "run: &native_subject_check |",
             "steps.launch.outcome == 'success'",
@@ -1331,5 +1335,6 @@ mod bootstrap_admission_tests {
                 .is_err()
             );
         }
+        Ok(())
     }
 }
