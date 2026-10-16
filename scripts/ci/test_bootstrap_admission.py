@@ -291,6 +291,20 @@ class AdmissionTests(unittest.TestCase):
                     signal.alarm(0)
                     restore()
 
+    def test_partial_rerun_cannot_reuse_prior_admission_outputs(self):
+        import os, signal
+        from unittest.mock import patch
+        code = RESULT[RESULT.index('def expired('):]
+        env = dict(self.env, ADMISSION_REQUEST=json.dumps(self.request))
+        for changed in (dict(GITHUB_RUN_ATTEMPT='2'), dict(GITHUB_ACTOR='other'),
+                        dict(GITHUB_TRIGGERING_ACTOR='other'), dict(GITHUB_REPOSITORY='other/repo')):
+            with self.subTest(changed=changed), patch.dict(os.environ, dict(env, **changed), clear=True):
+                try:
+                    with self.assertRaises(ValueError):
+                        exec(compile(code, 'ci.yml/refresh', 'exec'), dict(ADMISSION.__dict__, public_api=lambda _: self.fail('must reject before API')))
+                finally:
+                    signal.alarm(0)
+
     def test_actual_driver_emits_only_after_authority_checks(self):
         import os, tempfile, urllib.request
         from unittest.mock import patch

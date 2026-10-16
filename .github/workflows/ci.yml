@@ -439,6 +439,11 @@ jobs:
               raise TimeoutError('bootstrap native refresh deadline exceeded')
           signal.signal(signal.SIGALRM, expired)
           signal.alarm(120)
+          require(os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'bootstrap partial rerun is not admission')
+          require(os.environ['GITHUB_REPOSITORY'] == REPO
+                  and os.environ['GITHUB_ACTOR'] == COORDINATOR
+                  and os.environ['GITHUB_TRIGGERING_ACTOR'] == COORDINATOR,
+                  'bootstrap coordinator mismatch')
           request = json.loads(os.environ['ADMISSION_REQUEST'])
           path = '/repos/' + REPO + '/pulls/' + str(request['pr'])
           current = public_api(path)
