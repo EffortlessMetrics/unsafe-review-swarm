@@ -1,8 +1,9 @@
 # Protected-base review-owner bootstrap
 
-This source-only branch supplies the three existing owners required by the
-reviewed central `native-review-v1` hook. It does not change the migration,
-workflows, product checks, permissions, protection or live allowance. It creates
+This prerequisite branch supplies the three existing owners required by the
+reviewed central `native-review-v1` hook. It preserves the migration and product checks, permissions, protection and live
+allowance. A temporary legacy-workflow admission guard makes draft publication
+cheap while these owners are reviewed for landing. It creates
 no new review requirement: the prepared #2380 caller already selects the central
 contract, which refuses when these protected-base files are absent.
 
@@ -53,6 +54,7 @@ Upstream Perl-specific policy-surface tests and helper scripts are excluded.
 python3 scripts/ci/test_check_pr_semantic_review_currentness.py
 python3 scripts/ci/test_review_owner_supersession.py
 python3 scripts/ci/test_review_owner_bootstrap.py
+python3 scripts/ci/test_bootstrap_admission.py
 bash -n scripts/ci/check-pr-review-convergence scripts/ci/check-pr-review-convergence-core
 ```
 
@@ -67,8 +69,8 @@ qualification. No test posts review markers or calls live GitHub.
 
 #2380 retains migration ownership at reviewed source
 77bea9a8c4303a07da759a68ac02e9b889f6604b. This bootstrap is separately based on
-Unsafe main b5355e2f917cad5132f5e1b72e2d8d43510b7d8a; it contains only owners,
-tests and this source handoff. No existing separate Unsafe owner PR was found;
+Unsafe main b5355e2f917cad5132f5e1b72e2d8d43510b7d8a; it contains the owners,
+tests, source handoff and temporary legacy-workflow admission guard. No existing separate Unsafe owner PR was found;
 the original owner fixes above are already merged in Perl.
 
 The bootstrap must land in Unsafe **protected main** through its normal review
@@ -81,13 +83,30 @@ semantic owner requires a genuine substantive semantic-review:v1 record bound
 to the cumulative subject; a generic source-review comment is not that record.
 Do not mint a positive marker or admission request from this bootstrap handoff.
 
-A main-target bootstrap PR currently inherits the legacy CI workflow, whose PR
-trigger is not late-admission guarded. This handoff therefore publishes only a
-non-main source branch, not a new PR or readiness transition that would start
-unapproved early product CI. Existing push workflows are restricted to
-main/master; this source branch is not a qualification trigger. The parent
-coordinator owns selecting an authorized normal landing/proof path. No required
-status is manufactured and no protection is bypassed.
+The bootstrap retains the existing legacy proof floor for its own normal
+required-check qualification. Product execution requires a fresh native PR body
+edit by the existing coordinator, with an independent review receipt bound to
+head/base/native integration/tree. Draft, Ready and synchronize do not admit
+product execution. The router emits hosted metadata-only routing without an
+inventory request on those events; the required check fails before checkout,
+toolchain setup or Cargo. It cannot treat skipped product proof as green.
+
+The same bounded native authority program runs before setup, immediately before
+product entry and after successful proof. It rejects subject drift, revocation,
+dismissed/adverse review and unavailable metadata. Checkout explicitly selects
+the reviewed native merge SHA; the launched proof confirms that checkout. The
+existing real command chains and bounded nonfatal failure publisher remain.
+The assertion step runs only after a successful launch, avoiding its long
+missing-receipt wait when admission or setup fails. No new token scopes, actions,
+runner grants, required checks or dispatch entrypoint are added.
+
+This guard does **not** select central 8ff, establish protected-base owner
+readiness, or make a whole-run deadline claim. The existing legacy 60-minute job
+cap remains; queue, setup and cleanup timing require actual qualification. The
+migration's stricter deadline is a separate consumer contract. No native request
+or qualification run is issued by local fixture tests. Draft publication is for
+source collaboration and remote-only qualification dependencies; landing still
+requires current independent review, real product success and native policy.
 
 Live allowance for the migration's exact 8ff77e58 pin is still unverified.
 Immutable runtime tools, cold product fit, artifacts/result binding and cleanup

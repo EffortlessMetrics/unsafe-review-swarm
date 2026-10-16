@@ -186,6 +186,36 @@ fn check_diagnostics_staging_order(path: &str, text: &str) -> Result<(), String>
     Ok(())
 }
 
+/// Keep bootstrap publication cheap without making absent proof a green check.
+fn check_bootstrap_admission_contract(path: &str, text: &str) -> Result<(), String> {
+    check_lane_markers(
+        path,
+        text,
+        "bootstrap late admission",
+        &[
+            "types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]",
+            "needs: [admission, route]",
+            "run: &native_subject_check |",
+            "Refresh native authority immediately before product proof",
+            "Revalidate exact native subject after product proof",
+            "steps.launch.outcome == 'success'",
+            "no explicit native admission",
+            "|| exit 78",
+        ],
+        &["workflow_dispatch:", "merge_group:"],
+    )?;
+    let guard = text.find("run: &native_subject_check").unwrap();
+    let checkout = text.find("uses: actions/checkout").unwrap_or(0);
+    let route_guard = text.find("no explicit native admission").unwrap();
+    let inventory = text.find("RESP=\"$(gh api").unwrap_or(0);
+    if guard >= checkout || route_guard >= inventory {
+        return Err(format!(
+            "{path} must reject absent admission before setup or inventory"
+        ));
+    }
+    Ok(())
+}
+
 /// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
 pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     let path = ".github/workflows/ci.yml";
@@ -262,6 +292,7 @@ pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
         ],
     )?;
     check_core_failure_evidence_contract(path, &text)?;
+    check_bootstrap_admission_contract(path, &text)?;
     if text.contains("repos/${") && text.contains("/actions/runners") {
         return Err(format!(
             "{path} must not reintroduce repository runner discovery (org-level only)"
@@ -1278,5 +1309,27 @@ clippy\t4\t0\tbare-secret-material\n";
             ));
         }
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod bootstrap_admission_tests {
+    #[test]
+    fn missing_guard_is_rejected() {
+        let workflow = include_str!("../../.github/workflows/ci.yml");
+        super::check_bootstrap_admission_contract("ci.yml", workflow).unwrap();
+        for marker in [
+            "run: &native_subject_check |",
+            "steps.launch.outcome == 'success'",
+            "|| exit 78",
+        ] {
+            assert!(
+                super::check_bootstrap_admission_contract(
+                    "ci.yml",
+                    &workflow.replace(marker, "REMOVED")
+                )
+                .is_err()
+            );
+        }
     }
 }
