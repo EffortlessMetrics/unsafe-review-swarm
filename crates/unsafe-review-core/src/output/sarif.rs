@@ -188,6 +188,7 @@ struct SarifResultProperties {
     missing_evidence: Vec<String>,
     witness_routes: Vec<String>,
     witness_route_details: Vec<SarifWitnessRoute>,
+    related_tests: Vec<SarifRelatedTest>,
     next_action: String,
     verify_commands: Vec<String>,
     trust_boundary: &'static str,
@@ -215,9 +216,32 @@ impl From<&ReviewCard> for SarifResultProperties {
                 .map(|route| format!("{}: {}", route.kind.as_str(), route.reason))
                 .collect(),
             witness_route_details: card.routes.iter().map(SarifWitnessRoute::from).collect(),
+            related_tests: card
+                .related_tests
+                .iter()
+                .map(SarifRelatedTest::from)
+                .collect(),
             next_action: card.next_action.summary.clone(),
             verify_commands: card.next_action.verify_commands.clone(),
             trust_boundary: TRUST_BOUNDARY,
+        }
+    }
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct SarifRelatedTest {
+    name: String,
+    file: String,
+    line: usize,
+}
+
+impl From<&crate::domain::RelatedTest> for SarifRelatedTest {
+    fn from(test: &crate::domain::RelatedTest) -> Self {
+        Self {
+            name: test.name.clone(),
+            file: test.file.clone(),
+            line: test.line,
         }
     }
 }
@@ -343,6 +367,18 @@ mod tests {
         assert_eq!(
             value["runs"][0]["results"][0]["properties"]["witnessRouteDetails"][0]["kind"],
             "miri"
+        );
+        assert_eq!(
+            value["runs"][0]["results"][0]["properties"]["relatedTests"][0]["name"],
+            "reads_header"
+        );
+        assert_eq!(
+            value["runs"][0]["results"][0]["properties"]["relatedTests"][0]["file"],
+            "src/lib.rs"
+        );
+        assert_eq!(
+            value["runs"][0]["results"][0]["properties"]["relatedTests"][0]["line"],
+            16
         );
         assert!(
             value["runs"][0]["results"][0]["properties"]["verifyCommands"][0]

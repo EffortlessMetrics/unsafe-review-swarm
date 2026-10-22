@@ -12,6 +12,14 @@ mod contract_text;
 mod control_flow;
 mod copy_range;
 mod evidence_state;
+// Call-to-parameter mapping preserved for the #2306 callee-contract model:
+// no obligation synthesizer may use it until an explicit supported
+// requirement source exists (#2315).
+#[allow(
+    dead_code,
+    reason = "mapping helpers preserved for #2306; no synthesizer may use them per #2315"
+)]
+pub(crate) mod ffi_argument;
 mod freshness;
 mod generic_bounds;
 mod get_unchecked;
@@ -31,9 +39,11 @@ mod raw_pointer_alignment;
 mod raw_pointer_bounds;
 mod reach_scan;
 mod receiver_path;
+mod return_value_discharge;
 mod set_len;
 mod site_context;
 mod source_value;
+mod state_bit_predicate;
 mod target_feature_discharge;
 mod transmute;
 mod u8_bool_value;
@@ -89,11 +99,11 @@ use self::identifier_syntax::{is_simple_identifier, let_binding_name};
 use self::initialized_discharge::initialized_discharge_state;
 use self::layout_discharge::layout_discharge_state;
 use self::marker_scan::{any_marker_occurrence, any_marker_tail};
-use self::operation_scope::code_before_operation;
+use self::operation_scope::{code_before_site_operation, site_snippet_anchor};
 use self::option_state::{ends_with_some_pattern, is_some_binding, match_some_branch_after_marker};
 use self::ownership_discharge::ownership_discharge_state;
 use self::pointer_arithmetic::has_pointer_arithmetic_bounds_guard;
-use self::pointer_live_discharge::pointer_live_discharge_state;
+use self::pointer_live_discharge::{nullability_discharge_state, pointer_live_discharge_state};
 use self::raw_pointer_bounds::{
     has_raw_pointer_read_bounds_evidence, has_raw_pointer_write_bounds_evidence,
 };
@@ -102,6 +112,7 @@ use self::receiver_path::{
     contains_receiver_fragment, contains_receiver_path, is_receiver_path_char,
     receiver_before_marker,
 };
+use self::return_value_discharge::return_value_discharge_state;
 use self::site_context::{code_context, code_context_through_site};
 use self::source_value::source_value_identifier;
 use self::target_feature_discharge::target_feature_discharge_state;
@@ -154,7 +165,8 @@ fn discharge_state_for(
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => capacity_discharge_state(site, lower),
         "initialized" => initialized_discharge_state(site, lower),
-        "non-null" | "pointer-live" => pointer_live_discharge_state(site, lower),
+        "non-null" => nullability_discharge_state(site, lower),
+        "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
             callee_contract_discharge_state(family, &site.operation.expression, lower)
@@ -162,10 +174,13 @@ fn discharge_state_for(
         "valid-value" => valid_value_discharge_state(site, lower),
         "layout" => layout_discharge_state(site, lower),
         "unreachable" => unreachable_discharge_state(family, lower),
+        "return-value" => return_value_discharge_state(site),
         "target-feature" => target_feature_discharge_state(family, contract),
-        "utf8" => utf8_discharge_state(family, lower),
+        "utf8" => utf8_discharge_state(site, family, lower),
         "valid-zero" => valid_zero_discharge_state(family, lower),
-        _ => EvidenceState::missing("No obligation-specific guard code was detected"),
+        _ => EvidenceState::missing(format!(
+            "No obligation-specific guard code was detected for the `{key}` obligation (no guard pattern is recognized for this obligation)"
+        )),
     }
 }
 
@@ -173,7 +188,7 @@ fn discharge_state_for(
 mod tests {
     use super::*;
     use crate::domain::{
-        OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+        OperationFamily, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
     };
     use std::fs;
     use std::path::{Path, PathBuf};
@@ -207,10 +222,12 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: snippet.to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 family,
                 expression: snippet.to_string(),
+                bound_name: None,
             },
             context_before: context_before.into_iter().map(str::to_string).collect(),
             context_after: context_after.into_iter().map(str::to_string).collect(),
@@ -1104,6 +1121,198 @@ mod tests {
     }
 
     #[test]
+    fn maybeuninit_array_assume_init_accepts_fully_initialized_array_binding() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Assoc form names the slot as its first argument, not a dot
+        // receiver; an array binding of `MaybeUninit::new` elements
+        // initializes every element, so it discharges like the method form.
+        let array_new = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];"],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        let ev = obligation_evidence(&array_new, &obligations, &contract, &reach);
+        assert!(ev[0].discharge.present);
+        // Same shape with the enclosing function signature in context, as
+        // the scanner emits it.
+        let array_new_in_fn = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "pub fn array_new_init() -> [u32; 4] {",
+                "let buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec!["}"],
+        );
+        let ev_fn = obligation_evidence(&array_new_in_fn, &obligations, &contract, &reach);
+        assert!(ev_fn[0].discharge.present);
+    }
+
+    #[test]
+    fn maybeuninit_drop_accepts_dominating_state_bit_guard() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Crossbeam shape: the drop runs only when the slot state records a
+        // prior write. The summary must name the predicate, not generic
+        // guard code.
+        let guarded = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+
+        let evidence = obligation_evidence(&guarded, &obligations, &contract, &reach);
+        assert!(evidence[0].discharge.present);
+        let summary = &evidence[0].discharge.summary;
+        assert!(
+            summary.contains("write"),
+            "summary names the bit: {summary}"
+        );
+    }
+
+    #[test]
+    fn maybeuninit_drop_rejects_ungoverning_state_bit_shapes() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Bit test after the operation cannot guard it.
+        let guarded_after = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let slot = (*block).slots.get_unchecked_mut(offset);"],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["if *slot.state.get_mut() & WRITE != 0 {", "}"],
+        );
+        // The tested state must belong to the dropped slot.
+        let other_state = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *other.state.get_mut() & WRITE != 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+        // `== 0` puts the operation in the bit-unset arm.
+        let wrong_arm = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE == 0 {",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+        // A closed sibling branch does not dominate the operation.
+        let sibling_branch = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+                "}",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec![],
+        );
+        // Rebinding the slot between guard and operation voids the guard.
+        let rebound = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut slot = (*block).slots.get_unchecked_mut(offset);",
+                "if *slot.state.get_mut() & WRITE != 0 {",
+                "slot = (*block).slots.get_unchecked_mut(other);",
+            ],
+            "unsafe { (*slot.msg.get()).assume_init_drop() }",
+            vec!["}"],
+        );
+
+        for site in [
+            &guarded_after,
+            &other_state,
+            &wrong_arm,
+            &sibling_branch,
+            &rebound,
+        ] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+        }
+    }
+
+    #[test]
+    fn maybeuninit_array_assume_init_rejects_partial_and_stale_coverage() {
+        let obligations = vec![SafetyObligation::new(
+            "initialized",
+            "all fields/elements are initialized and valid before `assume_init`",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // Loop element writes cannot prove totality textually: a loop over
+        // half the slots must not discharge, even though the write marker
+        // names the same slot.
+        let half_loop = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut buf: [MaybeUninit<u32>; 4] = MaybeUninit::uninit_array();",
+                "for i in 0..2 {",
+                "    buf[i].write(i as u32);",
+                "}",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        // Rebinding the slot after the initializing binding discards it.
+        let stale_binding = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec![
+                "let mut buf: [MaybeUninit<u32>; 4] = [MaybeUninit::new(0); 4];",
+                "buf = MaybeUninit::uninit_array();",
+            ],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+        // No initialization evidence at all.
+        let bare_passthrough = site_with_family(
+            OperationFamily::MaybeUninitAssumeInit,
+            vec!["let buf: [MaybeUninit<u32>; 4] = MaybeUninit::uninit_array();"],
+            "unsafe { MaybeUninit::array_assume_init(buf) }",
+            vec![],
+        );
+
+        for site in [&half_loop, &stale_binding, &bare_passthrough] {
+            let ev = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!ev[0].discharge.present);
+        }
+    }
+
+    #[test]
     fn maybeuninit_assume_init_rejects_conditional_other_and_stale_initialization() {
         let obligations = vec![SafetyObligation::new(
             "initialized",
@@ -1260,6 +1469,33 @@ mod tests {
         assert_eq!(
             raw_read_evidence[0].discharge.summary,
             "No obligation-specific guard code was detected"
+        );
+    }
+
+    #[test]
+    fn unhandled_obligation_key_names_itself_in_discharge_summary() {
+        let obligations = vec![SafetyObligation::new(
+            "asm",
+            "inline assembly operands and clobbers are valid",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let site = site_with_family(
+            OperationFamily::RawPointerRead,
+            vec!["pub unsafe fn run(ptr: *const u8) -> u8 {"],
+            "ptr.read()",
+            vec![],
+        );
+
+        let evidence = obligation_evidence(&site, &obligations, &contract, &reach);
+
+        assert!(!evidence[0].discharge.present);
+        assert_eq!(
+            evidence[0].discharge.summary,
+            "No obligation-specific guard code was detected for the `asm` obligation (no guard pattern is recognized for this obligation)"
         );
     }
 
@@ -4463,6 +4699,113 @@ mod tests {
         assert!(if_let_ok_evidence[0].discharge.present);
         assert!(let_else_ok_evidence[0].discharge.present);
         assert!(match_ok_evidence[0].discharge.present);
+    }
+
+    #[test]
+    fn from_utf8_plain_assert_is_ok_discharges_utf8_obligation() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // A failing plain assert aborts before the unchecked conversion, so
+        // it validates the buffer exactly like the branch shapes.
+        let bare_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(bytes).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        let message_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(bytes).is_ok(), \"header must be utf8\");"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+
+        for site in [&bare_assert, &message_assert] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(evidence[0].discharge.present);
+        }
+    }
+
+    #[test]
+    fn from_utf8_assert_rejects_debug_wrong_buffer_stale_and_aliased() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // debug_assert! is compiled out in release: no runtime validation.
+        let debug_assert = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["debug_assert!(core::str::from_utf8(bytes).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // The assert must name the converted buffer.
+        let wrong_buffer = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec!["assert!(core::str::from_utf8(other).is_ok());"],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // Reassigning the buffer after the assert voids the validation.
+        let reassigned = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "assert!(core::str::from_utf8(bytes).is_ok());",
+                "bytes = refill();",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+        // An aliased boolean carries no inline validation text: crediting it
+        // would require dataflow the analyzer does not have.
+        let aliased = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "let ok = core::str::from_utf8(bytes).is_ok();",
+                "assert!(ok);",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(bytes) }",
+            vec![],
+        );
+
+        for site in [&debug_assert, &wrong_buffer, &reassigned, &aliased] {
+            let evidence = obligation_evidence(site, &obligations, &contract, &reach);
+            assert!(!evidence[0].discharge.present);
+        }
+    }
+
+    #[test]
+    fn from_utf8_unchecked_anchors_on_own_call_not_first_duplicate() {
+        let obligations = vec![SafetyObligation::new("utf8", "bytes are valid UTF-8")];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        // An earlier guarded site sharing the window must not donate its
+        // buffer argument to a later unguarded site: the later call converts
+        // a different buffer with no validation of its own.
+        let later_unguarded = site_with_family(
+            OperationFamily::StrFromUtf8Unchecked,
+            vec![
+                "fn one() {",
+                "assert!(core::str::from_utf8(bytes).is_ok());",
+                "unsafe { core::str::from_utf8_unchecked(bytes) }",
+                "}",
+                "fn two() {",
+            ],
+            "unsafe { core::str::from_utf8_unchecked(other) }",
+            vec!["}"],
+        );
+
+        let evidence = obligation_evidence(&later_unguarded, &obligations, &contract, &reach);
+        assert!(!evidence[0].discharge.present);
     }
 
     #[test]

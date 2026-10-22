@@ -4,7 +4,9 @@ use super::{
     ScannedSite, contains_any, contains_call_name, context_slice, first_non_ws_column, one_line,
     visibility_for_snippet,
 };
-use crate::domain::{OperationFamily, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind};
+use crate::domain::{
+    OperationFamily, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
+};
 use crate::input::diff::DiffIndex;
 use std::collections::{BTreeMap, BTreeSet};
 use std::path::PathBuf;
@@ -111,10 +113,12 @@ fn js_buffer_materialize_after_reentry_site(
             public_api_surface: false,
             changed: true,
             snippet: materialize.text.clone(),
+            role: SourceRole::Unknown,
         },
         operation: UnsafeOperation {
             family: js_buffer_stable_byte_family(capture),
             expression: js_buffer_stable_byte_expression(capture, reentry, materialize),
+            bound_name: None,
         },
         context_before,
         context_after,
@@ -212,6 +216,7 @@ fn js_buffer_stale_span_use_site(
             public_api_surface: false,
             changed: true,
             snippet: use_line.text.clone(),
+            role: SourceRole::Unknown,
         },
         operation: UnsafeOperation {
             family: OperationFamily::StableByteSourceGetterReentry,
@@ -222,6 +227,7 @@ fn js_buffer_stale_span_use_site(
                 use_line,
                 stale_guard_idx.map(|idx| &owner_lines[idx]),
             ),
+            bound_name: None,
         },
         context_before,
         context_after,

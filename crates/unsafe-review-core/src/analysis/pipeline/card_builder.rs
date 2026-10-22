@@ -17,7 +17,12 @@ pub(super) fn build_card(
     scanned_site: crate::analysis::scanner::ScannedSite,
 ) -> ReviewCard {
     let hazards = obligations::hazards_for(&scanned_site.operation.family);
-    let obligations = obligations::obligations_for(&scanned_site.operation.family);
+    let mut obligations = obligations::obligations_for(&scanned_site.operation.family);
+    if scanned_site.operation.family == OperationFamily::Ffi {
+        obligations.extend(obligations::ffi_return_value_obligation(
+            scanned_site.operation.bound_name.as_deref(),
+        ));
+    }
     let contract = evidence::contract_evidence(&scanned_site);
     let contract_for_classification = operation_contract_override(&scanned_site.operation.family)
         .unwrap_or_else(|| contract.clone());
@@ -33,7 +38,11 @@ pub(super) fn build_card(
         &reach,
     );
     let discharge = evidence::summarize_discharge(&obligation_evidence);
-    let routes = witness::routes_for(&hazards, scanned_site.site.owner.as_ref());
+    let routes = witness::routes_for(
+        &hazards,
+        scanned_site.site.owner.as_ref(),
+        reach.state != "unreached",
+    );
     let (mut class, mut priority, confidence) =
         classify::classify(&hazards, &contract_for_classification, &discharge, &reach);
     let mut missing = Vec::new();
@@ -72,18 +81,18 @@ pub(super) fn build_card(
         for evidence in &mut obligation_evidence {
             evidence.witness = crate::domain::EvidenceState::present(&witness_evidence.summary);
         }
-        if class == ReviewClass::GuardedUnwitnessed {
+        // A structured verdict (`confirmed` / `not_reproduced` /
+        // `inconclusive`) is an observation about one run, not a discharge of
+        // the witness obligation: a reproduced failure still requires
+        // attention, an inconclusive run leaves adequacy unresolved, and a
+        // single non-reproduction is not a safety claim. Keep the witness
+        // work open (and the hazard-derived priority intact) while retaining
+        // the receipt evidence and its limitations in the slots. Only a
+        // verdict-less receipt (legacy/human `executed` / `receipt_imported`
+        // provenance) closes the card as before.
+        if class == ReviewClass::GuardedUnwitnessed && witness_evidence.verdict.is_none() {
             class = ReviewClass::GuardedAndWitnessed;
-            // A `confirmed` verdict means the runtime witness observed a
-            // failure at the site. That preserves the safety obligation and
-            // increases urgency: do NOT lower priority. The site was
-            // witnessed (hence `GuardedAndWitnessed`), but the observed
-            // failure is evidence the unsafe code triggered the hazard — not
-            // that it is safe. All other verdicts (absent / `not_reproduced`
-            // / `inconclusive`) lower priority to Low as before.
-            if witness_evidence.verdict.as_deref() != Some("confirmed") {
-                priority = Priority::Low;
-            }
+            priority = Priority::Low;
         }
     } else if class == ReviewClass::GuardedUnwitnessed
         && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
@@ -131,6 +140,10 @@ pub(super) fn build_card(
             &scanned_site.site.visibility,
             &routes,
             &obligation_evidence,
+            contract_for_classification.present,
+            scanned_site.site.owner.as_deref(),
+            &scanned_site.context_before,
+            witness_evidence.confirmation_state(),
         )
     };
     let next_action = NextAction {

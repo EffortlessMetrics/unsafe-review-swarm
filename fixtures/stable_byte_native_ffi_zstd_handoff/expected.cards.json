@@ -37,12 +37,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `abi` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
+          "summary": "1 related test file mentions owner `zstd_overlap_handoff`"
         },
         "witness": {
           "present": false,
@@ -66,7 +66,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
+          "summary": "1 related test file mentions owner `zstd_overlap_handoff`"
         },
         "witness": {
           "present": false,
@@ -77,7 +77,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `zstd_overlap_handoff`",
+    "reach": "1 related test file mentions owner `zstd_overlap_handoff`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -97,6 +97,13 @@
         "reason": "Reviewed FFI ABI and ownership seams can be recorded with a human deep-review receipt when executable witnesses cannot cross the foreign boundary",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "mentions_zstd_overlap_handoff",
+        "file": "src/lib.rs",
+        "line": 51
       }
     ],
     "missing": [
@@ -181,12 +188,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `byte-stability` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `zstd_overlap_handoff`"
+          "summary": "1 related test file mentions owner `zstd_overlap_handoff`"
         },
         "witness": {
           "present": false,
@@ -197,7 +204,7 @@
     ],
     "contract": "Stable-byte-source native FFI heuristic uses byte-stability evidence, not unsafe API safety docs",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `zstd_overlap_handoff`",
+    "reach": "1 related test file mentions owner `zstd_overlap_handoff`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -205,6 +212,13 @@
         "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "mentions_zstd_overlap_handoff",
+        "file": "src/lib.rs",
+        "line": 51
       }
     ],
     "missing": [

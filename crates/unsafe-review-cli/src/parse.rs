@@ -1,9 +1,10 @@
 use crate::command::{
-    BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
-    BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
-    CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format,
-    InitOptions, OutcomeOptions, RepoOptions, SubcommandHelpTarget,
+    AgentCommand, AgentTasksOptions, BaselineAddOptions, BaselineCommand, BaselineInitOptions,
+    BaselineRefreshOptions, BaselineStatusOptions, CandidateCommand, CandidateImportOptions,
+    CandidateLintOptions, CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions,
+    CheckOptions, Command, ContextQuery, DiffInput, EnvFeatureSelect, EnvOptions,
+    ExternalPrSetupOptions, FirstPrEntrypoint, FirstPrOptions, Format, InitOptions, OutcomeOptions,
+    RepoOptions, ScopeOptions, ScopeSelect, SubcommandHelpTarget, WorkOptions,
 };
 use std::{
     env,
@@ -72,6 +73,10 @@ pub(crate) fn parse(args: impl IntoIterator<Item = String>) -> Result<Command, S
             })
         }
         "repo" => parse_repo(rest).map(Command::Repo),
+        "scope" => parse_scope(rest).map(Command::Scope),
+        "work" => parse_work(rest).map(Command::Work),
+        "agent" => parse_agent(rest).map(Command::Agent),
+        "environment" => parse_environment(rest).map(Command::Environment),
         "pilot" => parse_check(rest).map(|mut options| {
             options.max_cards = Some(options.max_cards.unwrap_or(5));
             Command::Pilot(options)
@@ -107,6 +112,10 @@ fn is_known_command(command: &str) -> bool {
             | "pr-setup"
             | "pr"
             | "repo"
+            | "scope"
+            | "work"
+            | "agent"
+            | "environment"
             | "pilot"
             | "badges"
             | "explain"
@@ -654,6 +663,10 @@ fn subcommand_help_for(command: &str) -> Command {
         "init" => SubcommandHelpTarget::Init,
         "pr-setup" => SubcommandHelpTarget::PrSetup,
         "doctor" => SubcommandHelpTarget::Doctor,
+        "scope" => SubcommandHelpTarget::Scope,
+        "work" => SubcommandHelpTarget::Work,
+        "agent" => SubcommandHelpTarget::Agent,
+        "environment" => SubcommandHelpTarget::Environment,
         "badges" => SubcommandHelpTarget::Badges,
         "lsp" => SubcommandHelpTarget::Lsp,
         "support" => SubcommandHelpTarget::Support,
@@ -955,6 +968,347 @@ fn parse_doctor(args: Vec<String>) -> Result<Command, String> {
     Ok(Command::Doctor { root })
 }
 
+fn parse_scope_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported scope format `{}`; scope projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_scope(args: Vec<String>) -> Result<ScopeOptions, String> {
+    let mut options = ScopeOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--base" => {
+                idx += 1;
+                options.base = Some(value(&args, idx, "--base")?.to_string());
+            }
+            arg if arg.starts_with("--base=") => {
+                options.base = Some(inline_value(arg, "--base")?.to_string());
+            }
+            "--head" => {
+                idx += 1;
+                options.head = Some(value(&args, idx, "--head")?.to_string());
+            }
+            arg if arg.starts_with("--head=") => {
+                options.head = Some(inline_value(arg, "--head")?.to_string());
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_scope_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_scope_format(inline_value(arg, "--format")?)?;
+            }
+            other => return Err(format!("unknown scope argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err("only one of --staged, --unstaged, --worktree may be given".to_string());
+    }
+    if options.base.is_some() {
+        if scope_flags > 0 {
+            return Err("--base selects a commit range and cannot be combined with --staged, --unstaged, or --worktree".to_string());
+        }
+        options.scope = ScopeSelect::CommitRange;
+    }
+    if options.head.is_some() && options.base.is_none() {
+        return Err("--head needs --base: a range head without a base is not a scope".to_string());
+    }
+    Ok(options)
+}
+
+fn parse_agent(args: Vec<String>) -> Result<AgentCommand, String> {
+    let mut rest = args.as_slice();
+    if rest.first().is_some_and(|word| *word == "help") {
+        return Ok(AgentCommand::Help);
+    }
+    let Some((subcommand, tail)) = rest.split_first() else {
+        return Ok(AgentCommand::Help);
+    };
+    rest = tail;
+    if subcommand != "tasks" {
+        return Err(format!(
+            "unknown agent subcommand `{subcommand}`; expected `tasks` (run `unsafe-review agent --help`)"
+        ));
+    }
+    let mut options = AgentTasksOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < rest.len() {
+        match rest[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(rest, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--scope" => {
+                idx += 1;
+                options.scope = match value(rest, idx, "--scope")? {
+                    "staged" => ScopeSelect::Staged,
+                    "unstaged" => ScopeSelect::Unstaged,
+                    "worktree" => ScopeSelect::Worktree,
+                    other => {
+                        return Err(format!(
+                            "unknown --scope `{other}`; expected staged, unstaged, or worktree"
+                        ));
+                    }
+                };
+                scope_flags += 1;
+            }
+            "--role" => {
+                idx += 1;
+                let raw = value(rest, idx, "--role")?.to_string();
+                unsafe_review_core::TaskRole::parse(&raw)?;
+                options.role = Some(raw);
+            }
+            "--readiness" => {
+                idx += 1;
+                let raw = value(rest, idx, "--readiness")?.to_string();
+                unsafe_review_core::TaskReadiness::parse(&raw)?;
+                options.readiness = Some(raw);
+            }
+            "--human-only" => {
+                options.human_only = true;
+            }
+            "--changed-only" => {
+                options.changed_only = true;
+            }
+            "--max-tasks" => {
+                idx += 1;
+                options.max_tasks = parse_max_tasks(value(rest, idx, "--max-tasks")?)?;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_agent_format(value(rest, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_agent_format(inline_value(arg, "--format")?)?;
+            }
+            "--json" => {
+                options.format = Format::Json;
+            }
+            "--help" | "-h" => {
+                return Ok(AgentCommand::Help);
+            }
+            other => return Err(format!("unknown agent tasks argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err(
+            "only one scope selection may be given (--staged, --unstaged, --worktree, --scope)"
+                .to_string(),
+        );
+    }
+    Ok(AgentCommand::Tasks(options))
+}
+
+fn parse_agent_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported agent format `{}`; agent tasks projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_work_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported work format `{}`; work projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_work(args: Vec<String>) -> Result<WorkOptions, String> {
+    let mut options = WorkOptions::default();
+    let mut scope_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--staged" => {
+                options.scope = ScopeSelect::Staged;
+                scope_flags += 1;
+            }
+            "--unstaged" => {
+                options.scope = ScopeSelect::Unstaged;
+                scope_flags += 1;
+            }
+            "--worktree" => {
+                options.scope = ScopeSelect::Worktree;
+                scope_flags += 1;
+            }
+            "--short" => {
+                options.short = true;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_work_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_work_format(inline_value(arg, "--format")?)?;
+            }
+            "--json" => {
+                options.format = Format::Json;
+            }
+            "--max-cards" => {
+                idx += 1;
+                options.max_cards = Some(parse_max_cards(value(&args, idx, "--max-cards")?)?);
+            }
+            arg if arg.starts_with("--max-cards=") => {
+                options.max_cards = Some(parse_max_cards(inline_value(arg, "--max-cards")?)?);
+            }
+            other => return Err(format!("unknown work argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if scope_flags > 1 {
+        return Err("only one of --staged, --unstaged, --worktree may be given".to_string());
+    }
+    Ok(options)
+}
+
+fn parse_environment_format(raw: &str) -> Result<Format, String> {
+    match parse_format(raw)? {
+        Format::Human => Ok(Format::Human),
+        Format::Json => Ok(Format::Json),
+        other => Err(format!(
+            "unsupported environment format `{}`; environment projects `human` and `json` only",
+            format_name(&other)
+        )),
+    }
+}
+
+fn parse_environment(args: Vec<String>) -> Result<EnvOptions, String> {
+    let mut options = EnvOptions::default();
+    let mut feature_flags = 0u8;
+    let mut idx = 0usize;
+    while idx < args.len() {
+        match args[idx].as_str() {
+            "--root" => {
+                idx += 1;
+                options.root = parse_path_value(&args, idx, "--root")?;
+            }
+            arg if arg.starts_with("--root=") => {
+                options.root = parse_inline_path_value(arg, "--root")?;
+            }
+            "--features" => {
+                idx += 1;
+                let raw = value(&args, idx, "--features")?;
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
+                feature_flags += 1;
+            }
+            arg if arg.starts_with("--features=") => {
+                let raw = inline_value(arg, "--features")?;
+                options.features =
+                    EnvFeatureSelect::Explicit(parse_feature_list(raw, "--features")?);
+                feature_flags += 1;
+            }
+            "--all-features" => {
+                options.features = EnvFeatureSelect::All;
+                feature_flags += 1;
+            }
+            "--no-default-features" => {
+                options.features = EnvFeatureSelect::NoDefault;
+                feature_flags += 1;
+            }
+            "--no-toolchain-probe" => {
+                options.probe_toolchain = false;
+            }
+            "--no-member-expand" => {
+                options.expand_members = false;
+            }
+            "--format" => {
+                idx += 1;
+                options.format = parse_environment_format(value(&args, idx, "--format")?)?;
+            }
+            arg if arg.starts_with("--format=") => {
+                options.format = parse_environment_format(inline_value(arg, "--format")?)?;
+            }
+            other => return Err(format!("unknown environment argument `{other}`")),
+        }
+        idx += 1;
+    }
+    if feature_flags > 1 {
+        return Err(
+            "only one of --features, --all-features, --no-default-features may be given"
+                .to_string(),
+        );
+    }
+    Ok(options)
+}
+
+/// Split a `--features` value into names. A leading `=` is a typo for the
+/// inline form (`--features =fast` instead of `--features=fast`); accepting
+/// it would record a feature Cargo never recognizes, so it fails closed.
+fn parse_feature_list(raw: &str, flag: &str) -> Result<Vec<String>, String> {
+    if raw.starts_with('=') {
+        return Err(format!(
+            "missing value for {flag} (got `{raw}`; expected `{flag} <a,b>` or `{flag}=<a,b>`)"
+        ));
+    }
+    Ok(raw
+        .split(',')
+        .map(str::trim)
+        .filter(|item| !item.is_empty())
+        .map(str::to_string)
+        .collect())
+}
+
 fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     let mut options = FirstPrOptions::default();
     let mut saw_base_ref = false;
@@ -973,20 +1327,33 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
                 "unknown first-pr argument `{arg}`; did you mean `--out-dir`?"
             ));
         }
-        // `--format`, `--policy`, `--json`, `--markdown` belong to `check`/`repo`.
-        // `first-pr` always writes a full advisory artifact bundle to `--out-dir`
-        // and is advisory-only; none of these flags are honored.
-        // Intercept before try_apply_check_arg silently consumes them.
+        // `--format`, `--policy`, `--json`, `--markdown`, `--short` belong to
+        // `check`/`repo`. `first-pr` always writes a full advisory artifact
+        // bundle to `--out-dir` and is advisory-only; none of these flags are
+        // honored. Intercept before try_apply_check_arg silently consumes them.
+        // The envelope-selection flags are `check`-only for the same reason:
+        // the configuration section projects human/json output, which
+        // `first-pr` never renders.
         if arg == "--format"
             || arg.starts_with("--format=")
             || arg == "--policy"
             || arg.starts_with("--policy=")
             || arg == "--json"
             || arg == "--markdown"
+            || arg == "--short"
+            || arg == "--features"
+            || arg.starts_with("--features=")
+            || arg == "--all-features"
+            || arg == "--no-default-features"
+            || arg == "--target"
+            || arg.starts_with("--target=")
+            || arg == "--aperture"
+            || arg == "--impact"
+            || arg == "--stages"
         {
             return Err(format!(
-                "unknown first-pr argument `{arg}`; `--format` and `--policy` belong to the \
-                 `check`/`repo` subcommands — `first-pr` always writes a full advisory artifact \
+                "unknown first-pr argument `{arg}`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
                  bundle to `--out-dir`"
             ));
         }
@@ -1070,6 +1437,18 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
     }
     validate_first_pr_exact_sha_options(&options, saw_base_ref, saw_base_sha)?;
     validate_check_options(&options.check)?;
+    if let Some(latency_out) = &options.check.latency_out {
+        let mut protected: Vec<(&str, std::path::PathBuf)> = Vec::new();
+        protected.push(("--out-dir", options.out_dir.clone()));
+        for name in crate::execute::first_pr_artifact_names() {
+            protected.push(("bundle artifact", options.out_dir.join(name)));
+        }
+        let borrowed: Vec<(&str, &std::path::Path)> = protected
+            .iter()
+            .map(|(flag, path)| (*flag, path.as_path()))
+            .collect();
+        crate::latency::reject_latency_collision(latency_out, &borrowed)?;
+    }
     Ok(options)
 }
 
@@ -1087,6 +1466,24 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
     let mut options = RepoOptions::default();
     let mut idx = 0usize;
     while idx < args.len() {
+        // The envelope-selection flags and `--aperture` are `check`-only:
+        // those sections project single-run human/json output, which `repo`
+        // never renders through that path.
+        let arg = args[idx].as_str();
+        if arg == "--features"
+            || arg.starts_with("--features=")
+            || arg == "--all-features"
+            || arg == "--no-default-features"
+            || arg == "--target"
+            || arg.starts_with("--target=")
+            || arg == "--aperture"
+            || arg == "--impact"
+            || arg == "--stages"
+        {
+            return Err(format!(
+                "unknown repo argument `{arg}`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
+            ));
+        }
         if let Some(consumed) = check_parse::try_apply_check_arg(&args, idx, &mut options.check)? {
             idx += consumed;
             continue;
@@ -1164,6 +1561,20 @@ fn parse_repo(args: Vec<String>) -> Result<RepoOptions, String> {
         idx += 1;
     }
     validate_check_options(&options.check)?;
+    if options.list_files && options.check.latency_out.is_some() {
+        return Err(
+            "--latency-out has no analysis to measure under --list-files/--dry-run; drop one of the flags"
+                .to_string(),
+        );
+    }
+    if let (Some(latency_out), Some(report)) = (&options.check.latency_out, &options.check.out) {
+        let protected = crate::execute::repo_protected_outputs(report);
+        let borrowed: Vec<(&str, &std::path::Path)> = protected
+            .iter()
+            .map(|(flag, path)| (*flag, path.as_path()))
+            .collect();
+        crate::latency::reject_latency_collision(latency_out, &borrowed)?;
+    }
     Ok(options)
 }
 
@@ -1476,6 +1887,42 @@ fn validate_check_options(options: &CheckOptions) -> Result<(), String> {
     if options.base.is_some() && options.diff.is_some() {
         return Err("choose only one of --base or --diff".to_string());
     }
+    if let (Some(latency_out), Some(out)) = (&options.latency_out, &options.out) {
+        crate::latency::reject_latency_collision(latency_out, &[("--out", out)])?;
+    }
+    if options.short && options.format != Format::Human {
+        return Err(
+            "--short applies to human output only; drop --format or use the default human format"
+                .to_string(),
+        );
+    }
+    if options.has_env_selection()
+        && options.format != Format::Human
+        && options.format != Format::Json
+    {
+        return Err(
+            "the configuration section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
+    if options.aperture && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the aperture section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
+    if options.impact && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the impact section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
+    if options.stages && options.format != Format::Human && options.format != Format::Json {
+        return Err(
+            "the stages section projects `human` and `json` only; drop --format or use one of those"
+                .to_string(),
+        );
+    }
     Ok(())
 }
 
@@ -1550,6 +1997,11 @@ fn parse_max_cards(raw: &str) -> Result<usize, String> {
 fn parse_max_files(raw: &str) -> Result<usize, String> {
     raw.parse::<usize>()
         .map_err(|err| format!("invalid --max-files `{raw}`: {err}"))
+}
+
+fn parse_max_tasks(raw: &str) -> Result<usize, String> {
+    raw.parse::<usize>()
+        .map_err(|err| format!("invalid --max-tasks `{raw}`: {err}"))
 }
 
 fn parse_timeout_seconds(raw: &str) -> Result<u64, String> {
@@ -1655,6 +2107,432 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::PrSummary);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_envelope_selection_for_check() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "fast, checked",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+        ]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            options.env_features,
+            EnvFeatureSelect::Explicit(vec!["fast".to_string(), "checked".to_string()])
+        );
+        assert_eq!(options.target, Some("x86_64-unknown-linux-gnu".to_string()));
+        assert!(options.has_env_selection());
+
+        let command = parse(args(["unsafe-review", "check"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(!options.has_env_selection());
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_envelope_selection_conflicts_and_format() {
+        let both = parse(args([
+            "unsafe-review",
+            "check",
+            "--all-features",
+            "--no-default-features",
+        ]));
+        assert_eq!(
+            both,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given (got --no-default-features too)"
+                    .to_string()
+            )
+        );
+        let bad_format = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "fast",
+            "--format",
+            "sarif",
+        ]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "the configuration section projects `human` and `json` only; drop --format or use one of those"
+                    .to_string()
+            )
+        );
+        let repeated = parse(args([
+            "unsafe-review",
+            "check",
+            "--features",
+            "a",
+            "--features",
+            "b",
+        ]));
+        assert_eq!(
+            repeated,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given (got --features too)"
+                    .to_string()
+            )
+        );
+        let repeated_target = parse(args([
+            "unsafe-review",
+            "check",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+            "--target",
+            "aarch64-apple-darwin",
+        ]));
+        assert_eq!(
+            repeated_target,
+            Err("--target may be given only once (got --target again)".to_string())
+        );
+        let empty_target = parse(args(["unsafe-review", "check", "--target", " "]));
+        assert_eq!(
+            empty_target,
+            Err("--target needs a triple (for example `x86_64-unknown-linux-gnu`)".to_string())
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--features", "fast"])),
+            Err(
+                "unknown first-pr argument `--features`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--aperture"])),
+            Err(
+                "unknown first-pr argument `--aperture`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--target", "x"])),
+            Err(
+                "unknown repo argument `--target`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--aperture"])),
+            Err(
+                "unknown repo argument `--aperture`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "first-pr", "--impact"])),
+            Err(
+                "unknown first-pr argument `--impact`; `--format`, `--policy`, `--short`, `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the \
+                 `check` subcommand — `first-pr` always writes a full advisory artifact \
+                 bundle to `--out-dir`"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args(["unsafe-review", "repo", "--impact"])),
+            Err(
+                "unknown repo argument `--impact`; `--features`, `--target`, `--aperture`, `--impact`, and `--stages` belong to the `check` subcommand"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args([
+                "unsafe-review",
+                "check",
+                "--impact",
+                "--format",
+                "sarif",
+            ])),
+            Err(
+                "the impact section projects `human` and `json` only; drop --format or use one of those"
+                    .to_string()
+            )
+        );
+        assert_eq!(
+            parse(args([
+                "unsafe-review",
+                "check",
+                "--aperture",
+                "--format",
+                "sarif",
+            ])),
+            Err(
+                "the aperture section projects `human` and `json` only; drop --format or use one of those"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn parses_work_scope_flags() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "work"]))?;
+        let Command::Work(options) = command else {
+            return Err("expected work command".to_string());
+        };
+        if options.scope != ScopeSelect::Worktree {
+            return Err("work must default to the worktree scope".to_string());
+        }
+        let command = parse(args(["unsafe-review", "work", "--staged", "--short"]))?;
+        let Command::Work(options) = command else {
+            return Err("expected work command".to_string());
+        };
+        if options.scope != ScopeSelect::Staged || !options.short {
+            return Err("work must honor --staged --short".to_string());
+        }
+        assert!(
+            parse(args(["unsafe-review", "work", "--staged", "--unstaged"])).is_err(),
+            "work must reject two scope flags"
+        );
+        assert!(
+            parse(args(["unsafe-review", "work", "--format", "sarif"])).is_err(),
+            "work must reject non-human/json formats"
+        );
+        assert!(
+            parse(args(["unsafe-review", "work", "--base", "main"])).is_err(),
+            "work is local-only and must reject --base"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_agent_tasks_filters() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "agent", "tasks"]))?;
+        let Command::Agent(AgentCommand::Tasks(options)) = command else {
+            return Err("expected agent tasks command".to_string());
+        };
+        if options.scope != ScopeSelect::Worktree {
+            return Err("agent tasks must default to the worktree scope".to_string());
+        }
+        let command = parse(args([
+            "unsafe-review",
+            "agent",
+            "tasks",
+            "--scope",
+            "staged",
+            "--role",
+            "production",
+            "--readiness",
+            "ready",
+            "--human-only",
+            "--changed-only",
+            "--max-tasks",
+            "5",
+        ]))?;
+        let Command::Agent(AgentCommand::Tasks(options)) = command else {
+            return Err("expected agent tasks command".to_string());
+        };
+        if options.scope != ScopeSelect::Staged
+            || options.role.as_deref() != Some("production")
+            || options.readiness.as_deref() != Some("ready")
+            || !options.human_only
+            || !options.changed_only
+            || options.max_tasks != 5
+        {
+            return Err("agent tasks must honor scope and filters".to_string());
+        }
+        assert!(
+            parse(args(["unsafe-review", "agent", "tasks", "--role", "prod"])).is_err(),
+            "agent tasks must reject unknown roles"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--readiness",
+                "soon"
+            ]))
+            .is_err(),
+            "agent tasks must reject unknown readiness"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--staged",
+                "--unstaged"
+            ]))
+            .is_err(),
+            "agent tasks must reject two scope flags"
+        );
+        assert!(
+            parse(args(["unsafe-review", "agent", "packets"])).is_err(),
+            "agent must reject unknown subcommands"
+        );
+        assert!(
+            parse(args([
+                "unsafe-review",
+                "agent",
+                "tasks",
+                "--format",
+                "sarif"
+            ]))
+            .is_err(),
+            "agent tasks must reject non-human/json formats"
+        );
+        let error = match parse(args([
+            "unsafe-review",
+            "agent",
+            "tasks",
+            "--max-tasks",
+            "many",
+        ])) {
+            Ok(_) => return Err("non-numeric --max-tasks should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("invalid --max-tasks"),
+            "error must name the flag the user typed"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_stages_for_check_only() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "check", "--stages"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(options.stages);
+        assert!(
+            parse(args(["unsafe-review", "first-pr", "--stages"])).is_err(),
+            "first-pr must reject --stages"
+        );
+        assert!(
+            parse(args(["unsafe-review", "repo", "--stages"])).is_err(),
+            "repo must reject --stages"
+        );
+        let error = match parse(args([
+            "unsafe-review",
+            "check",
+            "--stages",
+            "--format",
+            "sarif",
+        ])) {
+            Ok(_) => return Err("stages with sarif format should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("stages section"),
+            "error should name the stages section; got: `{error}`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parses_short_for_check_and_repo() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "check", "--short"]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert!(options.short);
+
+        let command = parse(args(["unsafe-review", "repo", "--short"]))?;
+        let Command::Repo(options) = command else {
+            return Err("expected repo command".to_string());
+        };
+        assert!(options.check.short);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_short_with_non_human_format() -> Result<(), String> {
+        let error = match parse(args([
+            "unsafe-review",
+            "check",
+            "--format",
+            "json",
+            "--short",
+        ])) {
+            Ok(_) => return Err("short with json format should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("--short"),
+            "error should name --short; got: `{error}`"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_short_for_policy_report_with_and_without_format() -> Result<(), String> {
+        // Follow-up review on #2245: `policy report` normalizes the shared
+        // parser's human default into a report format with no short
+        // rendering, so the flag must be rejected at that entry point.
+        for argv in [
+            ["unsafe-review", "policy", "report", "--short", "", ""],
+            [
+                "unsafe-review",
+                "policy",
+                "report",
+                "--short",
+                "--format",
+                "json",
+            ],
+            [
+                "unsafe-review",
+                "policy",
+                "report",
+                "--short",
+                "--format",
+                "markdown",
+            ],
+        ] {
+            let argv: Vec<String> = argv
+                .into_iter()
+                .filter(|arg| !arg.is_empty())
+                .map(str::to_string)
+                .collect();
+            let error = match parse(argv) {
+                Ok(_) => {
+                    return Err("policy report --short should fail".to_string());
+                }
+                Err(error) => error,
+            };
+            assert!(
+                error.contains("--short"),
+                "error should name --short; got: `{error}`"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn pilot_keeps_shared_short_support() -> Result<(), String> {
+        // `pilot` deliberately aliases the check renderer, so `--short`
+        // works there; pin the intentional alias instead of rejecting it.
+        let command = parse(args(["unsafe-review", "pilot", "--short"]))?;
+        let Command::Pilot(options) = command else {
+            return Err("expected pilot command".to_string());
+        };
+        assert!(options.short);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_short_for_first_pr() -> Result<(), String> {
+        let error = match parse(args(["unsafe-review", "first-pr", "--short"])) {
+            Ok(_) => return Err("short for first-pr should fail".to_string()),
+            Err(error) => error,
+        };
+        assert!(
+            error.contains("--short"),
+            "error should name --short; got: `{error}`"
+        );
         Ok(())
     }
 
@@ -2179,6 +3057,107 @@ mod tests {
             return Err("expected check command".to_string());
         };
         assert_eq!(options.format, Format::Sarif);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_latency_out_for_check() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out",
+            "target/latency.json",
+        ]))?;
+        let Command::Check(options) = command else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            options.latency_out,
+            Some(PathBuf::from("target/latency.json"))
+        );
+        let inline = parse(args([
+            "unsafe-review",
+            "check",
+            "--latency-out=target/inline.json",
+        ]))?;
+        let Command::Check(inline_options) = inline else {
+            return Err("expected check command".to_string());
+        };
+        assert_eq!(
+            inline_options.latency_out,
+            Some(PathBuf::from("target/inline.json"))
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_colliding_with_report_is_rejected() -> Result<(), String> {
+        let collided = parse(args([
+            "unsafe-review",
+            "check",
+            "--out",
+            "target/report.json",
+            "--latency-out",
+            "target/report.json",
+        ]));
+        assert!(
+            collided.is_err(),
+            "a receipt must not overwrite the rendered report"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_with_list_files_is_rejected() -> Result<(), String> {
+        let listed = parse(args([
+            "unsafe-review",
+            "repo",
+            "--list-files",
+            "--latency-out",
+            "target/latency.json",
+        ]));
+        assert!(
+            listed.is_err(),
+            "list-files performs no analysis for a receipt to measure"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_over_repo_sidecars_is_rejected() -> Result<(), String> {
+        for sidecar in [
+            "target/report.json.status.json",
+            "target/report.json.partial",
+            "target/unsafe-review-gate.json",
+        ] {
+            let collided = parse(args([
+                "unsafe-review",
+                "repo",
+                "--out",
+                "target/report.json",
+                "--latency-out",
+                sidecar,
+            ]));
+            assert!(
+                collided.is_err(),
+                "a receipt must not overwrite the repo-owned {sidecar}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn latency_out_inside_bundle_dir_is_rejected() -> Result<(), String> {
+        let bundled = parse(args([
+            "unsafe-review",
+            "first-pr",
+            "--out-dir=target/review",
+            "--latency-out=target/review/cards.json",
+        ]));
+        assert!(
+            bundled.is_err(),
+            "a receipt must not overwrite a bundle artifact"
+        );
         Ok(())
     }
 
@@ -2936,6 +3915,166 @@ mod tests {
     }
 
     #[test]
+    fn parses_scope_defaults_to_worktree_human() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "scope"]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::Worktree);
+        assert_eq!(options.format, Format::Human);
+        assert_eq!(options.root, PathBuf::from("."));
+        Ok(())
+    }
+
+    #[test]
+    fn parses_scope_staged_json() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "scope",
+            "--staged",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::Staged);
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_scope_base_as_commit_range() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "scope",
+            "--base",
+            "origin/main",
+            "--head",
+            "HEAD",
+        ]))?;
+        let Command::Scope(options) = command else {
+            return Err("expected scope command".to_string());
+        };
+        assert_eq!(options.scope, ScopeSelect::CommitRange);
+        assert_eq!(options.base, Some("origin/main".to_string()));
+        assert_eq!(options.head, Some("HEAD".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_scope_flag_conflicts() {
+        let both_scopes = parse(args(["unsafe-review", "scope", "--staged", "--unstaged"]));
+        assert_eq!(
+            both_scopes,
+            Err("only one of --staged, --unstaged, --worktree may be given".to_string())
+        );
+        let base_with_scope = parse(args([
+            "unsafe-review",
+            "scope",
+            "--staged",
+            "--base",
+            "main",
+        ]));
+        assert_eq!(
+            base_with_scope,
+            Err("--base selects a commit range and cannot be combined with --staged, --unstaged, or --worktree".to_string())
+        );
+        let head_without_base = parse(args(["unsafe-review", "scope", "--head", "HEAD"]));
+        assert_eq!(
+            head_without_base,
+            Err("--head needs --base: a range head without a base is not a scope".to_string())
+        );
+        let bad_format = parse(args(["unsafe-review", "scope", "--format", "sarif"]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "unsupported scope format `sarif`; scope projects `human` and `json` only"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
+    fn parses_environment_defaults() -> Result<(), String> {
+        let command = parse(args(["unsafe-review", "environment"]))?;
+        let Command::Environment(options) = command else {
+            return Err("expected environment command".to_string());
+        };
+        assert_eq!(options.root, PathBuf::from("."));
+        assert_eq!(options.features, EnvFeatureSelect::Default);
+        assert!(options.probe_toolchain);
+        assert!(options.expand_members);
+        assert_eq!(options.format, Format::Human);
+        Ok(())
+    }
+
+    #[test]
+    fn parses_environment_explicit_features_json() -> Result<(), String> {
+        let command = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "fast, checked",
+            "--format",
+            "json",
+        ]))?;
+        let Command::Environment(options) = command else {
+            return Err("expected environment command".to_string());
+        };
+        assert_eq!(
+            options.features,
+            EnvFeatureSelect::Explicit(vec!["fast".to_string(), "checked".to_string()])
+        );
+        assert_eq!(options.format, Format::Json);
+        Ok(())
+    }
+
+    #[test]
+    fn rejects_environment_feature_conflicts() {
+        let both = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "fast",
+            "--all-features",
+        ]));
+        assert_eq!(
+            both,
+            Err(
+                "only one of --features, --all-features, --no-default-features may be given"
+                    .to_string()
+            )
+        );
+        let bad_format = parse(args(["unsafe-review", "environment", "--format", "sarif"]));
+        assert_eq!(
+            bad_format,
+            Err(
+                "unsupported environment format `sarif`; environment projects `human` and `json` only"
+                    .to_string()
+            )
+        );
+        let unknown = parse(args(["unsafe-review", "environment", "--target", "x"]));
+        assert_eq!(
+            unknown,
+            Err("unknown environment argument `--target`".to_string())
+        );
+        let leading_eq = parse(args([
+            "unsafe-review",
+            "environment",
+            "--features",
+            "=fast",
+        ]));
+        assert_eq!(
+            leading_eq,
+            Err(
+                "missing value for --features (got `=fast`; expected `--features <a,b>` or `--features=<a,b>`)"
+                    .to_string()
+            )
+        );
+    }
+
+    #[test]
     fn parses_outcome_command() -> Result<(), String> {
         let command = parse(args([
             "unsafe-review",
@@ -2988,6 +4127,20 @@ mod tests {
         ]));
 
         assert_eq!(command, Err("missing value for --after".to_string()));
+    }
+
+    #[test]
+    fn explain_defaults_to_markdown_format() -> Result<(), String> {
+        let explain = parse(args(["unsafe-review", "explain", "UR-card"]))?;
+        assert_eq!(
+            explain,
+            Command::Explain {
+                root: PathBuf::from("."),
+                id: "UR-card".to_string(),
+                format: Format::Markdown,
+            }
+        );
+        Ok(())
     }
 
     #[test]

@@ -1,0 +1,331 @@
+[
+  {
+    "id": "UR-maybeuninit-assume-init-drop-state-bit-guard-fixture-src-lib-rs-drop-written-operation-maybe_uninit_assume_init-maybe-uninit-assume-init-755117bc1f68-initialized_memory-c1",
+    "class": "guarded_unwitnessed",
+    "priority": "medium",
+    "confidence": "medium",
+    "proof_path": "observable_red_green",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 13,
+      "column": 9,
+      "kind": "operation",
+      "owner": "drop_written",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { (*slot.msg.get()).assume_init_drop() }"
+    },
+    "operation": "unsafe { (*slot.msg.get()).assume_init_drop() }",
+    "operation_family": "maybe_uninit_assume_init",
+    "hazards": [
+      "initialized_memory",
+      "invalid_value"
+    ],
+    "obligations": [
+      "all fields/elements are initialized and valid before `assume_init`"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "initialized",
+        "description": "all fields/elements are initialized and valid before `assume_init`",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": true,
+          "state": "present",
+          "summary": "State bit required on this branch: slot.state.get_mut() & write != 0 supports initialized/drop eligibility"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "All inferred safety obligations have visible local discharge evidence",
+    "reach": "1 related test file mentions owner `drop_written`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test drop_written",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test drop_written",
+        "required": false
+      }
+    ],
+    "missing": [
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Attach a focused Miri or cargo-careful witness receipt or mark the static limitation explicitly.",
+    "verify_commands": [
+      "cargo +nightly miri test drop_written",
+      "cargo +nightly careful test drop_written"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `unsafe { (*slot.msg.get()).assume_init_drop() }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_written",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test drop_written` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_written",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-maybeuninit-assume-init-drop-state-bit-guard-fixture-src-lib-rs-drop-written-operation-maybe_uninit_assume_init-maybe-uninit-assume-init-755117bc1f68-initialized_memory-c1` still maps to `unsafe { (*slot.msg.get()).assume_init_drop() }` at `src/lib.rs:13:9` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test drop_written` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test drop_written` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "present",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "not_eligible",
+      "agent_lsp_readiness": "requires_witness_receipt"
+    }
+  },
+  {
+    "id": "UR-maybeuninit-assume-init-drop-state-bit-guard-fixture-src-lib-rs-drop-written-operation-raw_pointer_deref-deref-83951b375c4a-pointer_validity-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 13,
+      "column": 19,
+      "kind": "operation",
+      "owner": "drop_written",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "*slot.msg.get()"
+    },
+    "operation": "*slot.msg.get()",
+    "operation_family": "raw_pointer_deref",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "pointer-live",
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No pointer-liveness evidence was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "bounds",
+        "description": "buffer has enough bytes for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "alignment",
+        "description": "pointer is aligned for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "initialized",
+        "description": "memory is initialized for the accessed type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "key": "allocation",
+        "description": "access remains inside one live allocation",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "reach": {
+          "present": true,
+          "state": "present",
+          "summary": "1 related test file mentions owner `drop_written`"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "1 related test file mentions owner `drop_written`",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "command": "cargo +nightly miri test drop_written",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "command": "cargo +nightly careful test drop_written",
+        "required": false
+      }
+    ],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose local guards for these `raw_pointer_deref` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
+    "verify_commands": [
+      "cargo +nightly miri test drop_written",
+      "cargo +nightly careful test drop_written"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `*slot.msg.get()`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_written",
+        "route_kind": "miri",
+        "summary": "Build/run `cargo +nightly miri test drop_written` first for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test drop_written",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-maybeuninit-assume-init-drop-state-bit-guard-fixture-src-lib-rs-drop-written-operation-raw_pointer_deref-deref-83951b375c4a-pointer_validity-c1` still maps to `*slot.msg.get()` at `src/lib.rs:13:19` before upgrading confidence.",
+          "Build/run `cargo +nightly miri test drop_written` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "build/run `cargo +nightly miri test drop_written` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]

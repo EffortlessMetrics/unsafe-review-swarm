@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `pick_checked`"
+          "summary": "1 related test file mentions owner `pick_checked`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `pick_checked`",
+    "reach": "1 related test file mentions owner `pick_checked`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -65,6 +65,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test pick_checked",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "picks_checked_value",
+        "file": "src/lib.rs",
+        "line": 15
       }
     ],
     "missing": [

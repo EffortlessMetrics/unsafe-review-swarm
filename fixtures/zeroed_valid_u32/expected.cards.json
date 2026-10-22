@@ -42,7 +42,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `zero_u32`"
+          "summary": "1 related test file mentions owner `zero_u32`"
         },
         "witness": {
           "present": false,
@@ -53,7 +53,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `zero_u32`",
+    "reach": "1 related test file mentions owner `zero_u32`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -67,6 +67,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test zero_u32",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "returns_zero",
+        "file": "src/lib.rs",
+        "line": 11
       }
     ],
     "missing": [

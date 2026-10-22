@@ -6,6 +6,7 @@ pub(super) fn maybeuninit_operation_family(line: &str) -> Option<OperationFamily
 
 fn is_maybeuninit_assume_init_call(line: &str) -> bool {
     contains_call_name(line, "assume_init")
+        || contains_call_name(line, "array_assume_init")
         || contains_call_name(line, "assume_init_read")
         || contains_call_name(line, "assume_init_ref")
         || contains_call_name(line, "assume_init_mut")

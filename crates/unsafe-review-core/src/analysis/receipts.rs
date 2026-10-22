@@ -2228,12 +2228,12 @@ mod tests {
     }
 
     #[test]
-    fn confirmed_verdict_receipt_preserves_card_priority_and_marks_witnessed() -> Result<(), String>
-    {
-        // A `confirmed` receipt: the site was witnessed and the sanitizer fired.
-        // The card should become `guarded_and_witnessed` (site was witnessed) but
-        // priority must NOT be downgraded to Low — the observed failure increases
-        // urgency. The safety obligation is NOT cleared; it is preserved.
+    fn confirmed_verdict_receipt_keeps_witness_work_open() -> Result<(), String> {
+        // A `confirmed` receipt: the runtime witness observed a failure at the
+        // site. The observation is retained, but the witness work must NOT be
+        // retired: the card stays `guarded_unwitnessed` (actionable) with its
+        // hazard-derived priority intact, because a reproduced failure still
+        // requires attention. The safety obligation is NOT cleared.
         let root = copy_fixture_to_temp(
             "box_from_raw_box_origin",
             "unsafe-review-confirmed-receipt-priority",
@@ -2288,11 +2288,16 @@ mod tests {
             .cards
             .first()
             .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
-        // The card becomes `guarded_and_witnessed` because the site was witnessed.
+        // The card must NOT retire: a reproduced failure keeps the witness
+        // work open.
         assert_eq!(
             card_with_receipt.class.as_str(),
-            "guarded_and_witnessed",
-            "confirmed receipt must upgrade card to guarded_and_witnessed"
+            "guarded_unwitnessed",
+            "confirmed receipt must keep card guarded_unwitnessed"
+        );
+        assert!(
+            card_with_receipt.class.is_actionable(),
+            "confirmed card must stay actionable"
         );
         // Priority must NOT be lowered: a `confirmed` verdict means the hazard
         // reproduced and the safety obligation is not cleared.
@@ -2301,6 +2306,9 @@ mod tests {
             "medium",
             "confirmed receipt must preserve priority (not lower to low)"
         );
+        // Class-derived projections must agree: still a note, still a hint,
+        // never silently successful.
+        assert_eq!(card_with_receipt.class.sarif_level(), "note");
         // The witness evidence must carry the `confirmed` verdict through.
         assert_eq!(
             card_with_receipt.witness.verdict.as_deref(),
@@ -2312,13 +2320,25 @@ mod tests {
             "confirmed",
             "confirmation_state must be 'confirmed'"
         );
+        // The next action must address the observed failure, not ask for
+        // another receipt as if none existed.
+        assert!(
+            card_with_receipt
+                .next_action
+                .summary
+                .contains("reproduced the hazard"),
+            "confirmed next action must name the observed failure: {}",
+            card_with_receipt.next_action.summary
+        );
         Ok(())
     }
 
     #[test]
-    fn not_reproduced_verdict_receipt_lowers_priority_and_marks_witnessed() -> Result<(), String> {
-        // A `not_reproduced` receipt: the site was witnessed and no signal was
-        // observed in this run. Priority is lowered to Low as before.
+    fn not_reproduced_verdict_receipt_keeps_witness_work_open() -> Result<(), String> {
+        // A `not_reproduced` receipt: one run did not reproduce the hazard.
+        // That single observation is not a safety claim, so the witness work
+        // stays open with the hazard-derived priority intact — no urgency
+        // reduction as though verification succeeded.
         let root = copy_fixture_to_temp(
             "box_from_raw_box_origin",
             "unsafe-review-not-reproduced-priority",
@@ -2365,16 +2385,108 @@ mod tests {
             .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
         assert_eq!(
             card.class.as_str(),
-            "guarded_and_witnessed",
-            "not_reproduced receipt must upgrade card to guarded_and_witnessed"
+            "guarded_unwitnessed",
+            "not_reproduced receipt must keep card guarded_unwitnessed"
         );
-        // Priority IS lowered for not_reproduced (and absent verdict / inconclusive).
+        assert!(
+            card.class.is_actionable(),
+            "not_reproduced card must stay actionable"
+        );
+        // Priority is NOT lowered: a single non-reproduction is a bounded
+        // observation, not verification success.
         assert_eq!(
             card.priority.as_str(),
-            "low",
-            "not_reproduced receipt must lower priority to low"
+            "medium",
+            "not_reproduced receipt must preserve priority (not lower to low)"
         );
         assert_eq!(card.witness.verdict.as_deref(), Some("not_reproduced"));
+        assert_eq!(
+            card.witness.confirmation_state(),
+            "not_reproduced",
+            "confirmation_state must be 'not_reproduced'"
+        );
+        assert!(
+            card.next_action.summary.contains("not a safety claim"),
+            "not_reproduced next action must bound the observation: {}",
+            card.next_action.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn inconclusive_verdict_receipt_keeps_witness_work_open() -> Result<(), String> {
+        // An `inconclusive` receipt: the run settled nothing. Adequacy stays
+        // unresolved and urgency must not drop as though verification
+        // succeeded: the card stays open with its hazard-derived priority.
+        let root = copy_fixture_to_temp(
+            "box_from_raw_box_origin",
+            "unsafe-review-inconclusive-keeps-open",
+        )?;
+        let card_id = {
+            let output = analyze_fixture_root(&root)?;
+            output
+                .cards
+                .first()
+                .ok_or_else(|| "fixture produced no card".to_string())?
+                .id
+                .0
+                .clone()
+        };
+
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        fs::write(
+            receipt_dir.join("miri-inconclusive.json"),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "miri",
+  "strength": "ran",
+  "author": "core/fixtures",
+  "recorded_at": "2025-12-18T00:00:00Z",
+  "expires_at": "2099-12-31",
+  "verdict": "inconclusive",
+  "summary": "miri run: harness setup failed before the site executed"
+}}"#
+            ),
+        )
+        .map_err(|err| format!("write inconclusive receipt failed: {err}"))?;
+
+        let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card = output_with_receipt
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
+        assert_eq!(
+            card.class.as_str(),
+            "guarded_unwitnessed",
+            "inconclusive receipt must keep card guarded_unwitnessed"
+        );
+        assert!(
+            card.class.is_actionable(),
+            "inconclusive card must stay actionable"
+        );
+        assert_eq!(
+            card.priority.as_str(),
+            "medium",
+            "inconclusive receipt must preserve priority (not lower to low)"
+        );
+        assert_eq!(card.witness.verdict.as_deref(), Some("inconclusive"));
+        assert_eq!(
+            card.witness.confirmation_state(),
+            "inconclusive",
+            "confirmation_state must be 'inconclusive'"
+        );
+        assert!(
+            card.next_action.summary.contains("was inconclusive"),
+            "inconclusive next action must require a re-run: {}",
+            card.next_action.summary
+        );
         Ok(())
     }
 

@@ -1,35 +1,30 @@
-# unsafe-review-first-pr composite action
+# Thin wrapper around the single Action authority at the repository root
+# (action.yml, #1878). This file carries no independent implementation: it
+# mirrors the root inputs/outputs and delegates to `./`. Edit the contract
+# in the root file only.
 #
-# Renders an advisory unsafe-review first-pr bundle for a pull request, sets
-# step outputs for the bundle directory and advisory gate status, and appends
-# a bounded GitHub job summary.
-#
-# Advisory posture: this action does NOT post comments, does NOT request write
-# tokens, does NOT run witnesses (Miri, cargo-careful, sanitizers, Loom,
-# Shuttle, Kani, Crux), does NOT edit source files, and does NOT fail on
-# advisory findings by default.
-#
-# Trust boundary (fixed):
-#   Static unsafe contract review only. Not memory-safety proof, not UB-free
-#   status, not Miri-clean status, and not site-execution proof.
-#
-# See docs/ci/github-action.md for the adoption guide and
-# docs/specs/UNSAFE-REVIEW-SPEC-0037-pr-gate-composite-action.md for the
-# contract spec.
-#
-# When published to EffortlessMetrics/unsafe-review, callers reference this as:
+# New callers should use the root action directly; after source promotion:
 #   uses: EffortlessMetrics/unsafe-review@v1
 #
-# This development copy in unsafe-review-swarm is not the published surface.
+# Canonical guide: docs/ci/github-action.md
+#
+# Bundle artifacts verified by the delegated root run (mirrored here so the
+# wrapper keeps the same documented surface; the verify logic lives in the
+# root action only):
+# target/unsafe-review/review-kit.json target/unsafe-review/cards.json
+# target/unsafe-review/pr-summary.md target/unsafe-review/github-summary.md
+# target/unsafe-review/cards.sarif target/unsafe-review/comment-plan.json
+# target/unsafe-review/witness-plan.md target/unsafe-review/receipt-audit.md
+# target/unsafe-review/receipt-audit.json target/unsafe-review/policy-report.json
+# target/unsafe-review/policy-report.md target/unsafe-review/manual-candidates.json
+# target/unsafe-review/lsp.json target/unsafe-review/manual-repair-queue.json
+# target/unsafe-review/tokmd-packets.json target/unsafe-review/usefulness-telemetry.json
+# target/unsafe-review/repair-queue.json target/unsafe-review/unsafe-review-gate.json
 
 name: unsafe-review first-pr
 description: >
-  Advisory unsafe-review PR gate. Installs unsafe-review from crates.io, runs
-  first-pr, writes a bounded GitHub job summary, and sets bundle_dir and
-  gate_status outputs. Does not post comments, does not request write tokens,
-  does not run witnesses, and does not fail on advisory findings by default.
-  Static unsafe contract review only — not memory-safety proof, not UB-free
-  status, not Miri-clean status, and not site-execution proof.
+  Advisory unsafe-review PR gate (wrapper around the root action). See the
+  root action.yml for the contract, trust boundary, and version-skew rules.
 
 inputs:
   base_ref:
@@ -43,7 +38,7 @@ inputs:
       unsafe-review crate version to install from crates.io. Pin this to a
       known-good version to prevent silent breakage on new releases.
     required: false
-    default: "0.3.8"
+    default: "0.5.0"
   fetch_depth:
     description: >
       Depth passed to `git fetch --depth` when fetching the base ref. The
@@ -71,139 +66,24 @@ outputs:
   bundle_dir:
     description: >
       Absolute path to the advisory bundle directory. Pass this to an artifact
-      upload step. The bundle contains review-kit.json, cards.json,
-      pr-summary.md, github-summary.md, cards.sarif, comment-plan.json,
-      witness-plan.md, receipt-audit.md, receipt-audit.json,
-      policy-report.json, policy-report.md, manual-candidates.json,
-      manual-repair-queue.json, tokmd-packets.json,
-      usefulness-telemetry.json, lsp.json, repair-queue.json, and
-      unsafe-review-gate.json.
-    value: ${{ steps.set-outputs.outputs.bundle_dir }}
+      upload step.
+    value: ${{ steps.delegate.outputs.bundle_dir }}
   gate_status:
     description: >
       Contents of the status field from unsafe-review-gate.json — advisory
       metadata describing coverage movement (e.g. "advisory"). This is NOT a
       merge verdict. The caller decides how to use it.
-    value: ${{ steps.set-outputs.outputs.gate_status }}
+    value: ${{ steps.delegate.outputs.gate_status }}
 
 runs:
   using: composite
   steps:
-    - name: Install Rust toolchain
-      uses: dtolnay/rust-toolchain@1.98
-
-    - name: Fetch base ref
-      shell: bash
-      env:
-        BASE_REF: ${{ inputs.base_ref }}
-        FETCH_DEPTH: ${{ inputs.fetch_depth }}
-      run: |
-        git fetch --no-tags --depth="${FETCH_DEPTH}" origin \
-          "+refs/heads/${BASE_REF}:refs/remotes/origin/${BASE_REF}"
-
-    - name: Install unsafe-review from crates.io
-      shell: bash
-      env:
-        UNSAFE_REVIEW_VERSION: ${{ inputs.version }}
-      run: |
-        cargo install unsafe-review --locked --version "${UNSAFE_REVIEW_VERSION}"
-
-    - name: Render first-pr advisory bundle
-      shell: bash
-      env:
-        BASE_REF: ${{ inputs.base_ref }}
-        BUNDLE_DIR: ${{ inputs.out_dir }}
-        FAIL_ON_NEW_DEBT: ${{ inputs.fail_on_new_debt }}
-      run: |
-        mkdir -p "${BUNDLE_DIR}"
-        exit_code=0
-        unsafe-review first-pr \
-          --base "origin/${BASE_REF}" \
-          --out-dir "${BUNDLE_DIR}" \
-          || exit_code=$?
-
-        # Exit 0: advisory pass (including advisory findings — not a failure).
-        # Exit 1: policy result (new/worsened gaps). Only fail the job when
-        #         fail_on_new_debt is true; otherwise advisory, pass through.
-        # Exit 2: tool error (malformed input, internal failure) — always fail.
-        if [ "${exit_code}" -eq 2 ]; then
-          echo "::error::unsafe-review first-pr encountered a tool error (exit 2)"
-          exit 2
-        fi
-        if [ "${exit_code}" -eq 1 ] && [ "${FAIL_ON_NEW_DEBT}" = "true" ]; then
-          echo "::warning::unsafe-review first-pr found new or worsened coverage gaps (exit 1, fail_on_new_debt=true)"
-          exit 1
-        fi
-        # Exit 1 with fail_on_new_debt=false (default): advisory, do not fail.
-        exit 0
-
-    - name: Verify bundle file shape
-      shell: bash
-      env:
-        BUNDLE_DIR: ${{ inputs.out_dir }}
-      run: |
-        set -euo pipefail
-        # Required core: artifacts emitted by every supported unsafe-review release.
-        for required in \
-          review-kit.json \
-          cards.json \
-          pr-summary.md \
-          github-summary.md \
-          cards.sarif \
-          comment-plan.json \
-          witness-plan.md \
-          receipt-audit.md \
-          receipt-audit.json \
-          policy-report.json \
-          policy-report.md \
-          manual-candidates.json \
-          manual-repair-queue.json \
-          tokmd-packets.json \
-          lsp.json \
-          repair-queue.json \
-          unsafe-review-gate.json
-        do
-          if [ ! -s "${BUNDLE_DIR}/${required}" ]; then
-            echo "::error::unsafe-review bundle is missing or empty: ${BUNDLE_DIR}/${required}"
-            exit 1
-          fi
-        done
-        # Optional: artifacts added in newer releases. Verified only if present,
-        # so the action works against the pinned binary version regardless of age
-        # (a too-old pinned binary simply omits these; a present-but-empty file
-        # is still an error).
-        for optional in \
-          usefulness-telemetry.json
-        do
-          if [ -e "${BUNDLE_DIR}/${optional}" ] && [ ! -s "${BUNDLE_DIR}/${optional}" ]; then
-            echo "::error::unsafe-review bundle has present-but-empty: ${BUNDLE_DIR}/${optional}"
-            exit 1
-          fi
-        done
-
-    - name: Set outputs
-      id: set-outputs
-      shell: bash
-      env:
-        BUNDLE_DIR: ${{ inputs.out_dir }}
-      run: |
-        # bundle_dir: report the absolute path so callers can use it directly.
-        abs_dir="$(realpath "${BUNDLE_DIR}")"
-        echo "bundle_dir=${abs_dir}" >> "${GITHUB_OUTPUT}"
-
-        # gate_status: read the status field from unsafe-review-gate.json.
-        # This is advisory metadata (coverage movement), never a merge verdict.
-        gate_file="${BUNDLE_DIR}/unsafe-review-gate.json"
-        if [ -f "${gate_file}" ]; then
-          gate_status="$(jq -r '.status // "advisory"' "${gate_file}" 2>/dev/null || echo "advisory")"
-        else
-          gate_status="advisory"
-        fi
-        echo "gate_status=${gate_status}" >> "${GITHUB_OUTPUT}"
-
-    - name: Write GitHub job summary
-      shell: bash
-      env:
-        BUNDLE_DIR: ${{ inputs.out_dir }}
-      run: |
-        cat "${BUNDLE_DIR}/github-summary.md" >> "${GITHUB_STEP_SUMMARY}"
+    - name: Delegate to the root action authority
+      id: delegate
+      uses: ./
+      with:
+        base_ref: ${{ inputs.base_ref }}
+        version: ${{ inputs.version }}
+        fetch_depth: ${{ inputs.fetch_depth }}
+        out_dir: ${{ inputs.out_dir }}
+        fail_on_new_debt: ${{ inputs.fail_on_new_debt }}

@@ -1,0 +1,8 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -4,0 +5,4 @@
++pub fn run() {
++    // SAFETY: checkable takes no pointers and its return value is ignored.
++    unsafe { checkable() };
++}

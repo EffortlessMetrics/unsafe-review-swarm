@@ -1,0 +1,1050 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/seam-batch/checkouts/arrayvec",
+  "summary": {
+    "rust_files": 12,
+    "changed_files": 3,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 1,
+    "unsafe_sites": 8,
+    "cards": 8,
+    "open_actionable_gaps": 8,
+    "contract_missing": 7,
+    "guard_missing": 0,
+    "guarded_unwitnessed": 1,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 8,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-arrayvec-src-array-string-rs-try-push-operation-pointer_arithmetic-ptr-mut-d2cc791d131d-same_allocation-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/array_string.rs",
+        "line": 174,
+        "column": 13,
+        "kind": "operation",
+        "owner": "try_push",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "let ptr = self.xs.ptr_mut().add(len);"
+      },
+      "operation": "let ptr = self.xs.ptr_mut().add(len);",
+      "operation_family": "pointer_arithmetic",
+      "hazards": [
+        "same_allocation",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "bounds",
+          "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `try_push`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `try_push`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test try_push",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test try_push",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test try_push",
+        "cargo +nightly careful test try_push"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `let ptr = self.xs.ptr_mut().add(len);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test try_push",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test try_push` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test try_push",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-array-string-rs-try-push-operation-pointer_arithmetic-ptr-mut-d2cc791d131d-same_allocation-c1` still maps to `let ptr = self.xs.ptr_mut().add(len);` at `src/array_string.rs:174:13` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test try_push` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test try_push` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-array-string-rs-try-push-operation-vec_set_len-set-len-c3e5d17de212-initialized_memory-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/array_string.rs",
+        "line": 178,
+        "column": 21,
+        "kind": "operation",
+        "owner": "try_push",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "self.set_len(len + n);"
+      },
+      "operation": "self.set_len(len + n);",
+      "operation_family": "vec_set_len",
+      "hazards": [
+        "initialized_memory",
+        "bounds"
+      ],
+      "obligations": [
+        "new length is at most capacity",
+        "elements in the extended range are initialized"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "capacity",
+          "description": "new length is at most capacity",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Capacity guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `try_push`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "elements in the extended range are initialized",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Initialization evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `try_push`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "All inferred safety obligations have visible local discharge evidence",
+      "reach": "1 related test file mentions owner `try_push`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test try_push",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test try_push",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test try_push",
+        "cargo +nightly careful test try_push"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `self.set_len(len + n);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test try_push",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test try_push` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test try_push",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-array-string-rs-try-push-operation-vec_set_len-set-len-c3e5d17de212-initialized_memory-c1` still maps to `self.set_len(len + n);` at `src/array_string.rs:178:21` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test try_push` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test try_push` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "present",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-write-unsafe_fn-unsafe_declaration-write-7bc17eac51e0-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 27,
+        "column": 1,
+        "kind": "unsafe_fn",
+        "owner": "write",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "#[inline] unsafe fn write(ptr: *mut u8, index: usize, byte: u8) {"
+      },
+      "operation": "#[inline] unsafe fn write(ptr: *mut u8, index: usize, byte: u8) {",
+      "operation_family": "unsafe_declaration",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe declaration caller contract is documented and reviewable"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "caller-contract",
+          "description": "unsafe declaration caller contract is documented and reviewable",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `write`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[inline] unsafe fn write(ptr: *mut u8, index: usize, byte: u8) {`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-write-unsafe_fn-unsafe_declaration-write-7bc17eac51e0-unknown-c1` still maps to `#[inline] unsafe fn write(ptr: *mut u8, index: usize, byte: u8) {` at `src/char.rs:27:1` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-write-operation-raw_pointer_write-write-23c68a62c4ed-pointer_validity-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 29,
+        "column": 5,
+        "kind": "operation",
+        "owner": "write",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "ptr::write(ptr.add(index), byte)"
+      },
+      "operation": "ptr::write(ptr.add(index), byte)",
+      "operation_family": "raw_pointer_write",
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "same_allocation"
+      ],
+      "obligations": [
+        "pointer is live and dereferenceable for the accessed type",
+        "buffer has enough bytes for the accessed type",
+        "pointer is aligned for the accessed type",
+        "memory is initialized for the accessed type",
+        "access remains inside one live allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "bounds",
+          "description": "buffer has enough bytes for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "alignment",
+          "description": "pointer is aligned for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No alignment guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "memory is initialized for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "allocation",
+          "description": "access remains inside one live allocation",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `write`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test write",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test write",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test write",
+        "cargo +nightly careful test write"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `ptr::write(ptr.add(index), byte)`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test write",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test write` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test write",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-write-operation-raw_pointer_write-write-23c68a62c4ed-pointer_validity-c1` still maps to `ptr::write(ptr.add(index), byte)` at `src/char.rs:29:5` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test write` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test write` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-write-operation-pointer_arithmetic-add-cf3f2c9479b4-same_allocation-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 29,
+        "column": 16,
+        "kind": "operation",
+        "owner": "write",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "ptr.add(index)"
+      },
+      "operation": "ptr.add(index)",
+      "operation_family": "pointer_arithmetic",
+      "hazards": [
+        "same_allocation",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "bounds",
+          "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `write`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `write`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test write",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test write",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test write",
+        "cargo +nightly careful test write"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `ptr.add(index)`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test write",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test write` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test write",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-write-operation-pointer_arithmetic-add-cf3f2c9479b4-same_allocation-c1` still maps to `ptr.add(index)` at `src/char.rs:29:16` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test write` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test write` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-encode-utf8-unsafe_fn-unsafe_declaration-encode-utf8-00e4bfb1356e-unknown-c1",
+      "class": "guarded_unwitnessed",
+      "priority": "medium",
+      "confidence": "medium",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 39,
+        "column": 1,
+        "kind": "unsafe_fn",
+        "owner": "encode_utf8",
+        "visibility": "public",
+        "public_api_surface": true,
+        "snippet": "pub unsafe fn encode_utf8(ch: char, ptr: *mut u8, len: usize) -> Result<usize, EncodeUtf8Error>"
+      },
+      "operation": "pub unsafe fn encode_utf8(ch: char, ptr: *mut u8, len: usize) -> Result<usize, EncodeUtf8Error>",
+      "operation_family": "unsafe_declaration",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe declaration caller contract is documented and reviewable"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "caller-contract",
+          "description": "unsafe declaration caller contract is documented and reviewable",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `Safety:` documentation was detected"
+          },
+          "discharge": {
+            "present": true,
+            "state": "present",
+            "summary": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `encode_utf8`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `Safety:` documentation was detected",
+      "discharge": "Public unsafe API declaration is a caller-contract site; local guard evidence is not expected at the declaration",
+      "reach": "1 related test file mentions owner `encode_utf8`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Attach a human deep-review witness receipt or mark the static limitation explicitly.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guarded_unwitnessed` ReviewCard for `pub unsafe fn encode_utf8(ch: char, ptr: *mut u8, len: usize) -> Result<usize, EncodeUtf8Error>`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-encode-utf8-unsafe_fn-unsafe_declaration-encode-utf8-00e4bfb1356e-unknown-c1` still maps to `pub unsafe fn encode_utf8(ch: char, ptr: *mut u8, len: usize) -> Result<usize, EncodeUtf8Error>` at `src/char.rs:39:1` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "present",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "requires_witness_receipt"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-test-encode-utf8-operation-unsafe_fn_call-let-res-encode-utf8-6586da39e6e1-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 74,
+        "column": 13,
+        "kind": "operation",
+        "owner": "test_encode_utf8",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { let res = encode_utf8(ch, ptr, len).ok().unwrap(); assert_eq!(res, ch.len_utf8()); }"
+      },
+      "operation": "unsafe { let res = encode_utf8(ch, ptr, len).ok().unwrap(); assert_eq!(res, ch.len_utf8()); }",
+      "operation_family": "unsafe_fn_call",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "callee safety preconditions are satisfied"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "callee-contract",
+          "description": "callee safety preconditions are satisfied",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `test_encode_utf8` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `test_encode_utf8` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { let res = encode_utf8(ch, ptr, len).ok().unwrap(); assert_eq!(res, ch.len_utf8()); }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-test-encode-utf8-operation-unsafe_fn_call-let-res-encode-utf8-6586da39e6e1-unknown-c1` still maps to `unsafe { let res = encode_utf8(ch, ptr, len).ok().unwrap(); assert_eq!(res, ch.len_utf8()); }` at `src/char.rs:74:13` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_selected",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-arrayvec-src-char-rs-test-encode-utf8-oob-operation-unsafe_fn_call-assert-c08145a0530e-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/char.rs",
+        "line": 92,
+        "column": 9,
+        "kind": "operation",
+        "owner": "test_encode_utf8_oob",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { assert!(matches::matches!(encode_utf8(ch, ptr, len - 1), Err(_))); assert!(matches::matches!(encode_utf8(ch, ptr, len), Ok(_))); }"
+      },
+      "operation": "unsafe { assert!(matches::matches!(encode_utf8(ch, ptr, len - 1), Err(_))); assert!(matches::matches!(encode_utf8(ch, ptr, len), Ok(_))); }",
+      "operation_family": "unsafe_fn_call",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "callee safety preconditions are satisfied"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "callee-contract",
+          "description": "callee safety preconditions are satisfied",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `test_encode_utf8_oob` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `test_encode_utf8_oob` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { assert!(matches::matches!(encode_utf8(ch, ptr, len - 1), Err(_))); assert!(matches::matches!(encode_utf8(ch, ptr, len), Ok(_))); }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-arrayvec-src-char-rs-test-encode-utf8-oob-operation-unsafe_fn_call-assert-c08145a0530e-unknown-c1` still maps to `unsafe { assert!(matches::matches!(encode_utf8(ch, ptr, len - 1), Err(_))); assert!(matches::matches!(encode_utf8(ch, ptr, len), Ok(_))); }` at `src/char.rs:92:9` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_selected",
+        "agent_lsp_readiness": "needs_human"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T03:22:35Z",
+    "root_abs": "/tmp/seam-batch/checkouts/arrayvec",
+    "diff_path": "docs/accuracy/batches/2224-pr1/diffs/arrayvec-138.diff",
+    "diff_sha256": "5700259305257e237dc44bc4c9d4b9f7ed24981a2900f1f1b1a261ebdd074439",
+    "dirty_worktree": false
+  }
+}

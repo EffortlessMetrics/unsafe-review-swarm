@@ -37,6 +37,9 @@ fn safety_doc_summary(context: &str) -> Option<&'static str> {
         if trimmed.contains("# Safety") {
             return Some("Nearby `# Safety` documentation was detected");
         }
+        if trimmed.contains("SAFETY:") {
+            return Some("Nearby `SAFETY:` documentation was detected");
+        }
         if trimmed.contains("Safety:") {
             return Some("Nearby `Safety:` documentation was detected");
         }
@@ -143,6 +146,18 @@ mod tests {
             (
                 "//! Safety: module invariants describe the unsafe boundary.",
                 "Nearby `Safety:` documentation was detected",
+            ),
+            (
+                "/// SAFETY: ptr must be non-null, aligned, and initialized.",
+                "Nearby `SAFETY:` documentation was detected",
+            ),
+            (
+                "//! SAFETY: module invariants describe the unsafe boundary.",
+                "Nearby `SAFETY:` documentation was detected",
+            ),
+            (
+                "#[doc = \"SAFETY: caller must uphold the pointer contract.\"]",
+                "Nearby `SAFETY:` documentation was detected",
             ),
             (
                 "#[doc = \"# Safety\"]",

@@ -147,6 +147,19 @@ fn analyze_with_receipts(
     } else {
         diff_index.changed_rust_file_count()
     };
+    // Changed Rust files named by the diff that exist nowhere under the root
+    // were silently dropped from review. Record them so renderers report the
+    // narrowed scope instead of printing an honest-looking "no gaps found".
+    // Hostile refusals (traversal, absolute, symlink-escaping paths) are
+    // recorded separately: they keep the #1883 exit-0 contract and never
+    // trigger the wrong-root fail-closed error. Computed before the scan loop
+    // so partial status events carry both sets too.
+    let discovered: BTreeSet<&PathBuf> = all_rust_files.iter().collect();
+    let (unresolved_diff_files_set, rejected_diff_files_set) = if !repo_mode && diff_supplied {
+        diff_index.partition_unresolved(&input.root, &discovered)
+    } else {
+        (BTreeSet::new(), BTreeSet::new())
+    };
 
     let mut cards = Vec::new();
     let mut identity_counts = BTreeMap::new();
@@ -197,6 +210,9 @@ fn analyze_with_receipts(
             file_timings.push(PerFileScanStats {
                 file: rel.clone(),
                 scan_ms: file_result.scan_ms,
+                bytes: file_result.bytes,
+                lines: file_result.lines,
+                sites: file_result.sites.len() as u64,
             });
         }
         files_scanned += 1;
@@ -232,6 +248,8 @@ fn analyze_with_receipts(
                 policy_state.baseline_ids(),
                 &policy_state,
                 &candidate_files,
+                &unresolved_diff_files_set,
+                &rejected_diff_files_set,
             )),
         )?;
         last_scanned_path = Some(rel.clone());
@@ -292,6 +310,8 @@ fn analyze_with_receipts(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        unresolved_diff_files: unresolved_diff_files_set,
+        rejected_diff_files: rejected_diff_files_set,
         coverage_snapshot,
     };
     // Emit a final status event.  A capped scan emits a partial status that
@@ -488,6 +508,8 @@ fn partial_analyze_output(
     baseline_ids: &BTreeSet<String>,
     policy_state: &PolicyState,
     candidate_files: &[PathBuf],
+    unresolved_diff_files: &BTreeSet<PathBuf>,
+    rejected_diff_files: &BTreeSet<PathBuf>,
 ) -> AnalyzeOutput {
     let repo_mode = matches!(input.scope, Scope::Repo) || matches!(input.mode, AnalysisMode::Repo);
     let diff_supplied = !matches!(input.diff, DiffSource::NoneRepoScan);
@@ -528,6 +550,8 @@ fn partial_analyze_output(
         summary,
         cards,
         diff_scoped_files: diff_scoped_files_set,
+        unresolved_diff_files: unresolved_diff_files.clone(),
+        rejected_diff_files: rejected_diff_files.clone(),
         coverage_snapshot: policy_state.coverage_snapshot.clone(),
     }
 }
@@ -1055,8 +1079,18 @@ mod tests {
             (ReviewClass::WitnessMismatch, "matching receipt"),
             (ReviewClass::StaticUnknown, "witness route"),
         ] {
-            let summary =
-                next_action_summary(&class, "raw_pointer_read", false, "private", &[], &[]);
+            let summary = next_action_summary(
+                &class,
+                "raw_pointer_read",
+                false,
+                "private",
+                &[],
+                &[],
+                false,
+                None,
+                &[],
+                "pending",
+            );
             assert!(
                 summary.contains(expected),
                 "`{}` next action `{summary}` should mention `{expected}`",
@@ -1075,6 +1109,10 @@ mod tests {
             "private",
             &human_route,
             &[],
+            false,
+            None,
+            &[],
+            "pending",
         );
         assert!(
             summary.contains("human deep-review witness receipt"),
@@ -1093,6 +1131,10 @@ mod tests {
             "private",
             &miri_careful_routes,
             &[],
+            false,
+            None,
+            &[],
+            "pending",
         );
         assert!(miri_supported.contains("Miri"));
         assert!(miri_supported.contains("cargo-careful"));
@@ -1110,6 +1152,10 @@ mod tests {
             "private",
             &human_route,
             &[],
+            false,
+            None,
+            &[],
+            "pending",
         );
 
         assert!(summary.contains("inline_asm"));
@@ -1129,6 +1175,10 @@ mod tests {
             "private",
             &human_route,
             &[],
+            false,
+            None,
+            &[],
+            "pending",
         );
 
         assert!(summary.contains("pin_unchecked"));
@@ -1149,6 +1199,10 @@ mod tests {
             "private",
             &human_route,
             &[],
+            false,
+            None,
+            &[],
+            "pending",
         );
 
         assert!(summary.contains("unsafe_fn_call"));
@@ -1196,6 +1250,167 @@ mod tests {
         );
         assert_eq!(output.cards[0].site.owner, Some("source_root".to_string()));
         Ok(())
+    }
+
+    /// First narrow measured claim, #2231: within the declared aperture —
+    /// single-line `NonNull::new_unchecked(ident)` with a plain identifier
+    /// argument in the `nonnull_*` guard-shape fixtures — every seam is
+    /// enumerated source-first (analyzer output is never consulted for the
+    /// denominator), then each seam must produce exactly one
+    /// `NonNullUnchecked` card whose non-nullness evidence is correct for
+    /// the same pointer: present and naming the pointer on positive guard
+    /// fixtures, absent on negative controls (reassigned, shadowed, or
+    /// unrelated-pointer guards).
+    ///
+    /// The `nonnull_*` family scope is load-bearing, not a convenience:
+    /// positivity is inferred from the guard-shape fixture name, which is
+    /// only meaningful inside that family. A role-taxonomy fixture such as
+    /// `mixed_source_roles` (#2227) holds a `SAFETY`-comment-only production
+    /// seam with no code guard; the name rule would mislabel it positive
+    /// while the analyzer correctly leaves its evidence missing (a `SAFETY`
+    /// comment is not a guard). That seam is pinned by #2227's inventory
+    /// test, not by this aperture.
+    ///
+    /// Fixture-bound by construction: this measures the pinned corpus, not
+    /// unfamiliar code, and earns no global recall claim.
+    #[test]
+    fn nonnull_aperture_denominator_measures_same_pointer_evidence() -> Result<(), String> {
+        let workspace = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+        let fixture_root = workspace.join("fixtures");
+        let mut seams: Vec<(String, PathBuf, usize, String, bool)> = Vec::new();
+        let mut entries = fs::read_dir(&fixture_root)
+            .map_err(|err| format!("read fixtures failed: {err}"))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| format!("read fixtures failed: {err}"))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            if !entry.path().is_dir() {
+                continue;
+            }
+            let fixture = entry.file_name().to_string_lossy().into_owned();
+            if !fixture.starts_with("nonnull_") {
+                continue;
+            }
+            collect_aperture_seams(&entry.path(), &entry.path(), &fixture, &mut seams)?;
+        }
+        assert!(!seams.is_empty(), "aperture denominator must not be empty");
+
+        let mut recalled = 0usize;
+        let mut evidence_correct = 0usize;
+        let mut failures: Vec<String> = Vec::new();
+        for (fixture, rel, line, pointer, positive) in &seams {
+            let output = fixture_output(fixture)?;
+            let cards: Vec<&ReviewCard> = output
+                .cards
+                .iter()
+                .filter(|card| {
+                    card.operation.family == OperationFamily::NonNullUnchecked
+                        && card.site.location.line == *line
+                })
+                .collect();
+            if cards.len() != 1 {
+                failures.push(format!(
+                    "{fixture} {}:{line}: expected 1 NonNullUnchecked card, found {}",
+                    rel.display(),
+                    cards.len()
+                ));
+                continue;
+            }
+            recalled += 1;
+            let card = cards[0];
+            let evidence = card
+                .obligation_evidence
+                .iter()
+                .find(|evidence| evidence.obligation.key == "non-null");
+            match (positive, evidence) {
+                (true, Some(evidence))
+                    if evidence.discharge.present
+                        && evidence.discharge.summary.contains(pointer.as_str()) =>
+                {
+                    evidence_correct += 1;
+                }
+                (false, None) => {
+                    evidence_correct += 1;
+                }
+                (false, Some(evidence)) if !evidence.discharge.present => {
+                    evidence_correct += 1;
+                }
+                _ => failures.push(format!(
+                    "{fixture} {}:{line}: same-pointer evidence wrong for pointer `{pointer}` (positive={positive})",
+                    rel.display()
+                )),
+            }
+        }
+        assert!(
+            failures.is_empty(),
+            "aperture misses (denominator {}):\n{}",
+            seams.len(),
+            failures.join("\n")
+        );
+        assert_eq!(recalled, seams.len());
+        assert_eq!(evidence_correct, seams.len());
+        Ok(())
+    }
+
+    fn collect_aperture_seams(
+        root: &std::path::Path,
+        dir: &std::path::Path,
+        fixture: &str,
+        seams: &mut Vec<(String, PathBuf, usize, String, bool)>,
+    ) -> Result<(), String> {
+        let mut entries = fs::read_dir(dir)
+            .map_err(|err| format!("read {} failed: {err}", dir.display()))?
+            .collect::<Result<Vec<_>, _>>()
+            .map_err(|err| format!("read {} failed: {err}", dir.display()))?;
+        entries.sort_by_key(|entry| entry.file_name());
+        for entry in entries {
+            let path = entry.path();
+            if path.is_dir() {
+                collect_aperture_seams(root, &path, fixture, seams)?;
+                continue;
+            }
+            if path.extension().and_then(|ext| ext.to_str()) != Some("rs") {
+                continue;
+            }
+            let text = fs::read_to_string(&path)
+                .map_err(|err| format!("read {} failed: {err}", path.display()))?;
+            for (idx, line) in text.lines().enumerate() {
+                if let Some(pointer) = aperture_pointer(line) {
+                    seams.push((
+                        fixture.to_string(),
+                        path.strip_prefix(root).unwrap_or(&path).to_path_buf(),
+                        idx + 1,
+                        pointer,
+                        !fixture.contains("not_guard") && !fixture.contains("not_evidence"),
+                    ));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    /// Declared aperture: one line contains `NonNull::new_unchecked(ident)`
+    /// with a plain identifier argument and no turbofish. Returns the pointer
+    /// identifier lowercased, matching the discharge summary convention
+    /// (`nullability_guard_pointer` lowercases before summarizing), so the
+    /// same-pointer substring check is case-stable. Everything else
+    /// (multiline, turbofish, UFCS, macros, non-ident arguments) is outside
+    /// the aperture by construction.
+    fn aperture_pointer(line: &str) -> Option<String> {
+        let marker = "NonNull::new_unchecked(";
+        let start = line.find(marker)? + marker.len();
+        let rest = &line[start..];
+        let end = rest.find(')')?;
+        let arg = rest[..end].trim();
+        if arg.is_empty()
+            || !arg
+                .chars()
+                .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+            || arg.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+        {
+            return None;
+        }
+        Some(arg.to_ascii_lowercase())
     }
 
     #[test]
@@ -1423,6 +1638,175 @@ diff --git a/src/binding.cpp b/src/binding.cpp
     }
 
     #[test]
+    fn diff_scope_records_changed_rust_files_missing_from_the_root() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-unresolved-diff")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"unresolved-diff-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn present() {}
+diff --git a/src/missing.rs b/src/missing.rs
+--- a/src/missing.rs
++++ b/src/missing.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn absent() {}
+"#;
+
+        let mut partials = Vec::new();
+        let output = analyze_with_discovery_and_repo_events(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+            |event| {
+                if let Some(partial) = &event.partial_output
+                    && event.status.phase == RepoScanPhase::Scanning
+                {
+                    partials.push(partial.clone());
+                }
+                Ok(())
+            },
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 2);
+        assert_eq!(
+            output.unresolved_diff_files,
+            BTreeSet::from([PathBuf::from("src/missing.rs")]),
+            "the absent diff path must be recorded, not silently dropped"
+        );
+        assert!(
+            output
+                .diff_scoped_files
+                .contains(&PathBuf::from("src/lib.rs")),
+            "the present file must still resolve and scan"
+        );
+        assert!(
+            partials
+                .iter()
+                .all(|partial| partial.unresolved_diff_files == output.unresolved_diff_files),
+            "partial snapshots must carry the same narrowed-scope truth"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn diff_scope_rejects_traversal_paths_without_failing() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-rejected-diff")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"rejected-diff-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        let diff = r#"diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn present() {}
+diff --git a/etc/passwd.rs b/../../../../etc/passwd.rs
+--- a/etc/passwd.rs
++++ b/../../../../etc/passwd.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn hostile() {}
+"#;
+
+        let output = analyze_with_discovery(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 2);
+        assert!(
+            output.unresolved_diff_files.is_empty(),
+            "traversal paths are refusals, not wrong-root evidence: {:?}",
+            output.unresolved_diff_files
+        );
+        assert_eq!(
+            output.rejected_diff_files,
+            BTreeSet::from([PathBuf::from("../../../../etc/passwd.rs")]),
+        );
+        Ok(())
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn diff_scope_rejects_symlink_escaping_paths() -> Result<(), String> {
+        let outside = unique_temp_dir("unsafe-review-rejected-outside")?;
+        fs::create_dir_all(outside.join("src"))
+            .map_err(|err| format!("create src failed: {err}"))?;
+        let root = unique_temp_dir("unsafe-review-rejected-link-root")?;
+        fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
+        fs::write(
+            root.join("Cargo.toml"),
+            "[package]\nname = \"rejected-link-fixture\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+        )
+        .map_err(|err| format!("write Cargo.toml failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "pub unsafe fn present() {}\n")
+            .map_err(|err| format!("write src file failed: {err}"))?;
+        std::os::unix::fs::symlink(&outside, root.join("external-link"))
+            .map_err(|err| format!("create symlink failed: {err}"))?;
+        let diff = r#"diff --git a/external-link/src/lib.rs b/external-link/src/lib.rs
+--- a/external-link/src/lib.rs
++++ b/external-link/src/lib.rs
+@@ -1,0 +1,1 @@
++pub unsafe fn hostile() {}
+"#;
+
+        let output = analyze_with_discovery(
+            AnalyzeInput {
+                root: root.clone(),
+                scope: Scope::Diff,
+                diff: DiffSource::Text(diff.to_string()),
+                mode: AnalysisMode::Draft,
+                policy: PolicyMode::Advisory,
+                include_unchanged_tests: true,
+                max_cards: None,
+            },
+            DiscoveryOptions::default(),
+        )?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        fs::remove_dir_all(&outside).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(output.summary.changed_rust_files, 1);
+        assert!(
+            output.unresolved_diff_files.is_empty(),
+            "symlink escapes are refusals, not wrong-root evidence: {:?}",
+            output.unresolved_diff_files
+        );
+        assert_eq!(
+            output.rejected_diff_files,
+            BTreeSet::from([PathBuf::from("external-link/src/lib.rs")]),
+        );
+        Ok(())
+    }
+
+    #[test]
     fn operation_cards_inside_unsafe_fn_inherit_owner_safety_docs() -> Result<(), String> {
         let root = unique_temp_dir("unsafe-review-owner-contract")?;
         fs::create_dir_all(root.join("src")).map_err(|err| format!("create src failed: {err}"))?;
@@ -1477,6 +1861,181 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
         assert!(
             card.contract.present,
             "operation card should inherit enclosing unsafe fn # Safety docs"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn deref_of_get_unchecked_emits_only_the_get_unchecked_card() -> Result<(), String> {
+        // Drift-lock for #2238: dereferencing the `&T`/`&mut T` returned by
+        // `get_unchecked` cannot be UB by itself, so the deref arm must not
+        // emit a second card for the same expression.
+        let output = temp_source_output(
+            "unsafe-review-deref-get-unchecked-dedup",
+            r#"pub fn read_at(slice: &[u8], i: usize) -> u8 {
+    assert!(i < slice.len());
+    unsafe { *slice.get_unchecked(i) }
+}
+
+pub fn write_at(slice: &mut [u8], i: usize, v: u8) {
+    assert!(i < slice.len());
+    unsafe { *slice.get_unchecked_mut(i) = v; }
+}
+
+pub fn read_raw(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+"#,
+        )?;
+        let owned: Vec<(Option<String>, OperationFamily)> = output
+            .cards
+            .iter()
+            .map(|card| (card.site.owner.clone(), card.operation.family.clone()))
+            .collect();
+        for owner in ["read_at", "write_at"] {
+            let owner_families: Vec<OperationFamily> = owned
+                .iter()
+                .filter(|(name, _)| name.as_deref() == Some(owner))
+                .map(|(_, family)| family.clone())
+                .collect();
+            assert_eq!(
+                owner_families,
+                vec![OperationFamily::GetUnchecked],
+                "`{owner}` should emit only its get_unchecked card, got: {owner_families:?}"
+            );
+        }
+        assert!(
+            owned.contains(&(
+                Some("read_raw".to_string()),
+                OperationFamily::RawPointerDeref
+            )),
+            "genuine raw deref `*ptr` must still card, got: {owned:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn guard_missing_inside_documented_unsafe_fn_routes_to_caller_contract() -> Result<(), String> {
+        // Drift-lock for #2236: an unguarded operation inside a documented
+        // `unsafe fn` is GuardMissing (comment != guard), but the repair
+        // direction must be caller-contract review of the named owner, not
+        // local-guard construction.
+        let output = temp_source_output(
+            "unsafe-review-caller-contract-next-action",
+            r#"/// Reads one byte.
+///
+/// # Safety
+///
+/// `ptr` must be valid for reads of one byte.
+pub unsafe fn read_one(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+/// Reads one byte through a safe wrapper.
+pub fn read_wrapped(ptr: *const u8) -> u8 {
+    // SAFETY: ptr is live for this test fixture.
+    unsafe { *ptr }
+}
+"#,
+        )?;
+        let Some(card) = output.cards.iter().find(|card| {
+            card.operation.family == OperationFamily::RawPointerDeref
+                && card.site.owner.as_deref() == Some("read_one")
+        }) else {
+            return Err(format!(
+                "expected deref card owned by read_one: {:#?}",
+                output.cards
+            ));
+        };
+        assert_eq!(card.class, ReviewClass::GuardMissing);
+        assert!(
+            card.contract.present,
+            "test pre-condition: enclosing # Safety docs should be inherited"
+        );
+        let na = &card.next_action.summary;
+        assert!(
+            na.contains("read_one") && na.contains("caller"),
+            "inner-site next_action must route to caller-contract review of the owner; got: `{na}`"
+        );
+        assert!(
+            !na.contains("local guard"),
+            "inner-site next_action must not ask for a local guard; got: `{na}`"
+        );
+
+        // Safe-fn interior site with only a local rationale keeps the
+        // local-guard repair direction.
+        let Some(wrapped) = output.cards.iter().find(|card| {
+            card.operation.family == OperationFamily::RawPointerDeref
+                && card.site.owner.as_deref() == Some("read_wrapped")
+        }) else {
+            return Err(format!(
+                "expected deref card owned by read_wrapped: {:#?}",
+                output.cards
+            ));
+        };
+        assert_eq!(wrapped.class, ReviewClass::GuardMissing);
+        assert!(
+            wrapped.next_action.summary.contains("local guard"),
+            "safe-fn site must keep the local-guard repair direction; got: `{}`",
+            wrapped.next_action.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn unreached_card_cues_gate_commands_behind_test_first() -> Result<(), String> {
+        // Drift-lock for #2240: a `miri test <owner>` command cannot work when
+        // no test reaches the owner, so the confirmation cue must lead with
+        // the test-first precondition instead of presenting the command as
+        // directly runnable.
+        let output = temp_source_output(
+            "unsafe-review-unreached-test-first-cue",
+            r#"pub fn lonely(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+pub fn accompanied(ptr: *const u8) -> u8 {
+    unsafe { *ptr }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reaches_accompanied() {
+        let value = 7u8;
+        assert_eq!(accompanied(&value as *const u8), 7);
+    }
+}
+"#,
+        )?;
+        let cue_for = |owner: &str| -> Result<String, String> {
+            let card = output
+                .cards
+                .iter()
+                .find(|card| {
+                    card.operation.family == OperationFamily::RawPointerDeref
+                        && card.site.owner.as_deref() == Some(owner)
+                })
+                .ok_or_else(|| format!("expected deref card owned by {owner}"))?;
+            Ok(crate::output::confirmation::build_this_first(card)
+                .summary()
+                .to_string())
+        };
+        let lonely_cue = cue_for("lonely")?;
+        assert!(
+            lonely_cue.contains("lonely") && lonely_cue.contains("test"),
+            "unreached cue must gate behind a test-first step naming the owner; got: `{lonely_cue}`"
+        );
+        assert!(
+            !lonely_cue.starts_with("Build/run"),
+            "unreached cue must not present the command as directly runnable; got: `{lonely_cue}`"
+        );
+        let accompanied_cue = cue_for("accompanied")?;
+        assert!(
+            accompanied_cue.starts_with("Build/run"),
+            "reached cue must keep the direct command; got: `{accompanied_cue}`"
         );
         Ok(())
     }
@@ -1754,6 +2313,68 @@ pub unsafe fn advance(ptr: *const u8, offset: usize) -> *const u8 {
             );
             assert!(card.id.0.contains("nonnull-unchecked"));
         }
+        Ok(())
+    }
+
+    #[test]
+    fn nullability_keeps_pointer_live_open() -> Result<(), String> {
+        // A same-receiver null check is genuine non-nullness evidence, but it
+        // must not discharge the pointer-live obligation: the allocation may
+        // still be dead, small, misaligned, or invalid to access.
+        let output = fixture_output("raw_pointer_read_same_receiver_is_null_guard")?;
+        let card = single_card("raw_pointer_read_same_receiver_is_null_guard", &output)?;
+
+        assert!(
+            !obligation_discharge_present(card, "pointer-live"),
+            "null-only guard must leave pointer-live open"
+        );
+        let live = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "pointer-live")
+            .ok_or_else(|| "card must carry a pointer-live obligation".to_string())?;
+        assert!(
+            live.discharge
+                .summary
+                .contains("Nullability guard code was detected"),
+            "the observed null check must be retained as a true fact: {}",
+            live.discharge.summary
+        );
+        assert!(
+            live.discharge
+                .summary
+                .contains("liveness remains unresolved"),
+            "the residual obligation must stay visible: {}",
+            live.discharge.summary
+        );
+        assert!(
+            card.next_action.summary.contains("pointer is live"),
+            "next action must still require liveness evidence: {}",
+            card.next_action.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn same_origin_keeps_pointer_live_present() -> Result<(), String> {
+        // Genuine same-origin evidence still discharges pointer-live with
+        // unchanged wording.
+        let output = fixture_output("vec_from_raw_parts_manuallydrop_origin")?;
+        let card = single_card("vec_from_raw_parts_manuallydrop_origin", &output)?;
+
+        assert!(
+            obligation_discharge_present(card, "pointer-live"),
+            "same-origin evidence must keep pointer-live present"
+        );
+        let live = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "pointer-live")
+            .ok_or_else(|| "card must carry a pointer-live obligation".to_string())?;
+        assert_eq!(
+            live.discharge.summary,
+            "Vec::from_raw_parts same-origin pointer/capacity evidence was detected"
+        );
         Ok(())
     }
 
@@ -3892,8 +4513,8 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
 
     #[test]
     fn vec_from_raw_parts_uses_vec_operation_family() -> Result<(), String> {
-        let output = fixture_output("vec_from_raw_parts")?;
-        let card = single_card("vec_from_raw_parts", &output)?;
+        let output = fixture_output("vec_from_raw_parts_manuallydrop_origin")?;
+        let card = single_card("vec_from_raw_parts_manuallydrop_origin", &output)?;
 
         assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
         assert_eq!(card.operation.family, OperationFamily::VecFromRawParts);
@@ -4544,6 +5165,72 @@ pub fn read_at(offset: i32) -> Result<usize, ()> {
                 card.missing.iter().any(|missing| missing.kind == "guard"),
                 "{fixture} must not resolve the initialized-memory guard prompt"
             );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_drop_credits_dominating_state_bit_guard() -> Result<(), String> {
+        // The Crossbeam shape carries a second (deref) card, so select the
+        // drop card by family instead of asserting a single card.
+        let output = fixture_output("maybeuninit_assume_init_drop_state_bit_guard")?;
+        let Some(card) = output
+            .cards
+            .iter()
+            .find(|card| card.operation.family == OperationFamily::MaybeUninitAssumeInit)
+        else {
+            return Err("state-bit guard fixture should emit a drop card".to_string());
+        };
+
+        assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+        assert!(
+            matches!(
+                card.class,
+                ReviewClass::GuardedUnwitnessed | ReviewClass::UnsafeUnreached
+            ),
+            "guard fixture should classify as guarded, got {:?}",
+            card.class
+        );
+        assert!(obligation_discharge_present(card, "initialized"));
+        let Some(evidence) = card
+            .obligation_evidence
+            .iter()
+            .find(|evidence| evidence.obligation.key == "initialized")
+        else {
+            return Err("state-bit guard fixture should carry initialized evidence".to_string());
+        };
+        assert!(
+            evidence.discharge.summary.contains("WRITE")
+                || evidence.discharge.summary.contains("write"),
+            "summary names the bit: {}",
+            evidence.discharge.summary
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn maybeuninit_assume_init_drop_rejects_ungoverning_state_bit_guards() -> Result<(), String> {
+        for (fixture, owner) in [
+            (
+                "maybeuninit_assume_init_drop_state_bit_other_slot_not_guard",
+                "drop_unrelated_state",
+            ),
+            (
+                "maybeuninit_assume_init_drop_state_bit_wrong_arm_not_guard",
+                "drop_when_unset",
+            ),
+        ] {
+            let output = fixture_output(fixture)?;
+            let Some(card) = output.cards.iter().find(|card| {
+                card.operation.family == OperationFamily::MaybeUninitAssumeInit
+                    && card.site.owner.as_deref() == Some(owner)
+            }) else {
+                return Err(format!("{fixture} should emit a drop card"));
+            };
+
+            assert_eq!(card.site.kind, UnsafeSiteKind::Operation);
+            assert_eq!(card.class, ReviewClass::GuardMissing);
+            assert!(!obligation_discharge_present(card, "initialized"));
         }
         Ok(())
     }
@@ -5714,6 +6401,156 @@ unsafe extern "C" {
     }
 
     #[test]
+    fn ffi_bound_return_reports_checked_discharge() -> Result<(), String> {
+        let output = fixture_output("ffi_return_value_checked_guard")?;
+        let card = single_card("ffi_return_value_checked_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .any(|evidence| evidence.obligation.key == "return-value"),
+            "a bound FFI return must carry the return-value obligation"
+        );
+        assert!(obligation_discharge_present(card, "return-value"));
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_guarded_pointer_call_carries_no_invented_obligation() -> Result<(), String> {
+        // #2315: a dominating null check is an observed caller fact. It must
+        // not create the callee requirement it might one day satisfy, so no
+        // `argument` obligation may appear even when the check dominates.
+        let output = fixture_output("ffi_argument_null_check_guard")?;
+        let card = single_card("ffi_argument_null_check_guard", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            card.obligation_evidence
+                .iter()
+                .all(|evidence| evidence.obligation.key != "argument"),
+            "a null check must not invent a call-argument obligation"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_unguarded_and_integer_calls_carry_no_invented_obligation() -> Result<(), String> {
+        // #2315: raw-pointer parameter syntax alone must not create a
+        // non-null/validity requirement, and integer parameters never did.
+        let output = fixture_output("ffi_argument_unguarded_not_guard")?;
+        assert_eq!(output.cards.len(), 2);
+
+        for owner in ["unguarded", "added"] {
+            let card = output
+                .cards
+                .iter()
+                .find(|card| card.site.owner.as_deref() == Some(owner))
+                .ok_or(format!("missing card for the {owner} call"))?;
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "argument"),
+                "{owner}: parameter syntax must not invent a call-argument obligation"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_nullable_controls_carry_no_invented_obligation() -> Result<(), String> {
+        // #2315 required controls: sentinel, len-coupled, optional-out, and
+        // opaque-handle APIs plus a different-argument check and a
+        // declaration-less guarded call. None may gain an `argument`
+        // obligation from syntax or observed guards.
+        let output = fixture_output("ffi_argument_nullable_no_invented_obligation")?;
+        assert_eq!(output.cards.len(), 6);
+
+        for card in &output.cards {
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "argument"),
+                "{:?}: nullable/relational APIs must not gain an invented obligation",
+                card.site.owner
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn movement_context_card_is_not_new() -> Result<(), String> {
+        let output = fixture_output("movement_context_card_not_new")?;
+        let card = single_card("movement_context_card_not_new", &output)?;
+
+        assert_eq!(card.operation.family, OperationFamily::Ffi);
+        assert!(
+            !card.site.changed,
+            "a card on an unchanged line near added lines is context, not introduced"
+        );
+        assert_eq!(output.summary.cards, 1);
+        assert_eq!(output.summary.new_gaps, 0);
+        assert_eq!(output.summary.open_actionable_gaps, 1);
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_bound_return_without_check_reports_missing_discharge() -> Result<(), String> {
+        for fixture in [
+            "ffi_return_value_unchecked_not_guard",
+            "ffi_return_value_debug_assert_not_guard",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .any(|evidence| evidence.obligation.key == "return-value"),
+                "{fixture}: a bound FFI return must carry the return-value obligation"
+            );
+            assert!(
+                !obligation_discharge_present(card, "return-value"),
+                "{fixture}: an unchecked or debug_assert-only return must stay missing"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn ffi_discarded_return_carries_no_return_value_obligation() -> Result<(), String> {
+        for fixture in [
+            "ffi_return_value_ignored_no_obligation",
+            "ffi_return_value_discard_no_obligation",
+        ] {
+            let output = fixture_output(fixture)?;
+            let card = single_card(fixture, &output)?;
+
+            assert_eq!(card.operation.family, OperationFamily::Ffi);
+            assert!(
+                card.obligation_evidence
+                    .iter()
+                    .all(|evidence| evidence.obligation.key != "return-value"),
+                "{fixture}: an ignored or discarded FFI return must not gain the obligation"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn movement_added_site_is_new() -> Result<(), String> {
+        let output = fixture_output("ffi_call_sanitizer_route")?;
+        let card = single_card("ffi_call_sanitizer_route", &output)?;
+
+        assert!(card.site.changed, "a card on an added line is introduced");
+        assert_eq!(output.summary.new_gaps, 1);
+        assert_eq!(output.summary.open_actionable_gaps, 1);
+        Ok(())
+    }
+
+    #[test]
     fn card_identity_counts_duplicate_sites() -> Result<(), String> {
         let output = fixture_output("duplicate_raw_pointer_reads")?;
         if output.cards.len() != 2 {
@@ -6850,6 +7687,86 @@ evidence = "test fixture"
         let _ = fs::remove_dir_all(&root);
 
         assert!(events_checked > 0, "at least one event must be checked");
+        Ok(())
+    }
+
+    /// Mixed-repository inventory baseline (#2227 step 1). The
+    /// `mixed_source_roles` fixture holds production, `#[cfg(test)]`,
+    /// fixture-input, generated, shared/ambiguous, and example seams.
+    /// Complete inventory retains every correctly detected card; role
+    /// classification (step 2) changes the selected view, never evidence
+    /// or detected counts. Vocabulary: production (`src/lib.rs`,
+    /// `src/generated.rs`, `shared/span.rs` via `#[path]`), test-only
+    /// (`src/tested.rs` under `#[cfg(test)]`), fixture input
+    /// (`tests/fixtures/`), example (`examples/`).
+    #[test]
+    fn mixed_source_roles_inventory_retains_every_seam() -> Result<(), String> {
+        let root = fixture_root("mixed_source_roles");
+        let output = analyze(AnalyzeInput {
+            root,
+            scope: Scope::Repo,
+            diff: DiffSource::NoneRepoScan,
+            mode: AnalysisMode::Repo,
+            policy: PolicyMode::Advisory,
+            include_unchanged_tests: true,
+            max_cards: None,
+        })?;
+
+        let mut rows: Vec<String> = output
+            .cards
+            .iter()
+            .map(|card| {
+                format!(
+                    "{} :: {}",
+                    card.site.location.file.to_string_lossy().replace('\\', "/"),
+                    card.operation.family.as_str()
+                )
+            })
+            .collect();
+        rows.sort();
+        assert_eq!(
+            rows,
+            vec![
+                "examples/demo.rs :: raw_pointer_write".to_string(),
+                "shared/span.rs :: pointer_arithmetic".to_string(),
+                "src/generated.rs :: get_unchecked".to_string(),
+                "src/lib.rs :: nonnull_unchecked".to_string(),
+                "src/lib.rs :: raw_pointer_deref".to_string(),
+                "src/tested.rs :: raw_pointer_deref".to_string(),
+                "tests/fixtures/byte_input.rs :: raw_pointer_deref".to_string(),
+            ]
+        );
+        // The `#[cfg(test)]` helper seam stays visible: test-only does not
+        // mean suppressed.
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|card| card.site.location.file.ends_with("src/tested.rs"))
+        );
+        // Role distribution follows the fixture map: production seams in
+        // src/lib.rs, test seams in src/tested.rs and tests/fixtures, the
+        // generated helper, and unknown for the shared include plus the
+        // example. Counts cover every card; production-first never hides.
+        assert_eq!(output.summary.production_cards, 2);
+        assert_eq!(output.summary.test_cards, 2);
+        assert_eq!(output.summary.generated_cards, 1);
+        assert_eq!(output.summary.unknown_cards, 2);
+        assert_eq!(
+            output.summary.production_cards
+                + output.summary.test_cards
+                + output.summary.generated_cards
+                + output.summary.unknown_cards,
+            output.summary.cards
+        );
+        // The `#[path]`-included shared file is inventoried at its real
+        // location, not hidden by its directory name.
+        assert!(
+            output
+                .cards
+                .iter()
+                .any(|card| card.site.location.file.ends_with("shared/span.rs"))
+        );
         Ok(())
     }
 }

@@ -27,6 +27,7 @@ pub(crate) use queue::repair_queue_projection;
 
 mod context;
 mod evidence;
+pub mod index;
 mod packet;
 mod queue;
 mod range_scan;

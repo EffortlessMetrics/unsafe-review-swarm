@@ -43,11 +43,13 @@ mod external_pilots;
 mod first_hour;
 mod fixture_surfaces;
 mod fuzz_artifact_checks;
+mod latency_baseline;
 mod lsp_smoke;
 mod markdown;
 mod public_badges;
 mod public_surfaces;
 mod real_pr_corpus;
+mod seam_batch;
 mod self_unsafe;
 mod source_sync;
 mod source_truth_ledgers;
@@ -885,6 +887,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             fixture_surfaces::check_surface_determinism()?;
             real_pr_corpus::check()?;
             corpus_partitions::check()?;
+            seam_batch::check()?;
             evidence_loss_challenges::check()?;
             external_pilots::check()?;
             check_dogfood()?;
@@ -948,6 +951,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
+        commands::XtaskCommand::CheckSeamBatch => seam_batch::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
         commands::XtaskCommand::CheckExternalPilots => external_pilots::check(),
         commands::XtaskCommand::ExternalPilotRollup => external_pilot_rollup::write(),
@@ -958,6 +962,10 @@ fn run(args: Vec<String>) -> Result<(), String> {
         }
         commands::XtaskCommand::CheckLocalRun(id) => check_dispatch::run_named_check(&id, false),
         commands::XtaskCommand::LspSmoke => lsp_smoke::run(&root),
+        commands::XtaskCommand::LatencyBaseline(raw_args) => {
+            let baseline_args = latency_baseline::LatencyBaselineArgs::parse(&raw_args)?;
+            latency_baseline::run(&root, &baseline_args)
+        }
         commands::XtaskCommand::DogfoodExec(raw_args) => {
             let exec_args = dogfood_exec::DogfoodExecArgs::parse(&raw_args)?;
             dogfood_exec::run(&exec_args)
@@ -983,7 +991,7 @@ fn print_help() {
 /// command list; the trailing note records that classification.
 fn help_text() -> String {
     format!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, latency-baseline [--out <path>] [--runs <N>] [--skip-lsp] [--skip-repo], sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-seam-batch, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
     )
 }
 
@@ -6721,12 +6729,22 @@ fn parse_fixture_reach_claim(summary: &str) -> Option<FixtureReachClaim<'_>> {
 }
 
 fn parse_related_test_reach(summary: &str) -> Option<(usize, &str)> {
-    let (count, rest) = summary.split_once(" related test file(s) mention owner `")?;
-    let owner = rest.strip_suffix('`')?;
-    if owner.trim().is_empty() {
-        return None;
+    // Accept the current singular/plural summaries. The legacy
+    // "N related test file(s) mention owner" shape is retired: goldens no
+    // longer contain it.
+    for infix in [
+        " related test file mentions owner `",
+        " related test files mention owner `",
+    ] {
+        if let Some((count, rest)) = summary.split_once(infix) {
+            let owner = rest.strip_suffix('`')?;
+            if owner.trim().is_empty() {
+                return None;
+            }
+            return Some((count.parse().ok()?, owner));
+        }
     }
-    Some((count.parse().ok()?, owner))
+    None
 }
 
 fn reject_fixture_reach_overclaim(
@@ -10108,7 +10126,7 @@ jobs:
             "UR-raw-pointer-alignment-fixture-src-lib-rs-read-header-operation-raw_pointer_read-cast-header-8a1362456e39-pointer_validity-c1",
         )?;
         card["reach"] =
-            serde_json::Value::String("1 related test file(s) mention owner `other_owner`".into());
+            serde_json::Value::String("1 related test file mentions owner `other_owner`".into());
 
         let Err(err) = check_fixture_card_identity(
             "fixtures/raw_pointer_alignment/expected.cards.json",
@@ -11063,7 +11081,7 @@ jobs:
       "reach": {{
         "present": true,
         "state": "present",
-        "summary": "1 related test file(s) mention owner `read_header`"
+        "summary": "1 related test file mentions owner `read_header`"
       }},
       "witness": {{
         "present": false,
@@ -11078,7 +11096,7 @@ jobs:
   ],
   "contract": "Nearby `SAFETY:` comment was detected",
   "discharge": "No visible local guard detected",
-  "reach": "1 related test file(s) mention owner `read_header`",
+  "reach": "1 related test file mentions owner `read_header`",
   "witness": "No imported witness receipt was found",
   "next_action": "Add or expose the local guard that discharges the `raw_pointer_read` safety obligation.",
   "witness_routes": [

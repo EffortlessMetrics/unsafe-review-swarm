@@ -1,6 +1,10 @@
 use crate::analysis::{pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
+use crate::input::aperture::{AnalysisAperture, render_aperture_human};
+use crate::input::cfg::{CardConfiguration, render_configuration_human};
+use crate::input::impact::{ImpactInventory, render_impact_human};
+use crate::input::stages::{StageInventory, render_stages_human};
 use crate::input::workspace;
 use crate::output::{
     agent, badges, comment_plan, confirmation, gate_manifest, human, json, lsp, markdown, outcome,
@@ -126,6 +130,12 @@ pub struct PerFileScanStats {
     pub file: PathBuf,
     /// Wall-clock milliseconds spent scanning this file (parse + site detection).
     pub scan_ms: u64,
+    /// Bytes read for this file. Deterministic for identical inputs.
+    pub bytes: u64,
+    /// Lines parsed for this file. Deterministic for identical inputs.
+    pub lines: u64,
+    /// Unsafe sites detected in this file. Deterministic for identical inputs.
+    pub sites: u64,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -222,6 +232,13 @@ pub struct Summary {
     pub unsafe_sites: usize,
     pub cards: usize,
     pub open_actionable_gaps: usize,
+    /// Source-role triage counts over emitted cards (SPEC-0041): production,
+    /// test, generated, and unknown buckets. They always sum to `cards`;
+    /// production-first review uses them to order work, never to hide it.
+    pub production_cards: usize,
+    pub test_cards: usize,
+    pub generated_cards: usize,
+    pub unknown_cards: usize,
     pub contract_missing: usize,
     pub guard_missing: usize,
     pub guarded_unwitnessed: usize,
@@ -306,6 +323,20 @@ pub struct AnalyzeOutput {
     /// card resolved because we scanned its file and it is gone" from "baseline
     /// card not present because its file was out of diff scope" (SPEC-0030).
     pub diff_scoped_files: BTreeSet<PathBuf>,
+    /// On a diff-scoped run, changed Rust files from the diff that have no
+    /// file under the analysis root and were therefore not scanned at all.
+    /// Any non-empty value means the run reviewed less than the diff names:
+    /// renderers must surface these paths loudly, and callers must fail
+    /// closed when nothing at all resolved (wrong `--root`, usually a foreign
+    /// checkout or the wrong side of the reviewed change). Traversal,
+    /// absolute, and symlink-escaping paths are excluded here and recorded in
+    /// `rejected_diff_files` instead: they keep the #1883 exit-0 contract.
+    pub unresolved_diff_files: BTreeSet<PathBuf>,
+    /// On a diff-scoped run, changed Rust files from the diff that were
+    /// refused rather than missed: absolute paths, `..` traversals escaping
+    /// the root, and paths crossing a symlink that points outside the root.
+    /// Never resolved by design; never triggers the wrong-root error.
+    pub rejected_diff_files: BTreeSet<PathBuf>,
     /// Per-card coverage snapshot loaded from `policy/unsafe-review-baseline-snapshot.toml`.
     ///
     /// Output renderers use this to project the per-card `baseline_state`/`outcome_movement`
@@ -517,6 +548,19 @@ pub fn render_json(output: &AnalyzeOutput) -> String {
     json::render(output)
 }
 
+/// Render the JSON analyze artifact with an evaluated configuration
+/// section for an explicit envelope selection. Default runs never call
+/// this: their artifacts stay byte-stable with no `configuration` key.
+pub fn render_json_with_configuration(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+) -> String {
+    json::render_with_configuration(output, provenance, environment_digest, note, items)
+}
+
 /// Render the JSON analyze artifact with attached traceable evidence metadata.
 ///
 /// The `provenance` block is inserted as a nested object in the output.
@@ -527,6 +571,180 @@ pub fn render_json_with_provenance(output: &AnalyzeOutput, provenance: &Provenan
 
 pub fn render_human(output: &AnalyzeOutput) -> String {
     human::render(output)
+}
+
+/// Render human output with an evaluated configuration section appended
+/// for an explicit envelope selection. Default runs never call this.
+pub fn render_human_with_configuration(
+    output: &AnalyzeOutput,
+    short: bool,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_configuration_human(items, environment_digest, note));
+    rendered
+}
+
+/// Render the JSON analyze artifact with an aperture manifest section for
+/// an explicit `--aperture` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `aperture` key.
+pub fn render_json_with_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    aperture: AnalysisAperture,
+) -> String {
+    json::render_with_aperture(output, provenance, aperture)
+}
+
+/// One evaluated configuration section for the unified section renderer.
+pub struct ConfigurationArgs<'a> {
+    pub environment_digest: &'a str,
+    pub note: Option<&'a str>,
+    pub items: &'a [CardConfiguration],
+}
+
+/// Render the JSON analyze artifact with any combination of additive
+/// sections. Default runs pass all `None` and stay byte-stable.
+pub fn render_json_with_sections(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    configuration: Option<ConfigurationArgs<'_>>,
+    aperture: Option<AnalysisAperture>,
+    impact: Option<ImpactInventory>,
+    stages: Option<StageInventory>,
+) -> String {
+    json::render_with_sections(
+        output,
+        provenance,
+        configuration.map(|section| json::ConfigurationSection {
+            environment_digest: section.environment_digest,
+            note: section.note,
+            items: section.items,
+        }),
+        aperture,
+        impact,
+        stages,
+    )
+}
+
+/// Render the JSON analyze artifact with a stage/fact-requirement section
+/// for an explicit `--stages` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `stages` key.
+pub fn render_json_with_stages(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    stages: StageInventory,
+) -> String {
+    json::render_with_sections(output, provenance, None, None, None, Some(stages))
+}
+
+/// Render the JSON analyze artifact with a same-owner impact section for
+/// an explicit `--impact` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `impact` key.
+pub fn render_json_with_impact(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    impact: ImpactInventory,
+) -> String {
+    json::render_with_sections(output, provenance, None, None, Some(impact), None)
+}
+
+/// Render human output with a stage/fact-requirement section appended for
+/// an explicit `--stages` run. Default runs never call this.
+pub fn render_human_with_stages(
+    output: &AnalyzeOutput,
+    short: bool,
+    stages: &StageInventory,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_stages_human(stages));
+    rendered
+}
+
+/// Render human output with a same-owner impact section appended for an
+/// explicit `--impact` run. Default runs never call this.
+pub fn render_human_with_impact(
+    output: &AnalyzeOutput,
+    short: bool,
+    impact: &ImpactInventory,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_impact_human(impact));
+    rendered
+}
+
+/// Render the JSON analyze artifact with both configuration and aperture
+/// sections for runs that select an envelope and `--aperture`.
+pub fn render_json_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+    aperture: AnalysisAperture,
+) -> String {
+    json::render_with_configuration_and_aperture(
+        output,
+        provenance,
+        environment_digest,
+        note,
+        items,
+        aperture,
+    )
+}
+
+/// Render human output with an aperture manifest section appended for an
+/// explicit `--aperture` run. Default runs never call this.
+pub fn render_human_with_aperture(
+    output: &AnalyzeOutput,
+    short: bool,
+    aperture: &AnalysisAperture,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_aperture_human(aperture));
+    rendered
+}
+
+/// Render human output with configuration and aperture sections appended
+/// for runs that select an envelope and `--aperture`.
+pub fn render_human_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    short: bool,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[CardConfiguration],
+    aperture: &AnalysisAperture,
+) -> String {
+    let mut rendered = if short {
+        human::render_short(output)
+    } else {
+        human::render(output)
+    };
+    rendered.push_str(&render_configuration_human(items, environment_digest, note));
+    rendered.push_str(&render_aperture_human(aperture));
+    rendered
+}
+
+pub fn render_human_short(output: &AnalyzeOutput) -> String {
+    human::render_short(output)
 }
 
 pub fn render_markdown(output: &AnalyzeOutput) -> String {

@@ -643,7 +643,11 @@ fn verify_sha256(path: &Path, expected: &str) -> Result<(), String> {
         }
         hasher.update(&buffer[..count]);
     }
-    let digest = format!("{:x}", hasher.finalize());
+    let digest: String = hasher
+        .finalize()
+        .iter()
+        .map(|byte| format!("{byte:02x}"))
+        .collect();
     if digest != expected {
         return Err(format!("sha256 mismatch for {}", path.display()));
     }
@@ -1403,6 +1407,46 @@ esac
             }
             Ok(path)
         }
+    }
+
+    #[test]
+    fn sha256_verification_preserves_canonical_hex() -> Result<(), String> {
+        let dir = temp_dir("sha256")?;
+        let path = dir.join("asset");
+        let cases: &[(&[u8], &str)] = &[
+            (
+                b"",
+                "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+            ),
+            (
+                b"abc",
+                "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad",
+            ),
+            (
+                &vec![b'a'; 1_000_000],
+                "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0",
+            ),
+        ];
+        for (bytes, expected) in cases {
+            fs::write(&path, bytes).map_err(|error| format!("write hash fixture: {error}"))?;
+            verify_sha256(&path, expected)?;
+            for invalid in [
+                "0".repeat(64),
+                expected.to_uppercase(),
+                expected[1..].to_string(),
+            ] {
+                if verify_sha256(&path, &invalid).is_ok() {
+                    return Err("nonmatching or noncanonical hash was accepted".to_string());
+                }
+            }
+            fs::write(&path, b"tampered")
+                .map_err(|error| format!("tamper hash fixture: {error}"))?;
+            if verify_sha256(&path, expected).is_ok() {
+                return Err("tampered asset was accepted".to_string());
+            }
+        }
+        fs::remove_dir_all(&dir).map_err(|error| format!("remove hash fixture: {error}"))?;
+        Ok(())
     }
 
     #[test]

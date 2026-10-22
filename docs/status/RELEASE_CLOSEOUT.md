@@ -1,8 +1,9 @@
 # 0.4.0 release closeout — issue #1925
 
-Status: `qualified_for_owner_decision` (not released, published, or public).
-The repair lane is closed: every defect from the withdrawn verdict cleared
-with proof (see machine-readable closeout).
+Status: `released` — 0.4.0 published 2026-09-16 (source merge `8f67aaa5`,
+crates core/cli/facade 0.4.0, tag `v0.4.0`, GitHub Release live, public smoke
+green). The repair lane closed with every defect cleared on proof before
+publication (see machine-readable closeout).
 
 Machine-readable source:
 [`UNSAFE-REVIEW-CLOSEOUT-1925.toml`](../../plans/release-cutline/UNSAFE-REVIEW-CLOSEOUT-1925.toml)
@@ -57,21 +58,25 @@ read-only pins, and every committed change is on a pushed branch or merged PR.
 
 Syntax-first analysis only; false-actionability residuals stand; partial,
 capped, stale, and failed states are non-complete by contract; the editor loop
-is read-only with no witness execution; Windows untested; Action `v1`,
-prebuilts, marketplace, and crates.io availability are unavailable. This
-closeout proves the frozen release-shape contract only — not safety, UB-free
-status, accuracy, or authorization to publish.
+is read-only with no witness execution; Windows executed (hosted run
+`35132286041`, 17/17 green; LSP and pinned-consumer rows remain follow-up);
+Action `v1`, prebuilts, and marketplace remain unavailable; crates.io
+availability is the published 0.4.0 triple. This closeout records the frozen
+release-shape contract as published — not safety, UB-free status, accuracy,
+or authorization for anything beyond 0.4.0.
 
-## Owner publish handoff (copy-ready, NOT executed)
+## Owner publish handoff (EXECUTED 2026-09-16)
 
-1. Re-fetch source PR `#568`; prove head `a2b9cc48` and checks unchanged.
-2. Obtain explicit owner go — this closeout is not authorization.
-3. Merge with a merge commit (never squash).
-4. Publish core → CLI → facade; install from crates.io; rerun public smoke.
-5. Tag `v0.4.0`, create the GitHub Release, record receipts, mirror to swarm.
-6. Verify `source-divergence` shows no unacknowledged source commits.
+1. Re-fetched source PR `#568`; proved head `a2b9cc48` and checks unchanged. Done.
+2. Obtained explicit owner go. Done.
+3. Merged with a merge commit (no squash): `8f67aaa5`. Done.
+4. Published core → CLI → facade; installed from crates.io; reran public smoke. Done.
+5. Tagged `v0.4.0`, created the GitHub Release, recorded receipts, mirrored to swarm. Done.
+6. Verified `source-divergence` shows no unacknowledged source commits. Done
+   (checkpoint advanced to `8f67aaa5`).
 
 ## Rollback
 
-Abandon: close `#568` unmerged with reason; keep the branch and receipts as
-audit records. Nothing is published, so nothing needs retracting.
+Not applicable post-publication: crates cannot be un-published. Any defect
+found in 0.4.0 routes to a patch lane with its own qualification; the
+frozen 0.4.0 records above stay immutable.

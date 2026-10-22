@@ -1,11 +1,11 @@
 name: windows-qual
 
-# Advisory manual-only Windows installed-product qualification for the 0.4.0
-# candidate (swarm #1921 WINDOWS-MATRIX blocker, #1925 repair lane).
+# Advisory manual-only Windows clean-prefix source qualification.
+# Historical #1921/#1925 receipts remain frozen; current #1887/#1918 owns this lane.
 #
 # Runs the installed-product rows on windows-latest against an exact source
-# candidate SHA of EffortlessMetrics/unsafe-review#568: package listing,
-# install from the final packages, identity/help/doctor, preview-only init,
+# candidate SHA: package-file inventory, clean-prefix source installation,
+# actual executable/source identity, usable help, preview-only init,
 # one representative first-pr bundle plus the swarm artifact verifier, and
 # failure-semantics exits. LSP and pinned-consumer (tokmd/ub-review) rows are
 # explicitly out of scope here and remain maintainer-host follow-up; the
@@ -20,9 +20,9 @@ on:
   workflow_dispatch:
     inputs:
       source_sha:
-        description: "Source candidate SHA (unsafe-review#568 head)"
-        default: "a2b9cc48c6dc2aa8ef0380890213bfee56f5de52"
-        required: false
+        description: "Exact 40-hex source candidate SHA (no floating branch or version inference)"
+        default: "735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1"
+        required: true
 
 permissions:
   contents: read
@@ -60,36 +60,71 @@ jobs:
           toolchain: 1.98.1
 
       - name: Prove candidate identity
+        env:
+          INPUT_SOURCE_SHA: ${{ inputs.source_sha }}
         run: |
           set -euo pipefail
           cd source-candidate
           git rev-parse HEAD | tee ../candidate-sha.txt
-          grep '^version' crates/unsafe-review/Cargo.toml | head -n 1
+          git rev-parse 'HEAD^{tree}' | tee ../source-tree.txt
+          rustc --version | tee ../toolchain.txt
           sha256sum Cargo.lock | tee ../lockfile-sha.txt
           git show HEAD:Cargo.lock | sha256sum | tee ../lockfile-git-sha.txt
+          python - <<'EOF'
+          import hashlib, json, os, re, subprocess, tomllib
+          from pathlib import Path
+          expected = os.environ['INPUT_SOURCE_SHA'].lower()
+          if not re.fullmatch(r'[0-9a-f]{40}', expected):
+              raise SystemExit('source_sha must be an exact 40-hex commit')
+          actual = subprocess.check_output(['git', 'rev-parse', 'HEAD'], text=True).strip()
+          if actual != expected:
+              raise SystemExit('checked-out source does not match the requested candidate')
+          packages = ['unsafe-review-core', 'unsafe-review-cli', 'unsafe-review']
+          versions = {p: tomllib.loads(Path('crates', p, 'Cargo.toml').read_text())['package']['version'] for p in packages}
+          if len(set(versions.values())) != 1:
+              raise SystemExit('candidate package versions disagree')
+          tracked_lock = subprocess.check_output(['git', 'show', 'HEAD:Cargo.lock'])
+          working_lock = Path('Cargo.lock').read_bytes()
+          if working_lock.replace(b'\r\n', b'\n') != tracked_lock.replace(b'\r\n', b'\n'):
+              raise SystemExit('working lockfile differs from candidate source')
+          identity = {'candidate_sha': actual, 'source_tree': Path('../source-tree.txt').read_text().strip(),
+                      'package_versions': versions, 'tracked_lockfile_sha256': hashlib.sha256(tracked_lock).hexdigest()}
+          Path('../candidate-version.txt').write_text(versions['unsafe-review'])
+          Path('../source-identity.json').write_text(json.dumps(identity, indent=2))
+          EOF
           for p in unsafe-review-core unsafe-review-cli unsafe-review; do
-            cargo package --list -p "$p" | sort | tee "../pkg-list-$p.txt" | wc -l
+            cargo package --locked --list -p "$p" | sort | tee "../pkg-list-$p.txt" | wc -l
           done
 
-      - name: Install facade from final packages
+      - name: Install source-built facade into a clean prefix
         run: |
           set -euo pipefail
           cd source-candidate
-          cargo install --path crates/unsafe-review --root "$GITHUB_WORKSPACE/qual-prefix" --locked
+          cargo install --path crates/unsafe-review --root "$GITHUB_WORKSPACE/qual-prefix" --locked --jobs 1
           echo "$GITHUB_WORKSPACE/qual-prefix/bin" >> "$GITHUB_PATH"
 
       - name: Run qualification rows
+        env:
+          QUALIFICATION_VERIFIER_WORKSPACE: ${{ github.workspace }}
         run: |
           set -euo pipefail
-          B="$GITHUB_WORKSPACE/qual-prefix/bin/unsafe-review.exe"
+          B="$GITHUB_WORKSPACE/qual-prefix/bin/unsafe-review"
+          if [ "${RUNNER_OS}" = "Windows" ]; then B="${B}.exe"; fi
           ROWS="$GITHUB_WORKSPACE/rows.tsv"
           : > "$ROWS"
           rec() { printf '%s\t%s\t%s\n' "$1" "$2" "$3" >> "$ROWS"; }
-          v=$("$B" --version); rec identity 0 "$v"
+          v=$("$B" --version); printf '%s\n' "$v" > "$GITHUB_WORKSPACE/observed-version.txt"; rec identity 0 "$v"
           for c in doctor pr repo context lsp init pr-setup; do
-            if "$B" "$c" --help >/dev/null 2>&1; then rec "help:$c" 0 -; else rec "help:$c" 1 -; fi
+            case "$c" in
+              pr) expected='unsafe-review first-pr:' ;;
+              *) expected="unsafe-review $c:" ;;
+            esac
+            if "$B" "$c" --help > "help-$c.txt" 2>&1 && head -n 1 "help-$c.txt" | grep -F "$expected" >/dev/null && grep -F 'Usage:' "help-$c.txt" >/dev/null; then
+              rec "help:$c" 0 -
+            else
+              rec "help:$c" 1 "missing usable command-specific help"
+            fi
           done
-          if "$B" init --help >/dev/null 2>&1; then rec "help:init-top" 0 -; else rec "help:init-top" 1 -; fi
           rm -rf scratch-init && mkdir scratch-init && cd scratch-init
           git init -q . && mkdir -p .github/workflows && echo "# existing" > .github/workflows/keep.yml
           before=$(sha256sum .github/workflows/keep.yml | cut -d' ' -f1)
@@ -108,8 +143,15 @@ jobs:
           git commit -qam change
           BASE=$(git rev-parse HEAD~1)
           if "$B" first-pr --base-sha "$BASE" --out-dir "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:exit" 0 -; else rec "bundle:exit" 1 -; fi
+          cd "$QUALIFICATION_VERIFIER_WORKSPACE"
+          VERIFIER_LOG="$GITHUB_WORKSPACE/bundle-verifier.log"
+          if cargo run --locked -p xtask -- check-first-pr-artifacts "$GITHUB_WORKSPACE/rebind-bundle" > "$VERIFIER_LOG" 2>&1; then
+            rec "bundle:verifier" 0 -
+          else
+            rec "bundle:verifier" 1 "see bounded verifier diagnostic"
+            tail -n 20 "$VERIFIER_LOG" | head -c 4096 || true
+          fi
           cd "$GITHUB_WORKSPACE"
-          if cargo run --locked -p xtask -- check-first-pr-artifacts "$GITHUB_WORKSPACE/rebind-bundle" >/dev/null 2>&1; then rec "bundle:verifier" 0 -; else rec "bundle:verifier" 1 -; fi
           "$B" --bogus-flag >/dev/null 2>&1 && code=0 || code=$?
           if [ "$code" = 2 ]; then rec "fail:invalid-flag" 0 -; else rec "fail:invalid-flag" 1 "exit=$code"; fi
           printf 'not a diff' > bad.diff
@@ -121,38 +163,81 @@ jobs:
         run: |
           set -euo pipefail
           python - <<'EOF'
-          import hashlib, json, os
+          import hashlib, json, os, sys
+          from pathlib import Path
+          root = Path(os.environ['GITHUB_WORKSPACE'])
           rows = []
-          for line in open(os.path.join(os.environ['GITHUB_WORKSPACE'], 'rows.tsv')):
-            name, code, detail = line.rstrip('\n').split('\t')
-            rows.append({'row': name, 'exit': int(code), 'detail': detail[:160]})
-          exe = 'qual-prefix/bin/unsafe-review.exe'
-          h = hashlib.sha256(open(exe, 'rb').read()).hexdigest()
+          for line in (root / 'rows.tsv').read_text().splitlines():
+              name, code, detail = line.split('\t')
+              rows.append({'row': name, 'exit': int(code), 'detail': detail[:160]})
+          exe = root / ('qual-prefix/bin/unsafe-review' + ('.exe' if sys.platform == 'win32' else ''))
+          binary_hash = hashlib.sha256(exe.read_bytes()).hexdigest()
+          identity = json.loads((root / 'source-identity.json').read_text())
+          expected_version = (root / 'candidate-version.txt').read_text().strip()
+          observed_version = (root / 'observed-version.txt').read_text().strip()
+          sha = (root / 'candidate-sha.txt').read_text().strip()
+          def assertion(name, condition):
+              rows.append({'row': name, 'exit': 0 if condition else 1, 'detail': '-'})
+          assertion('identity:manifest-executable-version', observed_version == 'unsafe-review ' + expected_version)
+          assertion('identity:source-sha', identity['candidate_sha'] == sha)
+          assertion('identity:package-versions', all(v == expected_version for v in identity['package_versions'].values()))
+          lists = {}
+          for p in ['unsafe-review-core', 'unsafe-review-cli', 'unsafe-review']:
+              content = (root / ('pkg-list-' + p + '.txt')).read_bytes()
+              lists[p] = {'files': len(content.splitlines()), 'list_sha256': hashlib.sha256(content).hexdigest()}
           receipt = {
-            'candidate_sha': open('candidate-sha.txt').read().strip(),
-            'candidate_version': '0.4.0',
-            'lockfile_sha256': open('lockfile-sha.txt').read().split()[0],
-            'lockfile_git_content_sha256': open('lockfile-git-sha.txt').read().split()[0],
-            'installed_binary_sha256': h,
-            'toolchain': 'rustc 1.98.1',
-            'platform': 'windows-latest (see run context for exact image)',
+            'schema': 'unsafe-review/installed-qualification/v1',
+            'candidate_sha': sha, 'source_tree': identity['source_tree'],
+            'candidate_version': expected_version, 'observed_version': observed_version,
+            'package_versions': identity['package_versions'],
+            'package_file_inventory': lists,
+            'lockfile_sha256': identity['tracked_lockfile_sha256'],
+            'working_lockfile_sha256': (root / 'lockfile-sha.txt').read_text().split()[0],
+            'installed_binary_sha256': binary_hash,
+            'toolchain': (root / 'toolchain.txt').read_text().strip(),
+            'platform': sys.platform, 'runner_os': os.environ.get('RUNNER_OS'),
+            'runner_image': {'os': os.environ.get('ImageOS'), 'version': os.environ.get('ImageVersion')},
+            'install_method': 'cargo install --path crates/unsafe-review --root <clean-prefix> --locked --jobs 1',
+            'execution_class': 'source_built_clean_prefix',
+            'package_archive_install': 'not_run',
+            'registry_install': 'not_run',
             'rows': rows,
-            'out_of_scope': ['installed LSP session', 'pinned tokmd/ub-review consumer interop'],
-            'trust_boundary': 'Installed-path evidence only; no safety, UB-free, Miri-clean, site-execution, accuracy, or publication-authorization claim.',
+            'out_of_scope': ['installed LSP session', 'actual tokmd/ub-review/provider integration'],
+            'trust_boundary': 'Source-prefix consumer and package-list evidence only; no publication, safety, UB-free, Miri-clean, site-execution or calibrated-accuracy claim.',
           }
-          json.dump(receipt, open('windows-qual-receipt.json', 'w'), indent=2)
-          print(json.dumps({'rows': len(rows), 'binary_sha256': h}, indent=2))
-          # Every row records its assertion result (0 = pass), including the
-          # fail: rows, which assert the binary exits 2. Any nonzero is a failure.
+          (root / 'windows-qual-receipt.json').write_text(json.dumps(receipt, indent=2))
+          print(json.dumps({'rows': len(rows), 'binary_sha256': binary_hash, 'candidate_version': expected_version,
+                            'candidate_sha': sha, 'source_tree': identity['source_tree'],
+                            'lockfile_sha256': identity['tracked_lockfile_sha256'],
+                            'package_file_inventory': lists, 'platform': sys.platform,
+                            'execution_class': receipt['execution_class'],
+                            'receipt_sha256': hashlib.sha256((root / 'windows-qual-receipt.json').read_bytes()).hexdigest()}))
           bad = [r for r in rows if r['exit'] != 0]
           if bad:
-            raise SystemExit(f'QUALIFICATION FAILED: {bad}')
+              raise SystemExit(f'QUALIFICATION FAILED: {bad}')
           EOF
+
+      - name: Probe the actual source-prefix consumer
+        run: |
+          set -euo pipefail
+          B="$GITHUB_WORKSPACE/qual-prefix/bin/unsafe-review"
+          if [ "${RUNNER_OS}" = "Windows" ]; then B="${B}.exe"; fi
+          python .github/scripts/installed_consumer_probe.py \
+            --binary "$B" \
+            --scratch "$GITHUB_WORKSPACE/qualified-init-consumer" \
+            --provenance windows-qual-receipt.json \
+            --candidate "$(cat candidate-sha.txt)" \
+            --lockfile-sha256 "$(python -c "import json; print(json.load(open('source-identity.json'))['tracked_lockfile_sha256'])")" \
+            --expected-version "$(cat candidate-version.txt)"
 
       - name: Upload receipt
         if: always()
         uses: actions/upload-artifact@v7
         with:
           name: windows-qual-receipt
-          path: windows-qual-receipt.json
+          path: |
+            windows-qual-receipt.json
+            source-identity.json
+            pkg-list-*.txt
+            qualified-init-consumer/receipt.json
           retention-days: 7

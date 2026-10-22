@@ -47,8 +47,56 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
         return Err(format!("init root is not a directory: {}", root.display()));
     }
 
+    let resolved_root = fs::canonicalize(root)
+        .map_err(|err| format!("failed to resolve init root {}: {err}", root.display()))?;
+    // Inspection always retains the native canonical identity. Windows command
+    // spelling must round-trip before it can identify a repository or output.
+    let root = resolved_root.as_path();
+    let root_text = init_path_text(root).ok().filter(|text| {
+        !cfg!(windows) || fs::canonicalize(text).is_ok_and(|candidate| candidate == resolved_root)
+    });
+    let command_root = root_text.as_deref().map(Path::new);
+    let command_path =
+        |relative: &str| command_root.and_then(|root| init_path_text(&root.join(relative)).ok());
+
     let git_root = git_output(root, &["rev-parse", "--show-toplevel"]);
+    let git_checkout =
+        git_output(root, &["rev-parse", "--is-inside-work-tree"]).as_deref() == Some("true");
     let base_ref = detect_base_ref(root);
+    let root_arg = root_text.as_deref().map(init_shell_arg);
+    let artifact_dir = command_path("target/unsafe-review");
+    let badge_dir = command_path("badges");
+    let baseline_ledger = command_path("policy/unsafe-review-baseline.toml");
+    let baseline_snapshot = command_path("policy/unsafe-review-baseline-snapshot.toml");
+    let baseline_command =
+        root_arg
+            .as_deref()
+            .zip(baseline_ledger.as_deref())
+            .map(|(root_arg, ledger)| {
+                format!(
+                    "unsafe-review baseline init --root {root_arg} --out {}",
+                    init_shell_arg(ledger)
+                )
+            });
+    let first_pr = base_ref
+        .as_deref()
+        .zip(root_arg.as_deref())
+        .zip(artifact_dir.as_deref())
+        .map(|((base, root_arg), artifacts)| {
+            format!(
+                "unsafe-review pr --root {root_arg} --base {} --out-dir {}",
+                init_shell_arg(base),
+                init_shell_arg(artifacts)
+            )
+        });
+    let command_prerequisite = root_text.is_none().then_some(
+        "The resolved root has no lossless command spelling. Preview paths are display-only; copyable commands and absolute output identities are unavailable. Use a UTF-8 checkout path whose command spelling preserves its filesystem identity for generated handoffs.",
+    );
+    let first_pr_prerequisite = command_prerequisite.or_else(|| {
+        base_ref.is_none().then_some(
+            "Provide an explicit --base <ref> or --diff <file> to review this root; no PR command was generated.",
+        )
+    });
     let shallow =
         git_output(root, &["rev-parse", "--is-shallow-repository"]).as_deref() == Some("true");
     let cargo_manifest = root.join("Cargo.toml").is_file();
@@ -56,6 +104,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
     let workflow_path = root.join(WORKFLOW_PATH);
     let workflow = file_proposal(
         root,
+        command_root,
         WORKFLOW_PATH,
         &workflow_content(),
         "A minimal read-only pull-request workflow proposal; replace its action reference only after a verified public release exists.",
@@ -65,7 +114,14 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
     let proposal_output_writable = out_dir.map(writable_parent).unwrap_or(true);
 
     let mut warnings = Vec::new();
-    if git_root.is_none() {
+    if let Some(message) = command_prerequisite {
+        warnings.push(json!({
+            "code": "unrepresentable_path",
+            "severity": "warning",
+            "message": message,
+        }));
+    }
+    if !git_checkout {
         warnings.push(json!({
             "code": "missing_git",
             "severity": "warning",
@@ -79,7 +135,7 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             "message": "This checkout is shallow. The generated workflow is read-only, but local unsafe-review pr may need an explicit base or deeper history."
         }));
     }
-    if git_root.is_some() && base_ref.is_none() {
+    if git_checkout && base_ref.is_none() {
         warnings.push(json!({
             "code": "missing_base",
             "severity": "warning",
@@ -150,7 +206,8 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
         "tool": "unsafe-review",
         "mode": "preview_only",
         "writes_repository": false,
-        "root": root.display().to_string(),
+        "root": root_text,
+        "root_display": root.display().to_string(),
         "repository": {
             "git_root": git_root,
             "cargo_manifest": cargo_manifest,
@@ -167,22 +224,24 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             {
                 "kind": "baseline",
                 "status": "explicit_command_required",
-                "ledger_path": "policy/unsafe-review-baseline.toml",
-                "snapshot_path": "policy/unsafe-review-baseline-snapshot.toml",
-                "command": "unsafe-review baseline init --root .",
+                "ledger_path": baseline_ledger,
+                "snapshot_path": baseline_snapshot,
+                "command": baseline_command,
                 "reason": "Baseline creation is separate and must be run from a clean base/default branch after reviewing visible debt; it never labels debt as safe."
             },
             {
                 "kind": "badge",
                 "status": "optional_snippet",
-                "command": "unsafe-review badges --root . --out badges/",
+                "command": root_arg.as_deref().zip(badge_dir.as_deref()).map(|(root_arg, badges)| {
+                    format!("unsafe-review badges --root {root_arg} --out {}", init_shell_arg(badges))
+                }),
                 "snippet": "[![unsafe-review](https://img.shields.io/endpoint?url=https%3A%2F%2Fraw.githubusercontent.com%2FOWNER%2FREPO%2Fmain%2Fbadges%2Funsafe-review.json)](docs/BADGE_POLICY.md)",
                 "reason": "Badge output is a numeric projection of review evidence, not a safety or UB-free claim; replace OWNER/REPO only after choosing a checked-in refresh path."
             },
             {
                 "kind": "ub_review",
                 "status": "optional_pointer_only",
-                "artifact": "target/unsafe-review/unsafe-review-gate.json",
+                "artifact": command_path("target/unsafe-review/unsafe-review-gate.json"),
                 "existing_files": ub_review_files,
                 "reason": "Pass the canonical gate-manifest artifact to ub-review if that integration is already adopted; init does not duplicate ub-review policy or make it mandatory."
             },
@@ -194,10 +253,12 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
             }
         ],
         "commands": {
-            "doctor": "unsafe-review doctor --root .",
-            "first_pr": "unsafe-review pr --root .",
-            "first_pr_artifacts": "target/unsafe-review",
-            "review_baseline_separately": "unsafe-review baseline init --root ."
+            "doctor": root_arg.as_deref().map(|root_arg| format!("unsafe-review doctor --root {root_arg}")),
+            "command_prerequisite": command_prerequisite,
+            "first_pr": first_pr,
+            "first_pr_prerequisite": first_pr_prerequisite,
+            "first_pr_artifacts": artifact_dir,
+            "review_baseline_separately": baseline_command
         },
         "external_dependencies": [
             {
@@ -217,7 +278,48 @@ fn build_proposal(root: &Path, out_dir: Option<&Path>) -> Result<Value, String> 
     }))
 }
 
-fn file_proposal(root: &Path, relative: &str, content: &str, reason: &str) -> Value {
+fn init_path_text(path: &Path) -> Result<String, String> {
+    let text = path.to_str().ok_or_else(|| {
+        format!(
+            "init cannot represent this path in a command: {}",
+            path.display()
+        )
+    })?;
+    if cfg!(windows) {
+        // canonicalize adds the Windows extended-path prefix. Normal drive/UNC
+        // spelling is copyable in PowerShell and accepted by Git and the CLI.
+        let text = text.strip_prefix(r"\\?\").unwrap_or(text);
+        if let Some(unc) = text.strip_prefix("UNC\\") {
+            Ok(format!("//{}", unc.replace('\\', "/")))
+        } else {
+            Ok(text.replace('\\', "/"))
+        }
+    } else {
+        Ok(text.to_string())
+    }
+}
+
+fn init_shell_arg(value: &str) -> String {
+    if !value.is_empty()
+        && value.bytes().all(|byte| {
+            byte.is_ascii_alphanumeric() || matches!(byte, b'/' | b'.' | b'_' | b'-' | b':')
+        })
+    {
+        value.to_string()
+    } else if cfg!(windows) {
+        format!("'{}'", value.replace('\'', "''"))
+    } else {
+        format!("'{}'", value.replace('\'', "'\\''"))
+    }
+}
+
+fn file_proposal(
+    root: &Path,
+    command_root: Option<&Path>,
+    relative: &str,
+    content: &str,
+    reason: &str,
+) -> Value {
     let path = root.join(relative);
     let exists = path.exists();
     let existing = fs::read_to_string(&path).ok();
@@ -239,7 +341,7 @@ fn file_proposal(root: &Path, relative: &str, content: &str, reason: &str) -> Va
     let diff = proposal_diff(relative, existing.as_deref(), content);
     json!({
         "path": relative,
-        "absolute_path": path.display().to_string(),
+        "absolute_path": command_root.and_then(|root| init_path_text(&root.join(relative)).ok()),
         "exists": exists,
         "status": status,
         "operation": if status == "create" { "create" } else { "review_before_update" },
@@ -418,7 +520,12 @@ fn nearest_existing(path: &Path) -> Option<PathBuf> {
 fn print_human(proposal: &Value) {
     println!("unsafe-review init");
     println!("Mode: preview-only; repository changes: none");
-    println!("Root: {}", proposal["root"].as_str().unwrap_or("."));
+    println!(
+        "Root: {}",
+        proposal["root"]
+            .as_str()
+            .unwrap_or_else(|| { proposal["root_display"].as_str().unwrap_or("(unavailable)") })
+    );
     println!();
     println!("Proposed files:");
     if let Some(files) = proposal["proposed_files"].as_array() {
@@ -450,12 +557,36 @@ fn print_human(proposal: &Value) {
     }
     println!();
     println!("Commands:");
-    println!("- Doctor: {}", proposal["commands"]["doctor"]);
-    println!("- First PR: {}", proposal["commands"]["first_pr"]);
-    println!(
-        "- Baseline (separate, explicit): {}",
-        proposal["commands"]["review_baseline_separately"]
-    );
+    if let Some(command) = proposal["commands"]["doctor"].as_str() {
+        println!("- Doctor: {command}");
+    } else {
+        println!(
+            "- Doctor: unavailable. {}",
+            proposal["commands"]["command_prerequisite"]
+                .as_str()
+                .unwrap_or("")
+        );
+    }
+    if let Some(command) = proposal["commands"]["first_pr"].as_str() {
+        println!("- First PR: {command}");
+    } else {
+        println!(
+            "- First PR: requires input. {}",
+            proposal["commands"]["first_pr_prerequisite"]
+                .as_str()
+                .unwrap_or("")
+        );
+    }
+    if let Some(command) = proposal["commands"]["review_baseline_separately"].as_str() {
+        println!("- Baseline (separate, explicit): {command}");
+    } else {
+        println!(
+            "- Baseline (separate, explicit): unavailable. {}",
+            proposal["commands"]["command_prerequisite"]
+                .as_str()
+                .unwrap_or("")
+        );
+    }
     println!();
     println!("Recommendations:");
     if let Some(recommendations) = proposal["recommendations"].as_array() {

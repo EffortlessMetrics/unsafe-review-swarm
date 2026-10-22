@@ -1,5 +1,9 @@
 use crate::domain::{ObligationEvidence, ReviewClass, WitnessKind, WitnessRoute};
 
+#[allow(
+    clippy::too_many_arguments,
+    reason = "caller-contract routing needs site context alongside the class inputs; a params struct would churn every unit call site without clarity gain"
+)]
 pub(super) fn next_action_summary(
     class: &ReviewClass,
     operation: &str,
@@ -7,6 +11,10 @@ pub(super) fn next_action_summary(
     visibility: &str,
     routes: &[WitnessRoute],
     obligation_evidence: &[ObligationEvidence],
+    contract_present: bool,
+    owner: Option<&str>,
+    context_before: &[String],
+    witness_confirmation: &str,
 ) -> String {
     match class {
         ReviewClass::ContractMissing if public_api_surface => {
@@ -27,6 +35,17 @@ pub(super) fn next_action_summary(
         ReviewClass::GuardMissing if operation == "unsafe_fn_call" => "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.".to_string(),
         ReviewClass::GuardMissing if operation == "inline_asm" => "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
         ReviewClass::GuardMissing if operation == "pin_unchecked" => "Review the `pin_unchecked` move-prevention and projection invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.".to_string(),
+        ReviewClass::GuardMissing
+            if operation != "unsafe_declaration"
+                && contract_present
+                && let Some(owner) = owner
+                && !owner.is_empty()
+                && enclosing_unsafe_fn_owner(context_before, owner) =>
+        {
+            format!(
+                "Review the callers of `{owner}` against its documented safety contract; this site inherits the enclosing `unsafe fn` contract. Add a guard at this site only for obligations the caller contract cannot cover."
+            )
+        }
         ReviewClass::GuardMissing => {
             let missing_obligations: Vec<&ObligationEvidence> = obligation_evidence
                 .iter()
@@ -47,6 +66,21 @@ pub(super) fn next_action_summary(
                     "Add or expose the local guard that discharges the `{operation}` safety obligation."
                 )
             }
+        }
+        // A verdict-bearing receipt is already imported: the next action must
+        // say what the observation requires, never ask for another receipt
+        // as if none existed.
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "confirmed" => {
+            "The witness run reproduced the hazard at this site; fix the unsafe code or add a discharging guard and re-verify with a focused run. The receipt records the observation, not a resolution."
+                .to_string()
+        }
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "inconclusive" => {
+            "The witness run was inconclusive; re-run the focused witness command and attach a receipt with a recorded verdict, or mark the static limitation explicitly."
+                .to_string()
+        }
+        ReviewClass::GuardedUnwitnessed if witness_confirmation == "not_reproduced" => {
+            "One witness run did not reproduce the hazard; that single observation is not a safety claim. Expand coverage or attach a confirming receipt, or mark the static limitation explicitly."
+                .to_string()
         }
         ReviewClass::GuardedUnwitnessed if has_witness_route(routes, WitnessKind::HumanDeepReview) => {
             "Attach a human deep-review witness receipt or mark the static limitation explicitly."
@@ -81,4 +115,29 @@ pub(super) fn next_action_summary(
 
 fn has_witness_route(routes: &[WitnessRoute], kind: WitnessKind) -> bool {
     routes.iter().any(|route| route.kind == kind)
+}
+
+/// Whether the before-context contains the declaration of `owner` as an
+/// `unsafe fn`. Comment lines are skipped so a prose mention of the owner
+/// cannot fabricate an enclosing-contract relationship; only the routing of
+/// the next action depends on this, never the evidence state or class.
+fn enclosing_unsafe_fn_owner(context_before: &[String], owner: &str) -> bool {
+    context_before.iter().any(|line| {
+        let trimmed = line.trim_start();
+        if trimmed.starts_with("//") || trimmed.starts_with("/*") || trimmed.starts_with('*') {
+            return false;
+        }
+        let mut saw_unsafe = false;
+        let mut saw_fn = false;
+        let mut saw_owner = false;
+        for token in trimmed.split(|ch: char| !ch.is_alphanumeric() && ch != '_') {
+            match token {
+                _ if token == "unsafe" => saw_unsafe = true,
+                _ if token == "fn" => saw_fn = true,
+                _ if token == owner => saw_owner = true,
+                _ => {}
+            }
+        }
+        saw_unsafe && saw_fn && saw_owner
+    })
 }

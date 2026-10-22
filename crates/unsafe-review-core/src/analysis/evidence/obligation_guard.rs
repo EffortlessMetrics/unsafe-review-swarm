@@ -1,5 +1,5 @@
 use super::{
-    code_before_operation, get_unchecked_receiver_and_index, has_copy_slice_range_evidence,
+    code_before_site_operation, get_unchecked_receiver_and_index, has_copy_slice_range_evidence,
     has_get_unchecked_bounds_guard, has_length_or_bounds_guard,
     has_pointer_arithmetic_bounds_guard, has_raw_pointer_read_bounds_evidence,
     has_raw_pointer_write_bounds_evidence, has_write_bytes_bounds_evidence, set_len,
@@ -12,7 +12,7 @@ pub(super) fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
         && let Some((receiver, index)) =
             get_unchecked_receiver_and_index(&site.operation.expression)
     {
-        let guard_scope = code_before_operation(lower, &site.operation.expression)
+        let guard_scope = code_before_site_operation(site, lower, &site.operation.expression)
             .unwrap_or_else(|| lower.to_string());
         return has_get_unchecked_bounds_guard(&guard_scope, &receiver, &index);
     }
@@ -25,7 +25,7 @@ pub(super) fn has_bounds_guard(site: &ScannedSite, lower: &str) -> bool {
     {
         return has_write_bytes_bounds_evidence(&site.operation.expression);
     }
-    let guard_scope = code_before_operation(lower, &site.operation.expression)
+    let guard_scope = code_before_site_operation(site, lower, &site.operation.expression)
         .unwrap_or_else(|| lower.to_string());
     if matches!(
         site.operation.family,

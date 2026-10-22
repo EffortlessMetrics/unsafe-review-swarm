@@ -1,0 +1,933 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/acc-pr2/bytes",
+  "summary": {
+    "rust_files": 33,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 6,
+    "cards": 6,
+    "open_actionable_gaps": 6,
+    "contract_missing": 5,
+    "guard_missing": 1,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 6,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-aabaaee592fc-pointer_validity-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/buf/buf_mut.rs",
+        "line": 1416,
+        "column": 13,
+        "kind": "operation",
+        "owner": "put_bytes",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "ptr::write_bytes(self.as_mut_ptr(), val, cnt);"
+      },
+      "operation": "ptr::write_bytes(self.as_mut_ptr(), val, cnt);",
+      "operation_family": "raw_pointer_write",
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "same_allocation"
+      ],
+      "obligations": [
+        "pointer is live and dereferenceable for the accessed type",
+        "buffer has enough bytes for the accessed type",
+        "pointer is aligned for the accessed type",
+        "memory is initialized for the accessed type",
+        "access remains inside one live allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "bounds",
+          "description": "buffer has enough bytes for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "alignment",
+          "description": "pointer is aligned for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No alignment guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "memory is initialized for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "allocation",
+          "description": "access remains inside one live allocation",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "2 related test files mention owner `put_bytes`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test put_bytes",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test put_bytes",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test put_bytes",
+        "cargo +nightly careful test put_bytes"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `ptr::write_bytes(self.as_mut_ptr(), val, cnt);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test put_bytes",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test put_bytes` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test put_bytes",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-aabaaee592fc-pointer_validity-c1` still maps to `ptr::write_bytes(self.as_mut_ptr(), val, cnt);` at `src/buf/buf_mut.rs:1416:13` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test put_bytes` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test put_bytes` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-bytes-src-buf-buf-mut-rs-impl-unsafe_impl-unknown-impl-7a9731e95505-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/buf/buf_mut.rs",
+        "line": 1422,
+        "column": 1,
+        "kind": "unsafe_impl",
+        "owner": "impl",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe impl BufMut for &mut [core::mem::MaybeUninit<u8>] {"
+      },
+      "operation": "unsafe impl BufMut for &mut [core::mem::MaybeUninit<u8>] {",
+      "operation_family": "unknown",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe contract could not be inferred from this syntax shape"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "unknown",
+          "description": "unsafe contract could not be inferred from this syntax shape",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `impl` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `impl` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe impl BufMut for &mut [core::mem::MaybeUninit<u8>] {`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-src-buf-buf-mut-rs-impl-unsafe_impl-unknown-impl-7a9731e95505-unknown-c1` still maps to `unsafe impl BufMut for &mut [core::mem::MaybeUninit<u8>] {` at `src/buf/buf_mut.rs:1422:1` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-bytes-src-buf-buf-mut-rs-advance-mut-unsafe_fn-unsafe_declaration-advance-mut-fea4ee7b3b3e-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/buf/buf_mut.rs",
+        "line": 1433,
+        "column": 5,
+        "kind": "unsafe_fn",
+        "owner": "advance_mut",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "#[inline] unsafe fn advance_mut(&mut self, cnt: usize) {"
+      },
+      "operation": "#[inline] unsafe fn advance_mut(&mut self, cnt: usize) {",
+      "operation_family": "unsafe_declaration",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "unsafe declaration caller contract is documented and reviewable"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "caller-contract",
+          "description": "unsafe declaration caller contract is documented and reviewable",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `advance_mut`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "2 related test files mention owner `advance_mut`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `#[inline] unsafe fn advance_mut(&mut self, cnt: usize) {`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-src-buf-buf-mut-rs-advance-mut-unsafe_fn-unsafe_declaration-advance-mut-fea4ee7b3b3e-unknown-c1` still maps to `#[inline] unsafe fn advance_mut(&mut self, cnt: usize) {` at `src/buf/buf_mut.rs:1433:5` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-bytes-src-buf-buf-mut-rs-put-slice-operation-unsafe_fn_call-advance-mut-e0881139252c-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/buf/buf_mut.rs",
+        "line": 1443,
+        "column": 9,
+        "kind": "operation",
+        "owner": "put_slice",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { self.advance_mut(src.len()); }"
+      },
+      "operation": "unsafe { self.advance_mut(src.len()); }",
+      "operation_family": "unsafe_fn_call",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "callee safety preconditions are satisfied"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "callee-contract",
+          "description": "callee safety preconditions are satisfied",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "3 related test files mention owner `put_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "3 related test files mention owner `put_slice`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { self.advance_mut(src.len()); }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-src-buf-buf-mut-rs-put-slice-operation-unsafe_fn_call-advance-mut-e0881139252c-unknown-c1` still maps to `unsafe { self.advance_mut(src.len()); }` at `src/buf/buf_mut.rs:1443:9` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "needs_human"
+      }
+    },
+    {
+      "id": "UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-e4635a1226cf-pointer_validity-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/buf/buf_mut.rs",
+        "line": 1451,
+        "column": 13,
+        "kind": "operation",
+        "owner": "put_bytes",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "ptr::write_bytes(self.as_mut_ptr() as *mut u8, val, cnt);"
+      },
+      "operation": "ptr::write_bytes(self.as_mut_ptr() as *mut u8, val, cnt);",
+      "operation_family": "raw_pointer_write",
+      "hazards": [
+        "pointer_validity",
+        "alignment",
+        "initialized_memory",
+        "same_allocation"
+      ],
+      "obligations": [
+        "pointer is live and dereferenceable for the accessed type",
+        "buffer has enough bytes for the accessed type",
+        "pointer is aligned for the accessed type",
+        "memory is initialized for the accessed type",
+        "access remains inside one live allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is live and dereferenceable for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "bounds",
+          "description": "buffer has enough bytes for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "alignment",
+          "description": "pointer is aligned for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No alignment guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "memory is initialized for the accessed type",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "allocation",
+          "description": "access remains inside one live allocation",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `put_bytes`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "2 related test files mention owner `put_bytes`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test put_bytes",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test put_bytes",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [
+        "cargo +nightly miri test put_bytes",
+        "cargo +nightly careful test put_bytes"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `ptr::write_bytes(self.as_mut_ptr() as *mut u8, val, cnt);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test put_bytes",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test put_bytes` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test put_bytes",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-src-buf-buf-mut-rs-put-bytes-operation-raw_pointer_write-write-bytes-e4635a1226cf-pointer_validity-c1` still maps to `ptr::write_bytes(self.as_mut_ptr() as *mut u8, val, cnt);` at `src/buf/buf_mut.rs:1451:13` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test put_bytes` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test put_bytes` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-bytes-tests-test-buf-mut-rs-make-maybe-uninit-slice-operation-transmute-transmute-e4992462c09d-invalid_value-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "tests/test_buf_mut.rs",
+        "line": 196,
+        "column": 5,
+        "kind": "operation",
+        "owner": "make_maybe_uninit_slice",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { core::mem::transmute(slice) }"
+      },
+      "operation": "unsafe { core::mem::transmute(slice) }",
+      "operation_family": "transmute",
+      "hazards": [
+        "invalid_value",
+        "layout_or_repr",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "source and destination layouts are compatible",
+        "destination value satisfies Rust validity rules"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "layout",
+          "description": "source and destination layouts are compatible",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `make_maybe_uninit_slice` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "valid-value",
+          "description": "destination value satisfies Rust validity rules",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `make_maybe_uninit_slice` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `make_maybe_uninit_slice` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test make_maybe_uninit_slice",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test make_maybe_uninit_slice",
+          "required": false
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `transmute` safety obligations: (1) source and destination layouts are compatible, (2) destination value satisfies Rust validity rules.",
+      "verify_commands": [
+        "cargo +nightly miri test make_maybe_uninit_slice",
+        "cargo +nightly careful test make_maybe_uninit_slice"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::mem::transmute(slice) }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test make_maybe_uninit_slice",
+          "route_kind": "miri",
+          "summary": "No test reaches `make_maybe_uninit_slice` yet; write or identify a focused test for `make_maybe_uninit_slice` first, then build/run `cargo +nightly miri test make_maybe_uninit_slice` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test make_maybe_uninit_slice",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-bytes-tests-test-buf-mut-rs-make-maybe-uninit-slice-operation-transmute-transmute-e4992462c09d-invalid_value-c1` still maps to `unsafe { core::mem::transmute(slice) }` at `tests/test_buf_mut.rs:196:5` before upgrading confidence.",
+            "Write or identify a focused test for `make_maybe_uninit_slice` first (no test reaches it yet), then build/run `cargo +nightly miri test make_maybe_uninit_slice` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `make_maybe_uninit_slice` first (no test reaches it yet), then build/run `cargo +nightly miri test make_maybe_uninit_slice` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T05:35:39Z",
+    "root_abs": "/tmp/acc-pr2/bytes",
+    "diff_path": "docs/accuracy/batches/2224-pr2/diffs/bytes-597.diff",
+    "diff_sha256": "cf1be12b75bae07ac3437d9d8f437d257a9296af44de268b1c1a9fbd511bb876",
+    "dirty_worktree": false
+  }
+}

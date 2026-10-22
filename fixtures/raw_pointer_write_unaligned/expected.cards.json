@@ -40,12 +40,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No nullability guard code was detected"
+          "summary": "No pointer-liveness evidence was detected"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -69,7 +69,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -93,7 +93,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -112,12 +112,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `allocation` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `write_unaligned_header`"
+          "summary": "1 related test file mentions owner `write_unaligned_header`"
         },
         "witness": {
           "present": false,
@@ -128,7 +128,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "Some inferred safety obligations are missing local guard evidence",
-    "reach": "1 related test file(s) mention owner `write_unaligned_header`",
+    "reach": "1 related test file mentions owner `write_unaligned_header`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -142,6 +142,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test write_unaligned_header",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "writes_unaligned_header",
+        "file": "src/lib.rs",
+        "line": 16
       }
     ],
     "missing": [

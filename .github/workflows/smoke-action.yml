@@ -37,9 +37,9 @@ jobs:
           persist-credentials: false
           fetch-depth: 0
 
-      - name: Run composite action against this repo
+      - name: Run root action authority against this repo
         id: unsafe_review
-        uses: ./.github/actions/unsafe-review-first-pr
+        uses: ./
         with:
           base_ref: main
 

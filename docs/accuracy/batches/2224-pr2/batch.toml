@@ -1,0 +1,101 @@
+# #2224 PR2 seam-denominator batch manifest.
+#
+# Second growth increment: six pinned real PRs across three new projects
+# (crossbeam, bytes, parking_lot) plus a comment-only quiet control,
+# covering families PR1 did not exercise: unsafe_impl_send_sync,
+# copy_nonoverlapping, raw_pointer_deref in epoch reclamation, and
+# uninitialized-buffer advance/write guard discipline. Source-first expected
+# seams live in seams.toml; card-to-seam mapping in mapping.toml; frozen
+# first-run outputs under outputs/. Matching rules and the four baseline
+# questions live in protocol.md.
+schema_version = "seam-batch/v1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+protocol = "docs/accuracy/batches/2224-pr2/protocol.md"
+partition = "growth"
+label_status = "agent-drafted source-first; not human adjudication"
+trust_boundary = "Static unsafe contract review only. This batch measures ReviewCard seam recall, emitted-card correctness, obligation over-credit, selection usefulness, duplicates, and quiet-PR false alarms on six pinned PRs. It is not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, and not a merge verdict for any sampled PR."
+
+[acquisition]
+method = "read-only gh pr diff fetch plus pinned-head local checkout for analyzer --root"
+network_on_check_path = false
+diff_dir = "docs/accuracy/batches/2224-pr2/diffs"
+
+[analyzer]
+# Pinned at freeze time. The published-0.4.0 fixed-comparison slot is
+# reserved but unfilled: 0.4.0 is not yet published. The frozen baseline is
+# the exact development revision below.
+binary = "target/debug/unsafe-review"
+version = "0.3.8"
+revision = "09d30034fca6983a860bb94126b657d4f962aec9"
+revision_role = "exact development revision (origin/main at batch time)"
+fixed_comparison_040 = "unfilled: 0.4.0 not yet published; manifest reserves outputs/outputs-0.4.0/ for the comparison run"
+
+[run_config]
+command_shape = "cargo run --locked -p unsafe-review -- check --root <head-checkout> --diff <case-diff> --format json --out <frozen-output>"
+caps = "default analyzer caps; no timeouts hit; no witness execution"
+
+[[cases]]
+id = "crossbeam-1287"
+repository = "crossbeam-rs/crossbeam"
+pr = 1287
+role = "soundness fix: unsafe Send/Sync impls for skiplist RefRange gain K/V/C/R thread-safety bounds"
+base_sha = "bca3e30b3dcf256503d4fed2aa5a5318e968180f"
+head_sha = "8f3c6b565a0094d67e3f6b56698bb605c1c431f6"
+diff_file = "diffs/crossbeam-1287.diff"
+diff_sha256 = "4d86a987cc9433567231be6f701218f348c2349a5b578704adf5356f7fff7625"
+expected_seams = 1
+
+[[cases]]
+id = "crossbeam-1297"
+repository = "crossbeam-rs/crossbeam"
+pr = 1297
+role = "SB fix: epoch Local::unpin becomes a raw-pointer unsafe fn, Guard/Handle drops rechecked, plus a safe-API regression test"
+base_sha = "69a3a813572f4e830aaaea36f1da585a26537735"
+head_sha = "a49c8996db2fb5ff178448a8d7285bf34eee00d6"
+diff_file = "diffs/crossbeam-1297.diff"
+diff_sha256 = "fcb90b98989e1d042a9ea8518ecee52f9e2a35a304c68975032cfb97358964c4"
+expected_seams = 2
+
+[[cases]]
+id = "bytes-597"
+repository = "tokio-rs/bytes"
+pr = 597
+role = "new unsafe BufMut impl for MaybeUninit slices: unchecked advance_mut, assert-guarded write_bytes, plus safe-API tests"
+base_sha = "99a27542a0b90653f4ab66076c11a6a9ae706a0d"
+head_sha = "f9ca1efd1f67037aca074ee51795465d8026f167"
+diff_file = "diffs/bytes-597.diff"
+diff_sha256 = "cf1be12b75bae07ac3437d9d8f437d257a9296af44de268b1c1a9fbd511bb876"
+expected_seams = 3
+
+[[cases]]
+id = "bytes-818"
+repository = "tokio-rs/bytes"
+pr = 818
+role = "new extend_from_within: copy_nonoverlapping plus advance_mut under SAFETY comments, safe helper and tests"
+base_sha = "804ee6d039bdea017f0f3faf91806c9771d7e555"
+head_sha = "dc724e31a37ac930def922f2fc769d1e4224d330"
+diff_file = "diffs/bytes-818.diff"
+diff_sha256 = "f3f647a6e7fcf900235b5fd33c74b91c7da248c8d4c100c2fd8fd4964fb9b095"
+expected_seams = 2
+
+[[cases]]
+id = "bytes-744"
+repository = "tokio-rs/bytes"
+pr = 744
+role = "quiet control: comment-only typo fix in Buf::chunk docs, zero expected seams"
+base_sha = "30ee8e9cba87c6d31774c100d2c9fd67ff2ad94c"
+head_sha = "728735b9149d1dcd908e1e65ed6b3e33029870d4"
+diff_file = "diffs/bytes-744.diff"
+diff_sha256 = "c61ca9b31781502ea4fd8f49a99346918189ff6af691af6f9ba0b52f029c1aa4"
+expected_seams = 0
+
+[[cases]]
+id = "parking_lot-349"
+repository = "Amanieu/parking_lot"
+pr = 349
+role = "soundness fix: ArcMutexGuard gains cfg-gated unsafe Send/Sync impls, marker narrowed to *const ()"
+base_sha = "336a9b31ff385728d00eb7ef173e4d054584b787"
+head_sha = "d435120052d9a36757cfc15f3b29f1ff71a3feac"
+diff_file = "diffs/parking_lot-349.diff"
+diff_sha256 = "2314eae50eb4d392df92deea970a629b1a20ad1c0c9ca482c841efc9741e70f5"
+expected_seams = 1

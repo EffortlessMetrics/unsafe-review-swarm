@@ -41,7 +41,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `borrow_slot`"
+          "summary": "1 related test file mentions owner `borrow_slot`"
         },
         "witness": {
           "present": false,
@@ -52,7 +52,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `borrow_slot`",
+    "reach": "1 related test file mentions owner `borrow_slot`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -66,6 +66,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test borrow_slot",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "borrows_slot",
+        "file": "src/lib.rs",
+        "line": 13
       }
     ],
     "missing": [

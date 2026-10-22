@@ -5,6 +5,7 @@ import test from "node:test";
 
 import {
   BundleParseError,
+  actionableDiagnostics,
   capDiagnosticsPerFile,
   diagnosticsByFile,
   diagnosticCapSummaries,
@@ -130,6 +131,27 @@ test("parseBundle returns diagnostics, hovers, and code actions", () => {
   assert.equal(result.codeActions[0].payload?.cardId, "UR-foo");
   assert.equal(result.codeActions[0].payload?.proofPath, "source_route_only");
   assert.deepEqual(result.warnings, ["code_action #0 uses legacy 0.1 action shape"]);
+});
+
+test("actionableDiagnostics keeps flagged and legacy entries only", () => {
+  const base = MINIMAL_BUNDLE.diagnostics[0];
+  const bundle = {
+    ...MINIMAL_BUNDLE,
+    diagnostics: [
+      { ...base, card_id: "UR-open", actionable: true },
+      { ...base, card_id: "UR-closed", actionable: false },
+      { ...base, card_id: "UR-legacy" },
+    ],
+  };
+  const result = parseBundle(JSON.stringify(bundle));
+  assert.deepEqual(
+    result.diagnostics.map((diag) => diag.actionable),
+    [true, false, undefined],
+  );
+  assert.deepEqual(
+    actionableDiagnostics(result.diagnostics).map((diag) => diag.cardId),
+    ["UR-open", "UR-legacy"],
+  );
 });
 
 test("parseBundle preserves canonical 0.2 action semantics", () => {

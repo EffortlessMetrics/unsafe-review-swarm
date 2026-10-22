@@ -38,7 +38,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `non-overlap` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -83,17 +83,18 @@
     "witness_routes": [
       {
         "kind": "miri",
-        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo +nightly miri test copy_checked",
         "required": false
       },
       {
         "kind": "cargo-careful",
-        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo +nightly careful test copy_checked",
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
@@ -110,7 +111,7 @@
         "kind": "verify_command",
         "command": "cargo +nightly miri test copy_checked",
         "route_kind": "miri",
-        "summary": "Build/run `cargo +nightly miri test copy_checked` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `copy_checked` yet; write or identify a focused test for `copy_checked` first, then build/run `cargo +nightly miri test copy_checked` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -118,12 +119,12 @@
         "route_kind": "miri",
         "steps": [
           "Confirm ReviewCard `UR-copy-nonoverlapping-slice-range-shadowed-dst-not-guard-fixture-src-lib-rs-copy-checked-operation-copy_nonoverlapping-copy-nonoverlapping-3b394b24b2ef-pointer_validity-c1` still maps to `unsafe { core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), count) }` at `src/lib.rs:7:5` before upgrading confidence.",
-          "Build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
+          "Write or identify a focused test for `copy_checked` first (no test reaches it yet), then build/run `cargo +nightly miri test copy_checked` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo +nightly miri test copy_checked` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `copy_checked` first (no test reaches it yet), then build/run `cargo +nightly miri test copy_checked` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

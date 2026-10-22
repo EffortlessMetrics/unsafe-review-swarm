@@ -210,7 +210,7 @@ mod tests {
     use crate::api::{PolicyMode, Scope, Summary};
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
-        NextAction, Priority, ProofPath, ReachEvidence, ReviewClass, SourceLocation,
+        NextAction, Priority, ProofPath, ReachEvidence, ReviewClass, SourceLocation, SourceRole,
         UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
     };
     use crate::freshness::AnalysisIdentity;
@@ -235,10 +235,12 @@ mod tests {
                 public_api_surface: true,
                 changed: true,
                 snippet: "pub unsafe fn f() {}".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "pub unsafe fn f() {}".to_string(),
                 family: OperationFamily::UnsafeDeclaration,
+                bound_name: None,
             },
             hazards: vec![HazardKind::Unknown],
             obligations: vec![],
@@ -275,6 +277,8 @@ mod tests {
             summary: Summary::default(),
             cards,
             diff_scoped_files: BTreeSet::new(),
+            unresolved_diff_files: BTreeSet::new(),
+            rejected_diff_files: BTreeSet::new(),
             coverage_snapshot: BTreeMap::new(),
         }
     }

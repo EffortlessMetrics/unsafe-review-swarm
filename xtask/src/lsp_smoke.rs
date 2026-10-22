@@ -380,7 +380,10 @@ fn validate_witness_command_response(response: &Value, card_id: &str) -> Result<
     Ok(())
 }
 
-fn wait_for_id(messages: &Receiver<Result<Value, String>>, id: u64) -> Result<Value, String> {
+pub(crate) fn wait_for_id(
+    messages: &Receiver<Result<Value, String>>,
+    id: u64,
+) -> Result<Value, String> {
     let deadline = Instant::now() + MESSAGE_TIMEOUT;
     loop {
         let message = receive_until(messages, deadline)?;
@@ -390,7 +393,7 @@ fn wait_for_id(messages: &Receiver<Result<Value, String>>, id: u64) -> Result<Va
     }
 }
 
-fn wait_for_method(
+pub(crate) fn wait_for_method(
     messages: &Receiver<Result<Value, String>>,
     method: &str,
 ) -> Result<Value, String> {
@@ -403,7 +406,7 @@ fn wait_for_method(
     }
 }
 
-fn receive_until(
+pub(crate) fn receive_until(
     messages: &Receiver<Result<Value, String>>,
     deadline: Instant,
 ) -> Result<Value, String> {
@@ -416,7 +419,7 @@ fn receive_until(
         .map_err(|error| format!("timed out waiting for live LSP message: {error}"))?
 }
 
-fn read_message(reader: &mut BufReader<impl Read>) -> Result<Value, String> {
+pub(crate) fn read_message(reader: &mut BufReader<impl Read>) -> Result<Value, String> {
     let mut content_length = None;
     loop {
         let mut line = String::new();
@@ -447,7 +450,7 @@ fn read_message(reader: &mut BufReader<impl Read>) -> Result<Value, String> {
     serde_json::from_slice(&body).map_err(|error| format!("invalid LSP JSON message: {error}"))
 }
 
-fn write_message(writer: &mut impl Write, message: &Value) -> Result<(), String> {
+pub(crate) fn write_message(writer: &mut impl Write, message: &Value) -> Result<(), String> {
     let body =
         serde_json::to_vec(message).map_err(|error| format!("encode LSP message: {error}"))?;
     write!(writer, "Content-Length: {}\r\n\r\n", body.len())
@@ -460,7 +463,7 @@ fn write_message(writer: &mut impl Write, message: &Value) -> Result<(), String>
         .map_err(|error| format!("flush LSP message: {error}"))
 }
 
-fn file_uri(path: &Path) -> Result<Uri, String> {
+pub(crate) fn file_uri(path: &Path) -> Result<Uri, String> {
     if !path.is_absolute() {
         return Err(format!(
             "LSP smoke file URI requires an absolute path: {}",

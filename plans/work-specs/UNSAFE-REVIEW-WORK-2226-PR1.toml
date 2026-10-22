@@ -1,0 +1,54 @@
+# Issue-linked work specification for the non-null / pointer-live evidence split.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2226"
+kind = "correctness"
+objective = "Separate non-null guard evidence from pointer-liveness discharge at their shared obligation dispatch."
+user_outcome = "A null-only guard is retained as a true observed fact but can no longer make a pointer-liveness obligation look discharged; the card states what was observed, what it supports, and what remains unresolved."
+claim_boundary = "This slice proves the first-PR slot separation with paired tests and re-blessed goldens; it does not claim alias analysis, full liveness analysis, calibrated accuracy, safety, execution, or policy readiness."
+
+[scope]
+included = [
+    "Split the shared non-null/pointer-live discharge dispatch in analysis/evidence.rs",
+    "Narrow pointer_live_discharge_state: nullability-only evidence becomes a missing slot with a supporting-fact summary; same-origin Vec/Box evidence retained",
+    "Reframe the pointer-live no-evidence summary around liveness, keeping the non-null wording for the non-null slot",
+    "Paired card-level tests: null-only guard versus genuine same-origin evidence, including next action",
+    "Regenerate only affected fixture/projection goldens with an explained before/after diff",
+]
+excluded = [
+    "General alias analysis, HIR/MIR engines, or target builds",
+    "Changes to nullability-guard recognition itself (same-receiver, position-aware rules stay)",
+    "Wider evidence-discharge audits beyond the pointer-live slot",
+    "Accuracy claims from increased strictness; corpus comparison is recorded, not scored",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "A null check remains truly reported where observed; the change removes only the inference from non-nullness to liveness."
+
+[[invariant]]
+id = "INV-2"
+text = "No new evidence model is introduced: the binary present/missing slot keeps working, with the weaker fact carried in the summary."
+
+[[invariant]]
+id = "INV-3"
+text = "Existing user receipts and baselines keep their interpretation; only the described slot wording and presence change."
+
+[[acceptance]]
+id = "AC-2226-PR1-1"
+text = "A null-only guard keeps the non-null slot present and leaves the pointer-live slot missing with a summary that names the detected guard and the unresolved liveness."
+proof = ["cargo test -p unsafe-review-core --locked nullability_keeps_pointer_live_open"]
+
+[[acceptance]]
+id = "AC-2226-PR1-2"
+text = "Genuine same-origin Vec/Box evidence keeps the pointer-live slot present with unchanged wording."
+proof = ["cargo test -p unsafe-review-core --locked same_origin_keeps_pointer_live_present"]
+
+[[acceptance]]
+id = "AC-2226-PR1-3"
+text = "Complete cards and next actions agree with the slot states; only affected goldens change."
+proof = ["cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2226-pr1-nonnull-pointer-live-split"
+notes = "Coordinate card-builder-adjacent assertions with #2236; consume typed origin facts when available."

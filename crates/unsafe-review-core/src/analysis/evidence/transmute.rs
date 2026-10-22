@@ -1,20 +1,29 @@
 use super::{
-    any_compact_if_condition, branch_still_open_at_operation, code_before_operation,
+    any_compact_if_condition, branch_still_open_at_operation, code_before_site_operation,
     condition_has_top_level_conjunct, condition_has_top_level_disjunct, contains_executable_return,
     has_u8_bool_value_guard, is_runtime_assert_at, matching_call_argument_end,
     matching_code_block_end, matching_generic_argument_end, source_value_identifier,
     split_top_level_pair, strip_block_comments_and_literals,
 };
+use crate::analysis::scanner::ScannedSite;
 
-pub(super) fn has_transmute_layout_size_evidence(lower: &str, expression: &str) -> bool {
-    let Some(context) = TransmuteCallContext::for_operation(lower, expression) else {
+pub(super) fn has_transmute_layout_size_evidence(
+    site: &ScannedSite,
+    lower: &str,
+    expression: &str,
+) -> bool {
+    let Some(context) = TransmuteCallContext::for_operation(site, lower, expression) else {
         return false;
     };
     context.layout_context().has_size_evidence()
 }
 
-pub(super) fn has_transmute_u8_bool_valid_value_evidence(lower: &str, expression: &str) -> bool {
-    let Some(context) = TransmuteCallContext::for_operation(lower, expression) else {
+pub(super) fn has_transmute_u8_bool_valid_value_evidence(
+    site: &ScannedSite,
+    lower: &str,
+    expression: &str,
+) -> bool {
+    let Some(context) = TransmuteCallContext::for_operation(site, lower, expression) else {
         return false;
     };
     context
@@ -30,9 +39,9 @@ struct TransmuteCallContext {
 }
 
 impl TransmuteCallContext {
-    fn for_operation(lower: &str, expression: &str) -> Option<Self> {
+    fn for_operation(site: &ScannedSite, lower: &str, expression: &str) -> Option<Self> {
         let stripped = strip_block_comments_and_literals(lower);
-        let before_call = code_before_operation(&stripped, expression)?;
+        let before_call = code_before_site_operation(site, &stripped, expression)?;
         let compact_expression = compact_code(&expression.to_ascii_lowercase());
         Self::parse_operation(before_call, &compact_expression)
     }

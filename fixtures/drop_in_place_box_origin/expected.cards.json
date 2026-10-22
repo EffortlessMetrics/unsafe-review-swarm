@@ -44,7 +44,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+          "summary": "1 related test file mentions owner `drop_owned_box`"
         },
         "witness": {
           "present": false,
@@ -68,7 +68,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+          "summary": "1 related test file mentions owner `drop_owned_box`"
         },
         "witness": {
           "present": false,
@@ -92,7 +92,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `drop_owned_box`"
+          "summary": "1 related test file mentions owner `drop_owned_box`"
         },
         "witness": {
           "present": false,
@@ -103,7 +103,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `drop_owned_box`",
+    "reach": "1 related test file mentions owner `drop_owned_box`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -117,6 +117,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test drop_owned_box",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "mentions_drop_owned_box",
+        "file": "src/lib.rs",
+        "line": 14
       }
     ],
     "missing": [

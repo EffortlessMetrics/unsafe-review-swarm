@@ -2,8 +2,9 @@ use crate::command::{
     BaselineAddOptions, BaselineCommand, BaselineInitOptions, BaselineRefreshOptions,
     BaselineStatusOptions, CandidateCommand, CandidateImportOptions, CandidateLintOptions,
     CandidateListOptions, CandidateNewOptions, CandidateWitnessPlanOptions, CheckOptions, Command,
-    ContextQuery, DiffInput, ExternalPrSetupOptions, FirstPrOptions, Format, OutcomeOptions,
-    ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions, SubcommandHelpTarget,
+    ContextQuery, DiffInput, EnvFeatureSelect, ExternalPrSetupOptions, FirstPrOptions, Format,
+    OutcomeOptions, ReceiptTemplateOptions, RepoOptions, SavedOutputReceiptOptions,
+    SubcommandHelpTarget,
 };
 use serde_json::json;
 #[cfg(unix)]
@@ -19,35 +20,113 @@ use std::sync::{Arc, Mutex};
 use std::thread;
 use std::time::{Duration, Instant};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, CardId, CargoCarefulReceiptInput,
-    ConcurrencyReceiptInput, DiffSource, DiscoveryOptions, MiriReceiptInput, PolicyMode,
-    ProofReceiptInput, Provenance, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
-    SanitizerReceiptInput, ScanCost, Scope, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
-    analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events,
-    audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
-    baseline_refresh_preview, baseline_status, collect_context_range, compare_outcome_json,
-    discover_repo_files, evaluate_policy_report, evaluate_policy_report_from_output,
+    AnalysisAperture, AnalysisMode, AnalyzeInput, AnalyzeOutput, ApertureConfigurationInput,
+    CardConfiguration, CardId, CargoCarefulReceiptInput, CfgInputs, ConcurrencyReceiptInput,
+    ConfigurationArgs, DiffSource, DiscoveryOptions, EnvDiscoverOptions, EnvironmentSource,
+    ImpactInventory, ImpactSubject, MiriReceiptInput, PolicyMode, ProofReceiptInput, Provenance,
+    RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, SanitizerReceiptInput, ScanCost,
+    Scope, StageConfigurationInput, StageInventory, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessReceipt,
+    analyze, analyze_with_discovery, analyze_with_discovery_and_repo_events, assemble_aperture,
+    assemble_stage_inventory, audit_witness_receipts, baseline_add, baseline_init,
+    baseline_init_preview, baseline_refresh_preview, baseline_status, changed_lines_in_diff,
+    collect_context_range, compare_outcome_json, discover_environment, discover_repo_files,
+    evaluate_configurations, evaluate_policy_report, evaluate_policy_report_from_output,
     lint_manual_candidate_text, load_manual_candidates, manual_candidate_implementer_handoff,
-    new_manual_candidate_skeleton, read_manual_candidate, render_badge_jsons,
-    render_baseline_refresh_human, render_baseline_refresh_json, render_baseline_status_human,
-    render_baseline_status_json, render_comment_plan, render_gate_manifest,
-    render_gate_manifest_repo, render_github_summary, render_human, render_json,
-    render_json_with_provenance, render_lsp, render_manual_candidate_witness_plan, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif,
-    render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
+    new_manual_candidate_skeleton, read_manual_candidate, relate_same_owner, render_aperture_human,
+    render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
+    render_baseline_status_human, render_baseline_status_json, render_comment_plan,
+    render_configuration_human, render_gate_manifest, render_gate_manifest_repo,
+    render_github_summary, render_human, render_human_short, render_impact_human, render_json,
+    render_json_with_provenance, render_json_with_sections, render_lsp,
+    render_manual_candidate_witness_plan, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_stages_human, render_usefulness_telemetry_with_cost,
+    render_witness_plan, summarize_configurations, validate_witness_receipts,
 };
 
+mod agent;
 mod card_lookup;
 mod confirm;
+mod environment;
 mod first_pr;
 mod init;
+mod scope;
+mod work;
 
 const NO_CHANGED_GAPS_MESSAGE: &str = "No changed unsafe-review gaps were found.";
+
+/// Fail closed when a diff-scoped run resolved none of its changed Rust files
+/// under the analysis root: emitting "no gaps found" over unscanned content
+/// is the wrong-root footgun, not a clean review. A partially resolved scope
+/// proceeds, but the missing files are returned for a loud warning so the
+/// narrowed scope cannot pass unnoticed.
+fn check_unresolved_diff_scope(output: &AnalyzeOutput) -> Result<Option<String>, String> {
+    let mut missing: Vec<String> = output
+        .unresolved_diff_files
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    missing.sort();
+    let mut refused: Vec<String> = output
+        .rejected_diff_files
+        .iter()
+        .map(|path| path.display().to_string())
+        .collect();
+    refused.sort();
+    // Hostile refusals (traversal, absolute, symlink-escaping paths) keep the
+    // #1883 exit-0 contract: they are reported, never resolved, and never fail
+    // the run. Only innocent absences can trigger the wrong-root error.
+    if !refused.is_empty() && missing.is_empty() {
+        return Ok(Some(format!(
+            "warning: refused hostile diff paths (never resolved by design): {}",
+            refused.join(", "),
+        )));
+    }
+    if missing.is_empty() {
+        return Ok(None);
+    }
+    if output.summary.changed_rust_files > 0 && output.diff_scoped_files.is_empty() {
+        return Err(format!(
+            "none of the {} changed Rust {} in the diff resolve under --root {} ({}); refusing to emit an empty review over unscanned content. Point --root at the tree containing the reviewed files, usually the PR head checkout",
+            output.summary.changed_rust_files,
+            if output.summary.changed_rust_files == 1 {
+                "file"
+            } else {
+                "files"
+            },
+            output.root.display(),
+            missing.join(", "),
+        ));
+    }
+    let mut warning = format!(
+        "warning: {}/{} changed Rust files not found under --root {} and were not scanned: {}. The review covers only the resolved files",
+        missing.len(),
+        output.summary.changed_rust_files,
+        output.root.display(),
+        missing.join(", "),
+    );
+    if !refused.is_empty() {
+        warning.push_str(&format!(
+            "; refused hostile paths (never resolved by design): {}",
+            refused.join(", "),
+        ));
+    }
+    Ok(Some(warning))
+}
 const NO_CHANGED_GAPS_LIMITATION: &str =
     "This does not prove the repo safe, UB-free, Miri-clean, or that any unsafe site executed.";
 const FIRST_RUN_TRUST_BOUNDARY: &str = "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.";
+
+/// Shared exit-code contract footer for the top-level and review-command helps.
+/// Exit codes are part of the scripting contract: agents branch on 0/1/2.
+fn print_exit_code_footer() {
+    println!("Exit codes:");
+    println!("  0  ran to completion: clean, or advisory findings (advisory policy default)");
+    println!("  1  ran to completion: no-new-debt policy found new or worsened coverage gaps");
+    println!("  2  tool did not complete a review: usage, input/IO, or internal error");
+    println!();
+}
 type FirstPrRenderer = fn(&AnalyzeOutput) -> String;
 
 const REVIEW_KIT_ARTIFACT: &str = "review-kit.json";
@@ -70,6 +149,11 @@ const FIRST_PR_RENDERED_ARTIFACTS: [(&str, FirstPrRenderer); 8] = [
     ("lsp.json", render_lsp),
     ("repair-queue.json", render_repair_queue),
 ];
+/// Bundle artifact filenames for `first-pr`, exposed so argument parsing can
+/// reject a `--latency-out` destination that would overwrite one of them.
+pub(crate) fn first_pr_artifact_names() -> &'static [&'static str] {
+    &FIRST_PR_ARTIFACTS
+}
 const FIRST_PR_ARTIFACTS: [&str; 18] = [
     REVIEW_KIT_ARTIFACT,
     GATE_MANIFEST_ARTIFACT,
@@ -162,6 +246,12 @@ pub(crate) fn execute(command: Command) -> Result<(), crate::RunFailure> {
             DiscoveryOptions::default(),
         ),
         Command::Repo(options) => repo(options),
+        Command::Scope(options) => scope::run(&options).map_err(crate::RunFailure::Tool),
+        Command::Work(options) => work::run(&options),
+        Command::Agent(command) => agent::run(&command),
+        Command::Environment(options) => {
+            environment::run(&options).map_err(crate::RunFailure::Tool)
+        }
         Command::Pilot(options) => run_check(
             options,
             Scope::Diff,
@@ -242,14 +332,176 @@ fn print_support() {
     println!("- docs/status/SUPPORT_TIERS.md");
 }
 
+/// One evaluated configuration section for an explicit envelope selection.
+struct ConfigurationBundle {
+    digest: String,
+    note: Option<String>,
+    items: Vec<CardConfiguration>,
+}
+
+/// Evaluate card configurations when the caller selected an explicit
+/// envelope (`--features` family or `--target`); `None` on default runs so
+/// their output stays byte-stable. Environment discovery failure never fails
+/// the run: feature and target atoms evaluate to unknown with a note.
+fn configuration_bundle(
+    root: &Path,
+    features: &EnvFeatureSelect,
+    target: Option<&str>,
+    output: &AnalyzeOutput,
+) -> Option<ConfigurationBundle> {
+    if *features == EnvFeatureSelect::Default && target.is_none() {
+        return None;
+    }
+    let selection = environment::feature_selection(features);
+    let discover = EnvDiscoverOptions {
+        probe_toolchain: true,
+        expand_members: true,
+        features: selection.clone(),
+    };
+    let (digest, note, inputs) = match discover_environment(
+        root,
+        EnvironmentSource::ExplicitCli,
+        &discover,
+    ) {
+        Ok(env) => {
+            let digest = env.digest.clone();
+            let inputs = CfgInputs::from_environment(&env, target);
+            (digest, None, inputs)
+        }
+        Err(err) => (
+            "unknown".to_string(),
+            Some(format!(
+                "environment discovery failed ({err}); feature and target atoms stay unevaluated"
+            )),
+            CfgInputs::for_selection(&selection),
+        ),
+    };
+    let items = evaluate_configurations(root, &output.cards, &inputs, &digest);
+    Some(ConfigurationBundle {
+        digest,
+        note,
+        items,
+    })
+}
+
+/// Render human/json `check` output with any combination of additive
+/// sections (configuration, aperture, impact, stages) in a fixed order.
+/// Default runs select nothing and render exactly the historical output.
+#[allow(
+    clippy::too_many_arguments,
+    reason = "one additive section per parameter keeps default runs byte-stable without a params-struct churn across the single call site"
+)]
+fn render_check_sections(
+    output: &AnalyzeOutput,
+    format: &Format,
+    short: bool,
+    provenance: Option<&Provenance>,
+    bundle: Option<&ConfigurationBundle>,
+    aperture: Option<&AnalysisAperture>,
+    impact: Option<&ImpactInventory>,
+    stages: Option<&StageInventory>,
+) -> String {
+    let selected = bundle.is_some() || aperture.is_some() || impact.is_some() || stages.is_some();
+    if !selected {
+        return render_with_format_and_provenance(output, format, short, provenance);
+    }
+    match format {
+        Format::Human => {
+            let mut rendered = if short {
+                render_human_short(output)
+            } else {
+                render_human(output)
+            };
+            if let Some(bundle) = bundle {
+                rendered.push_str(&render_configuration_human(
+                    &bundle.items,
+                    &bundle.digest,
+                    bundle.note.as_deref(),
+                ));
+            }
+            if let Some(aperture) = aperture {
+                rendered.push_str(&render_aperture_human(aperture));
+            }
+            if let Some(impact) = impact {
+                rendered.push_str(&render_impact_human(impact));
+            }
+            if let Some(stages) = stages {
+                rendered.push_str(&render_stages_human(stages));
+            }
+            rendered
+        }
+        Format::Json => render_json_with_sections(
+            output,
+            provenance,
+            bundle.map(|bundle| ConfigurationArgs {
+                environment_digest: &bundle.digest,
+                note: bundle.note.as_deref(),
+                items: &bundle.items,
+            }),
+            aperture.cloned(),
+            impact.cloned(),
+            stages.cloned(),
+        ),
+        _ => render_with_format_and_provenance(output, format, short, provenance),
+    }
+}
+
+/// Footer builder for a framed `run_check` invocation: rendered after the
+/// analysis output is known, so it can name exact card follow-ups.
+pub(crate) type CheckFooter = Box<dyn FnOnce(&AnalyzeOutput) -> String>;
+
+/// Framing for one `run_check` invocation: which command name the latency
+/// receipt carries, plus an optional human-only header/footer around the
+/// rendered output. `check` and `pilot` pass no frame; `work` names its
+/// scope, identities, and copyable next commands.
+pub(crate) struct CheckFrame {
+    pub command_name: &'static str,
+    pub header: Option<String>,
+    pub footer: Option<CheckFooter>,
+}
+
 fn run_check(
     options: CheckOptions,
     scope: Scope,
     mode: AnalysisMode,
     discovery: DiscoveryOptions,
 ) -> Result<(), crate::RunFailure> {
-    let provenance = build_provenance(&options);
     let diff = diff_source(&options).map_err(crate::RunFailure::Tool)?;
+    run_check_with_diff(
+        options,
+        scope,
+        mode,
+        discovery,
+        diff,
+        CheckFrame {
+            command_name: "check",
+            header: None,
+            footer: None,
+        },
+    )
+}
+
+fn run_check_with_diff(
+    options: CheckOptions,
+    scope: Scope,
+    mode: AnalysisMode,
+    discovery: DiscoveryOptions,
+    diff: DiffSource,
+    frame: CheckFrame,
+) -> Result<(), crate::RunFailure> {
+    let mut clock = crate::latency::PhaseClock::start();
+    let scope_name = scope.as_str();
+    let provenance = build_provenance(&options);
+    // Captured before `options.root` moves into the analysis input: the
+    // configuration projection re-reads card files from the same root.
+    let config_root = options.root.clone();
+    let config_features = options.env_features.clone();
+    let config_target = options.target.clone();
+    // Captured before `diff` moves into the analysis input, and only when
+    // `--impact` is selected: parsing the diff twice on every run would
+    // waste a full parse plus a second diff-file read for nothing.
+    let impact_changed = options.impact.then(|| changed_lines_in_diff(&diff));
+    clock.tick(crate::latency::PHASE_INPUT);
     let policy = options.policy.clone();
     let output = analyze_with_discovery(
         AnalyzeInput {
@@ -264,16 +516,111 @@ fn run_check(
         discovery,
     )
     .map_err(crate::RunFailure::Tool)?;
-    let rendered = render_with_format_and_provenance(&output, &options.format, Some(&provenance));
+    clock.tick(crate::latency::PHASE_ANALYZE);
+    if let Some(warning) = check_unresolved_diff_scope(&output).map_err(crate::RunFailure::Tool)? {
+        eprintln!("{warning}");
+    }
+    let bundle = configuration_bundle(
+        &config_root,
+        &config_features,
+        config_target.as_deref(),
+        &output,
+    );
+    let aperture = options.aperture.then(|| {
+        let config = bundle.as_ref().map(|bundle| ApertureConfigurationInput {
+            environment_digest: &bundle.digest,
+            note: bundle.note.as_deref(),
+            counts: summarize_configurations(&bundle.items),
+        });
+        assemble_aperture(&output, config)
+    });
+    let impact = impact_changed.as_ref().map(|changed| {
+        let subjects: Vec<ImpactSubject> = output.cards.iter().map(ImpactSubject::from).collect();
+        relate_same_owner(&config_root, changed, &subjects)
+    });
+    // Assembled after impact and the configuration bundle so the inventory
+    // can reference both, including a failed environment discovery;
+    // selecting `--stages` changes nothing else about the run, and default
+    // runs skip this entirely.
+    let stages = options.stages.then(|| {
+        assemble_stage_inventory(
+            &output,
+            impact.as_ref(),
+            bundle.as_ref().map(|bundle| StageConfigurationInput {
+                environment_digest: bundle.digest.as_str(),
+                note: bundle.note.as_deref(),
+            }),
+        )
+    });
+    let rendered = render_check_sections(
+        &output,
+        &options.format,
+        options.short,
+        Some(&provenance),
+        bundle.as_ref(),
+        aperture.as_ref(),
+        impact.as_ref(),
+        stages.as_ref(),
+    );
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    // The work frame wraps human output only: headers and next-command
+    // footers are console guidance, never part of a machine artifact.
+    let framed = match (&options.format, frame.header, frame.footer) {
+        (Format::Human, header, footer) => {
+            let mut out = String::new();
+            if let Some(header) = header {
+                out.push_str(&header);
+            }
+            out.push_str(&rendered);
+            if let Some(footer) = footer {
+                out.push_str(&footer(&output));
+            }
+            out
+        }
+        _ => rendered,
+    };
+    let output_bytes = framed.len() as u64;
     if let Some(path) = options.out {
         ensure_parent_dir(&path).map_err(crate::RunFailure::Tool)?;
-        fs::write(&path, rendered).map_err(|err| {
+        fs::write(&path, &framed).map_err(|err| {
             crate::RunFailure::Tool(format!("write {} failed: {err}", path.display()))
         })?;
     } else {
-        println!("{rendered}");
+        println!("{framed}");
     }
-    enforce_policy(&output)?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let policy_result = enforce_policy(&output);
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
+    let options_digest = crate::latency::digest_check_options(
+        options.policy.as_str(),
+        options.max_cards,
+        &format!("{:?}", options.format),
+        options.short,
+    );
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: options.latency_out.as_deref(),
+        command: frame.command_name,
+        scope: scope_name,
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })
+    .map_err(crate::RunFailure::Tool)?;
+    policy_result?;
     Ok(())
 }
 
@@ -285,9 +632,19 @@ fn repo(options: RepoOptions) -> Result<(), crate::RunFailure> {
 }
 
 fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
+    let mut clock = crate::latency::PhaseClock::start();
+    let options_digest = crate::latency::digest_repo_options(
+        options.check.policy.as_str(),
+        options.check.max_cards,
+        &format!("{:?}", options.check.format),
+        options.check.short,
+        &options.discovery,
+        options.timeout_seconds,
+    );
     let check = options.check;
     let provenance = build_provenance(&check);
     let diff = diff_source(&check).map_err(crate::RunFailure::Tool)?;
+    clock.tick(crate::latency::PHASE_INPUT);
     let policy = check.policy.clone();
     let report_path = check.out.clone();
     let partial_path = report_path.as_deref().map(repo_partial_path);
@@ -298,6 +655,7 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
         partial_path.clone(),
         options.progress,
         check.format.clone(),
+        check.short,
         options.timeout_seconds,
         scan_scope,
     )
@@ -334,7 +692,11 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
             "unsafe-review repo: no Rust files selected after include/exclude/ignores; check --root, --include, --exclude, --[no-]large-repo-ignores, and --[no-]respect-gitignore"
         );
     }
-    let rendered = render_with_format_and_provenance(&output, &check.format, Some(&provenance));
+    clock.tick(crate::latency::PHASE_ANALYZE);
+    let rendered =
+        render_with_format_and_provenance(&output, &check.format, check.short, Some(&provenance));
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    let rendered_bytes = rendered.len() as u64;
     if let Some(path) = report_path {
         let partial = repo_partial_path(&path);
         let output_bytes = match write_repo_report(&path, &partial, rendered) {
@@ -383,7 +745,33 @@ fn run_repo_check(options: RepoOptions) -> Result<(), crate::RunFailure> {
     } else {
         println!("{rendered}");
     }
-    enforce_policy(&output)?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let policy_result = enforce_policy(&output);
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: if policy_result.is_ok() {
+            crate::latency::PolicyOutcome::Pass
+        } else {
+            crate::latency::PolicyOutcome::Fail
+        },
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: check.latency_out.as_deref(),
+        command: "repo",
+        scope: "repo",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: rendered_bytes,
+    })
+    .map_err(crate::RunFailure::Tool)?;
+    policy_result?;
     Ok(())
 }
 
@@ -539,6 +927,7 @@ struct RepoStatusReporter {
     last_status: Arc<Mutex<Option<RepoScanStatus>>>,
     partial_output: Arc<Mutex<Option<AnalyzeOutput>>>,
     format: Format,
+    short: bool,
     scan_scope: RepoScanScopeMetadata,
     last_phase: Option<String>,
     last_discovery_heartbeat: usize,
@@ -580,6 +969,7 @@ impl RepoStatusReporter {
         partial_path: Option<PathBuf>,
         progress: bool,
         format: Format,
+        short: bool,
         timeout_seconds: Option<u64>,
         scan_scope: RepoScanScopeMetadata,
     ) -> Result<Self, String> {
@@ -603,6 +993,7 @@ impl RepoStatusReporter {
             last_status,
             partial_output,
             format,
+            short,
             scan_scope,
             last_phase: None,
             last_discovery_heartbeat: 0,
@@ -718,7 +1109,7 @@ impl RepoStatusReporter {
             return Ok(None);
         };
         ensure_parent_dir(path)?;
-        fs::write(path, render_with_format(&output, &self.format))
+        fs::write(path, render_with_format(&output, &self.format, self.short))
             .map_err(|err| format!("write partial repo report {} failed: {err}", path.display()))?;
         Ok(Some(path.clone()))
     }
@@ -850,7 +1241,9 @@ impl RepoSignalState {
             return Ok(None);
         };
         ensure_parent_dir(path)?;
-        fs::write(path, render_with_format(&output, &self.format))
+        // Signal-interrupt partials keep the full rendering: an interrupted
+        // scan needs complete detail for diagnosis, not the short summary.
+        fs::write(path, render_with_format(&output, &self.format, false))
             .map_err(|err| format!("write partial repo report {} failed: {err}", path.display()))?;
         Ok(Some(path.clone()))
     }
@@ -987,6 +1380,9 @@ fn render_repo_scan_status(
                 serde_json::json!({
                     "file": repo_path_display(&entry.file),
                     "scan_ms": entry.scan_ms,
+                    "bytes": entry.bytes,
+                    "lines": entry.lines,
+                    "sites": entry.sites,
                 })
             })
             .collect::<Vec<_>>()
@@ -1257,6 +1653,23 @@ fn repo_partial_path(out: &Path) -> PathBuf {
     out_with_suffix(out, ".partial")
 }
 
+/// Every filesystem output a `repo --out <report>` run owns, so argument
+/// parsing can reject a `--latency-out` destination that would overwrite
+/// one of them: the report itself, its status sidecar and partial file,
+/// and the gate manifest written beside the report.
+pub(crate) fn repo_protected_outputs(report: &Path) -> Vec<(&'static str, PathBuf)> {
+    let gate_manifest = report
+        .parent()
+        .map(|dir| dir.join(GATE_MANIFEST_ARTIFACT))
+        .unwrap_or_else(|| PathBuf::from(GATE_MANIFEST_ARTIFACT));
+    vec![
+        ("--out", report.to_path_buf()),
+        ("status sidecar", repo_status_path(report)),
+        ("partial report", repo_partial_path(report)),
+        ("gate manifest", gate_manifest),
+    ]
+}
+
 fn out_with_suffix(out: &Path, suffix: &str) -> PathBuf {
     if let Some(file_name) = out.file_name() {
         let mut suffixed_file_name = file_name.to_os_string();
@@ -1332,6 +1745,16 @@ fn repo_incomplete_error(
 }
 
 #[cfg(debug_assertions)]
+fn touch_repo_interrupt_ready_file() {
+    // Lets kill-based e2e tests wait for the pause instead of guessing with a
+    // fixed sleep: the test polls for this file, then delivers the signal
+    // while the child is deterministically parked.
+    if let Ok(path) = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE") {
+        let _ = std::fs::write(path, "paused\n");
+    }
+}
+
+#[cfg(debug_assertions)]
 fn maybe_pause_for_repo_interrupt_test() {
     let Ok(raw) = std::env::var("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS") else {
         return;
@@ -1339,6 +1762,7 @@ fn maybe_pause_for_repo_interrupt_test() {
     let Ok(ms) = raw.parse::<u64>() else {
         return;
     };
+    touch_repo_interrupt_ready_file();
     std::thread::sleep(Duration::from_millis(ms));
 }
 
@@ -1366,6 +1790,7 @@ fn maybe_pause_for_repo_interrupt_after_scan(status: &RepoScanStatus) {
         .ok()
         .and_then(|raw| raw.parse::<u64>().ok())
         .unwrap_or(5_000);
+    touch_repo_interrupt_ready_file();
     std::thread::sleep(Duration::from_millis(ms));
 }
 
@@ -1484,12 +1909,15 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             terminal_command,
         )?;
     }
+    let mut clock = crate::latency::PhaseClock::start();
+    let latency_out = check.latency_out.clone();
     let provenance = build_provenance(&check);
     let diff = diff_source(&check)?;
     let root = check.root.clone();
+    clock.tick(crate::latency::PHASE_INPUT);
     // Start wall-clock timer before analysis — used to populate scan_cost in
     // usefulness-telemetry.json (SPEC-0038 §scan_cost).  Core must not measure
-    // wall time; this is the only place where an Instant is allowed for this purpose.
+    // wall time for cost claims; wall clocks live in this emit layer only.
     let scan_started = Instant::now();
     let output = analyze(AnalyzeInput {
         root: root.clone(),
@@ -1500,6 +1928,10 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    clock.tick(crate::latency::PHASE_ANALYZE);
+    if let Some(warning) = check_unresolved_diff_scope(&output)? {
+        eprintln!("{warning}");
+    }
     let receipt_audit = audit_witness_receipts(AnalyzeInput {
         root: root.clone(),
         scope: Scope::Diff,
@@ -1509,16 +1941,26 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         include_unchanged_tests: true,
         max_cards: check.max_cards,
     })?;
+    // The receipt_audit span covers the audit's own receipt-less
+    // re-analysis plus receipt auditing: auditing witness receipts
+    // requires analyzing the same input without them. Comparing this
+    // span's cost with the analyze span is expected, not double counting.
+    clock.tick(crate::latency::PHASE_RECEIPT_AUDIT);
     let policy_report = evaluate_policy_report_from_output(&output)?;
+    // The policy_eval span covers policy report evaluation plus loading
+    // the manual candidates, which are policy-domain bundle inputs read
+    // from `.unsafe-review/candidates/`.
     let manual_candidates = load_manual_candidates(&root)?;
+    clock.tick(crate::latency::PHASE_POLICY_EVAL);
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| artifact_write_failure("create", &options.out_dir, err))?;
-    // Accumulate bytes written across all artifact writes.  The total is
-    // the disk footprint of this run's output bundle — diagnostic only,
-    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
-    // performance guarantee.
-    let mut output_bytes: u64 = 0;
+    // The phase vocabulary is a strict render/write partition shared by all
+    // three review commands: `projections` renders every artifact in memory
+    // and writes nothing; `artifact_writes` writes every rendered artifact
+    // and renders nothing (except the cost-dependent telemetry file, whose
+    // byte total is only known after the other writes).
+    let mut rendered_artifacts: Vec<(&str, String)> = Vec::new();
     let mut comment_plan_artifact = None;
     for (name, renderer) in FIRST_PR_RENDERED_ARTIFACTS {
         // cards.json uses the provenance-aware renderer to emit schema 0.2.
@@ -1536,42 +1978,42 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         if name == "comment-plan.json" {
             comment_plan_artifact = Some(rendered.clone());
         }
-        output_bytes += write_artifact(&options.out_dir.join(name), rendered)?;
+        rendered_artifacts.push((name, rendered));
     }
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_ARTIFACT),
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_ARTIFACT,
         render_receipt_audit_markdown(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(RECEIPT_AUDIT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        RECEIPT_AUDIT_JSON_ARTIFACT,
         render_receipt_audit_json(&receipt_audit),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_JSON_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_JSON_ARTIFACT,
         render_policy_report_json(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(POLICY_REPORT_MARKDOWN_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        POLICY_REPORT_MARKDOWN_ARTIFACT,
         render_policy_report_markdown(&policy_report),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_CANDIDATES_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_CANDIDATES_ARTIFACT,
         first_pr::render_manual_candidates_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(MANUAL_REPAIR_QUEUE_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        MANUAL_REPAIR_QUEUE_ARTIFACT,
         first_pr::render_manual_repair_queue_artifact(&root, &manual_candidates),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(TOKMD_PACKETS_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        TOKMD_PACKETS_ARTIFACT,
         first_pr::render_tokmd_packets_artifact(
             &root,
             &manual_candidates,
             comment_plan_artifact.as_deref(),
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(REVIEW_KIT_ARTIFACT),
+    ));
+    rendered_artifacts.push((
+        REVIEW_KIT_ARTIFACT,
         first_pr::render_review_kit_manifest(
             &output,
             &root,
@@ -1579,11 +2021,17 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
             &manual_candidates,
             &FIRST_PR_ARTIFACTS,
         ),
-    )?;
-    output_bytes += write_artifact(
-        &options.out_dir.join(GATE_MANIFEST_ARTIFACT),
-        render_gate_manifest(&output),
-    )?;
+    ));
+    rendered_artifacts.push((GATE_MANIFEST_ARTIFACT, render_gate_manifest(&output)));
+    clock.tick(crate::latency::PHASE_PROJECTIONS);
+    // Accumulate bytes written across all artifact writes.  The total is
+    // the disk footprint of this run's output bundle — diagnostic only,
+    // not a coverage claim, proof, UB-free, Miri-clean, site-execution, or
+    // performance guarantee.
+    let mut output_bytes: u64 = 0;
+    for (name, rendered) in &rendered_artifacts {
+        output_bytes += write_artifact(&options.out_dir.join(name), rendered.clone())?;
+    }
     // Build scan_cost for the telemetry injection.  elapsed_ms is measured here
     // (after all other artifacts are written); output_bytes at this point is the
     // subtotal excluding the telemetry file itself (it cannot include its own
@@ -1598,6 +2046,27 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         &options.out_dir.join(USEFULNESS_TELEMETRY_ARTIFACT),
         render_usefulness_telemetry_with_cost(&output, Some(&scan_cost)),
     )?;
+    clock.tick(crate::latency::PHASE_ARTIFACT_WRITES);
+    let options_digest =
+        crate::latency::digest_check_options("advisory", check.max_cards, "bundle", false);
+    let outcome = crate::latency::LatencyOutcome {
+        policy: crate::latency::PolicyOutcome::NotEvaluated,
+        scan_capped: output.summary.scan_capped,
+        card_cap: output.summary.card_cap,
+        unresolved_diff_files: output.unresolved_diff_files.len(),
+        rejected_diff_files: output.rejected_diff_files.len(),
+    };
+    crate::latency::write_receipt_if_requested(crate::latency::ReceiptParams {
+        path: latency_out.as_deref(),
+        command: "first-pr",
+        scope: "diff",
+        provenance: &provenance,
+        options_digest: &options_digest,
+        outcome: &outcome,
+        clock: &clock,
+        cards: output.cards.len(),
+        output_bytes_total: output_bytes,
+    })?;
 
     first_pr::print_first_pr_report(first_pr::FirstPrReport {
         terminal_command,
@@ -1962,16 +2431,22 @@ fn ensure_parent_dir(path: &Path) -> Result<(), String> {
     Ok(())
 }
 
-fn render_with_format(output: &unsafe_review_core::AnalyzeOutput, format: &Format) -> String {
-    render_with_format_and_provenance(output, format, None)
+fn render_with_format(
+    output: &unsafe_review_core::AnalyzeOutput,
+    format: &Format,
+    short: bool,
+) -> String {
+    render_with_format_and_provenance(output, format, short, None)
 }
 
 fn render_with_format_and_provenance(
     output: &unsafe_review_core::AnalyzeOutput,
     format: &Format,
+    short: bool,
     provenance: Option<&Provenance>,
 ) -> String {
     match format {
+        Format::Human if short => render_human_short(output),
         Format::Human => render_human(output),
         Format::Json => {
             if let Some(prov) = provenance {
@@ -2032,6 +2507,9 @@ fn doctor(root: &Path) -> Result<(), String> {
     );
     println!("kani: {}", yes_no(tool_available("kani")));
     println!("crux: {}", yes_no(tool_available("crux")));
+    println!(
+        "missing witness tools are informational only: review and witness routing still work without them; install a tool only to run its opt-in witness"
+    );
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
@@ -2690,6 +3168,12 @@ fn receipt_template(options: ReceiptTemplateOptions) -> Result<(), String> {
         // Templates never claim a run happened, so no verdict is emitted;
         // authors may add one after an actual run.
         verdict: None,
+        // A template records no execution; terminal status stays unknown,
+        // never an assumed clean exit.
+        exit_code: None,
+        terminated_by_signal: None,
+        // A template records no observation; it stays unbound.
+        subject: None,
     };
     receipt.validate()?;
     let rendered = receipt.to_pretty_json()?;
@@ -2814,6 +3298,8 @@ fn receipt_import_miri(options: SavedOutputReceiptOptions) -> Result<(), String>
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2837,6 +3323,8 @@ fn receipt_import_careful(options: SavedOutputReceiptOptions) -> Result<(), Stri
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2863,6 +3351,8 @@ fn receipt_import_sanitizer(options: SavedOutputReceiptOptions) -> Result<(), St
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
+        subject: None,
         allow_runtime: options.allow_runtime,
     })?;
     let rendered = receipt.to_pretty_json()?;
@@ -2890,6 +3380,8 @@ fn receipt_import_concurrency(options: SavedOutputReceiptOptions) -> Result<(), 
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -2916,6 +3408,8 @@ fn receipt_import_proof(options: SavedOutputReceiptOptions) -> Result<(), String
         expires_at: options.expires_at,
         command: options.command,
         limitations: options.limitations,
+        terminal_status: None,
+        subject: None,
     })?;
     let rendered = receipt.to_pretty_json()?;
     if let Some(path) = options.out {
@@ -3173,10 +3667,59 @@ fn print_subcommand_help(target: SubcommandHelpTarget) {
         SubcommandHelpTarget::Init => print_init_help(),
         SubcommandHelpTarget::PrSetup => print_pr_setup_help(),
         SubcommandHelpTarget::Doctor => print_doctor_help(),
+        SubcommandHelpTarget::Scope => print_scope_help(),
+        SubcommandHelpTarget::Work => print_work_help(),
+        SubcommandHelpTarget::Agent => agent::print_agent_help(),
+        SubcommandHelpTarget::Environment => print_environment_help(),
         SubcommandHelpTarget::Badges => print_badges_help(),
         SubcommandHelpTarget::Lsp => print_lsp_help(),
         SubcommandHelpTarget::Support => print_support(),
     }
+}
+
+fn print_scope_help() {
+    println!("unsafe-review scope: name the analyzed source state");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review scope [--root .] [--staged|--unstaged|--worktree] [--base <ref> [--head <ref>]] \
+         [--format human|json]"
+    );
+    println!();
+    println!("Read-only: prints the canonical change-set identity (scope, Git identities,");
+    println!("included/omitted files, completeness, digest).");
+    println!("The default scope is --worktree. --base selects a commit range (head defaults");
+    println!("to HEAD). Identity only: no analysis runs and no safety claim is made.");
+}
+
+fn print_work_help() {
+    println!("unsafe-review work: review local changes in one screen");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review work [--root .] [--staged|--unstaged|--worktree] [--short] \\\n         [--format human|json] [--max-cards <N>]"
+    );
+    println!();
+    println!("Advisory review of staged (HEAD -> index), unstaged (index -> worktree),");
+    println!("or combined worktree changes against HEAD. The default scope is --worktree;");
+    println!("the chosen scope and its identities headline every run. Same canonical");
+    println!("cards and renderers as `check`; no PR bundle, no source edits, no hooks.");
+    println!("Files both staged and unstaged are named loudly on --staged runs because");
+    println!("worktree bytes are analyzed. Human and json project the same tasks.");
+}
+
+fn print_environment_help() {
+    println!("unsafe-review environment: name the analyzed configuration envelope");
+    println!();
+    println!("Usage:");
+    println!(
+        "  unsafe-review environment [--root .] [--features <a,b>] [--all-features] \\\n         [--no-default-features] [--no-toolchain-probe] [--no-member-expand] \\\n         [--format human|json]"
+    );
+    println!();
+    println!("Read-only: prints the canonical environment identity (workspace, packages,");
+    println!("targets, feature selection, toolchain facts, unknown inputs, digest).");
+    println!("At most one feature-selection flag may be given. Identity only: no analysis");
+    println!("runs, no cards are filtered, and no applicability claim is made.");
 }
 
 fn print_init_help() {
@@ -3197,7 +3740,8 @@ fn print_check_help() {
     println!(
         "  unsafe-review check [--root .] [--base <ref> | --diff <file|->] \
          [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] \
-         [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>]"
+         [--short] [--policy advisory|no-new-debt] [--out <file>] [--max-cards <N>] [--latency-out <file>] \
+         [--aperture] [--impact] [--stages]"
     );
     println!();
     println!("Options:");
@@ -3210,10 +3754,19 @@ fn print_check_help() {
         "- --format <name>  output format: human (default), json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan"
     );
     println!(
+        "- --short          human output only: one risk-ranked line per card (highest risk first)"
+    );
+    println!(
         "- --policy <name>  advisory (default, exit 0) or no-new-debt (exit 1 for new/worsened gaps)"
     );
     println!("- --out <file>     write rendered output to a file instead of stdout");
     println!("- --max-cards <N>  stop collecting after N cards");
+    println!(
+        "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
+    );
+    println!("- --aperture       append the per-analysis aperture manifest (human/json only)");
+    println!("- --impact         append the same-owner impact inventory (human/json only)");
+    println!("- --stages         append the stage/fact-requirement inventory (human/json only)");
     println!("- --json           shorthand for --format json");
     println!("- --markdown       shorthand for --format markdown");
     println!();
@@ -3223,6 +3776,7 @@ fn print_check_help() {
     println!("  unsafe-review check --diff - --format sarif < patch.diff");
     println!("  unsafe-review check --base origin/main --policy no-new-debt");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
@@ -3232,7 +3786,7 @@ fn print_first_pr_help() {
     println!("Usage:");
     println!(
         "  unsafe-review first-pr [--root .] [--base origin/main | --base-sha <sha> [--head-sha <sha>] | --diff <file|->] \
-         [--out-dir target/unsafe-review] [--max-cards <N>]"
+         [--out-dir target/unsafe-review] [--max-cards <N>] [--latency-out <file>]"
     );
     println!();
     println!("  pr       preferred first-run entry point for the same advisory bundle");
@@ -3251,6 +3805,9 @@ fn print_first_pr_help() {
     println!("- --diff <file|-> read diff from a file or stdin instead of --base");
     println!("- --out-dir <dir> directory for all artifacts (default: target/unsafe-review)");
     println!("- --max-cards <N> stop collecting after N cards");
+    println!(
+        "- --latency-out <file> write a machine-readable phase-latency receipt (diagnostic only)"
+    );
     println!();
     println!("Examples:");
     println!("  unsafe-review pr");
@@ -3277,6 +3834,7 @@ fn print_first_pr_help() {
         "  mkdir -p /path/to && git -C /path/to/repo diff --binary --full-index --output=/path/to/change.diff <base-sha>...<head-sha> && unsafe-review pr --root /path/to/repo --diff /path/to/change.diff --out-dir /path/to/review-kit"
     );
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: always advisory; {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
         "unsafe-review does not execute witnesses, post comments, edit source, or enforce blocking policy by default."
@@ -3346,6 +3904,7 @@ fn print_pilot_help() {
     println!("  unsafe-review pilot --diff change.diff --format json");
     println!("  unsafe-review pilot --base origin/main --max-cards 10");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
@@ -3353,11 +3912,11 @@ fn print_explain_help() {
     println!("unsafe-review explain: show full detail for a single ReviewCard");
     println!();
     println!("Usage:");
-    println!("  unsafe-review explain [--root .] [--format json|markdown] <card-id>");
+    println!("  unsafe-review explain [--root .] [--format markdown|json] <card-id>");
     println!();
     println!("Options:");
     println!("- --root <dir>    repository root (default: current directory)");
-    println!("- --format <name> json (default) or markdown");
+    println!("- --format <name> markdown (default) or json");
     println!("- --json          shorthand for --format json");
     println!("- --markdown      shorthand for --format markdown");
     println!();
@@ -3705,49 +4264,51 @@ fn print_help() {
     println!("  unsafe-review check --base origin/main  advisory review of the current diff");
     println!();
     println!("Review a change:");
-    println!("  check     advisory review of a diff; the core command");
-    println!("  pr        first-run PR review bundle: auto-detects root and base ref");
-    println!("  first-pr  same bundle as `pr`, with inputs passed explicitly (compatibility name)");
-    println!("  review    alias for first-pr");
-    println!("  pilot     quick diff review capped at 5 cards");
-    println!("  repo      advisory review of every Rust file under --root, not a diff");
-    println!("  pr-setup  print read-only external GitHub PR checkout and raw-diff commands");
+    println!("  check        advisory review of a diff; the core command");
+    println!("  pr           first-run PR review bundle: auto-detects root and base ref");
+    println!(
+        "  first-pr     same bundle as `pr`, with inputs passed explicitly (compatibility name)"
+    );
+    println!("  review       alias for first-pr");
+    println!("  pilot        quick diff review capped at 5 cards");
+    println!("  repo         advisory review of every Rust file under --root, not a diff");
+    println!("  scope        name the analyzed source state (read-only change-set identity)");
+    println!("  work         review staged, unstaged, or combined local changes in one screen");
+    println!("  agent        machine task index over local changes for LLM consumers");
+    println!("  environment  name the analyzed configuration envelope (read-only)");
+    println!("  pr-setup     print read-only external GitHub PR checkout and raw-diff commands");
     println!();
     println!("Inspect a finding:");
-    println!("  explain   show full detail for a single ReviewCard");
-    println!("  context   emit an LLM-ready context packet for a card or file range");
-    println!("  badges    generate badge JSON files for the repository");
-    println!("  lsp       start the Language Server Protocol server over stdio for editors");
+    println!("  explain      show full detail for a single ReviewCard");
+    println!("  context      emit an LLM-ready context packet for a card or file range");
+    println!("  badges       generate badge JSON files for the repository");
+    println!("  lsp          start the Language Server Protocol server over stdio for editors");
     println!();
     println!("Track and discharge coverage debt:");
     println!(
-        "  baseline  record pre-existing debt as the coverage floor (init/add/status/refresh)"
+        "  baseline     record pre-existing debt as the coverage floor (init/add/status/refresh)"
     );
-    println!("  policy    advisory no-new-debt policy simulation report");
-    println!("  outcome   compare two cards.json snapshots for movement");
+    println!("  policy       advisory no-new-debt policy simulation report");
+    println!("  outcome      compare two cards.json snapshots for movement");
     println!(
-        "  confirm   route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`"
+        "  confirm      route a witness for one card: `confirm <card-id> --dry-run|--allow-heavy`"
     );
     println!(
         "            executes the routed witness command only with --allow-heavy; never default;"
     );
     println!("            --dry-run previews without executing");
-    println!("  receipt   create, import, validate, and audit witness receipts");
+    println!("  receipt      create, import, validate, and audit witness receipts");
     println!("            `receipt-template` is a compatibility name for `receipt template`");
-    println!("  candidate import and project manual advisory candidates");
+    println!("  candidate    import and project manual advisory candidates");
     println!();
     println!("Repository posture:");
-    println!("  doctor    check the repository setup");
-    println!("  init      preview repository adoption without writing files");
-    println!("  support   print the current support tiers and advisory posture");
+    println!("  doctor       check the repository setup");
+    println!("  init         preview repository adoption without writing files");
+    println!("  support      print the current support tiers and advisory posture");
     println!();
     println!("Flags may be passed as `--flag value` or `--flag=value`.");
     println!();
-    println!("Exit codes:");
-    println!("  0  ran to completion: clean, or advisory findings (advisory policy default)");
-    println!("  1  ran to completion: no-new-debt policy found new or worsened coverage gaps");
-    println!("  2  tool did not complete a review: usage, input/IO, or internal error");
-    println!();
+    print_exit_code_footer();
     println!("Trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
         "unsafe-review does not run witnesses, post comments, edit source, or block by default."
@@ -3759,7 +4320,7 @@ fn print_repo_help() {
     println!();
     println!("Usage:");
     println!(
-        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--policy advisory|no-new-debt] [--out file] [--max-cards N]"
+        "  unsafe-review repo [--root .] [--include glob] [--exclude glob] [--list-files|--dry-run] [--progress] [--timeout-seconds N] [--respect-gitignore|--no-respect-gitignore] [--large-repo-ignores|--no-large-repo-ignores] [--max-files N] [--format human|json|markdown|pr-summary|github-summary|sarif|comment-plan|lsp|witness-plan] [--short] [--policy advisory|no-new-debt] [--out file] [--max-cards N] [--latency-out file]"
     );
     println!();
     println!("What repo scans today:");
@@ -3798,10 +4359,16 @@ fn print_repo_help() {
         "- --format <name> chooses human, json, markdown, pr-summary, github-summary, sarif, comment-plan, lsp, or witness-plan output."
     );
     println!(
+        "- --short renders one risk-ranked line per card (highest risk first); human output only."
+    );
+    println!(
         "- --policy advisory is the default; --policy no-new-debt exits 1 for new or worsened coverage gaps."
     );
     println!("- --out <file> writes the rendered report to a file instead of stdout.");
     println!("- --max-cards <N> stops after N cards are collected; it does not limit discovery.");
+    println!(
+        "- --latency-out <file> writes a machine-readable phase-latency receipt (diagnostic only)."
+    );
     println!();
     println!("Large-repo guidance:");
     println!(
@@ -3829,6 +4396,7 @@ fn print_repo_help() {
     );
     println!("- Without --out, Unix SIGTERM/SIGINT prints an interruption diagnostic to stderr.");
     println!();
+    print_exit_code_footer();
     println!("Trust boundary:");
     println!("- ReviewCards are advisory static findings: {FIRST_RUN_TRUST_BOUNDARY}");
     println!(
@@ -3920,14 +4488,17 @@ fn print_candidate_help() {
 #[cfg(test)]
 mod tests {
     use super::{
-        RepoScanScopeMetadata, ensure_readable_diff, ensure_review_root, git_ref_error,
-        render_repo_scan_incomplete_status, render_repo_scan_status, repo_status_operator_json,
-        resolve_diff_path, review_root_error, shell_path_arg, writable_status, yes_no,
+        RepoScanScopeMetadata, check_unresolved_diff_scope, ensure_readable_diff,
+        ensure_review_root, git_ref_error, render_repo_scan_incomplete_status,
+        render_repo_scan_status, repo_status_operator_json, resolve_diff_path, review_root_error,
+        shell_path_arg, writable_status, yes_no,
     };
+    use std::collections::BTreeMap;
     use std::io;
     use std::path::{Path, PathBuf};
     use unsafe_review_core::{
-        DiscoveryOptions, PerFileScanStats, RepoScanPhase, RepoScanStatus, RepoStopReason,
+        AnalysisIdentity, AnalysisMode, AnalyzeOutput, DiscoveryOptions, PerFileScanStats,
+        PolicyMode, RepoScanPhase, RepoScanStatus, RepoStopReason, Scope, api::Summary,
     };
 
     fn test_scan_scope() -> RepoScanScopeMetadata {
@@ -3937,6 +4508,82 @@ mod tests {
     #[test]
     fn ensure_review_root_accepts_a_directory() -> Result<(), String> {
         ensure_review_root(Path::new("."))
+    }
+
+    fn diff_scope_output(
+        changed_rust: usize,
+        resolved: &[&str],
+        unresolved: &[&str],
+    ) -> AnalyzeOutput {
+        diff_scope_output_with_rejected(changed_rust, resolved, unresolved, &[])
+    }
+
+    fn diff_scope_output_with_rejected(
+        changed_rust: usize,
+        resolved: &[&str],
+        unresolved: &[&str],
+        rejected: &[&str],
+    ) -> AnalyzeOutput {
+        AnalyzeOutput {
+            analysis_identity: AnalysisIdentity::new("diff"),
+            schema_version: "0.1".to_string(),
+            tool: "unsafe-review".to_string(),
+            root: PathBuf::from("/tmp/foreign-repo"),
+            scope: Scope::Diff,
+            mode: AnalysisMode::Draft,
+            policy: PolicyMode::Advisory,
+            summary: Summary {
+                changed_rust_files: changed_rust,
+                ..Default::default()
+            },
+            cards: Vec::new(),
+            diff_scoped_files: resolved.iter().map(PathBuf::from).collect(),
+            unresolved_diff_files: unresolved.iter().map(PathBuf::from).collect(),
+            rejected_diff_files: rejected.iter().map(PathBuf::from).collect(),
+            coverage_snapshot: BTreeMap::new(),
+        }
+    }
+
+    #[test]
+    fn unresolved_scope_is_clean_when_everything_resolves() -> Result<(), String> {
+        let output = diff_scope_output(2, &["src/a.rs", "src/b.rs"], &[]);
+        assert_eq!(check_unresolved_diff_scope(&output)?, None);
+        Ok(())
+    }
+
+    #[test]
+    fn unresolved_scope_fails_closed_when_nothing_resolves() {
+        let output = diff_scope_output(2, &[], &["src/a.rs", "src/b.rs"]);
+        let err = check_unresolved_diff_scope(&output)
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("--root /tmp/foreign-repo"), "{err}");
+        assert!(err.contains("refusing to emit an empty review"), "{err}");
+        assert!(err.contains("src/a.rs"), "{err}");
+        assert!(err.contains("PR head checkout"), "{err}");
+    }
+
+    #[test]
+    fn unresolved_scope_warns_but_proceeds_on_partial_resolution() -> Result<(), String> {
+        let output = diff_scope_output(3, &["src/a.rs", "src/b.rs"], &["src/c.rs"]);
+        let warning = check_unresolved_diff_scope(&output)?
+            .ok_or_else(|| "partial scope must warn".to_string())?;
+        assert!(warning.contains("1/3"), "{warning}");
+        assert!(warning.contains("src/c.rs"), "{warning}");
+        assert!(warning.contains("were not scanned"), "{warning}");
+        Ok(())
+    }
+
+    #[test]
+    fn unresolved_scope_keeps_hostile_exit_zero_with_a_warning() -> Result<(), String> {
+        // Traversal-only scope: nothing innocent is missing, so the #1883
+        // exit-0 contract holds, but the refusal must still be loud.
+        let output = diff_scope_output_with_rejected(1, &[], &[], &["../../../../etc/passwd.rs"]);
+        let warning = check_unresolved_diff_scope(&output)?
+            .ok_or_else(|| "hostile refusal must warn".to_string())?;
+        assert!(warning.contains("refused hostile"), "{warning}");
+        assert!(warning.contains("passwd.rs"), "{warning}");
+        Ok(())
     }
 
     #[test]

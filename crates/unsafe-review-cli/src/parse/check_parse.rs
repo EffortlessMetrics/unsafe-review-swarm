@@ -59,6 +59,22 @@ pub(super) fn try_apply_check_arg(
             options.format = Format::Json;
             Ok(Some(1))
         }
+        "--short" => {
+            options.short = true;
+            Ok(Some(1))
+        }
+        "--aperture" => {
+            options.aperture = true;
+            Ok(Some(1))
+        }
+        "--impact" => {
+            options.impact = true;
+            Ok(Some(1))
+        }
+        "--stages" => {
+            options.stages = true;
+            Ok(Some(1))
+        }
         "--markdown" => {
             options.format = Format::Markdown;
             Ok(Some(1))
@@ -79,8 +95,83 @@ pub(super) fn try_apply_check_arg(
             options.max_cards = Some(parse_max_cards_inline(arg, "--max-cards")?);
             Ok(Some(1))
         }
+        "--latency-out" => {
+            options.latency_out = Some(PathBuf::from(value(args, idx + 1, "--latency-out")?));
+            Ok(Some(2))
+        }
+        arg if arg.starts_with("--latency-out=") => {
+            options.latency_out = Some(PathBuf::from(inline_value(arg, "--latency-out")?));
+            Ok(Some(1))
+        }
+        "--features" => {
+            reject_second_env_selection(options, "--features")?;
+            options.env_features = EnvFeatureSelect::Explicit(parse_feature_list(
+                value(args, idx + 1, "--features")?,
+                "--features",
+            )?);
+            Ok(Some(2))
+        }
+        arg if arg.starts_with("--features=") => {
+            reject_second_env_selection(options, "--features")?;
+            options.env_features = EnvFeatureSelect::Explicit(parse_feature_list(
+                inline_value(arg, "--features")?,
+                "--features",
+            )?);
+            Ok(Some(1))
+        }
+        "--all-features" => {
+            reject_second_env_selection(options, "--all-features")?;
+            options.env_features = EnvFeatureSelect::All;
+            Ok(Some(1))
+        }
+        "--no-default-features" => {
+            reject_second_env_selection(options, "--no-default-features")?;
+            options.env_features = EnvFeatureSelect::NoDefault;
+            Ok(Some(1))
+        }
+        "--target" => {
+            reject_second_target(options)?;
+            let triple = value(args, idx + 1, "--target")?;
+            reject_empty_target(triple)?;
+            options.target = Some(triple.to_string());
+            Ok(Some(2))
+        }
+        arg if arg.starts_with("--target=") => {
+            reject_second_target(options)?;
+            let triple = inline_value(arg, "--target")?;
+            reject_empty_target(triple)?;
+            options.target = Some(triple.to_string());
+            Ok(Some(1))
+        }
         _ => Ok(None),
     }
+}
+
+/// Reject a second feature-selection flag: the envelope selects exactly
+/// one posture, independent of flag order.
+fn reject_second_env_selection(options: &CheckOptions, flag: &str) -> Result<(), String> {
+    if options.env_features != EnvFeatureSelect::Default {
+        return Err(format!(
+            "only one of --features, --all-features, --no-default-features may be given (got {flag} too)"
+        ));
+    }
+    Ok(())
+}
+
+/// Reject a second `--target`: the envelope selects exactly one triple,
+/// so a repeated flag is a typo, not an override.
+fn reject_second_target(options: &CheckOptions) -> Result<(), String> {
+    if options.target.is_some() {
+        return Err("--target may be given only once (got --target again)".to_string());
+    }
+    Ok(())
+}
+
+fn reject_empty_target(triple: &str) -> Result<(), String> {
+    if triple.trim().is_empty() {
+        return Err("--target needs a triple (for example `x86_64-unknown-linux-gnu`)".to_string());
+    }
+    Ok(())
 }
 
 fn parse_max_cards_arg(args: &[String], idx: usize, flag: &str) -> Result<usize, String> {

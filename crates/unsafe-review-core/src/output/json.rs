@@ -2,7 +2,7 @@ use crate::api::{AnalyzeOutput, Provenance, Scope, Summary};
 use crate::domain::coverage::compute_agent_lsp_readiness;
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
-    ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, ReviewCard,
+    ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, RelatedTest, ReviewCard,
     WitnessReceiptCoverage, WitnessRoute,
 };
 use crate::output::agent::card_has_scoped_repairs;
@@ -12,6 +12,7 @@ use crate::output::{REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY, UNKNOWN_OWNER};
 use crate::policy::SnapshotCoverage;
 use crate::util::path_display;
 use serde::Serialize;
+use std::collections::BTreeSet;
 use std::path::{Path, PathBuf};
 
 /// Schema version for the plain (no-provenance) JSON analyze artifact.
@@ -27,6 +28,125 @@ pub(crate) fn render(output: &AnalyzeOutput) -> String {
 /// Render the JSON analyze artifact with an attached provenance block (schema 0.2).
 pub(crate) fn render_with_provenance(output: &AnalyzeOutput, provenance: &Provenance) -> String {
     render_pretty(&JsonAnalyzeOutput::from_with_provenance(output, provenance))
+}
+
+/// Render the JSON analyze artifact with an evaluated configuration
+/// section for an explicit envelope selection. Default runs never call
+/// this: their artifacts stay byte-stable with no `configuration` key.
+pub(crate) fn render_with_configuration(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[crate::input::cfg::CardConfiguration],
+) -> String {
+    let counts = crate::input::cfg::summarize_configurations(items);
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.configuration = Some(JsonConfiguration {
+        environment_digest,
+        note,
+        gated_cards: counts.gated,
+        active: counts.active,
+        inactive: counts.inactive,
+        unknown: counts.unknown,
+        unsupported: counts.unsupported,
+        items,
+    });
+    render_pretty(&projected)
+}
+
+/// Render the JSON analyze artifact with an aperture manifest section for
+/// an explicit `--aperture` run. Default runs never call this: their
+/// artifacts stay byte-stable with no `aperture` key.
+pub(crate) fn render_with_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    aperture: crate::input::aperture::AnalysisAperture,
+) -> String {
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.aperture = Some(JsonAperture { manifest: aperture });
+    render_pretty(&projected)
+}
+
+/// One evaluated configuration section for the unified renderer.
+pub(crate) struct ConfigurationSection<'a> {
+    pub environment_digest: &'a str,
+    pub note: Option<&'a str>,
+    pub items: &'a [crate::input::cfg::CardConfiguration],
+}
+
+/// Render the JSON analyze artifact with any combination of additive
+/// sections. Default runs pass all `None` and stay byte-stable.
+pub(crate) fn render_with_sections(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    configuration: Option<ConfigurationSection<'_>>,
+    aperture: Option<crate::input::aperture::AnalysisAperture>,
+    impact: Option<crate::input::impact::ImpactInventory>,
+    stages: Option<crate::input::stages::StageInventory>,
+) -> String {
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    if let Some(section) = configuration {
+        let counts = crate::input::cfg::summarize_configurations(section.items);
+        projected.configuration = Some(JsonConfiguration {
+            environment_digest: section.environment_digest,
+            note: section.note,
+            gated_cards: counts.gated,
+            active: counts.active,
+            inactive: counts.inactive,
+            unknown: counts.unknown,
+            unsupported: counts.unsupported,
+            items: section.items,
+        });
+    }
+    if let Some(manifest) = aperture {
+        projected.aperture = Some(JsonAperture { manifest });
+    }
+    if let Some(manifest) = impact {
+        projected.impact = Some(JsonImpact { manifest });
+    }
+    if let Some(manifest) = stages {
+        projected.stages = Some(JsonStages { manifest });
+    }
+    render_pretty(&projected)
+}
+
+/// Render the JSON analyze artifact with both configuration and aperture
+/// sections for runs that select an envelope and `--aperture`.
+pub(crate) fn render_with_configuration_and_aperture(
+    output: &AnalyzeOutput,
+    provenance: Option<&Provenance>,
+    environment_digest: &str,
+    note: Option<&str>,
+    items: &[crate::input::cfg::CardConfiguration],
+    aperture: crate::input::aperture::AnalysisAperture,
+) -> String {
+    let counts = crate::input::cfg::summarize_configurations(items);
+    let mut projected = match provenance {
+        Some(provenance) => JsonAnalyzeOutput::from_with_provenance(output, provenance),
+        None => JsonAnalyzeOutput::from_plain(output),
+    };
+    projected.configuration = Some(JsonConfiguration {
+        environment_digest,
+        note,
+        gated_cards: counts.gated,
+        active: counts.active,
+        inactive: counts.inactive,
+        unknown: counts.unknown,
+        unsupported: counts.unsupported,
+        items,
+    });
+    projected.aperture = Some(JsonAperture { manifest: aperture });
+    render_pretty(&projected)
 }
 
 fn render_pretty(value: &impl Serialize) -> String {
@@ -50,11 +170,74 @@ struct JsonAnalyzeOutput<'a> {
     trust_boundary: &'static str,
     root: String,
     summary: JsonSummary,
+    /// Changed Rust files from the diff with no file under the analysis root.
+    /// Absent when every changed file resolved: a present-but-empty review is
+    /// then an honest empty, not a narrowed scope masquerading as one.
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    unresolved_diff_files: &'a BTreeSet<PathBuf>,
+    /// Changed Rust files refused rather than missed (traversal, absolute, or
+    /// symlink-escaping paths). Absent when the diff named none.
+    #[serde(skip_serializing_if = "BTreeSet::is_empty")]
+    rejected_diff_files: &'a BTreeSet<PathBuf>,
     cards: Vec<JsonCard<'a>>,
     /// Traceable evidence metadata (schema 0.2+). Absent in 0.1 artifacts for
     /// backward compatibility; `schema_version` distinguishes the two shapes.
     #[serde(skip_serializing_if = "Option::is_none")]
     provenance: Option<JsonProvenance>,
+    /// Configuration section for explicit envelope selections (#2318 PR2).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    configuration: Option<JsonConfiguration<'a>>,
+    /// Aperture manifest for explicit `--aperture` runs (#2331 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    aperture: Option<JsonAperture>,
+    /// Same-owner impact inventory for explicit `--impact` runs (#2319 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    impact: Option<JsonImpact>,
+    /// Stage/fact-requirement inventory for explicit `--stages` runs (#2325 PR1).
+    /// Absent on default runs so golden artifacts stay byte-stable.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    stages: Option<JsonStages>,
+}
+
+/// JSON projection of an aperture manifest: owned, since the manifest is
+/// assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonAperture {
+    #[serde(flatten)]
+    manifest: crate::input::aperture::AnalysisAperture,
+}
+
+/// JSON projection of a same-owner impact inventory: owned, since the
+/// inventory is assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonImpact {
+    #[serde(flatten)]
+    manifest: crate::input::impact::ImpactInventory,
+}
+
+/// JSON projection of a stage/fact-requirement inventory: owned, since the
+/// inventory is assembled per render.
+#[derive(Serialize)]
+pub(crate) struct JsonStages {
+    #[serde(flatten)]
+    manifest: crate::input::stages::StageInventory,
+}
+
+/// JSON projection of an evaluated configuration section.
+#[derive(Serialize)]
+pub(crate) struct JsonConfiguration<'a> {
+    environment_digest: &'a str,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    note: Option<&'a str>,
+    gated_cards: usize,
+    active: usize,
+    inactive: usize,
+    unknown: usize,
+    unsupported: usize,
+    items: &'a [crate::input::cfg::CardConfiguration],
 }
 
 /// JSON projection of [`Provenance`].
@@ -90,6 +273,8 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
+            unresolved_diff_files: &output.unresolved_diff_files,
+            rejected_diff_files: &output.rejected_diff_files,
             cards: output
                 .cards
                 .iter()
@@ -103,6 +288,10 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 })
                 .collect(),
             provenance: None,
+            configuration: None,
+            aperture: None,
+            impact: None,
+            stages: None,
         }
     }
 
@@ -129,6 +318,8 @@ impl<'a> JsonAnalyzeOutput<'a> {
             trust_boundary: TRUST_BOUNDARY,
             root: path_display(&output.root),
             summary: JsonSummary::from(&output.summary),
+            unresolved_diff_files: &output.unresolved_diff_files,
+            rejected_diff_files: &output.rejected_diff_files,
             cards: output
                 .cards
                 .iter()
@@ -142,6 +333,10 @@ impl<'a> JsonAnalyzeOutput<'a> {
                 })
                 .collect(),
             provenance: Some(json_provenance),
+            configuration: None,
+            aperture: None,
+            impact: None,
+            stages: None,
         }
     }
 }
@@ -155,6 +350,11 @@ struct JsonSummary {
     unsafe_sites: usize,
     cards: usize,
     open_actionable_gaps: usize,
+    /// Source-role triage counts over emitted cards (SPEC-0041).
+    production_cards: usize,
+    test_cards: usize,
+    generated_cards: usize,
+    unknown_cards: usize,
     contract_missing: usize,
     guard_missing: usize,
     guarded_unwitnessed: usize,
@@ -192,6 +392,10 @@ impl From<&Summary> for JsonSummary {
             unsafe_sites: summary.unsafe_sites,
             cards: summary.cards,
             open_actionable_gaps: summary.open_actionable_gaps,
+            production_cards: summary.production_cards,
+            test_cards: summary.test_cards,
+            generated_cards: summary.generated_cards,
+            unknown_cards: summary.unknown_cards,
             contract_missing: summary.contract_missing,
             guard_missing: summary.guard_missing,
             guarded_unwitnessed: summary.guarded_unwitnessed,
@@ -235,6 +439,7 @@ struct JsonCard<'a> {
     reach: &'a str,
     witness: &'a str,
     witness_routes: Vec<JsonWitnessRoute<'a>>,
+    related_tests: Vec<JsonRelatedTest<'a>>,
     missing: Vec<&'a str>,
     next_action: &'a str,
     verify_commands: &'a [String],
@@ -302,6 +507,11 @@ impl<'a> JsonCard<'a> {
             reach: &card.reach.summary,
             witness: &card.witness.summary,
             witness_routes: card.routes.iter().map(JsonWitnessRoute::from).collect(),
+            related_tests: card
+                .related_tests
+                .iter()
+                .map(JsonRelatedTest::from)
+                .collect(),
             missing: card
                 .missing
                 .iter()
@@ -330,6 +540,23 @@ impl<'a> From<&'a WitnessRoute> for JsonWitnessRoute<'a> {
             reason: &route.reason,
             command: route.command.as_deref(),
             required: route.required,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct JsonRelatedTest<'a> {
+    name: &'a str,
+    file: &'a str,
+    line: usize,
+}
+
+impl<'a> From<&'a RelatedTest> for JsonRelatedTest<'a> {
+    fn from(test: &'a RelatedTest) -> Self {
+        Self {
+            name: &test.name,
+            file: &test.file,
+            line: test.line,
         }
     }
 }
@@ -1347,6 +1574,15 @@ mod tests {
         );
         assert_eq!(value["cards"][0]["operation_family"], "raw_pointer_read");
         assert!(value["cards"][0]["obligation_evidence"].is_array());
+        let related = &value["cards"][0]["related_tests"];
+        assert!(related.is_array(), "cards.json must project related_tests");
+        assert!(
+            !related.as_array().is_none_or(|tests| tests.is_empty()),
+            "fixture card has reaching tests to project"
+        );
+        assert!(related[0]["name"].is_string());
+        assert!(related[0]["file"].is_string());
+        assert!(related[0]["line"].is_u64());
         assert_eq!(value["cards"][0]["witness_routes"][0]["kind"], "miri");
         assert!(
             value["cards"][0]["next_action"]

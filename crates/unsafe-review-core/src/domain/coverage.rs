@@ -624,8 +624,8 @@ mod tests {
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, HazardKind, MissingEvidence,
         NextAction, OperationFamily, Priority, ProofPath, ReachEvidence, ReviewCard, ReviewClass,
-        SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence, WitnessKind,
-        WitnessRoute,
+        SourceLocation, SourceRole, UnsafeOperation, UnsafeSite, UnsafeSiteKind, WitnessEvidence,
+        WitnessKind, WitnessRoute,
     };
 
     /// Minimal card for coverage-block tests.
@@ -656,10 +656,12 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: "unsafe { *ptr }".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),
                 family: OperationFamily::RawPointerDeref,
+                bound_name: None,
             },
             hazards: vec![HazardKind::PointerValidity],
             obligations: vec![],

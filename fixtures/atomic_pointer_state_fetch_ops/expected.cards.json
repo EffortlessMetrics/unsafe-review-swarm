@@ -37,12 +37,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `state-transition` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `fetch_and_tag`"
+          "summary": "1 related test file mentions owner `fetch_and_tag`"
         },
         "witness": {
           "present": false,
@@ -61,12 +61,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `ordering` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `fetch_and_tag`"
+          "summary": "1 related test file mentions owner `fetch_and_tag`"
         },
         "witness": {
           "present": false,
@@ -77,7 +77,7 @@
     ],
     "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `fetch_and_tag`",
+    "reach": "1 related test file mentions owner `fetch_and_tag`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -91,6 +91,13 @@
         "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
         "command": "cargo test fetch_and_tag_shuttle -- --nocapture",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "tagged_pointer_fetches_preserve_pointer_shape",
+        "file": "src/lib.rs",
+        "line": 35
       }
     ],
     "missing": [
@@ -177,7 +184,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `state-transition` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -201,7 +208,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `ordering` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -222,17 +229,18 @@
     "witness_routes": [
       {
         "kind": "loom",
-        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test fetch_or_tag_loom -- --nocapture",
         "required": false
       },
       {
         "kind": "shuttle",
-        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test fetch_or_tag_shuttle -- --nocapture",
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
@@ -250,7 +258,7 @@
         "kind": "verify_command",
         "command": "cargo test fetch_or_tag_loom -- --nocapture",
         "route_kind": "loom",
-        "summary": "Build/run `cargo test fetch_or_tag_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `fetch_or_tag` yet; write or identify a focused test for `fetch_or_tag` first, then build/run `cargo test fetch_or_tag_loom -- --nocapture` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -258,12 +266,12 @@
         "route_kind": "loom",
         "steps": [
           "Confirm ReviewCard `UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-or-tag-operation-atomic_pointer_state-from-ptr-6c5b27e03741-atomic_ordering-c1` still maps to `unsafe { Shared::from_ptr(self.data.fetch_or(mask, order)) }` at `src/lib.rs:21:9` before upgrading confidence.",
-          "Build/run `cargo test fetch_or_tag_loom -- --nocapture` as the smallest available command for this card.",
+          "Write or identify a focused test for `fetch_or_tag` first (no test reaches it yet), then build/run `cargo test fetch_or_tag_loom -- --nocapture` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo test fetch_or_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `fetch_or_tag` first (no test reaches it yet), then build/run `cargo test fetch_or_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
@@ -318,7 +326,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `state-transition` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -342,7 +350,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `ordering` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -363,17 +371,18 @@
     "witness_routes": [
       {
         "kind": "loom",
-        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone",
+        "reason": "Concurrency or shared-mutable-state hazard; interleaving model is a better first witness than Miri alone. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test fetch_xor_tag_loom -- --nocapture",
         "required": false
       },
       {
         "kind": "shuttle",
-        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
+        "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
         "command": "cargo test fetch_xor_tag_shuttle -- --nocapture",
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",
@@ -391,7 +400,7 @@
         "kind": "verify_command",
         "command": "cargo test fetch_xor_tag_loom -- --nocapture",
         "route_kind": "loom",
-        "summary": "Build/run `cargo test fetch_xor_tag_loom -- --nocapture` first for this card; attach a matching receipt only if it confirms the route"
+        "summary": "No test reaches `fetch_xor_tag` yet; write or identify a focused test for `fetch_xor_tag` first, then build/run `cargo test fetch_xor_tag_loom -- --nocapture` for this card; attach a matching receipt only if it confirms the route"
       },
       "minimal_repro": {
         "kind": "verify_command",
@@ -399,12 +408,12 @@
         "route_kind": "loom",
         "steps": [
           "Confirm ReviewCard `UR-atomic-pointer-state-fetch-ops-fixture-src-lib-rs-fetch-xor-tag-operation-atomic_pointer_state-from-ptr-4f274a720bbb-atomic_ordering-c1` still maps to `unsafe { Shared::from_ptr(self.data.fetch_xor(mask, order) as *mut T) }` at `src/lib.rs:25:9` before upgrading confidence.",
-          "Build/run `cargo test fetch_xor_tag_loom -- --nocapture` as the smallest available command for this card.",
+          "Write or identify a focused test for `fetch_xor_tag` first (no test reaches it yet), then build/run `cargo test fetch_xor_tag_loom -- --nocapture` as the smallest available command for this card.",
           "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
         ],
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
-      "confirmation_step": "build/run `cargo test fetch_xor_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
+      "confirmation_step": "write or identify a focused test for `fetch_xor_tag` first (no test reaches it yet), then build/run `cargo test fetch_xor_tag_loom -- --nocapture` first, then attach a matching receipt if it confirms the route",
       "runtime_executed": false,
       "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."

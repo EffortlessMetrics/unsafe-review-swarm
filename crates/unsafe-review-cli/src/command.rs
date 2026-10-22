@@ -1,5 +1,5 @@
 use std::path::{Path, PathBuf};
-use unsafe_review_core::{DiscoveryOptions, PolicyMode};
+use unsafe_review_core::{DEFAULT_MAX_TASKS, DiscoveryOptions, PolicyMode};
 
 /// Query surface for `context` — either a single card by id or a file:line range.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -34,6 +34,142 @@ pub(crate) enum Format {
     WitnessPlan,
 }
 
+/// Which local authoring state `scope` names. The default (`Worktree`)
+/// covers all tracked local change relative to HEAD.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum ScopeSelect {
+    Staged,
+    Unstaged,
+    Worktree,
+    CommitRange,
+}
+
+/// Options for the local authoring `work` command: review staged, unstaged,
+/// or combined worktree changes without shell-created diff files (#2310).
+/// The default scope is the full worktree (staged plus unstaged) against
+/// HEAD; the chosen scope is always visible in the first output line.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct WorkOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    pub short: bool,
+    pub format: Format,
+    pub max_cards: Option<usize>,
+}
+
+impl Default for WorkOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            short: false,
+            format: Format::Human,
+            max_cards: None,
+        }
+    }
+}
+
+/// Options for `agent tasks`: the compact machine task index over a local
+/// scope (#2311 PR1). Same scope vocabulary as `work`; filters never
+/// reclassify, and the cap truncates visibly with an expansion path.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct AgentTasksOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    pub role: Option<String>,
+    pub readiness: Option<String>,
+    pub human_only: bool,
+    pub changed_only: bool,
+    pub max_tasks: usize,
+    pub format: Format,
+}
+
+impl Default for AgentTasksOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            role: None,
+            readiness: None,
+            human_only: false,
+            changed_only: false,
+            max_tasks: DEFAULT_MAX_TASKS,
+            format: Format::Json,
+        }
+    }
+}
+
+/// Agent subcommands. Only the task index ships in PR1; the selected packet
+/// (PR2) and result/recheck envelope (PR3) reuse these identities.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum AgentCommand {
+    Tasks(AgentTasksOptions),
+    Help,
+}
+
+/// Options for the read-only `scope` command: name exactly which source
+/// state a review would analyze, without running the analysis. The
+/// configuration envelope belongs to the environment-identity slice (#2318).
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct ScopeOptions {
+    pub root: PathBuf,
+    pub scope: ScopeSelect,
+    /// Range base ref/commit. Selects `CommitRange` when present.
+    pub base: Option<String>,
+    /// Range head ref/commit. Only valid with `--base`; defaults to HEAD.
+    pub head: Option<String>,
+    pub format: Format,
+}
+
+/// Which feature posture the `environment` envelope selects. The default
+/// (`Default`) is Cargo defaults; exactly one selection flag may be given.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum EnvFeatureSelect {
+    Default,
+    NoDefault,
+    Explicit(Vec<String>),
+    All,
+}
+
+/// Options for the read-only `environment` command: name the configuration
+/// envelope a result would be computed under, without running the analysis.
+/// New explicit inputs only; zero-argument defaults of other commands change
+/// nothing.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) struct EnvOptions {
+    pub root: PathBuf,
+    pub features: EnvFeatureSelect,
+    /// Run the read-only `rustc -vV` probe for host triple and version.
+    pub probe_toolchain: bool,
+    /// Expand workspace member patterns into member manifests.
+    pub expand_members: bool,
+    pub format: Format,
+}
+
+impl Default for EnvOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            features: EnvFeatureSelect::Default,
+            probe_toolchain: true,
+            expand_members: true,
+            format: Format::Human,
+        }
+    }
+}
+
+impl Default for ScopeOptions {
+    fn default() -> Self {
+        Self {
+            root: PathBuf::from("."),
+            scope: ScopeSelect::Worktree,
+            base: None,
+            head: None,
+            format: Format::Human,
+        }
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) struct CheckOptions {
     pub root: PathBuf,
@@ -43,6 +179,26 @@ pub(crate) struct CheckOptions {
     pub policy: PolicyMode,
     pub out: Option<PathBuf>,
     pub max_cards: Option<usize>,
+    /// One line per card, highest risk first. Human output only.
+    pub short: bool,
+    /// Write a machine-readable phase-latency receipt to this path when the
+    /// run completes. Diagnostic only; never source contents.
+    pub latency_out: Option<PathBuf>,
+    /// Explicit envelope selection for the configuration projection
+    /// (#2318 PR2). Default selects nothing: no section is rendered and
+    /// default output stays byte-stable.
+    pub env_features: EnvFeatureSelect,
+    /// Explicitly selected target triple for configuration evaluation.
+    pub target: Option<String>,
+    /// Render the additive aperture manifest section (#2331 PR1).
+    /// Default off so default output stays byte-stable.
+    pub aperture: bool,
+    /// Render the additive same-owner impact inventory (#2319 PR1).
+    /// Default off so default output stays byte-stable.
+    pub impact: bool,
+    /// Render the additive stage/fact-requirement inventory (#2325 PR1).
+    /// Default off so default output stays byte-stable.
+    pub stages: bool,
 }
 
 impl Default for CheckOptions {
@@ -55,7 +211,23 @@ impl Default for CheckOptions {
             policy: PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
+            latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
+            aperture: false,
+            impact: false,
+            stages: false,
         }
+    }
+}
+
+impl CheckOptions {
+    /// Whether the caller selected an explicit configuration envelope: any
+    /// feature-selection flag or `--target`. Only then is the configuration
+    /// section evaluated and rendered.
+    pub(crate) fn has_env_selection(&self) -> bool {
+        self.env_features != EnvFeatureSelect::Default || self.target.is_some()
     }
 }
 
@@ -353,6 +525,10 @@ pub(crate) enum SubcommandHelpTarget {
     FirstPr,
     Pilot,
     Explain,
+    Scope,
+    Work,
+    Agent,
+    Environment,
     Context,
     Confirm,
     Receipt,
@@ -380,6 +556,10 @@ pub(crate) enum Command {
     },
     Check(CheckOptions),
     Repo(RepoOptions),
+    Scope(ScopeOptions),
+    Work(WorkOptions),
+    Agent(AgentCommand),
+    Environment(EnvOptions),
     Pilot(CheckOptions),
     FirstPr(FirstPrOptions),
     PrSetup(ExternalPrSetupOptions),
@@ -437,6 +617,13 @@ impl Command {
             | Command::ReceiptAudit(options)
             | Command::PolicyReport(options) => Some(&options.root),
             Command::Repo(options) => Some(&options.check.root),
+            Command::Scope(options) => Some(&options.root),
+            Command::Work(options) => Some(&options.root),
+            Command::Agent(command) => match command {
+                AgentCommand::Tasks(options) => Some(&options.root),
+                AgentCommand::Help => None,
+            },
+            Command::Environment(options) => Some(&options.root),
             Command::FirstPr(options) => Some(&options.check.root),
             Command::Confirm(options) => Some(&options.root),
             Command::Candidate(command) => match command {

@@ -57,10 +57,10 @@ expected_owner = "with_byte"
 expected_site_kind = "operation"
 expected_obligation_key = "pointer-live"
 expected_contract_state = "present"
-expected_discharge_state = "present"
+expected_discharge_state = "missing"
 expected_witness_route_kinds = ["miri", "cargo-careful"]
 label_source = "fixture_golden"
-rationale = "An inline unsafe block with a concrete raw pointer deref should emit the operation card without an unknown wrapper duplicate."
+rationale = "An inline unsafe block with a concrete raw pointer deref should emit the operation card without an unknown wrapper duplicate. Since #2226-PR1 the null-only guard no longer discharges pointer-live, so the discharge expectation is missing with the supporting null fact retained; the no-duplicate control is unchanged."
 
 [[samples]]
 id = "impl-trait-bound-owner-inference"

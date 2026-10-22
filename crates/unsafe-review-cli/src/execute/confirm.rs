@@ -1,6 +1,6 @@
 use std::fs;
 use std::io::Read;
-use std::path::{Path, PathBuf};
+use std::path::{Component, Path, PathBuf};
 use std::process::{Command as ProcessCommand, Stdio};
 use std::thread;
 use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
@@ -8,7 +8,8 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
     ExecutedReceiptInput, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
-    SanitizerReceiptInput, Scope, WitnessKind, WitnessReceipt, WitnessRoute, analyze,
+    SanitizerReceiptInput, Scope, SubjectBinding, TerminalStatus, WitnessKind, WitnessReceipt,
+    WitnessRoute, analyze,
 };
 
 use crate::command::{CheckOptions, ConfirmOptions};
@@ -41,7 +42,7 @@ impl CommandSource {
 }
 
 pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
-    let card = resolve_card(&options)?;
+    let (card, scope, tool_version) = resolve_card(&options)?;
     let (kind, routed_command) = select_route(&card.id.0, &card.routes)?;
     let lane = confirm_lane(kind, &card.id.0)?;
     let command_source = if options.command.is_some() {
@@ -50,15 +51,29 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
         CommandSource::AnalyzerRoute
     };
     let command_text = options.command.clone().unwrap_or(routed_command);
+    let invocation = parse_command_line(&command_text)?;
     if options.dry_run {
-        print_dry_run(&options, &card, kind, lane, &command_text, command_source);
+        print_dry_run(
+            &options,
+            &card,
+            kind,
+            lane,
+            &command_text,
+            command_source,
+            &invocation,
+        );
         return Ok(());
     }
+    reject_diff_execution(&options)?;
     println!("command provenance: {}", command_source.label());
-    let (envs, argv) = parse_command_line(&command_text)?;
+    println!("parsed program: {}", invocation.program);
+    println!("parsed argv: {}", invocation.describe_argv());
+    if !invocation.env.is_empty() {
+        println!("parsed env: {}", invocation.describe_env());
+    }
     let execution = execute_with_timeout(
-        &envs,
-        &argv,
+        &invocation.env,
+        &invocation.exec_argv(),
         &options.root,
         Duration::from_secs(options.timeout_seconds),
     )?;
@@ -74,6 +89,15 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
         Some(value) => value.clone(),
         None => default_expires_at()?,
     };
+    let binding = subject_binding(
+        &options.root,
+        &card,
+        &scope,
+        &tool_version,
+        &execution.output,
+        execution.terminal,
+        &invocation,
+    );
     let receipt = match build_receipt(
         lane,
         ReceiptFields {
@@ -83,6 +107,8 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
             recorded_at,
             expires_at,
             command: command_text.clone(),
+            terminal: execution.terminal,
+            binding: Some(binding),
         },
     ) {
         Ok(receipt) => receipt,
@@ -102,9 +128,16 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     println!("card: {}", card.id.0);
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
+    println!("exit: {}", describe_terminal(execution.terminal));
+    if let Some(subject) = &receipt.subject {
+        println!("subject: {}", subject.subject_digest);
+    }
     println!("tool: {}", receipt.tool);
     println!("strength recorded: {}", receipt.strength);
     println!("receipt: {}", receipt_path.display());
+    if let Some(note) = receipt_install_note(&options.root, &receipt_path) {
+        println!("{note}");
+    }
     println!();
     println!(
         "next: re-run check or first-pr to import this receipt; the card upgrades only through the saved receipt."
@@ -120,6 +153,7 @@ fn print_dry_run(
     lane: ConfirmLane,
     command_text: &str,
     command_source: CommandSource,
+    invocation: &Invocation,
 ) {
     println!("unsafe-review confirm (dry run)");
     println!("card: {}", card.id.0);
@@ -127,6 +161,11 @@ fn print_dry_run(
     println!("route: {}", kind.as_str());
     println!("command: {command_text}");
     println!("command provenance: {}", command_source.label());
+    println!("parsed program: {}", invocation.program);
+    println!("parsed argv: {}", invocation.describe_argv());
+    if !invocation.env.is_empty() {
+        println!("parsed env: {}", invocation.describe_env());
+    }
     println!("working directory: {}", options.root.display());
     println!("timeout: {}s", options.timeout_seconds);
     println!(
@@ -140,7 +179,96 @@ fn print_dry_run(
     println!("trust boundary: {FIRST_RUN_TRUST_BOUNDARY}");
 }
 
-fn resolve_card(options: &ConfirmOptions) -> Result<ReviewCard, String> {
+/// Best-effort source revision probe. Returns `None` outside a git checkout
+/// or when git cannot answer; only the revision string and dirty bit travel
+/// into the receipt, never file contents or paths.
+fn git_head(root: &Path) -> Option<String> {
+    let run = execute_with_timeout(
+        &[],
+        &[
+            "git".to_string(),
+            "-C".to_string(),
+            root.to_string_lossy().into_owned(),
+            "rev-parse".to_string(),
+            "HEAD".to_string(),
+        ],
+        root,
+        Duration::from_secs(10),
+    )
+    .ok()?;
+    if run.timed_out || run.terminal.exit_code != Some(0) {
+        return None;
+    }
+    let head = run.output.trim().to_string();
+    (!head.is_empty()).then_some(head)
+}
+
+fn git_dirty(root: &Path) -> Option<bool> {
+    let run = execute_with_timeout(
+        &[],
+        &[
+            "git".to_string(),
+            "-C".to_string(),
+            root.to_string_lossy().into_owned(),
+            "status".to_string(),
+            "--porcelain=v1".to_string(),
+        ],
+        root,
+        Duration::from_secs(10),
+    )
+    .ok()?;
+    if run.timed_out || run.terminal.exit_code != Some(0) {
+        return None;
+    }
+    Some(!run.output.trim().is_empty())
+}
+
+fn subject_binding(
+    root: &Path,
+    card: &ReviewCard,
+    scope: &str,
+    tool_version: &str,
+    output: &str,
+    terminal: TerminalStatus,
+    invocation: &Invocation,
+) -> SubjectBinding {
+    let owner = card.site.owner.as_deref().unwrap_or("");
+    SubjectBinding {
+        subject_digest: SubjectBinding::digest_subject(&[
+            &card.id.0,
+            card.operation.family.as_str(),
+            owner,
+            &card.site.location.file.to_string_lossy(),
+            &card.site.snippet,
+        ]),
+        invocation_digest: Some(SubjectBinding::digest_invocation(
+            &invocation.program,
+            &invocation.args,
+            &invocation.env,
+        )),
+        scope: Some(scope.to_string()),
+        head_commit: git_head(root),
+        repo_dirty: git_dirty(root),
+        workdir: Some(".".to_string()),
+        output_digest: Some(SubjectBinding::digest_output(output)),
+        captured_complete: Some(terminal.captured_complete),
+        tool_version: Some(tool_version.to_string()),
+    }
+}
+
+/// A card resolved from a saved `--diff` patch cannot be executed: the
+/// witness would run in `--root`, but nothing establishes that checkout is
+/// the diff's tree, so the receipt would bind execution evidence to a
+/// subject it never observed. Check out the diff's tree and confirm without
+/// `--diff` instead. Dry-run previews never execute and stay allowed.
+fn reject_diff_execution(options: &ConfirmOptions) -> Result<(), String> {
+    if options.diff.is_some() {
+        return Err("cannot execute a witness for a card resolved from a saved --diff patch: the execution tree cannot be shown to be the reviewed tree; check out the diff and confirm without --diff".to_string());
+    }
+    Ok(())
+}
+
+fn resolve_card(options: &ConfirmOptions) -> Result<(ReviewCard, String, String), String> {
     let output = if options.base.is_some() || options.diff.is_some() {
         let check = CheckOptions {
             root: options.root.clone(),
@@ -166,7 +294,11 @@ fn resolve_card(options: &ConfirmOptions) -> Result<ReviewCard, String> {
         .iter()
         .find(|card| card.id.0 == options.card_id)
     {
-        return Ok(card.clone());
+        return Ok((
+            card.clone(),
+            output.analysis_identity.scope.clone(),
+            output.analysis_identity.tool_version.clone(),
+        ));
     }
     if card_lookup::manual_candidate_explain(&options.root, &options.card_id)?.is_some() {
         return Err(format!(
@@ -240,6 +372,8 @@ struct ReceiptFields {
     recorded_at: String,
     expires_at: String,
     command: String,
+    terminal: TerminalStatus,
+    binding: Option<SubjectBinding>,
 }
 
 fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessReceipt, String> {
@@ -253,6 +387,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
         ConfirmLane::CargoCareful => ExecutedReceiptInput::CargoCareful(CargoCarefulReceiptInput {
             card_id: fields.card_id,
@@ -262,6 +398,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
         ConfirmLane::Sanitizer(tool) => ExecutedReceiptInput::Sanitizer(SanitizerReceiptInput {
             card_id: fields.card_id,
@@ -272,6 +410,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
             allow_runtime: false,
         }),
         ConfirmLane::Concurrency(tool) => {
@@ -284,6 +424,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
                 expires_at: fields.expires_at,
                 command: fields.command,
                 limitations,
+                terminal_status: Some(fields.terminal),
+                subject: fields.binding.clone(),
             })
         }
         ConfirmLane::Proof(tool) => ExecutedReceiptInput::Proof(ProofReceiptInput {
@@ -295,6 +437,8 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
             expires_at: fields.expires_at,
             command: fields.command,
             limitations,
+            terminal_status: Some(fields.terminal),
+            subject: fields.binding.clone(),
         }),
     };
     WitnessReceipt::from_executed_output(input)
@@ -302,47 +446,144 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
 
 type EnvAssignments = Vec<(String, String)>;
 
-fn parse_command_line(command: &str) -> Result<(EnvAssignments, Vec<String>), String> {
-    let mut env = Vec::new();
-    let mut rest = command.trim_start();
-    while let Some((token, remainder)) = next_token(rest)? {
-        let Some(assignment) = env_assignment(&token) else {
-            break;
-        };
-        env.push(assignment);
-        rest = remainder.trim_start();
+/// One parsed witness invocation: program, arguments, environment
+/// overrides, and provenance. This single value feeds the dry-run preview,
+/// the process spawner, and the receipt identity, so the previewed command
+/// is the executed command.
+///
+/// Grammar (no shell involved): whitespace separates words; single quotes
+/// preserve bytes literally; double quotes preserve literally except that
+/// backslash escapes only `"` and `\` (so Windows paths survive); a
+/// backslash outside quotes escapes the next character; shell
+/// metacharacters (`| & ; < > ( ) $` and backtick) are rejected explicitly
+/// instead of being reinterpreted.
+#[derive(Clone, Debug, PartialEq, Eq)]
+struct Invocation {
+    program: String,
+    args: Vec<String>,
+    env: EnvAssignments,
+}
+
+impl Invocation {
+    fn exec_argv(&self) -> Vec<String> {
+        let mut argv = Vec::with_capacity(self.args.len() + 1);
+        argv.push(self.program.clone());
+        argv.extend(self.args.iter().cloned());
+        argv
     }
-    let argv = rest
-        .split_whitespace()
-        .map(str::to_string)
-        .collect::<Vec<_>>();
-    if argv.is_empty() {
+
+    fn describe_argv(&self) -> String {
+        format!("{:?}", self.exec_argv())
+    }
+
+    fn describe_env(&self) -> String {
+        // Keys only: values may carry secrets from user-authored witness
+        // commands, and this string is printed to the terminal (plus any
+        // CI log capturing stdout).
+        let keys: Vec<&str> = self.env.iter().map(|(key, _)| key.as_str()).collect();
+        format!("{keys:?} (values redacted)")
+    }
+}
+
+fn parse_command_line(command: &str) -> Result<Invocation, String> {
+    let words = split_command_words(command)?;
+    let mut env = Vec::new();
+    let mut words = words.into_iter();
+    let mut program = None;
+    for word in words.by_ref() {
+        if program.is_none()
+            && let Some(assignment) = env_assignment(&word)
+        {
+            env.push(assignment);
+            continue;
+        }
+        program = Some(word);
+        break;
+    }
+    let Some(program) = program else {
         return Err(
             "witness command has no executable to run after environment assignments".to_string(),
         );
-    }
-    Ok((env, argv))
+    };
+    Ok(Invocation {
+        program,
+        args: words.collect(),
+        env,
+    })
 }
 
-fn next_token(text: &str) -> Result<Option<(String, &str)>, String> {
-    let text = text.trim_start();
-    if text.is_empty() {
-        return Ok(None);
-    }
-    let mut in_quote = false;
-    for (idx, ch) in text.char_indices() {
+fn split_command_words(command: &str) -> Result<Vec<String>, String> {
+    let mut words = Vec::new();
+    let mut current = String::new();
+    let mut started = false;
+    let mut chars = command.chars().peekable();
+    while let Some(ch) = chars.next() {
         match ch {
-            '\'' => in_quote = !in_quote,
-            ch if ch.is_whitespace() && !in_quote => {
-                return Ok(Some((text[..idx].to_string(), &text[idx..])));
+            ch if ch.is_whitespace() => {
+                if started {
+                    words.push(std::mem::take(&mut current));
+                    started = false;
+                }
             }
-            _ => {}
+            '\'' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        None => {
+                            return Err(
+                                "witness command has an unterminated single quote".to_string()
+                            );
+                        }
+                        Some('\'') => break,
+                        Some(next) => current.push(next),
+                    }
+                }
+            }
+            '"' => {
+                started = true;
+                loop {
+                    match chars.next() {
+                        None => {
+                            return Err(
+                                "witness command has an unterminated double quote".to_string()
+                            );
+                        }
+                        Some('"') => break,
+                        // Inside double quotes only `"` and `\` are escapable,
+                        // so Windows paths like `"C:\tools\runner"` survive
+                        // unchanged. Every other backslash stays literal.
+                        Some('\\') => match chars.peek() {
+                            Some('"') | Some('\\') => {
+                                current.push(chars.next().unwrap_or('\\'));
+                            }
+                            _ => current.push('\\'),
+                        },
+                        Some(next) => current.push(next),
+                    }
+                }
+            }
+            '\\' => {
+                let Some(escaped) = chars.next() else {
+                    return Err("witness command has a trailing backslash".to_string());
+                };
+                started = true;
+                current.push(escaped);
+            }
+            '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' => {
+                return Err(format!(
+                    "witness command contains unsupported shell syntax `{ch}`; quote it to pass it literally or run the pipeline manually and import a receipt"
+                ));
+            }
+            _ => {
+                started = true;
+                current.push(ch);
+            }
         }
     }
-    if in_quote {
-        return Err("witness command has an unterminated single quote".to_string());
+    if started {
+        words.push(current);
     }
-    Ok(Some((text.to_string(), "")))
+    Ok(words)
 }
 
 fn env_assignment(token: &str) -> Option<(String, String)> {
@@ -358,19 +599,23 @@ fn env_assignment(token: &str) -> Option<(String, String)> {
     {
         return None;
     }
-    Some((name.to_string(), strip_single_quotes(value)))
+    Some((name.to_string(), value.to_string()))
 }
 
-fn strip_single_quotes(value: &str) -> String {
-    value
-        .strip_prefix('\'')
-        .and_then(|stripped| stripped.strip_suffix('\''))
-        .map_or_else(|| value.to_string(), str::to_string)
+fn describe_terminal(terminal: TerminalStatus) -> String {
+    if terminal.signaled {
+        return "signaled".to_string();
+    }
+    match terminal.exit_code {
+        Some(code) => format!("exit {code}"),
+        None => "exit unknown".to_string(),
+    }
 }
 
 struct CommandRun {
     output: String,
     timed_out: bool,
+    terminal: TerminalStatus,
 }
 
 fn execute_with_timeout(
@@ -401,9 +646,15 @@ fn execute_with_timeout(
     let stderr_reader = spawn_pipe_reader(child.stderr.take());
     let started = Instant::now();
     let mut timed_out = false;
+    let mut exit_code: Option<i32> = None;
+    let mut signaled = false;
     loop {
         match child.try_wait() {
-            Ok(Some(_status)) => break,
+            Ok(Some(status)) => {
+                exit_code = status.code();
+                signaled = exit_signaled(&status);
+                break;
+            }
             Ok(None) => {
                 if started.elapsed() >= timeout {
                     timed_out = true;
@@ -420,9 +671,34 @@ fn execute_with_timeout(
             }
         }
     }
+    // Joining here can stall past the timeout when the killed child left
+    // grandchildren holding the pipes: read_to_end only sees EOF once every
+    // writer exits. A timed-out run therefore finishes promptly only when
+    // the child has no surviving offspring. Killing the process group
+    // instead is future work, not this slice.
     let mut output = join_pipe_reader(stdout_reader)?;
     output.push_str(&join_pipe_reader(stderr_reader)?);
-    Ok(CommandRun { output, timed_out })
+    let terminal = TerminalStatus {
+        exit_code,
+        signaled,
+        captured_complete: !timed_out,
+    };
+    Ok(CommandRun {
+        output,
+        timed_out,
+        terminal,
+    })
+}
+
+#[cfg(unix)]
+fn exit_signaled(status: &std::process::ExitStatus) -> bool {
+    use std::os::unix::process::ExitStatusExt;
+    status.signal().is_some()
+}
+
+#[cfg(not(unix))]
+fn exit_signaled(_status: &std::process::ExitStatus) -> bool {
+    false
 }
 
 fn spawn_pipe_reader<R: Read + Send + 'static>(
@@ -471,6 +747,42 @@ fn confirm_log_path(root: &Path, card_id: &str) -> PathBuf {
     root.join("target")
         .join("unsafe-review-confirm")
         .join(format!("{prefix}-output.log"))
+}
+
+/// Advisory note naming where to install a receipt that landed outside the
+/// auto-discovery directory (`<root>/.unsafe-review/receipts/`). Returns
+/// `None` when the written path is already discovered, so the default flow
+/// stays quiet.
+fn receipt_install_note(root: &Path, written: &Path) -> Option<String> {
+    fn absolutize(base: &Path, path: &Path) -> PathBuf {
+        let joined = if path.is_absolute() {
+            path.to_path_buf()
+        } else {
+            base.join(path)
+        };
+        let mut out = PathBuf::new();
+        for component in joined.components() {
+            match component {
+                Component::CurDir => {}
+                Component::ParentDir => {
+                    out.pop();
+                }
+                rest => out.push(rest.as_os_str()),
+            }
+        }
+        out
+    }
+    let cwd = std::env::current_dir().unwrap_or_else(|_| PathBuf::from("."));
+    let discovery = absolutize(&cwd, root)
+        .join(".unsafe-review")
+        .join("receipts");
+    if absolutize(&cwd, written).starts_with(&discovery) {
+        return None;
+    }
+    Some(format!(
+        "note: receipt written outside the discovery dir; copy it to {} so re-running check or first-pr imports it automatically",
+        discovery.display(),
+    ))
 }
 
 fn receipt_output_path(options: &ConfirmOptions, receipt: &WitnessReceipt) -> PathBuf {
@@ -539,25 +851,30 @@ mod tests {
 
     #[test]
     fn parse_command_line_splits_env_assignments_and_argv() -> Result<(), String> {
-        let (envs, argv) =
+        let invocation =
             parse_command_line("RUSTFLAGS='-Z sanitizer=address' cargo +nightly test read_header")?;
 
         assert_eq!(
-            envs,
+            invocation.env,
             vec![("RUSTFLAGS".to_string(), "-Z sanitizer=address".to_string())]
         );
-        assert_eq!(argv, vec!["cargo", "+nightly", "test", "read_header"]);
+        assert_eq!(invocation.program, "cargo".to_string());
+        assert_eq!(invocation.args, vec!["+nightly", "test", "read_header"]);
+        assert_eq!(
+            invocation.exec_argv(),
+            vec!["cargo", "+nightly", "test", "read_header"]
+        );
         Ok(())
     }
 
     #[test]
     fn parse_command_line_accepts_multiple_unquoted_env_assignments() -> Result<(), String> {
-        let (envs, argv) = parse_command_line(
+        let invocation = parse_command_line(
             "MIRIFLAGS=-Zmiri-strict-provenance RUST_BACKTRACE=1 cargo +nightly miri test read_header",
         )?;
 
         assert_eq!(
-            envs,
+            invocation.env,
             vec![
                 (
                     "MIRIFLAGS".to_string(),
@@ -566,9 +883,10 @@ mod tests {
                 ("RUST_BACKTRACE".to_string(), "1".to_string()),
             ]
         );
+        assert_eq!(invocation.program, "cargo".to_string());
         assert_eq!(
-            argv,
-            vec!["cargo", "+nightly", "miri", "test", "read_header"]
+            invocation.args,
+            vec!["+nightly", "miri", "test", "read_header"]
         );
         Ok(())
     }
@@ -576,12 +894,13 @@ mod tests {
     #[test]
     fn parse_command_line_does_not_treat_flag_equals_values_as_env_assignments()
     -> Result<(), String> {
-        let (envs, argv) = parse_command_line("cargo kani --harness=byte_to_bool_harness")?;
+        let invocation = parse_command_line("cargo kani --harness=byte_to_bool_harness")?;
 
-        assert!(envs.is_empty());
+        assert!(invocation.env.is_empty());
+        assert_eq!(invocation.program, "cargo".to_string());
         assert_eq!(
-            argv,
-            vec!["cargo", "kani", "--harness=byte_to_bool_harness"]
+            invocation.args,
+            vec!["kani", "--harness=byte_to_bool_harness"]
         );
         Ok(())
     }
@@ -602,6 +921,108 @@ mod tests {
                     .to_string()
             )
         );
+    }
+
+    #[test]
+    fn parse_command_line_preserves_quoted_paths_and_empty_arguments() -> Result<(), String> {
+        let invocation = parse_command_line(r#""/opt/my tools/runner" --filter "a b" ''"#)?;
+
+        assert_eq!(invocation.program, "/opt/my tools/runner".to_string());
+        assert_eq!(invocation.args, vec!["--filter", "a b", ""]);
+        assert_eq!(
+            invocation.exec_argv(),
+            vec!["/opt/my tools/runner", "--filter", "a b", ""]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_supports_escapes_and_double_quotes() -> Result<(), String> {
+        let invocation = parse_command_line(r#"prog a\ b "c\"d" e"#)?;
+
+        assert_eq!(invocation.program, "prog".to_string());
+        assert_eq!(invocation.args, vec!["a b", "c\"d", "e"]);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_rejects_shell_syntax_explicitly() {
+        for command in [
+            "cargo test foo | grep bar",
+            "cargo test foo; cargo test bar",
+            "cargo test foo && cargo test bar",
+            "cargo test > out.txt",
+            "echo $(uname)",
+            "echo `uname`",
+            "FOO=$HOME cargo test",
+        ] {
+            let err = parse_command_line(command).err().unwrap_or_default();
+            assert!(
+                err.contains("unsupported shell syntax"),
+                "command `{command}` must fail explicitly, got `{err}`"
+            );
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn quoted_program_path_with_spaces_reaches_child_intact() -> Result<(), String> {
+        use std::os::unix::fs::PermissionsExt;
+        let dir =
+            std::env::temp_dir().join(format!("unsafe-review spaced dir {}", std::process::id()));
+        fs::create_dir_all(&dir).map_err(|err| format!("create spaced temp dir failed: {err}"))?;
+        let program = dir.join("echo child");
+        fs::write(&program, "#!/bin/sh\nprintf 'got:[%s]\\n' \"$@\"\n")
+            .map_err(|err| format!("write probe child failed: {err}"))?;
+        fs::set_permissions(&program, fs::Permissions::from_mode(0o755))
+            .map_err(|err| format!("chmod probe child failed: {err}"))?;
+
+        let command = format!("\"{}\" 'a b' c", program.display());
+        let invocation = parse_command_line(&command)?;
+        assert_eq!(invocation.program, program.to_string_lossy());
+        assert_eq!(invocation.args, vec!["a b".to_string(), "c".to_string()]);
+
+        let run = execute_with_timeout(
+            &invocation.env,
+            &invocation.exec_argv(),
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+        let _ = fs::remove_dir_all(&dir);
+
+        assert!(!run.timed_out);
+        assert_eq!(run.terminal.exit_code, Some(0));
+        assert!(run.output.contains("got:[a b]"), "output: {}", run.output);
+        assert!(run.output.contains("got:[c]"), "output: {}", run.output);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn spaced_argument_reaches_windows_child_intact() -> Result<(), String> {
+        let invocation = parse_command_line("cmd /C echo \"hello world\"")?;
+        assert_eq!(invocation.program, "cmd".to_string());
+        assert_eq!(invocation.args, vec!["/C", "echo", "hello world"]);
+
+        let run = execute_with_timeout(
+            &invocation.env,
+            &invocation.exec_argv(),
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert_eq!(run.terminal.exit_code, Some(0));
+        assert!(run.output.contains("hello world"), "output: {}", run.output);
+        Ok(())
+    }
+
+    #[test]
+    fn parse_command_line_rejects_trailing_backslash() {
+        let err = parse_command_line("cargo test foo\\")
+            .err()
+            .unwrap_or_default();
+        assert!(err.contains("trailing backslash"), "got `{err}`");
     }
 
     #[cfg(unix)]
@@ -748,6 +1169,8 @@ mod tests {
                 recorded_at: "2026-06-06T00:00:00Z".to_string(),
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
+                binding: None,
             },
         )?;
 
@@ -777,10 +1200,245 @@ mod tests {
                 recorded_at: "2026-06-06T00:00:00Z".to_string(),
                 expires_at: "2026-07-06".to_string(),
                 command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
+                binding: None,
             },
         );
 
         assert!(result.err().unwrap_or_default().contains("test result: ok"));
+    }
+
+    #[test]
+    fn describe_terminal_reports_exit_and_signal() {
+        assert_eq!(
+            describe_terminal(TerminalStatus::exited(0)),
+            "exit 0".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::exited(7)),
+            "exit 7".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::signaled()),
+            "signaled".to_string()
+        );
+        assert_eq!(
+            describe_terminal(TerminalStatus::unknown()),
+            "exit unknown".to_string()
+        );
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_retains_nonzero_exit_behind_success_output() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "printf 'test result: ok. 1 passed; 0 failed;\\n'; exit 7".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.output.contains("test result: ok"));
+        assert_eq!(run.terminal.exit_code, Some(7));
+        assert!(!run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn execute_with_timeout_retains_nonzero_exit_behind_success_output() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "cmd".to_string(),
+                "/C".to_string(),
+                "echo test result: ok & exit 7".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.output.contains("test result: ok"));
+        assert_eq!(run.terminal.exit_code, Some(7));
+        assert!(!run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_retains_signal_termination() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "kill -TERM $$".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(30),
+        )?;
+
+        assert!(!run.timed_out);
+        assert!(run.terminal.signaled);
+        assert!(run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn execute_with_timeout_marks_killed_capture_incomplete() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "sh".to_string(),
+                "-c".to_string(),
+                "exec sleep 30".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(1),
+        )?;
+
+        assert!(run.timed_out);
+        assert!(!run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[cfg(windows)]
+    #[test]
+    fn execute_with_timeout_marks_killed_capture_incomplete() -> Result<(), String> {
+        let run = execute_with_timeout(
+            &[],
+            &[
+                "cmd".to_string(),
+                "/C".to_string(),
+                "timeout /T 30 /NOBREAK > NUL".to_string(),
+            ],
+            Path::new("."),
+            Duration::from_secs(1),
+        )?;
+
+        assert!(run.timed_out);
+        assert!(!run.terminal.captured_complete);
+        Ok(())
+    }
+
+    #[test]
+    fn build_receipt_downgrades_success_output_on_nonzero_exit() -> Result<(), String> {
+        let receipt = build_receipt(
+            ConfirmLane::Miri,
+            ReceiptFields {
+                card_id:
+                    "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                        .to_string(),
+                output: "running 1 test\ntest read_header ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; finished in 0.01s\n"
+                    .to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-06-06T00:00:00Z".to_string(),
+                expires_at: "2026-07-06".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(7),
+                binding: None,
+            },
+        )?;
+
+        assert_eq!(receipt.verdict.as_deref(), Some("inconclusive"));
+        assert_eq!(receipt.exit_code, Some(7));
+        Ok(())
+    }
+
+    #[test]
+    fn subject_digest_is_deterministic_and_sensitive() {
+        let parts = ["UR-test-c1", "miri", "owner", "src/lib.rs", "snippet"];
+        assert_eq!(
+            SubjectBinding::digest_subject(&parts),
+            SubjectBinding::digest_subject(&parts)
+        );
+        assert_ne!(
+            SubjectBinding::digest_subject(&parts),
+            SubjectBinding::digest_subject(&[
+                "UR-test-c2",
+                "miri",
+                "owner",
+                "src/lib.rs",
+                "snippet"
+            ])
+        );
+    }
+
+    #[test]
+    fn git_probe_reports_revision_and_dirtiness() {
+        let root = Path::new(env!("CARGO_MANIFEST_DIR"));
+        let head = git_head(root);
+        let dirty = git_dirty(root);
+        if let (Some(head), Some(_)) = (head, dirty) {
+            assert_eq!(head.len(), 40, "head: {head}");
+            assert!(head.chars().all(|ch| ch.is_ascii_hexdigit()));
+        }
+    }
+
+    #[test]
+    fn build_receipt_preserves_subject_binding() -> Result<(), String> {
+        let binding = SubjectBinding {
+            subject_digest: "digest".to_string(),
+            invocation_digest: Some("invocation".to_string()),
+            scope: Some("repo".to_string()),
+            head_commit: Some("abc123".to_string()),
+            repo_dirty: Some(false),
+            workdir: Some(".".to_string()),
+            output_digest: Some("output".to_string()),
+            captured_complete: Some(true),
+            tool_version: Some("0.5.0".to_string()),
+        };
+        let receipt = build_receipt(
+            ConfirmLane::Miri,
+            ReceiptFields {
+                card_id:
+                    "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1"
+                        .to_string(),
+                output: "running 1 test\ntest read_header ... ok\n\ntest result: ok. 1 passed; 0 failed; 0 ignored; finished in 0.01s\n"
+                    .to_string(),
+                author: "core/fixtures".to_string(),
+                recorded_at: "2026-06-06T00:00:00Z".to_string(),
+                expires_at: "2026-07-06".to_string(),
+                command: "cargo +nightly miri test read_header".to_string(),
+                terminal: TerminalStatus::exited(0),
+                binding: Some(binding.clone()),
+            },
+        )?;
+
+        assert_eq!(receipt.subject, Some(binding));
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_install_note_stays_quiet_inside_discovery_dir() {
+        let root = Path::new("/repo");
+        let written = root
+            .join(".unsafe-review")
+            .join("receipts")
+            .join("confirm-miri-abc123.json");
+        assert_eq!(receipt_install_note(root, &written), None);
+    }
+
+    #[test]
+    fn receipt_install_note_names_discovery_dir_for_outside_paths() -> Result<(), String> {
+        let root = Path::new("/repo");
+        let note = receipt_install_note(root, Path::new("/tmp/stray-receipt.json"))
+            .ok_or_else(|| "outside path must produce a note".to_string())?;
+        assert!(
+            note.contains("/repo/.unsafe-review/receipts"),
+            "note must name the install dir: {note}"
+        );
+        assert!(note.contains("imports it automatically"), "{note}");
+        Ok(())
     }
 
     #[test]
@@ -795,5 +1453,111 @@ mod tests {
         );
         assert!(rendered.ends_with("-output.log"));
         assert!(rendered.contains("UR-crate-src-lib-rs-owner"));
+    }
+
+    const DRY_RUN_FIXTURE_ROOT: &str = "../../fixtures/copy_nonoverlapping";
+    const DRY_RUN_CARD_ID: &str = "UR-copy-nonoverlapping-src-lib-rs-copy-bytes-operation-copy_nonoverlapping-copy-nonoverlapping-a02b5acd2c90-pointer_validity-c1";
+
+    fn dry_run_options(command: &str) -> ConfirmOptions {
+        ConfirmOptions {
+            card_id: DRY_RUN_CARD_ID.to_string(),
+            root: PathBuf::from(DRY_RUN_FIXTURE_ROOT),
+            base: None,
+            diff: None,
+            dry_run: true,
+            author: String::new(),
+            expires_at: None,
+            timeout_seconds: 600,
+            command: Some(command.to_string()),
+            out: None,
+        }
+    }
+
+    fn assert_no_confirm_sidecars() {
+        let root = Path::new(DRY_RUN_FIXTURE_ROOT);
+        assert!(
+            !root.join(".unsafe-review").exists(),
+            "dry run must not write receipts"
+        );
+        assert!(
+            !root.join("target").exists(),
+            "dry run must not write raw output logs"
+        );
+    }
+
+    #[test]
+    fn dry_run_rejects_unterminated_quote_override() {
+        let options = dry_run_options("RUSTFLAGS='-Z sanitizer=address cargo test");
+        let err = run(options).err().unwrap_or_default();
+        assert!(
+            err.contains("unterminated single quote"),
+            "dry run must surface the parse failure, got `{err}`"
+        );
+        assert_no_confirm_sidecars();
+    }
+
+    #[test]
+    fn dry_run_rejects_unsupported_shell_syntax_override() {
+        let options = dry_run_options("cargo test foo | grep bar");
+        let err = run(options).err().unwrap_or_default();
+        assert!(
+            err.contains("unsupported shell syntax"),
+            "dry run must surface the parse failure, got `{err}`"
+        );
+        assert_no_confirm_sidecars();
+    }
+
+    #[test]
+    #[cfg(unix)]
+    fn dry_run_spawns_no_child_process() -> Result<(), String> {
+        let probe = std::env::temp_dir().join("unsafe-review-confirm-dry-run-probe");
+        let _ = std::fs::remove_file(&probe);
+        run(dry_run_options(&format!("touch {}", probe.display())))?;
+        assert!(
+            !probe.exists(),
+            "dry run must preview without executing the parsed invocation"
+        );
+        let _ = std::fs::remove_file(&probe);
+        assert_no_confirm_sidecars();
+        Ok(())
+    }
+
+    #[test]
+    fn diff_resolved_cards_cannot_execute() -> Result<(), String> {
+        let options = ConfirmOptions {
+            diff: Some(crate::command::DiffInput::Stdin),
+            ..ConfirmOptions::default()
+        };
+        assert!(reject_diff_execution(&options).is_err());
+        let options = ConfirmOptions::default();
+        reject_diff_execution(&options)?;
+        Ok(())
+    }
+
+    #[test]
+    fn describe_env_redacts_assignment_values() -> Result<(), String> {
+        let invocation = parse_command_line("AWS_SECRET_ACCESS_KEY=hunter2 cargo test")?;
+        let shown = invocation.describe_env();
+        assert!(shown.contains("AWS_SECRET_ACCESS_KEY"));
+        assert!(!shown.contains("hunter2"));
+        Ok(())
+    }
+
+    #[test]
+    fn git_probes_return_none_outside_a_repository() -> Result<(), String> {
+        let root = std::env::temp_dir().join(format!(
+            "unsafe-review-confirm-no-repo-{}",
+            std::process::id()
+        ));
+        if root.exists() {
+            fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        }
+        fs::create_dir_all(&root).map_err(|err| format!("create temp dir failed: {err}"))?;
+
+        assert_eq!(git_head(&root), None);
+        assert_eq!(git_dirty(&root), None);
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        Ok(())
     }
 }

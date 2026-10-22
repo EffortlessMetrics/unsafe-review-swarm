@@ -1,0 +1,68 @@
+# Issue-linked work specification for the #2224 first seam-denominator batch.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+kind = "correctness"
+objective = "Ship the #2224 PR1 protocol-plus-first-batch: five pinned real PRs including a quiet control, source-first expected-seam inventories, frozen first-run outputs, card-to-seam mapping that answers the four baseline questions, and a small committed evaluator with mutation-probed tests."
+user_outcome = "A reviewer can reproduce the first real-PR seam recall, emitted-card correctness, obligation over-credit, usefulness, duplicate, and quiet-PR false-alarm counts from committed manifests plus retained bounded artifacts, and can see exactly which judgments remain unresolved."
+claim_boundary = "This slice produces agent-drafted source-first labels as useful draft evidence, not human adjudication; it does not claim labeled calibration, global precision or recall, memory safety, witness adequacy, or policy readiness. No detector tuning. The published-0.4.0 comparison slot is reserved but unfilled because 0.4.0 is not yet published; the frozen baseline pins the exact development revision."
+
+[scope]
+included = [
+    "Batch manifest docs/accuracy/batches/2224-pr1/batch.toml with five pinned PRs: repository, PR number, exact base/head SHAs, diff sha256, analyzer binary identity, configuration, caps, corpus partition, and acquisition route",
+    "Source-first expected-seam inventory docs/accuracy/batches/2224-pr1/seams.toml recorded from diff reading before analyzer output is consulted, with stable seam identities, source ranges, operation and obligation rationale, scoped inclusion decisions, and labeler provenance",
+    "Frozen first-run analyzer outputs under docs/accuracy/batches/2224-pr1/outputs/ with sha256 pins in the batch manifest",
+    "Card-to-seam mapping docs/accuracy/batches/2224-pr1/mapping.toml using predeclared matching rules (match, missing, wrong-family, wrong-obligation, duplicate, wrongly-surfaced, infeasible-action, unknown) and answering the four baseline questions per seam, with unresolved judgments kept visible",
+    "Batch report docs/accuracy/batches/2224-pr1/report.md with raw counts, per-family and per-case slices, zero-output-case accounting, unsupported-family and partial-run counts, and a sample-uncertainty note; empty denominators stay unknown",
+    "Small xtask seam-batch evaluator plus check-seam-batch wiring that recomputes every reported count from manifest rows, accounts every emitted card and every expected seam, verifies frozen-output hashes, and fails closed on unaccounted rows",
+    "Evaluator unit tests with known TP/FP/FN/duplicate/unknown counts plus three mutation probes: dropped expected seam, changed label, and injected partial run",
+]
+excluded = [
+    "Detector tuning of any kind driven by batch feedback",
+    "Human adjudication; agent-drafted labels are marked as drafts with provenance",
+    "The 0.4.0 fixed-comparison run; the manifest reserves the slot and records why it is unfilled",
+    "General evaluation framework work beyond the single committed batch directory",
+    "Network acquisition on the check path; acquisition is a one-time recorded procedure, checks stay offline",
+    "Witness execution, third-party writes, comments, issues, or support promotion",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Expected-seam rows are committed with source-first provenance before the corresponding frozen outputs are consulted for mapping; mapping never edits the seam inventory to fit the output."
+
+[[invariant]]
+id = "INV-2"
+text = "Every emitted card in every frozen output is either mapped to a seam or explicitly dispositioned as wrongly-surfaced; every expected seam is either mapped or explicitly missing; nothing is silently dropped to improve a count."
+
+[[invariant]]
+id = "INV-3"
+text = "All reported aggregate counts are recomputed by the evaluator from manifest rows; the checker fails when a quoted total disagrees with its rows."
+
+[[acceptance]]
+id = "AC-2224-PR1-1"
+text = "Batch manifest pins five real PRs including one quiet control with exact base/head SHAs, diff hashes, analyzer binary identity, configuration, and partition; frozen outputs are committed and hash-verified."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR1-2"
+text = "Source-first seam inventory covers every case including zero-output expectations with stable identities, ranges, operation/obligation rationale, inclusion decisions, and draft-label provenance."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR1-3"
+text = "Mapping accounts every emitted card and every expected seam under the predeclared matching rules, answers the four baseline questions per seam, and keeps unresolved judgments visible with their effect on counts."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR1-4"
+text = "Evaluator unit tests pin known TP/FP/FN/duplicate/unknown counts and prove reactivity: dropping a seam moves recall, changing a label fails the check, and a partial run surfaces as unknown rather than silently passing."
+proof = ["cargo test -p xtask --locked seam_batch"]
+
+[[acceptance]]
+id = "AC-2224-PR1-5"
+text = "Full workspace proof stays green with the new checker wired into the deterministic gate."
+proof = ["cargo fmt --check", "cargo check --workspace --all-targets --locked", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2224-pr1-seam-batch"
+notes = "Reuse pilot PR identities where diffs are small enough to hand-label; keep pilot usefulness judgments separate from seam-denominator labels. Coordinate batch-dir conventions with check-first-pr-artifacts only if the bundle shape already fits; do not reshape either side in this slice."

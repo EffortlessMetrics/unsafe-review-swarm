@@ -4490,8 +4490,6 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4553,6 +4551,34 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
     assert!(limitations.iter().all(|item| !item.contains("did not run")));
     assert!(!root.join(".unsafe-review/receipts").exists());
     assert!(!root.join("target/unsafe-review-confirm").exists());
+
+    let diff_out = temp.path().join("diff execution rejected.json");
+    let diff_execution = run_failure_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/confirm"),
+            os("--command"),
+            OsString::from(&command_text),
+            os("--out"),
+            diff_out.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+    assert_failure_contains(
+        &diff_execution,
+        "cannot execute a witness for a card resolved from a saved --diff patch",
+    );
+    assert!(
+        !diff_out.exists(),
+        "rejected diff execution must not write a receipt"
+    );
     Ok(())
 }
 
@@ -4643,8 +4669,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4665,8 +4689,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -4691,8 +4713,6 @@ fn confirm_failures_write_only_the_documented_receipt_or_raw_log() -> Result<(),
             os("confirm"),
             os("--root"),
             os("."),
-            os("--diff"),
-            os("change.diff"),
             os("--allow-heavy"),
             os("--author"),
             os("e2e/confirm"),
@@ -6032,7 +6052,8 @@ fn repo_status_sidecar_includes_per_file_timings_for_small_scan() -> Result<(), 
         !timings.is_empty(),
         "file_timings must be non-empty for a scan that scanned files"
     );
-    // Each entry must have 'file' (string) and 'scan_ms' (number).
+    // Each entry must have 'file' (string) and numeric 'scan_ms',
+    // 'bytes', 'lines', and 'sites' fields.
     for entry in timings {
         assert!(
             entry["file"].as_str().is_some(),
@@ -6041,6 +6062,18 @@ fn repo_status_sidecar_includes_per_file_timings_for_small_scan() -> Result<(), 
         assert!(
             entry["scan_ms"].as_u64().is_some(),
             "each file_timings entry must have a numeric 'scan_ms' field; got: {entry}"
+        );
+        assert!(
+            entry["bytes"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'bytes' field; got: {entry}"
+        );
+        assert!(
+            entry["lines"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'lines' field; got: {entry}"
+        );
+        assert!(
+            entry["sites"].as_u64().is_some(),
+            "each file_timings entry must have a numeric 'sites' field; got: {entry}"
         );
     }
     // The number of entries must match files_scanned.
@@ -6277,6 +6310,7 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
     let report_path = temp.path().join("repo.json");
     let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
+    let ready_path = temp.path().join("paused.ready");
 
     let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
         .args([
@@ -6289,11 +6323,15 @@ fn repo_sigterm_writes_interrupted_status_sidecar() -> Result<(), Box<dyn Error>
             report_path.as_os_str().to_os_string(),
         ])
         .env("UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_MS", "5000")
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE",
+            ready_path.as_os_str(),
+        )
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    wait_for_pause_ready(&ready_path)?;
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -6353,6 +6391,7 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
     let report_path = temp.path().join("repo.json");
     let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
+    let ready_path = temp.path().join("paused.ready");
 
     let child = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
         .args([
@@ -6368,11 +6407,15 @@ fn repo_sigterm_keeps_completed_file_partial_report() -> Result<(), Box<dyn Erro
             "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
             "1",
         )
+        .env(
+            "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_READY_FILE",
+            ready_path.as_os_str(),
+        )
         .stdout(Stdio::piped())
         .stderr(Stdio::piped())
         .spawn()?;
 
-    std::thread::sleep(std::time::Duration::from_millis(500));
+    wait_for_pause_ready(&ready_path)?;
     let kill_status = Command::new("kill")
         .arg("-TERM")
         .arg(child.id().to_string())
@@ -8979,6 +9022,26 @@ fn os(value: &str) -> OsString {
     OsString::from(value)
 }
 
+/// Wait for a child process to signal it reached its test pause, instead of
+/// guessing with a fixed sleep. A fixed sleep flakes under parallel load when
+/// the child starts slowly: the signal then lands during startup and the
+/// assertions observe a different state.
+#[cfg(unix)]
+fn wait_for_pause_ready(ready_path: &Path) -> Result<(), Box<dyn Error>> {
+    let deadline = std::time::Instant::now() + std::time::Duration::from_secs(60);
+    while !ready_path.exists() {
+        if std::time::Instant::now() >= deadline {
+            return Err(format!(
+                "timed out waiting for paused child signal at {}",
+                ready_path.display()
+            )
+            .into());
+        }
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    Ok(())
+}
+
 fn current_confirm_card_id(root: &Path) -> Result<String, Box<dyn Error>> {
     let output = run_success_in_dir(
         [
@@ -9080,10 +9143,21 @@ fn single_confirm_log(log_dir: &Path) -> Result<String, Box<dyn Error>> {
     Ok(fs::read_to_string(logs[0].path())?)
 }
 
+/// Copy a fixture tree for an isolated test run.
+///
+/// `target/` directories are skipped: a parallel test run can leave a
+/// transient build-output directory inside a shared fixture source (created
+/// and removed while another test copies it), and copying it would both
+/// race and pollute the analysis input. The analyzer itself ignores
+/// `target/` under `large_repo_ignores`, so copies stay faithful without it.
+/// No fixture tracks a `target/` directory.
 fn copy_dir_all(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
     fs::create_dir_all(target)?;
     for entry in fs::read_dir(source)? {
         let entry = entry?;
+        if entry.file_name() == "target" {
+            continue;
+        }
         let source_path = entry.path();
         let target_path = target.join(entry.file_name());
         if source_path.is_dir() {
@@ -9092,6 +9166,26 @@ fn copy_dir_all(source: &Path, target: &Path) -> Result<(), Box<dyn Error>> {
             fs::copy(&source_path, &target_path)?;
         }
     }
+    Ok(())
+}
+
+#[test]
+fn copy_dir_all_skips_transient_target_dirs() -> Result<(), Box<dyn Error>> {
+    let source = TempDir::new("unsafe-review-copy-skip-source-e2e")?;
+    fs::create_dir_all(source.path().join("src"))?;
+    fs::write(source.path().join("src/lib.rs"), "pub fn f() {}\n")?;
+    fs::create_dir_all(source.path().join("target/stale"))?;
+    fs::write(source.path().join("target/stale.json"), "{}")?;
+    let dest = TempDir::new("unsafe-review-copy-skip-dest-e2e")?;
+    copy_dir_all(source.path(), dest.path())?;
+    assert!(
+        dest.path().join("src/lib.rs").is_file(),
+        "real sources must copy"
+    );
+    assert!(
+        !dest.path().join("target").exists(),
+        "transient build output must not copy"
+    );
     Ok(())
 }
 

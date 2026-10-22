@@ -61,6 +61,7 @@ export interface BundleWitnessRoute {
 }
 
 export interface BundleDiagnostic {
+  actionable?: boolean;
   cardId: string;
   code: string;
   message: string;
@@ -244,6 +245,7 @@ function parseDiagnostics(value: unknown, warnings: string[]): BundleDiagnostic[
       continue;
     }
     out.push({
+      actionable: typeof entry["actionable"] === "boolean" ? entry["actionable"] : undefined,
       cardId,
       code,
       message,
@@ -742,6 +744,12 @@ function isAnalysisIdentity(value: unknown): value is BundleAnalysisIdentity {
       record[field] === undefined || typeof record[field] === "string"
     ) && (documentVersion === undefined ||
       (typeof documentVersion === "number" && Number.isSafeInteger(documentVersion) && documentVersion >= 0));
+}
+
+export function actionableDiagnostics(
+  diagnostics: BundleDiagnostic[],
+): BundleDiagnostic[] {
+  return diagnostics.filter((diag) => diag.actionable !== false);
 }
 
 export function diagnosticsByFile(

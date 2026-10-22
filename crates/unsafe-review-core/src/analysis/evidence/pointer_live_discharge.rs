@@ -1,8 +1,23 @@
 use super::box_raw_origin::has_drop_in_place_box_origin_evidence;
-use super::nonnull::has_nullability_guard;
+use super::nonnull::{has_nullability_guard, nullability_guard_pointer};
 use super::vec_from_raw_parts::has_vec_from_raw_parts_origin_pointer_live_evidence;
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::{EvidenceState, OperationFamily};
+
+/// Non-nullness discharge: a same-receiver, position-aware null check is
+/// genuine evidence that the pointer is not null. Unchanged by the
+/// non-null/pointer-live split.
+pub(super) fn nullability_discharge_state(site: &ScannedSite, lower: &str) -> EvidenceState {
+    if let Some(pointer) = nullability_guard_pointer(site, lower) {
+        EvidenceState::present(format!(
+            "Nullability guard code was detected for `{pointer}`"
+        ))
+    } else if has_nullability_guard(site, lower) {
+        EvidenceState::present("Nullability guard code was detected")
+    } else {
+        EvidenceState::missing("No nullability guard code was detected")
+    }
+}
 
 pub(super) fn pointer_live_discharge_state(site: &ScannedSite, lower: &str) -> EvidenceState {
     let family = &site.operation.family;
@@ -17,12 +32,18 @@ pub(super) fn pointer_live_discharge_state(site: &ScannedSite, lower: &str) -> E
     {
         EvidenceState::present("Box::into_raw origin evidence was detected")
     } else if has_nullability_guard(site, lower) {
-        EvidenceState::present("Nullability guard code was detected")
+        // A null check is evidence of non-nullness, not evidence that the
+        // allocation is live, large enough, aligned, or valid to access.
+        // Retain the observed fact in a missing slot so the liveness
+        // obligation stays visible instead of looking discharged.
+        EvidenceState::missing(
+            "Nullability guard code was detected, but it supports non-nullness only; pointer liveness remains unresolved",
+        )
     } else if family == &OperationFamily::VecFromRawParts {
         EvidenceState::missing(
             "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
         )
     } else {
-        EvidenceState::missing("No nullability guard code was detected")
+        EvidenceState::missing("No pointer-liveness evidence was detected")
     }
 }

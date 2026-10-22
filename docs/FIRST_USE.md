@@ -1,6 +1,6 @@
 # First-use guide
 
-This guide is for a maintainer trying the public `v0.3.8` `unsafe-review` CLI
+This guide is for a maintainer trying the public `v0.4.0` `unsafe-review` CLI
 for the first time. Swarm main may contain newer unpublished candidate work;
 run `unsafe-review --version` and keep any local candidate checkout separate
 from the published install path.
@@ -13,13 +13,31 @@ blocking policy by default.
 ## Install
 
 ```bash
-cargo install unsafe-review --version 0.3.8 --locked
+cargo install unsafe-review --version 0.4.0 --locked
 unsafe-review --help
 ```
 
-The command above installs the last public release from crates.io. It does not
-install the unfrozen Swarm main candidate, and no `v1`, GitHub Release, or
-marketplace publication is implied by the current workbench docs.
+The command above installs the public 0.4.0 release from crates.io. It does not
+install the unfrozen Swarm main candidate. A `v0.4.0` GitHub Release exists on
+the source repository; no `v1` or marketplace publication is implied.
+
+If `init` is unknown, check which executable your shell selected before
+retrying. Entering a source checkout does not change PATH.
+
+```bash
+command -v unsafe-review
+unsafe-review --version
+unsafe-review init --root . --format json
+```
+
+In PowerShell, use `Get-Command unsafe-review -All` to inspect competing
+commands. Run the preview from a known Rust checkout; a supported invocation
+returns an `unsafe-review/init/v1` proposal without writing files. Version
+text alone cannot identify a development build, and older 0.3.8 executables can
+print global help and exit zero for `init --help` while rejecting the actual
+command. Select the intended executable explicitly, or use the workspace
+command below for source behavior. Keep published-package and source-built
+qualification results separate.
 
 If you are working from a local checkout, keep the installed command and the
 workspace command separate. The installed command is the user path; `cargo run`
@@ -27,13 +45,12 @@ is for development.
 
 ## Preview Repository Adoption
 
-Top-level `init` is available only in the unpublished swarm/candidate command
-surface; the public `v0.3.8` install above does not include it. Use an explicitly
-identified local checkout for this preview, or continue to
+Top-level `init` ships in the public `v0.4.0` install above: run
+`unsafe-review init` (preview-only by default) or continue to
 [Get A First Card](#get-a-first-card).
 
-From the root of that unpublished `unsafe-review-swarm` checkout, inspect a
-deterministic proposal with the workspace binary:
+From the root of an explicitly identified local checkout, the same proposal is
+available through the workspace binary (for development use):
 
 ```bash
 cargo run --locked -p unsafe-review-cli --bin cargo-unsafe-review -- init
@@ -49,6 +66,29 @@ repository warnings, recommended ignores, explicit baseline guidance, an
 optional badge snippet, the canonical ub-review gate-manifest pointer, and the
 exact `doctor` and `pr` commands. `--out` writes only
 `unsafe-review-init.json` to the explicitly selected proposal directory.
+
+In the development checkout, generated commands retain the resolved absolute
+repository root, detected PR base, and root-local output destinations when
+copied into another directory. Check the installed version separately before
+relying on this handoff correction.
+Command text uses PowerShell quoting on Windows and POSIX shell quoting elsewhere.
+If no base can be resolved, JSON `commands.first_pr` is `null` and
+`commands.first_pr_prerequisite` (also shown in human output) asks for an explicit
+`--base` or `--diff`; init does not offer a repository-wide scan as a PR review.
+If the resolved root has no lossless command spelling, init still inspects the
+native path and preserves the preview. This includes non-UTF-8 Unix roots and
+Windows verbatim names whose normalized spelling selects a different directory,
+such as distinct `repo` and `repo.` or `repo ` directories. Windows command text
+must resolve to the same native canonical root before init offers it.
+JSON marks `root` and unavailable commands/absolute destinations as null, labels
+`root_display` as display-only through the `unrepresentable_path` warning, and
+human output explains why handoffs are unavailable. Use a UTF-8 checkout path
+whose command spelling preserves its filesystem identity for generated commands.
+Git checkout detection remains independent of path text: a null `git_root` from
+unrepresentable output does not imply a missing checkout. Lossy display text never
+selects another repository.
+Baseline creation remains a separate explicit action from the selected clean
+base/default branch.
 
 The generated workflow uses a release placeholder. Do not apply it until the
 placeholder has been replaced with a separately verified public release or

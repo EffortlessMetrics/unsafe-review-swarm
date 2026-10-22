@@ -1,0 +1,128 @@
+# #2224 PR1 source-first expected-seam inventory.
+#
+# Recorded 2026-09-18T03:20Z from diff reading alone. No analyzer output has
+# been consulted for any case in this batch (analyzer_outputs_consulted =
+# false). Mapping must not edit this inventory to fit outputs.
+schema_version = "seam-batch-seams/v1"
+batch = "2224-pr1"
+recorded_at = "2026-09-18T03:20:21Z"
+analyzer_outputs_consulted = false
+
+[labeler]
+type = "agent-drafted"
+identity = "muse-code session sunny-zaniah"
+provenance = "source-first diff reading before any analyzer run on these cases; useful draft evidence, not human adjudication"
+
+trust_boundary = "Static unsafe contract review only. These expected seams describe unsafe operations a reviewer should examine in each sampled PR scope. They are not confirmed bugs, not exploitable vulnerabilities, not memory-safety proof, and not a claim about code outside the sampled diffs."
+
+# arrayvec-143 is the quiet control: two safe is_empty methods plus a safe
+# doctest. Zero expected seams. Any emitted card there is wrongly-surfaced
+# by protocol rule.
+
+# hashbrown-692: the from_raw_parts_mut call itself is a context line, but the
+# PR edits its safety contract (return type [Tag] -> [MaybeUninit<Tag>],
+# SAFETY wording drops the initialized-claim and keeps the count-claim), so
+# the site is in review scope.
+[[seams]]
+id = "hashbrown-692-S1"
+case = "hashbrown-692"
+source_anchor = "src/raw.rs ctrl_slice: slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes())"
+operation_family = "slice_from_raw_parts_mut"
+obligation_keys = ["buffer_validity", "initialized_memory", "alignment"]
+expected_contract = "present"
+expected_discharge = "partial"
+rationale = "Changed safety contract around a live from_raw_parts_mut: the count claim stays in the SAFETY comment but the initialized claim is gone, replaced structurally by the MaybeUninit return type. A correct card credits the comment for the count obligation only and must not credit it for initialization."
+inclusion = "include"
+
+# memchr-226: one changed arithmetic site. The added regression test calls
+# safe public APIs only, so it contributes no seam (recorded as an excluded
+# consideration in mapping, not a row here).
+[[seams]]
+id = "memchr-226-S1"
+case = "memchr-226"
+source_anchor = "src/arch/generic/packedpair.rs Finder loop: end.sub(needle.len()) replaced with end.distance(cur)"
+operation_family = "pointer_arithmetic"
+obligation_keys = ["in_bounds", "same_allocation"]
+expected_contract = "missing"
+expected_discharge = "missing"
+rationale = "UB-fix site: the wrapping-risk sub is removed and the replacement arithmetic still constrains cur against end. A correct card finds the changed site and judges the replacement; crediting the fix as a guard requires the distance call to actually dominate the later raw read."
+inclusion = "include"
+
+# getrandom-811: the ProcessPrng FFI call is a context line, but the PR
+# changes its obligation handling (debug_assert removed, explicit
+# result == TRUE check returning Err(UNEXPECTED) added).
+[[seams]]
+id = "getrandom-811-S1"
+case = "getrandom-811"
+source_anchor = "src/backends/windows.rs fill_inner: unsafe ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) with added result == TRUE check"
+operation_family = "ffi_call"
+obligation_keys = ["return_value_validation", "pointer_validity", "initialized_memory"]
+expected_contract = "present"
+expected_discharge = "partial"
+rationale = "The added if result == TRUE / else Err(UNEXPECTED) discharges the return-value obligation the old debug_assert could not (compiled out in release). Pointer and MaybeUninit-init obligations stay open. A correct card credits the new check and must not credit the removed debug_assert."
+inclusion = "include"
+
+# arrayvec-138 S1: new private unsafe helper with ptr::write(ptr.add(index))
+# and no Safety comment.
+[[seams]]
+id = "arrayvec-138-S1"
+case = "arrayvec-138"
+source_anchor = "src/char.rs added unsafe fn write: ptr::write(ptr.add(index), byte)"
+operation_family = "raw_pointer_write"
+obligation_keys = ["bounds", "pointer_validity"]
+expected_contract = "missing"
+expected_discharge = "missing"
+rationale = "New unsafe helper performing an offset write with no Safety comment and no bounds check inside; every caller must establish index < len. A correct card flags the missing contract."
+inclusion = "include"
+
+# arrayvec-138 S2: the encode_utf8 body issues offset writes guarded by
+# dominating len >= 1..4 branch conditions, with Safety docs on the fn.
+[[seams]]
+id = "arrayvec-138-S2"
+case = "arrayvec-138"
+source_anchor = "src/char.rs pub unsafe fn encode_utf8 write cluster: write(ptr, 0..3, ..) arms under len >= 1..4 conditions, Safety docs present"
+operation_family = "raw_pointer_write"
+obligation_keys = ["bounds"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Each write index is dominated by its arm's len >= N condition and the Safety section documents ptr-writable-for-len. A correct card either stays silent or reports discharged bounds; flagging these writes as unguarded would be wrong-obligation."
+inclusion = "include"
+
+# arrayvec-138 S3: try_push computes ptr_mut().add(len) and
+# remaining_cap = capacity - len with no visible len <= capacity guard, then
+# calls the new unsafe encode_utf8 inside an unsafe block.
+[[seams]]
+id = "arrayvec-138-S3"
+case = "arrayvec-138"
+source_anchor = "src/array_string.rs try_push: self.xs.ptr_mut().add(len), remaining_cap = capacity - len, encode_utf8(c, ptr, remaining_cap) call"
+operation_family = "pointer_arithmetic"
+obligation_keys = ["bounds"]
+expected_contract = "missing"
+expected_discharge = "missing"
+rationale = "Unchecked offset arithmetic plus an unsafe call whose len argument derives from an unguarded subtraction. len <= capacity likely holds by struct invariant, which the tool cannot see: a correct card reports the open bounds obligation. Whether the invariant counts as discharge is an unresolved judgment for mapping, not a seam edit."
+inclusion = "include"
+
+# arrayvec-138 S4/S5: test-harness unsafe calls with stack buffers. Genuine
+# unsafe operations in scope, so they stay in the recall denominator; Q3
+# judges whether surfacing them is useful (expected: usually not).
+[[seams]]
+id = "arrayvec-138-S4"
+case = "arrayvec-138"
+source_anchor = "src/char.rs test_encode_utf8: unsafe encode_utf8(ch, ptr, len) over a 16-byte stack buffer"
+operation_family = "unsafe_call"
+obligation_keys = ["bounds"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Test-harness unsafe call with an obviously sufficient stack buffer. Expected found; expected not-useful selection. Measures selected-card noise without touching recall."
+inclusion = "include"
+
+[[seams]]
+id = "arrayvec-138-S5"
+case = "arrayvec-138"
+source_anchor = "src/char.rs test_encode_utf8_oob: unsafe encode_utf8(ch, ptr, len - 1) expecting Err and (ch, ptr, len) expecting Ok"
+operation_family = "unsafe_call"
+obligation_keys = ["bounds"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Deliberately short-len call that must return Err without writing. Expected found; the interesting judgment is whether the card understands the Err arm makes the short call sound. Expected not-useful selection."
+inclusion = "include"

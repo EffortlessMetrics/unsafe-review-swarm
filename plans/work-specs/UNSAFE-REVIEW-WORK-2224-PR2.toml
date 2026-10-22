@@ -1,0 +1,68 @@
+# Issue-linked work specification for the #2224 second seam-denominator batch.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+kind = "correctness"
+objective = "Ship the #2224 PR2 growth batch: six pinned real PRs across three new projects including a quiet control, source-first expected-seam inventory with canonical operation families and obligation keys, frozen first-run outputs, card-to-seam mapping answering the four baseline questions, and check-seam-batch extended to verify both committed batches."
+user_outcome = "A reviewer can reproduce the growth-batch seam recall, emitted-card correctness, obligation over-credit, usefulness, duplicate, and quiet-PR false-alarm counts from committed manifests plus retained bounded artifacts, and can see exactly which judgments remain unresolved."
+claim_boundary = "This slice produces agent-drafted source-first labels as useful draft evidence, not human adjudication; it does not claim labeled calibration, global precision or recall, memory safety, witness adequacy, or policy readiness. No detector tuning. The published-0.4.0 comparison slot is reserved but unfilled because 0.4.0 is not yet published; the frozen baseline pins the exact development revision."
+
+[scope]
+included = [
+    "Batch manifest docs/accuracy/batches/2224-pr2/batch.toml with six pinned PRs: repository, PR number, exact base/head SHAs, diff sha256, analyzer binary identity, configuration, caps, corpus partition, and acquisition route",
+    "Source-first expected-seam inventory docs/accuracy/batches/2224-pr2/seams.toml recorded from diff reading plus enclosing-function reads before analyzer output is consulted, with stable seam identities, canonical operation families, canonical obligation keys, scoped inclusion decisions, and labeler provenance",
+    "Frozen first-run analyzer outputs under docs/accuracy/batches/2224-pr2/outputs/ with sha256 pins in the batch manifest",
+    "Card-to-seam mapping docs/accuracy/batches/2224-pr2/mapping.toml using predeclared matching rules and answering the four baseline questions per seam, with unresolved judgments and vocabulary gaps kept visible",
+    "Batch report docs/accuracy/batches/2224-pr2/report.md with raw counts, per-family and per-case slices, zero-output-case accounting, challenge-adjusted tally, and a sample-uncertainty note; empty denominators stay unknown",
+    "check-seam-batch extended from the single PR1 directory to the committed batch list, verifying every batch with the same fail-closed row accounting",
+    "Batch-scoped protocol docs/accuracy/batches/2224-pr2/protocol.md carrying the canonical family and obligation vocabularies plus the contract-versus-guard split",
+]
+excluded = [
+    "Detector tuning of any kind driven by batch feedback",
+    "Human adjudication; agent-drafted labels are marked as drafts with provenance",
+    "The 0.4.0 fixed-comparison run; the manifest reserves the slot and records why it is unfilled",
+    "General evaluation framework work beyond the second committed batch directory",
+    "Network acquisition on the check path; acquisition is a one-time recorded procedure, checks stay offline",
+    "Witness execution, third-party writes, comments, issues, or support promotion",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Expected-seam rows are committed with source-first provenance before the corresponding frozen outputs are consulted for mapping; mapping never edits the seam inventory to fit the output."
+
+[[invariant]]
+id = "INV-2"
+text = "Every emitted card in every frozen output is either mapped to a seam or explicitly dispositioned as wrongly-surfaced; every expected seam is either mapped or explicitly missing; nothing is silently dropped to improve a count."
+
+[[invariant]]
+id = "INV-3"
+text = "All reported aggregate counts are recomputed by the evaluator from manifest rows; the checker fails when a quoted total disagrees with its rows."
+
+[[acceptance]]
+id = "AC-2224-PR2-1"
+text = "Batch manifest pins six real PRs across three new projects including one quiet control with exact base/head SHAs, diff hashes, analyzer binary identity, configuration, and partition; frozen outputs are committed and hash-verified."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR2-2"
+text = "Source-first seam inventory covers every case including zero-output expectations with stable identities, canonical families and obligation keys, inclusion decisions, and draft-label provenance."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR2-3"
+text = "Mapping accounts every emitted card and every expected seam under the predeclared matching rules, answers the four baseline questions per seam, and keeps unresolved judgments and vocabulary gaps visible with their effect on counts."
+proof = ["cargo run --locked -p xtask -- check-seam-batch"]
+
+[[acceptance]]
+id = "AC-2224-PR2-4"
+text = "PR1 batch still verifies byte-identical under the extended checker; evaluator unit tests keep pinning known TP/FP/FN/duplicate/unknown counts."
+proof = ["cargo run --locked -p xtask -- check-seam-batch", "cargo test -p xtask --locked seam_batch"]
+
+[[acceptance]]
+id = "AC-2224-PR2-5"
+text = "Full workspace proof stays green with the extended checker wired into the deterministic gate."
+proof = ["cargo fmt --check", "cargo check --workspace --all-targets --locked", "cargo clippy --workspace --all-targets --locked -- -D warnings", "cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2224-pr2-seam-batch"
+notes = "Additive over PR1: no PR1 file is modified. Coordinate batch-dir conventions with check-first-pr-artifacts only if the bundle shape already fits; do not reshape either side in this slice."

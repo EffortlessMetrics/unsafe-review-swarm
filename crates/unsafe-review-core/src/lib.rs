@@ -14,6 +14,10 @@ mod output;
 mod policy;
 mod util;
 
+pub use output::agent::index::{
+    AGENT_TASK_INDEX_SCHEMA, AgentTask, DEFAULT_MAX_TASKS, TaskIndex, TaskIndexOptions,
+    TaskIndexTruncation, TaskReadiness, TaskRole, assemble_task_index, render_task_index_human,
+};
 pub use output::agent::{
     RepairCandidate, RepairCandidateApplicability, RepairCandidateKind, RepairCandidatePosition,
     RepairCandidateRange, RepairCandidateTarget, RepairEvidenceMovement,
@@ -30,13 +34,14 @@ pub use policy::baseline_ledger_path;
 
 pub use api::{
     AnalysisMode, AnalyzeInput, AnalyzeOutput, BaselineHealthCounts, BaselineHealthEntry,
-    BaselineHealthReport, BaselineInitResult, BaselineRefreshPlan, DiffSource, DiscoveryOptions,
-    FILE_TIMINGS_CAP, HealthBucket, OutcomeReport, PerFileScanStats, PolicyMode, PolicyReport,
-    Provenance, ReceiptAuditReport, RefreshAction, RefreshPlanEntry, RefreshPlanSummary,
-    RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason, ReviewCardConfirmationProjection,
-    ScanCost, Scope, analyze, analyze_with_discovery, analyze_with_discovery_and_progress,
-    analyze_with_discovery_and_repo_events, audit_witness_receipts, baseline_add, baseline_init,
-    baseline_init_preview, baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
+    BaselineHealthReport, BaselineInitResult, BaselineRefreshPlan, ConfigurationArgs, DiffSource,
+    DiscoveryOptions, FILE_TIMINGS_CAP, HealthBucket, OutcomeReport, PerFileScanStats, PolicyMode,
+    PolicyReport, Provenance, ReceiptAuditReport, RefreshAction, RefreshPlanEntry,
+    RefreshPlanSummary, RepoScanEvent, RepoScanPhase, RepoScanStatus, RepoStopReason,
+    ReviewCardConfirmationProjection, ScanCost, Scope, analyze, analyze_with_discovery,
+    analyze_with_discovery_and_progress, analyze_with_discovery_and_repo_events,
+    audit_witness_receipts, baseline_add, baseline_init, baseline_init_preview,
+    baseline_refresh_preview, baseline_status, bless_fixture_card_goldens,
     bless_fixture_card_goldens_from_workspace, bless_fixture_surface_goldens,
     bless_fixture_surface_goldens_from_workspace, collect_context, collect_context_range,
     compare_outcome_json, discover_repo_files, evaluate_policy_report,
@@ -45,14 +50,57 @@ pub use api::{
     render_badge_jsons, render_baseline_refresh_human, render_baseline_refresh_json,
     render_baseline_status_human, render_baseline_status_json, render_comment_plan,
     render_fixture_surface, render_fixture_surface_from_workspace, render_gate_manifest,
-    render_gate_manifest_repo, render_github_summary, render_human, render_json,
-    render_json_with_provenance, render_lsp, render_lsp_hover, render_markdown,
-    render_outcome_json, render_outcome_markdown, render_policy_report_json,
-    render_policy_report_markdown, render_pr_summary, render_receipt_audit_json,
-    render_receipt_audit_markdown, render_repair_queue, render_sarif, render_usefulness_telemetry,
+    render_gate_manifest_repo, render_github_summary, render_human, render_human_short,
+    render_human_with_aperture, render_human_with_configuration,
+    render_human_with_configuration_and_aperture, render_human_with_impact,
+    render_human_with_stages, render_json, render_json_with_aperture,
+    render_json_with_configuration, render_json_with_configuration_and_aperture,
+    render_json_with_impact, render_json_with_provenance, render_json_with_sections,
+    render_json_with_stages, render_lsp, render_lsp_hover, render_markdown, render_outcome_json,
+    render_outcome_markdown, render_policy_report_json, render_policy_report_markdown,
+    render_pr_summary, render_receipt_audit_json, render_receipt_audit_markdown,
+    render_repair_queue, render_sarif, render_usefulness_telemetry,
     render_usefulness_telemetry_with_cost, render_witness_plan, validate_witness_receipts,
 };
 pub use freshness::{AnalysisIdentity, AnalysisState};
+pub use input::aperture::{
+    APERTURE_SCHEMA_VERSION, AnalysisAperture, ApertureCaps, ApertureConfiguration,
+    ApertureConfigurationInput, ApertureFiles, ApertureRoles, ApertureUnsupported,
+    assemble_aperture, render_aperture_human,
+};
+pub use input::cfg::{
+    Applicability, CardConfiguration, CfgAtom, CfgAttrGate, CfgExpr, CfgInputs, CfgVerdict,
+    ConfigurationCounts, StructuralGates, collect_structural_gates, enclosing_cfg_exprs,
+    evaluate_configurations, parse_cfg_attr_gate, parse_cfg_expr, render_configuration_human,
+    summarize_configurations,
+};
+pub use input::changeset::{
+    ChangeScopeKind, ChangeSet, ChangedFile, FileChangeKind, FileProvenance, FileRename,
+    OmissionReason, OmittedFile, ScopeCompleteness, ScopeIdentities, ScopeLimitation,
+    ScopeLimitationKind,
+};
+pub use input::changeset_local::{discover_staged, discover_unstaged, discover_worktree};
+pub use input::changeset_spans::{
+    changeset_from_external_diff, changeset_from_overlay, changeset_from_snapshot,
+    discover_commit_range, render_changeset_human, render_changeset_json,
+};
+pub use input::diff::changed_lines_in_diff;
+pub use input::environment::{
+    AnalysisEnvironment, CargoTargetIdentity, CargoTargetKind, EnvDiscoverOptions,
+    EnvironmentLimitation, EnvironmentLimitationKind, EnvironmentSource, FeatureSelection,
+    PackageIdentity, ToolchainIdentity, discover_environment, render_environment_human,
+    render_environment_json,
+};
+pub use input::impact::{
+    AffectedSeam, ChangedItem, IMPACT_SCHEMA_VERSION, ImpactCause, ImpactInventory, ImpactSubject,
+    relate_same_owner, render_impact_human,
+};
+pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
+pub use input::stages::{
+    AnalysisStage, FactRequirement, FactState, STAGE_SCHEMA_VERSION, StageCompleteness,
+    StageConfigurationInput, StageInventory, StageRecord, assemble_stage_inventory,
+    render_stages_human,
+};
 
 /// Compute the SHA-256 hex digest of raw bytes.
 ///
@@ -75,6 +123,6 @@ pub use domain::{
     DischargeEvidence, ExecutedReceiptInput, HazardKind, MiriReceiptInput, MissingEvidence,
     NextAction, Priority, ProofPath, ProofReceiptInput, ReachEvidence, ReceiptCardIdKind,
     RelatedTest, ReviewCard, ReviewClass, SafetyObligation, SanitizerReceiptInput, SourceLocation,
-    UnsafeOperation, UnsafeSite, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind,
-    WitnessReceipt, WitnessRoute,
+    SubjectApplicability, SubjectBinding, TerminalStatus, UnsafeOperation, UnsafeSite,
+    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind, WitnessReceipt, WitnessRoute,
 };

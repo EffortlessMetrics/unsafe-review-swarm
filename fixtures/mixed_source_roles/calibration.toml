@@ -1,0 +1,7 @@
+[[cases]]
+fixture = "mixed_source_roles"
+kind = "positive"
+claim = "mixed repository retains production, test-only, fixture-input, generated, shared, and example seams in complete inventory"
+support_tier = "Core operation smoke slice"
+expected_cards = 7
+expected_class = "contract_missing"

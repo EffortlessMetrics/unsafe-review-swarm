@@ -3005,6 +3005,7 @@ fn artifact_path_display(base: &Path, name: &str) -> String {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::command::EnvFeatureSelect;
 
     #[test]
     fn handoff_commands_quote_roots_with_spaces() {
@@ -3073,6 +3074,13 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
+            latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
+            aperture: false,
+            impact: false,
+            stages: false,
         };
         assert_eq!(
             receipt_audit_command(&check),
@@ -3150,6 +3158,8 @@ mod tests {
             },
             cards: Vec::new(),
             diff_scoped_files: std::collections::BTreeSet::new(),
+            unresolved_diff_files: std::collections::BTreeSet::new(),
+            rejected_diff_files: std::collections::BTreeSet::new(),
             coverage_snapshot: std::collections::BTreeMap::new(),
         };
         let check = CheckOptions {
@@ -3160,6 +3170,13 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
+            latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
+            aperture: false,
+            impact: false,
+            stages: false,
         };
         let rendered = render_review_kit_manifest(
             &output,
@@ -4140,6 +4157,8 @@ mod tests {
             summary,
             cards,
             diff_scoped_files: std::collections::BTreeSet::new(),
+            unresolved_diff_files: std::collections::BTreeSet::new(),
+            rejected_diff_files: std::collections::BTreeSet::new(),
             coverage_snapshot: std::collections::BTreeMap::new(),
         }
     }
@@ -4174,6 +4193,13 @@ mod tests {
             policy: unsafe_review_core::PolicyMode::Advisory,
             out: None,
             max_cards: None,
+            short: false,
+            latency_out: None,
+            env_features: EnvFeatureSelect::Default,
+            target: None,
+            aperture: false,
+            impact: false,
+            stages: false,
         }
     }
 

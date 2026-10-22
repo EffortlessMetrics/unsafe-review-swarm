@@ -1,0 +1,41 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "/tmp/seam-batch/checkouts/arrayvec-143",
+  "summary": {
+    "rust_files": 12,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 0,
+    "cards": 0,
+    "open_actionable_gaps": 0,
+    "contract_missing": 0,
+    "guard_missing": 0,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 0,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-09-18T03:22:36Z",
+    "root_abs": "/tmp/seam-batch/checkouts/arrayvec-143",
+    "diff_path": "docs/accuracy/batches/2224-pr1/diffs/arrayvec-143.diff",
+    "diff_sha256": "812730708ff1d7a7a6ffa79724ca02cf84f9748ff30be01e881dcd12d59ead4e",
+    "dirty_worktree": false
+  }
+}

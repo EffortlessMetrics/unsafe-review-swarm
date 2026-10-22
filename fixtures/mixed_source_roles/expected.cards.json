@@ -1,0 +1,1220 @@
+[
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test demo_write",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `demo_write` yet; write or identify a focused test for `demo_write` first, then build/run `cargo +nightly miri test demo_write` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `demo_write` first (no test reaches it yet), then build/run `cargo +nightly miri test demo_write` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { *ptr = value }`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test demo_write",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-examples-demo-rs-demo-write-operation-raw_pointer_write-raw-pointer-write-15bafa2f85e2-pointer_validity-c1` still maps to `unsafe { *ptr = value }` at `examples/demo.rs:5:14` before upgrading confidence.",
+          "Write or identify a focused test for `demo_write` first (no test reaches it yet), then build/run `cargo +nightly miri test demo_write` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "id": "UR-mixed-source-roles-examples-demo-rs-demo-write-operation-raw_pointer_write-raw-pointer-write-15bafa2f85e2-pointer_validity-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No pointer-liveness evidence was detected"
+        },
+        "key": "pointer-live",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `demo_write` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "buffer has enough bytes for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `demo_write` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is aligned for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "key": "alignment",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `demo_write` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "memory is initialized for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "initialized",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `demo_write` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "access remains inside one live allocation",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "allocation",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `demo_write` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "operation": "unsafe { *ptr = value }",
+    "operation_family": "raw_pointer_write",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `demo_write` was found",
+    "site": {
+      "column": 14,
+      "file": "examples/demo.rs",
+      "kind": "operation",
+      "line": 5,
+      "owner": "demo_write",
+      "public_api_surface": false,
+      "snippet": "unsafe { *ptr = value }",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test demo_write",
+      "cargo +nightly careful test demo_write"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test demo_write",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test demo_write",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test advance",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `advance` yet; write or identify a focused test for `advance` first, then build/run `cargo +nightly miri test advance` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `advance` first (no test reaches it yet), then build/run `cargo +nightly miri test advance` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { ptr.add(n) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test advance",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-shared-span-rs-advance-operation-pointer_arithmetic-add-63699da27fc5-same_allocation-c1` still maps to `unsafe { ptr.add(n) }` at `shared/span.rs:6:5` before upgrading confidence.",
+          "Write or identify a focused test for `advance` first (no test reaches it yet), then build/run `cargo +nightly miri test advance` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "same_allocation",
+      "bounds",
+      "aliasing_or_provenance"
+    ],
+    "id": "UR-mixed-source-roles-shared-span-rs-advance-operation-pointer_arithmetic-add-63699da27fc5-same_allocation-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `advance` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+    ],
+    "operation": "unsafe { ptr.add(n) }",
+    "operation_family": "pointer_arithmetic",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `advance` was found",
+    "site": {
+      "column": 5,
+      "file": "shared/span.rs",
+      "kind": "operation",
+      "line": 6,
+      "owner": "advance",
+      "public_api_surface": false,
+      "snippet": "unsafe { ptr.add(n) }",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test advance",
+      "cargo +nightly careful test advance"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test advance",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test advance",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test generated_get",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `generated_get` yet; write or identify a focused test for `generated_get` first, then build/run `cargo +nightly miri test generated_get` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `generated_get` first (no test reaches it yet), then build/run `cargo +nightly miri test generated_get` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { *buf.get_unchecked(idx) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test generated_get",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-src-generated-rs-generated-get-operation-get_unchecked-get-unchecked-caae28b0414d-bounds-c1` still maps to `unsafe { *buf.get_unchecked(idx) }` at `src/generated.rs:8:5` before upgrading confidence.",
+          "Write or identify a focused test for `generated_get` first (no test reaches it yet), then build/run `cargo +nightly miri test generated_get` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "bounds"
+    ],
+    "id": "UR-mixed-source-roles-src-generated-rs-generated-get-operation-get_unchecked-get-unchecked-caae28b0414d-bounds-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "index is in bounds for the collection",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `generated_get` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "index is in bounds for the collection"
+    ],
+    "operation": "unsafe { *buf.get_unchecked(idx) }",
+    "operation_family": "get_unchecked",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `generated_get` was found",
+    "site": {
+      "column": 5,
+      "file": "src/generated.rs",
+      "kind": "operation",
+      "line": 8,
+      "owner": "generated_get",
+      "public_api_surface": false,
+      "snippet": "unsafe { *buf.get_unchecked(idx) }",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test generated_get",
+      "cargo +nightly careful test generated_get"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test generated_get",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test generated_get",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test read_production",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `read_production` yet; write or identify a focused test for `read_production` first, then build/run `cargo +nightly miri test read_production` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `read_production` first (no test reaches it yet), then build/run `cargo +nightly miri test read_production` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `*ptr`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test read_production",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-src-lib-rs-read-production-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1` still maps to `*ptr` at `src/lib.rs:11:14` before upgrading confidence.",
+          "Write or identify a focused test for `read_production` first (no test reaches it yet), then build/run `cargo +nightly miri test read_production` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "not_selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "id": "UR-mixed-source-roles-src-lib-rs-read-production-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No pointer-liveness evidence was detected"
+        },
+        "key": "pointer-live",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "buffer has enough bytes for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is aligned for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "key": "alignment",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "memory is initialized for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "initialized",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "access remains inside one live allocation",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "allocation",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "operation": "*ptr",
+    "operation_family": "raw_pointer_deref",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `read_production` was found",
+    "site": {
+      "column": 14,
+      "file": "src/lib.rs",
+      "kind": "operation",
+      "line": 11,
+      "owner": "read_production",
+      "public_api_surface": false,
+      "snippet": "*ptr",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test read_production",
+      "cargo +nightly careful test read_production"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test read_production",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test read_production",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "guard_missing",
+    "confidence": "medium",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test build_production",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `build_production` yet; write or identify a focused test for `build_production` first, then build/run `cargo +nightly miri test build_production` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `build_production` first (no test reaches it yet), then build/run `cargo +nightly miri test build_production` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { NonNull::new_unchecked(ptr) }`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test build_production",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-src-lib-rs-build-production-operation-nonnull_unchecked-new-unchecked-4868cc507d71-pointer_validity-c1` still maps to `unsafe { NonNull::new_unchecked(ptr) }` at `src/lib.rs:17:5` before upgrading confidence.",
+          "Write or identify a focused test for `build_production` first (no test reaches it yet), then build/run `cargo +nightly miri test build_production` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "not_selected",
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "pointer_validity"
+    ],
+    "id": "UR-mixed-source-roles-src-lib-rs-build-production-operation-nonnull_unchecked-new-unchecked-4868cc507d71-pointer_validity-c1",
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `nonnull_unchecked` safety obligation.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "description": "pointer is non-null before constructing NonNull",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nullability guard code was detected"
+        },
+        "key": "non-null",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `build_production` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer is non-null before constructing NonNull"
+    ],
+    "operation": "unsafe { NonNull::new_unchecked(ptr) }",
+    "operation_family": "nonnull_unchecked",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `build_production` was found",
+    "site": {
+      "column": 5,
+      "file": "src/lib.rs",
+      "kind": "operation",
+      "line": 17,
+      "owner": "build_production",
+      "public_api_surface": false,
+      "snippet": "unsafe { NonNull::new_unchecked(ptr) }",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test build_production",
+      "cargo +nightly careful test build_production"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test build_production",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test build_production",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test read_test_helper",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `read_test_helper` yet; write or identify a focused test for `read_test_helper` first, then build/run `cargo +nightly miri test read_test_helper` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `read_test_helper` first (no test reaches it yet), then build/run `cargo +nightly miri test read_test_helper` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `*ptr`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test read_test_helper",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-src-tested-rs-read-test-helper-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1` still maps to `*ptr` at `src/tested.rs:9:18` before upgrading confidence.",
+          "Write or identify a focused test for `read_test_helper` first (no test reaches it yet), then build/run `cargo +nightly miri test read_test_helper` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "not_selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "id": "UR-mixed-source-roles-src-tested-rs-read-test-helper-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No pointer-liveness evidence was detected"
+        },
+        "key": "pointer-live",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_test_helper` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "buffer has enough bytes for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_test_helper` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is aligned for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "key": "alignment",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_test_helper` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "memory is initialized for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "initialized",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_test_helper` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "access remains inside one live allocation",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "allocation",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_test_helper` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "operation": "*ptr",
+    "operation_family": "raw_pointer_deref",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `read_test_helper` was found",
+    "site": {
+      "column": 18,
+      "file": "src/tested.rs",
+      "kind": "operation",
+      "line": 9,
+      "owner": "read_test_helper",
+      "public_api_surface": false,
+      "snippet": "*ptr",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test read_test_helper",
+      "cargo +nightly careful test read_test_helper"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test read_test_helper",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test read_test_helper",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  },
+  {
+    "class": "contract_missing",
+    "confidence": "high",
+    "confirmation_cue": {
+      "build_this_first": {
+        "command": "cargo +nightly miri test fixture_read",
+        "kind": "verify_command",
+        "route_kind": "miri",
+        "summary": "No test reaches `fixture_read` yet; write or identify a focused test for `fixture_read` first, then build/run `cargo +nightly miri test fixture_read` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "confirmation_state": "pending",
+      "confirmation_step": "write or identify a focused test for `fixture_read` first (no test reaches it yet), then build/run `cargo +nightly miri test fixture_read` first, then attach a matching receipt if it confirms the route",
+      "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `*ptr`; confirm with external evidence before treating it as observed runtime behavior",
+      "minimal_repro": {
+        "command": "cargo +nightly miri test fixture_read",
+        "kind": "verify_command",
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety.",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-mixed-source-roles-tests-fixtures-byte-input-rs-fixture-read-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1` still maps to `*ptr` at `tests/fixtures/byte_input.rs:6:14` before upgrading confidence.",
+          "Write or identify a focused test for `fixture_read` first (no test reaches it yet), then build/run `cargo +nightly miri test fixture_read` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ]
+      },
+      "runtime_executed": false,
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+    "coverage": {
+      "agent_lsp_readiness": "ready",
+      "baseline_state": "new",
+      "comment_plan_status": "not_selected",
+      "contract_coverage": "missing",
+      "guard_coverage": "missing",
+      "manual_context": "absent",
+      "outcome_movement": "regressed",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing"
+    },
+    "discharge": "No visible local guard detected",
+    "hazards": [
+      "pointer_validity",
+      "alignment",
+      "initialized_memory",
+      "same_allocation"
+    ],
+    "id": "UR-mixed-source-roles-tests-fixtures-byte-input-rs-fixture-read-operation-raw_pointer_deref-deref-c47737c6108c-pointer_validity-c1",
+    "missing": [
+      "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+    "obligation_evidence": [
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is live and dereferenceable for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No pointer-liveness evidence was detected"
+        },
+        "key": "pointer-live",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `fixture_read` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "buffer has enough bytes for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No length or bounds guard code was detected"
+        },
+        "key": "bounds",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `fixture_read` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "pointer is aligned for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No alignment guard code was detected"
+        },
+        "key": "alignment",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `fixture_read` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "memory is initialized for the accessed type",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "initialized",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `fixture_read` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      },
+      {
+        "contract": {
+          "present": false,
+          "state": "missing",
+          "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+        },
+        "description": "access remains inside one live allocation",
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected"
+        },
+        "key": "allocation",
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `fixture_read` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "obligations": [
+      "pointer is live and dereferenceable for the accessed type",
+      "buffer has enough bytes for the accessed type",
+      "pointer is aligned for the accessed type",
+      "memory is initialized for the accessed type",
+      "access remains inside one live allocation"
+    ],
+    "operation": "*ptr",
+    "operation_family": "raw_pointer_deref",
+    "priority": "high",
+    "proof_path": "source_route_only",
+    "reach": "No static test mention of owner `fixture_read` was found",
+    "site": {
+      "column": 14,
+      "file": "tests/fixtures/byte_input.rs",
+      "kind": "operation",
+      "line": 6,
+      "owner": "fixture_read",
+      "public_api_surface": false,
+      "snippet": "*ptr",
+      "visibility": "private"
+    },
+    "verify_commands": [
+      "cargo +nightly miri test fixture_read",
+      "cargo +nightly careful test fixture_read"
+    ],
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "command": "cargo +nightly miri test fixture_read",
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+        "required": false
+      },
+      {
+        "command": "cargo +nightly careful test fixture_read",
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+        "required": false
+      }
+    ]
+  }
+]

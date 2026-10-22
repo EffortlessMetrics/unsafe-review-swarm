@@ -1,0 +1,86 @@
+# #2224 PR1 seam-denominator batch manifest.
+#
+# Five pinned real PRs, including one quiet control. Source-first expected
+# seams live in seams.toml; card-to-seam mapping in mapping.toml; frozen
+# first-run outputs under outputs/. Matching rules and the four baseline
+# questions live in protocol.md.
+schema_version = "seam-batch/v1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+protocol = "docs/accuracy/batches/2224-pr1/protocol.md"
+partition = "regression"
+label_status = "agent-drafted source-first; not human adjudication"
+trust_boundary = "Static unsafe contract review only. This batch measures ReviewCard seam recall, emitted-card correctness, obligation over-credit, selection usefulness, duplicates, and quiet-PR false alarms on five pinned PRs. It is not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, and not a merge verdict for any sampled PR."
+
+[acquisition]
+method = "read-only gh pr diff fetch plus pinned-head local checkout for analyzer --root"
+network_on_check_path = false
+diff_dir = "docs/accuracy/batches/2224-pr1/diffs"
+
+[analyzer]
+# Pinned at freeze time. The published-0.4.0 fixed-comparison slot is
+# reserved but unfilled: 0.4.0 is not yet published. The frozen baseline is
+# the exact development revision below.
+binary = "target/debug/unsafe-review"
+version = "0.3.8"
+revision = "8ff3bd9ae6107076d1289258f44c2be130c73003"
+revision_role = "exact development revision (origin/main at batch time)"
+fixed_comparison_040 = "unfilled: 0.4.0 not yet published; manifest reserves outputs/outputs-0.4.0/ for the comparison run"
+
+[run_config]
+command_shape = "cargo run --locked -p unsafe-review -- check --root <head-checkout> --diff <case-diff> --format json --out <frozen-output>"
+caps = "default analyzer caps; no timeouts hit; no witness execution"
+
+[[cases]]
+id = "arrayvec-143"
+repository = "bluss/arrayvec"
+pr = 143
+role = "quiet control: safe-only feature addition, zero expected seams"
+base_sha = "fc6664c540b5827c797e365b1c1dc7591c347140"
+head_sha = "633c863b0a7a8aa41fb77970abad3497cc1"
+diff_file = "diffs/arrayvec-143.diff"
+diff_sha256 = "812730708ff1d7a7a6ffa79724ca02cf84f9748ff30be01e881dcd12d59ead4e"
+expected_seams = 0
+
+[[cases]]
+id = "hashbrown-692"
+repository = "rust-lang/hashbrown"
+pr = 692
+role = "UB fix: MaybeUninit-typed control-byte slice with reworded SAFETY contract"
+base_sha = "d84a5526b24518033e9563d4ab4bebb1c6ba6c3c"
+head_sha = "7b3bba6eb4b2f03636155c918552b5f30c1a05b3"
+diff_file = "diffs/hashbrown-692.diff"
+diff_sha256 = "5a9f924063b8fa5f897d5078ab1d7ef77ced92b705a265c6dfe9d7536dec4a77"
+expected_seams = 1
+
+[[cases]]
+id = "memchr-226"
+repository = "BurntSushi/memchr"
+pr = 226
+role = "UB fix: wrapping-risk pointer sub replaced with distance, plus Miri-caught regression test"
+base_sha = "b41293b805c2709ef19d98f9b1191ca2e3a4e7c8"
+head_sha = "8221739db864a86b90e4c4f39723477f421e4dcb"
+diff_file = "diffs/memchr-226.diff"
+diff_sha256 = "868cf29bebf5154a4eccc356c33ef38fc57885445f3e3cc11582a87b39b12584"
+expected_seams = 1
+
+[[cases]]
+id = "getrandom-811"
+repository = "rust-random/getrandom"
+pr = 811
+role = "FFI fix: added ProcessPrng return-value check on the Windows backend"
+base_sha = "75895571b0eb4f9137381a0ddad876d3be5cfe53"
+head_sha = "3bcf4fc43a4707dbcc6a87827c6e0de888c74138"
+diff_file = "diffs/getrandom-811.diff"
+diff_sha256 = "dfa73b2cee6b7e5c40f01393afc95138269b4a69aefc9008b2b008ab42daee92"
+expected_seams = 1
+
+[[cases]]
+id = "arrayvec-138"
+repository = "bluss/arrayvec"
+pr = 138
+role = "raw-pointer rewrite: encode_utf8 over raw writes with branch-length guards, new unsafe helper without contract, unchecked call-site arithmetic, test-harness unsafe calls"
+base_sha = "b7b8cf8777afc11f7b9954638d21f91443101ac5"
+head_sha = "090a5c50cb3a6a6cdb7906ac3b810c2893a6c51c"
+diff_file = "diffs/arrayvec-138.diff"
+diff_sha256 = "5700259305257e237dc44bc4c9d4b9f7ed24981a2900f1f1b1a261ebdd074439"
+expected_seams = 5

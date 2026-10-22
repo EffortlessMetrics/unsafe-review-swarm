@@ -38,12 +38,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `non-overlap` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_checked`"
+          "summary": "1 related test file mentions owner `copy_checked`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_checked`"
+          "summary": "1 related test file mentions owner `copy_checked`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `copy_checked`",
+    "reach": "1 related test file mentions owner `copy_checked`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -92,6 +92,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test copy_checked",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "copies_into_shadowed_destination_path",
+        "file": "src/lib.rs",
+        "line": 26
       }
     ],
     "missing": [

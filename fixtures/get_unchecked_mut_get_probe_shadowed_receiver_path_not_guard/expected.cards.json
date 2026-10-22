@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `pick_after_shadowed_get_probe_path`"
+          "summary": "1 related test file mentions owner `pick_after_shadowed_get_probe_path`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `pick_after_shadowed_get_probe_path`",
+    "reach": "1 related test file mentions owner `pick_after_shadowed_get_probe_path`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -65,6 +65,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test pick_after_shadowed_get_probe_path",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "writes_fallback_after_receiver_path_shadowing",
+        "file": "src/lib.rs",
+        "line": 24
       }
     ],
     "missing": [

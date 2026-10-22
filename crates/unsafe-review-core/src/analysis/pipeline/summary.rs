@@ -1,6 +1,6 @@
 use crate::api::{Scope, Summary};
 use crate::domain::coverage::CoverageBlock;
-use crate::domain::{ReviewCard, ReviewClass};
+use crate::domain::{ReviewCard, ReviewClass, SourceRole};
 use crate::policy::{PolicyState, SnapshotCoverage};
 use crate::util::slug;
 use std::collections::BTreeSet;
@@ -15,7 +15,9 @@ use std::path::PathBuf;
 ///
 /// **Movement definitions (SPEC-0030)**:
 /// - `new_gaps`: open actionable cards not in the baseline ledger, constrained to
-///   changed-line sites on a diff-scoped run.
+///   exact added-line sites on a diff-scoped run. Proximity-context findings are
+///   still emitted and still count as open actionable gaps, but they are not
+///   introduced by the diff and must not inflate the new count.
 /// - `worsened_gaps`: baseline cards whose coverage regressed since the snapshot.
 /// - `improved_gaps`: baseline cards whose evidence coverage improved (pure improvement:
 ///   at least one slot advanced, no slot regressed).  Requires a saved coverage snapshot.
@@ -66,6 +68,14 @@ pub(super) fn summarize(
     let mut worsened = 0usize;
     let mut improved = 0usize;
     for card in cards {
+        // Source-role triage counts cover every emitted card: production
+        // first does not mean production only.
+        match card.site.role {
+            SourceRole::Production => summary.production_cards += 1,
+            SourceRole::Test => summary.test_cards += 1,
+            SourceRole::Generated => summary.generated_cards += 1,
+            SourceRole::Unknown => summary.unknown_cards += 1,
+        }
         if card.class.is_actionable() {
             summary.open_actionable_gaps += 1;
             // diff-scoped: only count new gaps on changed lines; repo-mode: all new gaps count.

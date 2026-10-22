@@ -5,7 +5,7 @@ use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-pub(super) struct SyntaxSiteIndex {
+pub(crate) struct SyntaxSiteIndex {
     operation_lines: BTreeSet<usize>,
     operation_block_lines: BTreeSet<usize>,
 }

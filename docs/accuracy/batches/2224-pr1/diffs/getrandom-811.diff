@@ -1,0 +1,55 @@
+diff --git a/CHANGELOG.md b/CHANGELOG.md
+index 719fde63d..b95fc72e2 100644
+--- a/CHANGELOG.md
++++ b/CHANGELOG.md
+@@ -4,6 +4,15 @@ All notable changes to this project will be documented in this file.
+ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/)
+ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
+ 
++## [Unreleased]
++
++[Unreleased]: https://github.com/rust-random/getrandom/compare/v0.4.1...master
++
++### Fixed
++- Check the return value of `ProcessPrng` on Windows [#811]
++
++[#811]: https://github.com/rust-random/getrandom/pull/811
++
+ ## [0.4.1] - 2026-02-03
+ 
+ ### Fixed
+diff --git a/src/backends/windows.rs b/src/backends/windows.rs
+index b6ea76345..ffe2a3181 100644
+--- a/src/backends/windows.rs
++++ b/src/backends/windows.rs
+@@ -49,9 +49,25 @@ const TRUE: BOOL = 1;
+ #[inline]
+ pub fn fill_inner(dest: &mut [MaybeUninit<u8>]) -> Result<(), Error> {
+     let result = unsafe { ProcessPrng(dest.as_mut_ptr().cast::<u8>(), dest.len()) };
+-    // `ProcessPrng` is documented to always return TRUE. All potential errors are handled
+-    // during loading of `BCryptPrimitive.dll`. See the "Process base PRNG" section
+-    // in the aforementioned Windows RNG whitepaper for more information.
+-    debug_assert!(result == TRUE);
+-    Ok(())
++    // On Windows 10 and later, `ProcessPrng` is documented to always return
++    // TRUE. All potential errors are handled during loading of
++    // `BCryptPrimitive.dll`. See the "Process base PRNG" section in the
++    // aforementioned Windows RNG whitepaper for more information.
++    //
++    // The Zig project found that Windows 8 implements `ProcessPrng` in a way
++    // that may fail and return a value other than `TRUE`. Although recent
++    // versions of the Rust toolchain do not support Windows 8, we cannot rule
++    // out this backend being used in an executable that will run on Windows 8
++    // (e.g. a fork of this crate backported to have an MSRV lower than 1.76,
++    // or a fork of the Rust toolchain to support older Windows versions, or
++    // other build hacks).
++    //
++    // Further, Wine's implementation of `ProcessPrng` CAN fail, in every
++    // version through Wine 11.2, and this may be the case for any other Windows
++    // emulation layers.
++    if result == TRUE {
++        Ok(())
++    } else {
++        Err(Error::UNEXPECTED)
++    }
+ }

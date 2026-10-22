@@ -41,7 +41,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `assume_new`"
+          "summary": "1 related test file mentions owner `assume_new`"
         },
         "witness": {
           "present": false,
@@ -52,7 +52,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `assume_new`",
+    "reach": "1 related test file mentions owner `assume_new`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -66,6 +66,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test assume_new",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "assumes_new",
+        "file": "src/lib.rs",
+        "line": 14
       }
     ],
     "missing": [

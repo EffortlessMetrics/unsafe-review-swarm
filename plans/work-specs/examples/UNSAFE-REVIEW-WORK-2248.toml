@@ -1,0 +1,122 @@
+# Basis: swarm f281130eff518edec829d4b9a37205a536357ed3.
+# Source e718c06325d1e8e1769f8973cd35bb3303395561 contains this swarm head;
+# its compare adds packaging/docs/LSP goldens, not a fix to this receipt path.
+# Initial delivery is an unmerged regression-first draft, not a completed fix.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2248"
+kind = "correctness"
+objective = "Retain adverse and inconclusive observations without retiring the outstanding reviewer action."
+user_outcome = "Importing a matching receipt exposes its result while the same unresolved operation stays visible in canonical review state and refreshed outcomes."
+claim_boundary = "Controlled saved-receipt regressions test classification and projection behavior, not witness execution, site reach, safety, calibration or release readiness. The first draft supplies acceptance tests; it does not claim the production transition has been fixed."
+dependencies = []
+blockers = []
+affected_files = [
+    "crates/unsafe-review-core/tests/witness_observation.rs",
+    "crates/unsafe-review-core/src/analysis/receipts.rs",
+    "crates/unsafe-review-core/src/analysis/pipeline/card_builder.rs",
+    "crates/unsafe-review-core/src/domain/classification.rs",
+    "crates/unsafe-review-core/src/output/outcome/mod.rs",
+]
+affected_symbols = [
+    "confirmed_verdict_receipt_preserves_card_priority_and_marks_witnessed",
+    "ReviewClass::is_actionable",
+    "ReviewClass::sarif_level",
+    "ReviewClass::lsp_severity",
+    "compare_outcome_json",
+]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0009", "UNSAFE-REVIEW-SPEC-0044"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Reuse the Box-origin fixture through the public analysis API and actual saved-receipt loader",
+    "Capture the exact card ID and serialize the before snapshot before importing a receipt",
+    "Keep confirmed/inconclusive observations, remaining actionability, priority and canonical severity coherent",
+    "Retain the same unresolved card in the outcome consumer's remaining-work projection",
+    "Preserve no-verdict, not-reproduced and wrong-tool controls",
+    "Update existing contradictory expectations with the eventual canonical transition fix",
+]
+excluded = [
+    "Executing Miri, the scanned fixture or third-party source",
+    "Default execution, automatic repair/comment posting, or blocking product findings",
+    "Changing scanner families, source-role filtering, baseline or suppression policy",
+    "Selecting a new public enum or compatibility policy without mapping its affected consumers",
+    "Whole receipt-subject identity migration, broad outcome redesign, or release work",
+    "Merging the regression-only draft while it still fails the intended contract",
+]
+
+[[invariant]]
+id = "INV-2248-OBSERVATION"
+text = "Receipt presence, its verdict, and remaining reviewer work are separate facts; a failed or uncertain observation is retained rather than discarded to keep an action open."
+
+[[invariant]]
+id = "INV-2248-IDENTITY"
+text = "Before and after refer to the same captured operation ID and unchanged controlled source; a first-card lookup cannot silently switch the subject."
+
+[[invariant]]
+id = "INV-2248-PROJECTION"
+text = "Severity and eligibility derive from canonical state, not a renderer-local priority override. Improved knowledge may coexist with unresolved work."
+
+[[acceptance]]
+id = "AC-2248-CONFIRMED"
+text = "A matching confirmed receipt remains present, does not reduce priority, and leaves the operation actionable with non-closed canonical severity."
+proof = ["cargo test --locked -p unsafe-review-core --test witness_observation confirmed_observation_keeps_review_work_open"]
+
+[[acceptance]]
+id = "AC-2248-INCONCLUSIVE"
+text = "An inconclusive observation preserves unresolved verification work without reducing priority or treating the receipt as successful completion."
+proof = ["cargo test --locked -p unsafe-review-core --test witness_observation inconclusive_observation_keeps_review_work_open"]
+
+[[acceptance]]
+id = "AC-2248-OUTCOME"
+text = "The public snapshot comparator keeps the exact operation in remaining work and does not report it resolved solely after adverse/uncertain receipt import. A gain in evidence need not be forbidden from the improved-information axis."
+proof = ["cargo test --locked -p unsafe-review-core --test witness_observation adverse_observations_remain_in_outcome_work"]
+
+[[acceptance]]
+id = "AC-2248-CONTROLS"
+text = "No-verdict and not-reproduced receipts retain their supported observations; a wrong-tool receipt cannot clear the current route. Existing expired/human-receipt compatibility tests remain in the broader suite."
+proof = [
+    "cargo test --locked -p unsafe-review-core --test witness_observation non_adverse_receipt_controls_preserve_their_observations",
+    "cargo test --locked -p unsafe-review-core --test witness_observation wrong_tool_receipt_does_not_clear_work",
+    "cargo test --locked -p unsafe-review-core receipts",
+]
+
+[[acceptance]]
+id = "AC-2248-INTEGRATION"
+text = "After the production fix, all affected canonical mappings, existing receipt expectations and repository gates pass on the new head; an expected-red draft is never treated as a passing implementation."
+proof = [
+    "cargo fmt --all -- --check",
+    "cargo test --locked -p unsafe-review-core --test witness_observation",
+    "cargo run --locked -p xtask -- check-work-specs",
+    "cargo run --locked -p xtask -- check-pr",
+]
+
+[[integration]]
+surface = "existing_receipt_regression"
+expected = "Retain the useful priority/source setup of the existing confirmed-verdict test, but replace its contradictory forced evidence-complete expectation when implementing the canonical fix. Do not disable either test to get green."
+
+[[integration]]
+surface = "outcome_consumer"
+expected = "Consume verdict-aware canonical actionability instead of allowing the comparator's separate class table to retire the operation. Preserve the distinction between better evidence and successful repair."
+
+[[integration]]
+surface = "source_swarm"
+expected = "The regression draft does not change product source or the sync checkpoint. Record source e718c063 versus swarm f281130e explicitly; normal source-sync reconciliation remains a separate existing-owner task before feature integration."
+
+[[risk]]
+id = "RISK-2248-FALSE-RED"
+mitigation = "Require the real Box-origin guarded-unwitnessed baseline and matching imported verdict; a compile failure, missing fixture or malformed receipt is not evidence of the intended defect."
+
+[[risk]]
+id = "RISK-2248-SHALLOW-FIX"
+mitigation = "Check remaining-work counts and the public outcome API in addition to priority; do not hardcode a replacement class or patch only one renderer."
+
+[[risk]]
+id = "RISK-2248-SCOPE"
+mitigation = "Leave unrelated bindings, execution capture and semantic analysis to their current owners. Keep one writer on overlapping card-builder changes and allow independent executor work to proceed."
+
+[compatibility]
+posture = "The initial commit adds tests and this work spec only. The later implementation must account for exhaustive class/consumer mappings without silently changing saved-receipt or suppression compatibility."
+
+[rollback]
+strategy = "Revert only this bounded branch's test and implementation changes together if abandoned; preserve the issue's counterexamples and do not restore an unsupported completed-verification claim."

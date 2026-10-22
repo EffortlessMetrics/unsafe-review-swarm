@@ -25,6 +25,11 @@ impl BuildThisFirstCue {
             summary,
         }
     }
+
+    #[cfg(test)]
+    pub(crate) fn summary(&self) -> &str {
+        &self.summary
+    }
 }
 
 #[derive(Serialize)]
@@ -101,15 +106,32 @@ pub(crate) fn hypothesis_to_confirm(card: &ReviewCard) -> String {
     )
 }
 
+/// The card owner when a test-first precondition applies: the card is
+/// unreached (no test mentions the owner) yet carries a test-filtered witness
+/// command that cannot run until such a test exists. Ownerless cards and
+/// reached cards have no such precondition.
+pub(crate) fn unreached_command_owner(card: &ReviewCard) -> Option<&str> {
+    if card.reach.state != "unreached" || card.next_action.verify_commands.is_empty() {
+        return None;
+    }
+    card.site.owner.as_deref().filter(|owner| !owner.is_empty())
+}
+
 pub(crate) fn build_this_first(card: &ReviewCard) -> BuildThisFirstCue {
     if let Some(command) = card.next_action.verify_commands.first() {
+        let summary = match unreached_command_owner(card) {
+            Some(owner) => format!(
+                "No test reaches `{owner}` yet; write or identify a focused test for `{owner}` first, then build/run `{command}` for this card; attach a matching receipt only if it confirms the route"
+            ),
+            None => format!(
+                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
+            ),
+        };
         return BuildThisFirstCue::new(
             "verify_command",
             Some(command.clone()),
             card.routes.first().map(|route| route.kind.as_str()),
-            format!(
-                "Build/run `{command}` first for this card; attach a matching receipt only if it confirms the route"
-            ),
+            summary,
         );
     }
     if let Some(route) = card.routes.first() {
@@ -139,13 +161,21 @@ pub(crate) fn minimal_repro(card: &ReviewCard) -> MinimalReproCue {
         location_label(card)
     );
     if let Some(command) = card.next_action.verify_commands.first() {
+        let run_step = match unreached_command_owner(card) {
+            Some(owner) => format!(
+                "Write or identify a focused test for `{owner}` first (no test reaches it yet), then build/run `{command}` as the smallest available command for this card."
+            ),
+            None => {
+                format!("Build/run `{command}` as the smallest available command for this card.")
+            }
+        };
         return MinimalReproCue::new(
             "verify_command",
             Some(command.clone()),
             card.routes.first().map(|route| route.kind.as_str()),
             vec![
                 identity_step,
-                format!("Build/run `{command}` as the smallest available command for this card."),
+                run_step,
                 "Attach a matching receipt only if that run confirms the same route and ReviewCard identity.".to_string(),
             ],
         );
@@ -191,9 +221,14 @@ pub(crate) fn minimal_repro(card: &ReviewCard) -> MinimalReproCue {
 
 pub(crate) fn confirmation_step(card: &ReviewCard) -> String {
     if let Some(command) = card.next_action.verify_commands.first() {
-        return format!(
-            "build/run `{command}` first, then attach a matching receipt if it confirms the route"
-        );
+        return match unreached_command_owner(card) {
+            Some(owner) => format!(
+                "write or identify a focused test for `{owner}` first (no test reaches it yet), then build/run `{command}` first, then attach a matching receipt if it confirms the route"
+            ),
+            None => format!(
+                "build/run `{command}` first, then attach a matching receipt if it confirms the route"
+            ),
+        };
     }
     if let Some(route) = card.routes.first() {
         return format!(

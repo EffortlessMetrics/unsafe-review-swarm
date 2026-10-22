@@ -173,6 +173,7 @@ fn diagnostics_for_with_status(
 /// evidence, or readiness.  The DTO remains read-only and advisory.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct EditorDiagnostic {
+    pub actionable: bool,
     pub card_id: String,
     pub code: String,
     pub coverage: EditorCoverageBlock,
@@ -217,6 +218,7 @@ impl EditorDiagnostic {
         )
         .state;
         Self {
+            actionable: card.class.is_actionable(),
             card_id: card.id.0.clone(),
             code: card.class.as_str().to_string(),
             coverage: EditorCoverageBlock::from(coverage_block),

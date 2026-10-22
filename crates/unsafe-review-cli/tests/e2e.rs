@@ -568,7 +568,7 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     let stdout = String::from_utf8(output.stdout)?;
 
     assert!(
-        stdout.contains("  pr        first-run PR review bundle"),
+        stdout.contains("  pr           first-run PR review bundle"),
         "help must mention the `pr` first-run entry point: {stdout}"
     );
     assert!(
@@ -577,9 +577,17 @@ fn help_output_mentions_pr_alias() -> Result<(), Box<dyn Error>> {
     );
     assert!(
         stdout.contains(
-            "pr-setup  print read-only external GitHub PR checkout and raw-diff commands"
+            "pr-setup     print read-only external GitHub PR checkout and raw-diff commands"
         ),
         "help must mention the read-only external PR setup helper: {stdout}"
+    );
+    assert!(
+        stdout.contains("  scope        name the analyzed source state"),
+        "help must mention the read-only scope identity: {stdout}"
+    );
+    assert!(
+        stdout.contains("  environment  name the analyzed configuration envelope"),
+        "help must mention the read-only environment identity: {stdout}"
     );
 
     Ok(())
@@ -691,6 +699,10 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
     let mut expected = vec![
         "check",
         "repo",
+        "scope",
+        "work",
+        "agent",
+        "environment",
         "pr",
         "pr-setup",
         "first-pr",
@@ -722,7 +734,28 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
 }
 
 /// Column (0-indexed) where every top-level help command description starts.
-const HELP_DESCRIPTION_COLUMN: usize = 12;
+const HELP_DESCRIPTION_COLUMN: usize = 15;
+
+#[test]
+fn doctor_names_missing_witness_tools_as_informational() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("doctor")
+            .arg("--root")
+            .arg(fixture_root("raw_pointer_alignment")),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains(
+            "missing witness tools are informational only: review and witness routing still work without them; install a tool only to run its opt-in witness"
+        ),
+        "doctor must give a next step for missing witness tools\nstdout:\n{stdout}"
+    );
+
+    Ok(())
+}
 
 #[test]
 fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
@@ -758,6 +791,36 @@ fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> 
             stdout.contains(artifact),
             "first-pr help must list bundle artifact `{artifact}`\nstdout:\n{stdout}"
         );
+    }
+
+    Ok(())
+}
+
+#[test]
+fn review_command_helps_document_exit_code_contract() -> Result<(), Box<dyn Error>> {
+    // Agents script on exit codes, and they read per-command help, not just the
+    // top-level overview. Every review-command help must restate the 0/1/2
+    // contract next to its trust boundary.
+    for command in ["check", "first-pr", "pilot", "repo"] {
+        let output = checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .arg("unsafe-review")
+                .arg(command)
+                .arg("--help"),
+        )?;
+        let stdout = String::from_utf8(output.stdout)?;
+
+        for line in [
+            "Exit codes:",
+            "0  ran to completion: clean, or advisory findings (advisory policy default)",
+            "1  ran to completion: no-new-debt policy found new or worsened coverage gaps",
+            "2  tool did not complete a review: usage, input/IO, or internal error",
+        ] {
+            assert!(
+                stdout.contains(line),
+                "`{command} --help` must document `{line}`\nstdout:\n{stdout}"
+            );
+        }
     }
 
     Ok(())
@@ -816,6 +879,28 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
             "first-pr help must include exact external PR setup cue `{expected}`\nstdout:\n{stdout}"
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn explain_help_names_markdown_as_default_format() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("explain")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("- --format <name> markdown (default) or json"),
+        "explain help must name markdown as the default format\nstdout:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("json (default)"),
+        "explain help must not claim json is the default format\nstdout:\n{stdout}"
+    );
 
     Ok(())
 }
@@ -1153,6 +1238,561 @@ fn init_is_preview_only_deterministic_and_conflict_visible() -> Result<(), Box<d
     assert!(!root.join("unsafe-review-init.json").exists());
 
     Ok(())
+}
+
+#[cfg(unix)]
+#[test]
+fn init_unrepresentable_root_retains_preview_without_lossy_handoffs() -> Result<(), Box<dyn Error>>
+{
+    use std::ffi::OsString;
+    use std::os::unix::ffi::OsStringExt;
+
+    let temp = TempDir::new("unsafe-review-init-path-encoding")?;
+    let root = temp.path().join(OsString::from_vec(b"repo-\xff".to_vec()));
+    init_handoff_repo(&root)?;
+    run_git(&root, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::create_dir_all(workflow.parent().ok_or("workflow parent")?)?;
+    fs::write(&workflow, "name: owner-managed-workflow\n")?;
+    let before = work_tree_state(&root)?;
+    // Lossy conversion must never redirect inspection or a later command.
+    let lossy_alias = PathBuf::from(root.to_string_lossy().into_owned());
+    fs::create_dir_all(&lossy_alias)?;
+    fs::write(lossy_alias.join("alias-only.txt"), "wrong repository\n")?;
+    let proposal_dir = temp.path().join("proposal");
+    let run_init = |format, out: bool| {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command.args(["unsafe-review", "init", "--format", format]);
+        command.current_dir(&root);
+        if out {
+            command.arg("--out").arg(&proposal_dir);
+        }
+        checked_output(&mut command)
+    };
+
+    let first = run_init("json", false)?;
+    let proposal: Value = serde_json::from_slice(&first.stdout)?;
+    assert_eq!(proposal["mode"], "preview_only");
+    assert_eq!(proposal["writes_repository"], false);
+    assert!(proposal.as_object().ok_or("proposal")?.contains_key("root"));
+    assert!(proposal["root"].is_null());
+    assert!(proposal["root_display"].is_string());
+    assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert_eq!(proposal["repository"]["base_ref"], "origin/main");
+    assert_eq!(proposal["proposed_files"][0]["status"], "conflict");
+    assert!(
+        proposal["proposed_files"][0]
+            .as_object()
+            .ok_or("file")?
+            .contains_key("absolute_path")
+    );
+    assert!(proposal["proposed_files"][0]["absolute_path"].is_null());
+    assert_contains(
+        proposal["proposed_files"][0]["diff"]
+            .as_str()
+            .ok_or("diff")?,
+        "owner-managed-workflow",
+    );
+    for key in [
+        "doctor",
+        "first_pr",
+        "first_pr_artifacts",
+        "review_baseline_separately",
+    ] {
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands")?
+                .contains_key(key)
+        );
+        assert!(
+            proposal["commands"][key].is_null(),
+            "lossy command/path: {key}"
+        );
+    }
+    let warnings = proposal["warnings"].as_array().ok_or("warnings")?;
+    assert!(proposal["repository"]["git_root"].is_null());
+    assert!(
+        !warnings
+            .iter()
+            .any(|warning| warning["code"] == "missing_git"),
+        "non-UTF-8 checkout identity is unavailable, not absent"
+    );
+    assert!(
+        warnings
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    let recommendations = proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?;
+    for (kind, keys) in [
+        ("baseline", vec!["command", "ledger_path", "snapshot_path"]),
+        ("badge", vec!["command"]),
+        ("ub_review", vec!["artifact"]),
+    ] {
+        let recommendation = recommendations
+            .iter()
+            .find(|item| item["kind"] == kind)
+            .ok_or("recommendation")?;
+        for key in keys {
+            assert!(
+                recommendation
+                    .as_object()
+                    .ok_or("recommendation object")?
+                    .contains_key(key)
+            );
+        }
+    }
+    for recommendation in recommendations {
+        for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
+            assert!(recommendation[key].is_null(), "lossy recommendation: {key}");
+        }
+    }
+    let human = String::from_utf8(run_init("human", false)?.stdout)?;
+    assert_contains(&human, "unrepresentable_path");
+    assert_contains(&human, "unavailable");
+    assert!(!human.contains("unsafe-review doctor --root"));
+    assert!(!human.contains("Provide an explicit --base"));
+    assert_eq!(first.stdout, run_init("json", false)?.stdout);
+    assert!(!proposal_dir.exists());
+    assert_eq!(first.stdout, run_init("json", true)?.stdout);
+    assert!(proposal_dir.join("unsafe-review-init.json").is_file());
+    assert_eq!(fs::read_dir(&proposal_dir)?.count(), 1);
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: owner-managed-workflow\n"
+    );
+    for destination in ["target", "policy", "badges", "unsafe-review-init.json"] {
+        assert!(!root.join(destination).exists());
+        assert!(!lossy_alias.join(destination).exists());
+    }
+    assert_eq!(work_tree_state(&root)?, before);
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_ordinary_control() -> Result<(), Box<dyn Error>> {
+    let mut temp = TempDir::new("unsafe-review-init-windows-control")?;
+    temp.path = fs::canonicalize(temp.path())?;
+    let root = temp.path().join("ordinary-control");
+    fs::create_dir_all(&root)?;
+    let proposal = init_handoff_proposal(temp.path(), &root)?;
+    assert!(proposal["root"].is_string());
+    assert!(proposal["commands"]["doctor"].is_string());
+    assert!(proposal["commands"]["first_pr_artifacts"].is_string());
+    assert!(proposal["proposed_files"][0]["absolute_path"].is_string());
+    assert!(
+        !proposal["warnings"]
+            .as_array()
+            .ok_or("warnings")?
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    Ok(())
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_period() -> Result<(), Box<dyn Error>> {
+    init_native_identity_windows_refusal(".")
+}
+
+#[cfg(windows)]
+#[test]
+fn init_native_identity_windows_space() -> Result<(), Box<dyn Error>> {
+    init_native_identity_windows_refusal(" ")
+}
+
+#[cfg(windows)]
+fn init_native_identity_windows_refusal(suffix: &str) -> Result<(), Box<dyn Error>> {
+    let mut temp = TempDir::new("unsafe-review-init-windows-identity")?;
+    // Keep creation, inspection and cleanup in the native Windows namespace.
+    temp.path = fs::canonicalize(temp.path())?;
+    let stem = "repo";
+    let alias = temp.path().join(&stem);
+    let root = temp.path().join(format!("{stem}{suffix}"));
+    for path in [&root, &alias] {
+        fs::create_dir_all(path.join(".github/workflows"))?;
+    }
+    assert_ne!(fs::canonicalize(&root)?, fs::canonicalize(&alias)?);
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"native-root\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    let workflow = root.join(".github/workflows/unsafe-review-first-pr.yml");
+    let alias_workflow = alias.join(".github/workflows/unsafe-review-first-pr.yml");
+    fs::write(&workflow, "name: native-owner-workflow\n")?;
+    fs::write(&alias_workflow, "name: alias-owner-workflow\n")?;
+
+    let proposal = init_handoff_proposal(temp.path(), &root)?;
+    assert_eq!(proposal["mode"], "preview_only");
+    assert_eq!(proposal["writes_repository"], false);
+    assert_eq!(proposal["repository"]["cargo_manifest"], true);
+    assert!(proposal["root"].is_null());
+    assert_eq!(
+        Path::new(proposal["root_display"].as_str().ok_or("root display")?),
+        fs::canonicalize(&root)?
+    );
+    let file = &proposal["proposed_files"][0];
+    assert_eq!(file["status"], "conflict");
+    assert!(file["absolute_path"].is_null());
+    let diff = file["diff"].as_str().ok_or("native conflict diff")?;
+    assert_contains(diff, "native-owner-workflow");
+    assert!(!diff.contains("alias-owner-workflow"));
+    for key in [
+        "doctor",
+        "first_pr",
+        "first_pr_artifacts",
+        "review_baseline_separately",
+    ] {
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands")?
+                .contains_key(key)
+        );
+        assert!(
+            proposal["commands"][key].is_null(),
+            "ambiguous identity: {key}"
+        );
+    }
+    for recommendation in proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?
+    {
+        for key in ["command", "ledger_path", "snapshot_path", "artifact"] {
+            assert!(
+                recommendation[key].is_null(),
+                "ambiguous recommendation: {key}"
+            );
+        }
+    }
+    assert!(
+        proposal["warnings"]
+            .as_array()
+            .ok_or("warnings")?
+            .iter()
+            .any(|warning| warning["code"] == "unrepresentable_path")
+    );
+    assert_eq!(
+        proposal,
+        init_handoff_proposal(temp.path(), &root)?,
+        "native preview must remain deterministic"
+    );
+    assert_eq!(
+        fs::read_to_string(&workflow)?,
+        "name: native-owner-workflow\n"
+    );
+    assert_eq!(
+        fs::read_to_string(&alias_workflow)?,
+        "name: alias-owner-workflow\n"
+    );
+    assert!(!alias.join("Cargo.toml").exists());
+    for destination in ["target", "policy", "badges", "unsafe-review-init.json"] {
+        assert!(!root.join(destination).exists());
+        assert!(!alias.join(destination).exists());
+    }
+    Ok(())
+}
+
+#[test]
+fn init_handoffs_keep_foreign_root_base_and_output() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-foreign-root")?;
+    let caller = temp.path().join("caller");
+    let target = temp.path().join("target repo's $literal;name");
+    init_handoff_repo(&caller)?;
+    init_handoff_repo(&target)?;
+    fs::write(
+        caller.join("src/caller_only.rs"),
+        "pub unsafe fn caller_only(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    fs::write(caller.join("src/inherited.rs"), "pub fn caller_safe() {}\n")?;
+    let caller_before = work_tree_state(&caller)?;
+    run_git(&target, &["update-ref", "refs/remotes/origin/main", "HEAD"])?;
+    fs::write(
+        target.join("src/lib.rs"),
+        "pub unsafe fn changed_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&target, &["add", "src/lib.rs"])?;
+    run_git(&target, &["commit", "-qm", "changed seam"])?;
+
+    // Relative input must remain usable after copying the handoff to another cwd.
+    let relative_target = Path::new("..").join(target.file_name().ok_or("target name")?);
+    let proposal = init_handoff_proposal(&caller, &relative_target)?;
+    let absolute_proposal = init_handoff_proposal(&caller, &target)?;
+    assert_eq!(proposal["commands"], absolute_proposal["commands"]);
+    let resolved_target = PathBuf::from(proposal["root"].as_str().ok_or("resolved root")?);
+    assert_eq!(
+        fs::canonicalize(&resolved_target)?,
+        fs::canonicalize(&target)?
+    );
+    let first_pr = proposal["commands"]["first_pr"]
+        .as_str()
+        .ok_or("first PR command missing despite resolvable base")?;
+    assert_contains(first_pr, "--base origin/main");
+    assert_contains(first_pr, "--out-dir");
+    assert!(
+        !target.join("target").exists(),
+        "init must remain preview-only"
+    );
+    assert_eq!(work_tree_state(&caller)?, caller_before);
+
+    let human = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .args(["unsafe-review", "init", "--root"])
+            .arg(&target)
+            .current_dir(&caller),
+    )?;
+    let human = String::from_utf8(human.stdout)?;
+    for (label, key) in [("Doctor", "doctor"), ("First PR", "first_pr")] {
+        let command = proposal["commands"][key].as_str().ok_or("command string")?;
+        assert_contains(&human, &format!("- {label}: {command}\n"));
+        let output = init_follow_handoff(&caller, command)?;
+        if key == "doctor" {
+            assert_contains(
+                &String::from_utf8(output.stdout)?,
+                &format!("workspace root: {}", resolved_target.display()),
+            );
+        }
+    }
+    let artifact_dir = PathBuf::from(
+        proposal["commands"]["first_pr_artifacts"]
+            .as_str()
+            .ok_or("artifact destination")?,
+    );
+    assert_eq!(artifact_dir, resolved_target.join("target/unsafe-review"));
+    let cards: Value = serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
+    let cards = cards["cards"].as_array().ok_or("cards array")?;
+    assert!(!cards.is_empty(), "changed unsafe seam must be selected");
+    for card in cards {
+        assert_eq!(card["site"]["file"], "src/lib.rs");
+        assert_eq!(card["site"]["owner"], "changed_byte");
+    }
+
+    let recommendations = proposal["recommendations"]
+        .as_array()
+        .ok_or("recommendations")?;
+    let badge = recommendations
+        .iter()
+        .find(|item| item["kind"] == "badge")
+        .ok_or("badge")?;
+    init_follow_handoff(&caller, badge["command"].as_str().ok_or("badge command")?)?;
+    assert!(target.join("badges/unsafe-review.json").is_file());
+    let expected_badges = temp.path().join("expected-badges");
+    let caller_badges = temp.path().join("caller-badges");
+    for (root, out) in [(&target, &expected_badges), (&caller, &caller_badges)] {
+        checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .args(["unsafe-review", "badges", "--root"])
+                .arg(root)
+                .arg("--out")
+                .arg(out),
+        )?;
+    }
+    let generated_badge = fs::read(target.join("badges/unsafe-review.json"))?;
+    assert_eq!(
+        generated_badge,
+        fs::read(expected_badges.join("unsafe-review.json"))?
+    );
+    assert_ne!(
+        generated_badge,
+        fs::read(caller_badges.join("unsafe-review.json"))?
+    );
+    let baseline = recommendations
+        .iter()
+        .find(|item| item["kind"] == "baseline")
+        .ok_or("baseline")?;
+    let preview = init_follow_handoff(
+        &caller,
+        &format!(
+            "{} --dry-run --format json",
+            baseline["command"].as_str().ok_or("baseline command")?
+        ),
+    )?;
+    let preview: Value = serde_json::from_slice(&preview.stdout)?;
+    assert_eq!(preview["mode"], "preview");
+    assert_eq!(preview["writes_files"], false);
+    let debt_cards = preview["cards"].as_array().ok_or("baseline debt cards")?;
+    for path in ["src/lib.rs", "src/inherited.rs"] {
+        assert!(
+            debt_cards.iter().any(|card| card["path"] == path),
+            "missing target debt: {path}"
+        );
+    }
+    assert!(
+        !debt_cards
+            .iter()
+            .any(|card| card["path"] == "src/caller_only.rs")
+    );
+    assert_eq!(
+        Path::new(baseline["ledger_path"].as_str().ok_or("ledger path")?),
+        resolved_target.join("policy/unsafe-review-baseline.toml")
+    );
+    assert_eq!(preview["ledger_path"], baseline["ledger_path"]);
+    assert_eq!(preview["snapshot_path"], baseline["snapshot_path"]);
+    assert!(
+        !target.join("policy").exists(),
+        "baseline preview must not write"
+    );
+
+    // Repeating the copied PR command from a third cwd retains scope and output.
+    init_follow_handoff(temp.path(), first_pr)?;
+    let repeated: Value =
+        serde_json::from_str(&fs::read_to_string(artifact_dir.join("cards.json"))?)?;
+    assert_eq!(repeated["cards"].as_array().ok_or("repeated cards")?, cards);
+    assert_eq!(work_tree_state(&caller)?, caller_before);
+    for destination in ["target", "badges", "policy"] {
+        assert!(
+            !caller.join(destination).exists(),
+            "handoff wrote into caller: {destination}"
+        );
+        assert!(
+            !temp.path().join(destination).exists(),
+            "handoff wrote into third cwd: {destination}"
+        );
+    }
+    Ok(())
+}
+
+#[test]
+fn init_missing_base_requires_input_instead_of_repo_scan() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-missing-base")?;
+    for git_checkout in [false, true] {
+        let root = temp
+            .path()
+            .join(if git_checkout { "git" } else { "no-git" });
+        fs::create_dir_all(&root)?;
+        if git_checkout {
+            init_handoff_repo(&root)?;
+        }
+        let proposal = init_handoff_proposal(temp.path(), &root)?;
+        assert!(
+            proposal["commands"]
+                .as_object()
+                .ok_or("commands object")?
+                .contains_key("first_pr")
+        );
+        assert!(
+            proposal["commands"]["first_pr"].is_null(),
+            "missing base must not offer an unconstrained PR: {proposal}"
+        );
+        let prerequisite = proposal["commands"]["first_pr_prerequisite"]
+            .as_str()
+            .ok_or("explicit missing-base prerequisite")?;
+        assert_contains(prerequisite, "--base");
+        assert_contains(prerequisite, "--diff");
+        let human = checked_output(
+            Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+                .args(["unsafe-review", "init", "--root"])
+                .arg(&root),
+        )?;
+        assert_contains(&String::from_utf8(human.stdout)?, prerequisite);
+        assert!(!root.join("target").exists());
+    }
+    Ok(())
+}
+
+#[test]
+fn init_handoff_carries_each_detected_base() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-init-base-priority")?;
+    let root = temp.path();
+    init_handoff_repo(root)?;
+    for reference in ["review-base", "main", "master"] {
+        run_git(
+            root,
+            &[
+                "update-ref",
+                &format!("refs/remotes/origin/{reference}"),
+                "HEAD",
+            ],
+        )?;
+    }
+    run_git(
+        root,
+        &[
+            "symbolic-ref",
+            "refs/remotes/origin/HEAD",
+            "refs/remotes/origin/review-base",
+        ],
+    )?;
+    for (reference, remove) in [
+        ("origin/review-base", "refs/remotes/origin/HEAD"),
+        ("origin/main", "refs/remotes/origin/main"),
+        ("origin/master", "refs/remotes/origin/master"),
+    ] {
+        let proposal = init_handoff_proposal(root, root)?;
+        assert_eq!(proposal["repository"]["base_ref"], reference);
+        assert_contains(
+            proposal["commands"]["first_pr"]
+                .as_str()
+                .ok_or("PR command")?,
+            &format!("--base {reference}"),
+        );
+        if remove.ends_with("HEAD") {
+            run_git(root, &["symbolic-ref", "--delete", remove])?;
+        } else {
+            run_git(root, &["update-ref", "-d", remove])?;
+        }
+    }
+    Ok(())
+}
+
+fn init_handoff_repo(root: &Path) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(root.join("src"))?;
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "init@example.test"])?;
+    run_git(root, &["config", "user.name", "init handoff test"])?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"init-handoff\"\nversion = \"0.0.0\"\nedition = \"2024\"\n",
+    )?;
+    fs::write(root.join(".gitignore"), "target/\nbadges/\n")?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    fs::write(
+        root.join("src/inherited.rs"),
+        "pub unsafe fn inherited_only(ptr: *const u8) -> u8 { unsafe { *ptr } }\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    Ok(())
+}
+
+fn init_handoff_proposal(caller: &Path, root: &Path) -> Result<Value, Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .args(["unsafe-review", "init", "--root"])
+            .arg(root)
+            .args(["--format", "json"])
+            .current_dir(caller),
+    )?;
+    Ok(serde_json::from_slice(&output.stdout)?)
+}
+
+fn init_follow_handoff(caller: &Path, generated: &str) -> Result<Output, Box<dyn Error>> {
+    // Substitute only the executable, leaving the actual generated shell arguments intact.
+    let arguments = generated
+        .strip_prefix("unsafe-review ")
+        .ok_or("handoff executable")?;
+    let mut shell = if cfg!(windows) {
+        let mut command = Command::new("powershell.exe");
+        command.args(["-NoProfile", "-NonInteractive", "-Command"]);
+        command.arg(format!("function unsafe_review_test {{ & $env:UNSAFE_REVIEW_TEST_BIN unsafe-review @args }}; unsafe_review_test {arguments}; exit $LASTEXITCODE"));
+        command
+    } else {
+        let mut command = Command::new("sh");
+        command.arg("-c").arg(format!("unsafe_review_test() {{ \"$UNSAFE_REVIEW_TEST_BIN\" unsafe-review \"$@\"; }}; unsafe_review_test {arguments}"));
+        command
+    };
+    checked_output(
+        shell
+            .env(
+                "UNSAFE_REVIEW_TEST_BIN",
+                env!("CARGO_BIN_EXE_cargo-unsafe-review"),
+            )
+            .current_dir(caller),
+    )
 }
 
 #[test]
@@ -1758,4 +2398,748 @@ impl Drop for TempDir {
     fn drop(&mut self) {
         let _ = fs::remove_dir_all(&self.path);
     }
+}
+
+#[test]
+fn scope_names_staged_state() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-scope-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "scope-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"scope-demo\"\nversion = \"0.1.0\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    fs::write(root.join("src/lib.rs"), "pub fn staged() {}\n")?;
+    run_git(root, &["add", "src/lib.rs"])?;
+
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("scope")
+            .arg("--root")
+            .arg(root)
+            .arg("--staged")
+            .arg("--format")
+            .arg("json"),
+    )?;
+    let value: Value = serde_json::from_str(&String::from_utf8(output.stdout)?)?;
+    assert_eq!(value["changeset"]["scope"], "staged");
+    assert!(
+        value["changeset"]["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("changeset-sha256:"),
+        "change set must carry its subject digest: {value}"
+    );
+    assert_eq!(
+        value["changeset"]["included_files"]
+            .as_array()
+            .map(Vec::len),
+        Some(1)
+    );
+    assert!(
+        value["changeset"]["identities"]["index_state"].is_string(),
+        "staged scope must pin the index state: {value}"
+    );
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("scope")
+            .arg("--root")
+            .arg(root)
+            .arg("--staged"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert!(
+        stdout.contains("scope: staged"),
+        "human scope names the scope: {stdout}"
+    );
+    assert!(
+        stdout.contains("digest: changeset-sha256:"),
+        "human scope names the subject digest: {stdout}"
+    );
+    Ok(())
+}
+
+#[test]
+fn check_configuration_names_gated_cards_under_selection() -> Result<(), Box<dyn Error>> {
+    // Two cfg-gated unsafe fns added on top of a base commit: under
+    // (--features fast, --target aarch64) both are active; under a
+    // contradictory selection both are inactive; default runs print no
+    // configuration section at all so golden output stays byte-stable.
+    let temp = TempDir::new("unsafe-review-configuration-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "configuration-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"configuration-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(feature = \"fast\")]\npub unsafe fn read_fast(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(target_arch = \"aarch64\")]\npub unsafe fn read_neon(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let active = run(
+        &["--features", "fast", "--target", "aarch64-apple-darwin"],
+        "json",
+    )?;
+    assert!(
+        active["cards"].as_array().map(Vec::len).unwrap_or_default() >= 2,
+        "gated unsafe fns must produce cards: {active}"
+    );
+    // Each gated fn yields two subjects (the fn-signature card and the
+    // operation card inside its body); structural scope gates both, where
+    // the old line-window scan only saw the in-body operations.
+    assert_eq!(active["configuration"]["gated_cards"], 4);
+    assert_eq!(active["configuration"]["active"], 4);
+    assert_eq!(active["configuration"]["inactive"], 0);
+    assert!(
+        active["configuration"]["environment_digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("environment-sha256:"),
+        "configuration names the envelope digest: {active}"
+    );
+
+    let inactive = run(
+        &[
+            "--no-default-features",
+            "--target",
+            "x86_64-unknown-linux-gnu",
+        ],
+        "json",
+    )?;
+    assert_eq!(inactive["configuration"]["gated_cards"], 4);
+    assert_eq!(inactive["configuration"]["active"], 0);
+    assert_eq!(inactive["configuration"]["inactive"], 4);
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("configuration").is_none(),
+        "default runs must not gain a configuration key: {plain}"
+    );
+    Ok(())
+}
+
+#[test]
+fn check_aperture_reports_manifest_only_when_requested() -> Result<(), Box<dyn Error>> {
+    // The aperture manifest is opt-in: `--aperture` adds a versioned
+    // `aperture` section to human/json output, default runs stay
+    // byte-stable without it, and an envelope selection plus `--aperture`
+    // renders both sections with the envelope reflected in the manifest.
+    let temp = TempDir::new("unsafe-review-aperture-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "aperture-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"aperture-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n\n[features]\ndefault = []\nfast = []\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n\n#[cfg(feature = \"fast\")]\npub unsafe fn read_fast(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("aperture").is_none(),
+        "default runs must not gain an aperture key: {plain}"
+    );
+
+    let manifest = run(&["--aperture"], "json")?;
+    let aperture = &manifest["aperture"];
+    assert_eq!(aperture["schema_version"], 1);
+    assert!(
+        aperture["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("aperture-sha256:"),
+        "manifest names its digest: {aperture}"
+    );
+    assert_eq!(aperture["scope"], "diff");
+    assert!(
+        aperture["files"]["analyzed_diff_files"]
+            .as_array()
+            .map(|files| files.iter().any(|file| file == "src/lib.rs"))
+            .unwrap_or(false),
+        "manifest names the analyzed files: {aperture}"
+    );
+    assert_eq!(aperture["configuration"]["envelope_selected"], false);
+    assert!(
+        aperture["limitations"]
+            .as_array()
+            .map(Vec::len)
+            .unwrap_or_default()
+            >= 1,
+        "manifest always states its limitations: {aperture}"
+    );
+
+    let both = run(&["--aperture", "--features", "fast"], "json")?;
+    assert!(
+        both.get("configuration").is_some(),
+        "envelope runs keep the configuration section: {both}"
+    );
+    assert_eq!(both["aperture"]["configuration"]["envelope_selected"], true);
+    assert_eq!(both["aperture"]["configuration"]["gated_cards"], 2);
+    Ok(())
+}
+
+#[test]
+fn check_impact_reselects_unchanged_seams_by_owner() -> Result<(), Box<dyn Error>> {
+    // Same-owner impact is opt-in: `--impact` relates changed guard and
+    // contract lines to the unchanged unsafe subjects in their owner,
+    // leaves other owners alone, and default runs stay byte-stable.
+    let temp = TempDir::new("unsafe-review-impact-e2e")?;
+    let root = temp.path();
+    run_git(root, &["init", "-q"])?;
+    run_git(root, &["config", "user.email", "test@example.com"])?;
+    run_git(root, &["config", "user.name", "impact-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"impact-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "/// # Safety\n/// Caller holds the buffer.\npub unsafe fn read_checked(ptr: *const u8, len: usize) -> u8 {\n    // padding one\n    // padding two\n    // padding three\n    // padding four\n    // padding five\n    // padding six\n    if len == 0 {\n        return 0;\n    }\n    unsafe { *ptr }\n}\n\npub unsafe fn read_other(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "base"])?;
+    let base = run_git(root, &["rev-parse", "HEAD"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "/// # Safety (exclusive)\n/// Caller holds the buffer.\npub unsafe fn read_checked(ptr: *const u8, len: usize) -> u8 {\n    // padding one\n    // padding two\n    // padding three\n    // padding four\n    // padding five\n    // padding six\n    if len == 0 {\n        return 1;\n    }\n    unsafe { *ptr }\n}\n\npub unsafe fn read_other(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(root, &["add", "."])?;
+    run_git(root, &["commit", "-qm", "head"])?;
+
+    let run = |extra: &[&str], format: &str| -> Result<serde_json::Value, Box<dyn Error>> {
+        let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+        command
+            .arg("unsafe-review")
+            .arg("check")
+            .arg("--root")
+            .arg(root)
+            .arg("--base")
+            .arg(&base)
+            .arg("--format")
+            .arg(format);
+        for flag in extra {
+            command.arg(flag);
+        }
+        let output = checked_output(&mut command)?;
+        Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+    };
+
+    let plain = run(&[], "json")?;
+    assert!(
+        plain.get("impact").is_none(),
+        "default runs must not gain an impact key: {plain}"
+    );
+
+    let inventory = run(&["--impact"], "json")?;
+    let impact = &inventory["impact"];
+    assert_eq!(impact["schema_version"], 1);
+    assert!(
+        impact["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("impact-sha256:"),
+        "inventory names its digest: {impact}"
+    );
+    let affected = impact["affected"].as_array().cloned().unwrap_or_default();
+    assert!(
+        !affected.is_empty(),
+        "changed guard and contract must reselect the unchanged operation: {impact}"
+    );
+    assert!(
+        affected.iter().all(|seam| seam["owner"] == "read_checked"),
+        "only the changed owner is affected: {impact}"
+    );
+    let causes: Vec<&str> = affected
+        .iter()
+        .filter_map(|seam| seam["cause"].as_str())
+        .collect();
+    assert!(
+        causes.contains(&"enclosing_owner_changed"),
+        "guard edit is an owner cause: {impact}"
+    );
+    assert!(
+        causes.contains(&"safety_contract_changed"),
+        "contract edit is a contract cause: {impact}"
+    );
+    let items = impact["items"].as_array().cloned().unwrap_or_default();
+    assert_eq!(items.len(), 1);
+    assert_eq!(items[0]["owner"], "read_checked");
+    assert_eq!(items[0]["code_changed"], true);
+    assert_eq!(items[0]["contract_changed"], true);
+    Ok(())
+}
+
+fn work_fixture_repo(prefix: &str) -> Result<(TempDir, PathBuf), Box<dyn Error>> {
+    let temp = TempDir::new(prefix)?;
+    let root = temp.path().to_path_buf();
+    run_git(&root, &["init", "-q"])?;
+    run_git(&root, &["config", "user.email", "test@example.com"])?;
+    run_git(&root, &["config", "user.name", "work-e2e"])?;
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"work-demo\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), "pub fn base() {}\n")?;
+    run_git(&root, &["add", "."])?;
+    run_git(&root, &["commit", "-qm", "base"])?;
+    Ok((temp, root))
+}
+
+fn work_tree_state(root: &Path) -> Result<String, Box<dyn Error>> {
+    let staged = run_git(root, &["diff", "--cached"])?;
+    let unstaged = run_git(root, &["diff"])?;
+    let status = run_git(root, &["status", "--porcelain"])?;
+    Ok(format!("{staged}\n---\n{unstaged}\n---\n{status}"))
+}
+
+fn work_binary() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+    command.arg("unsafe-review").arg("work");
+    command
+}
+
+#[test]
+fn work_staged_reviews_index_without_shell_diff() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-staged-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    let before = work_tree_state(&root)?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(
+        &stdout,
+        "unsafe-review work: staged changes (HEAD -> index)",
+    );
+    assert_contains(&stdout, "scope: staged, HEAD ");
+    assert_contains(&stdout, "included: src/lib.rs");
+    assert_contains(&stdout, "changeset ");
+    assert_contains(&stdout, "read_byte");
+    assert_contains(
+        &stdout,
+        "recheck this scope: unsafe-review work --staged --root",
+    );
+    assert_contains(&stdout, "scope identity: unsafe-review scope --root");
+
+    // The authoring loop must not move the index or worktree.
+    assert_eq!(work_tree_state(&root)?, before);
+
+    // Execute the generated recheck command: same scope, same result shape.
+    let recheck = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let recheck_stdout = String::from_utf8(recheck.stdout)?;
+    assert_contains(&recheck_stdout, "scope: staged, HEAD ");
+
+    // Execute the generated explain command for the top JSON card.
+    let json_output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--json"),
+    )?;
+    let value: Value = serde_json::from_str(&String::from_utf8(json_output.stdout)?)?;
+    let card_id = value["cards"][0]["id"]
+        .as_str()
+        .ok_or("work json must carry card ids")?;
+    assert!(!card_id.is_empty(), "card id must not be empty");
+    let explain = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("explain")
+            .arg("--root")
+            .arg(&root)
+            .arg(card_id),
+    )?;
+    let explained = String::from_utf8(explain.stdout)?;
+    assert_contains(&explained, card_id);
+    Ok(())
+}
+
+#[test]
+fn work_staged_names_mixed_unstaged_edits() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-mixed-e2e")?;
+    fs::write(root.join("src/lib.rs"), "pub fn staged() {}\n")?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub fn staged() {}\n\npub fn also_unstaged() {}\n",
+    )?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "also has unstaged edits");
+    assert_contains(
+        &stdout,
+        "worktree bytes are analyzed, not staged-only content",
+    );
+    assert_contains(&stdout, "src/lib.rs");
+    Ok(())
+}
+
+#[test]
+fn work_quiet_scope_names_scope_never_safe() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-quiet-e2e")?;
+    fs::write(root.join("src/lib.rs"), "pub fn harmless() {}\n")?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let output = checked_output(
+        work_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--staged")
+            .arg("--short"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "scope: staged, HEAD ");
+    assert_contains(&stdout, "No changed unsafe-review gaps were found");
+    assert_contains(&stdout, "cards: 0");
+    Ok(())
+}
+
+#[test]
+fn work_rejects_scope_conflicts_and_non_git_roots() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-work-reject-e2e")?;
+
+    let conflict = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("work")
+        .arg("--root")
+        .arg(&root)
+        .arg("--staged")
+        .arg("--unstaged")
+        .output()?;
+    assert!(!conflict.status.success(), "two scope flags must fail");
+    assert_eq!(conflict.status.code(), Some(2));
+    let combined = format!(
+        "{}{}",
+        String::from_utf8_lossy(&conflict.stderr),
+        String::from_utf8_lossy(&conflict.stdout)
+    );
+    assert_contains(&combined, "only one of --staged, --unstaged, --worktree");
+
+    let bare = TempDir::new("unsafe-review-work-no-git-e2e")?;
+    let outside = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("work")
+        .arg("--root")
+        .arg(bare.path())
+        .output()?;
+    assert!(!outside.status.success(), "work outside git must fail");
+    assert_eq!(outside.status.code(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn help_output_mentions_work_front_door() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(
+        &stdout,
+        "work         review staged, unstaged, or combined local changes in one screen",
+    );
+
+    let work_help = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("work")
+            .arg("--help"),
+    )?;
+    let work_stdout = String::from_utf8(work_help.stdout)?;
+    assert_contains(&work_stdout, "[--staged|--unstaged|--worktree]");
+    Ok(())
+}
+
+fn agent_binary() -> Command {
+    let mut command = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"));
+    command.arg("unsafe-review").arg("agent").arg("tasks");
+    command
+}
+
+fn agent_index(root: &Path, extra: &[&str]) -> Result<Value, Box<dyn Error>> {
+    let output = checked_output(agent_binary().arg("--root").arg(root).args(extra))?;
+    Ok(serde_json::from_str(&String::from_utf8(output.stdout)?)?)
+}
+
+#[test]
+fn agent_tasks_indexes_staged_scope_with_commands() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-tasks-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+    let before = work_tree_state(&root)?;
+
+    let value = agent_index(&root, &["--scope", "staged"])?;
+    assert_eq!(
+        value["schema_version"], "unsafe-review/agent-task-index/v1",
+        "index must carry its versioned schema: {value}"
+    );
+    let tasks = value["tasks"].as_array().ok_or("tasks must be an array")?;
+    assert!(!tasks.is_empty(), "staged unsafe change must yield tasks");
+    let task = &tasks[0];
+    for key in [
+        "task_id",
+        "subject_id",
+        "card_id",
+        "file",
+        "line",
+        "class",
+        "movement",
+        "role",
+        "mechanism",
+        "action_kind",
+        "route_readiness",
+        "agent_applicability",
+        "packet_command",
+        "recheck_command",
+    ] {
+        assert!(task.get(key).is_some(), "task must carry `{key}`: {task}");
+    }
+    assert!(
+        value["changeset_digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("changeset-sha256:"),
+        "index must pin the analyzed change set: {value}"
+    );
+    assert!(
+        value["digest"]
+            .as_str()
+            .unwrap_or_default()
+            .starts_with("task-index-sha256:"),
+        "index must carry its digest: {value}"
+    );
+    assert_eq!(
+        value["truncation"]["truncated"], false,
+        "index below the cap must not read truncated: {value}"
+    );
+
+    // Execute the generated packet command for the first task.
+    let packet = task["packet_command"]
+        .as_str()
+        .ok_or("packet command must be a string")?;
+    let mut argv: Vec<&str> = packet.split_whitespace().collect();
+    assert_eq!(argv.remove(0), "unsafe-review");
+    let packet_output =
+        checked_output(Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review")).args(argv))?;
+    let packet_stdout = String::from_utf8(packet_output.stdout)?;
+    assert_contains(&packet_stdout, task["card_id"].as_str().unwrap_or_default());
+
+    // Execute the generated recheck command: same scope reproduces the tasks.
+    let recheck = value["tasks"][0]["recheck_command"]
+        .as_str()
+        .ok_or("recheck command must be a string")?;
+    let mut re_argv: Vec<&str> = recheck.split_whitespace().collect();
+    assert_eq!(re_argv.remove(0), "unsafe-review");
+    let recheck_output =
+        checked_output(Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review")).args(re_argv))?;
+    let rechecked: Value = serde_json::from_str(&String::from_utf8(recheck_output.stdout)?)?;
+    assert_eq!(
+        rechecked["tasks"][0]["task_id"], tasks[0]["task_id"],
+        "recheck must reproduce the same tasks"
+    );
+
+    // Read queries never move the index or worktree.
+    assert_eq!(work_tree_state(&root)?, before);
+    Ok(())
+}
+
+#[test]
+fn agent_tasks_filters_narrow_and_caps_truncate() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-filter-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let human_only = agent_index(&root, &["--scope", "staged", "--human-only"])?;
+    for task in human_only["tasks"].as_array().cloned().unwrap_or_default() {
+        assert_eq!(
+            task["agent_applicability"], "human_only",
+            "human-only filter must select human tasks: {task}"
+        );
+    }
+
+    let capped = agent_index(&root, &["--scope", "staged", "--max-tasks", "1"])?;
+    assert_eq!(capped["tasks"].as_array().map(Vec::len), Some(1));
+    assert_eq!(capped["truncation"]["truncated"], true);
+    assert!(
+        capped["truncation"]["omitted_tasks"]
+            .as_u64()
+            .unwrap_or_default()
+            >= 1,
+        "omitted rows must be counted: {capped}"
+    );
+    assert_contains(
+        capped["truncation"]["expansion"]
+            .as_str()
+            .unwrap_or_default(),
+        "--max-tasks",
+    );
+
+    let bad_role = Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("agent")
+        .arg("tasks")
+        .arg("--root")
+        .arg(&root)
+        .arg("--role")
+        .arg("prod")
+        .output()?;
+    assert!(!bad_role.status.success(), "unknown role must fail");
+    assert_eq!(bad_role.status.code(), Some(2));
+    Ok(())
+}
+
+#[test]
+fn agent_tasks_human_lists_same_tasks() -> Result<(), Box<dyn Error>> {
+    let (_temp, root) = work_fixture_repo("unsafe-review-agent-human-e2e")?;
+    fs::write(
+        root.join("src/lib.rs"),
+        "pub unsafe fn read_byte(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    run_git(&root, &["add", "src/lib.rs"])?;
+
+    let value = agent_index(&root, &["--scope", "staged"])?;
+    let output = checked_output(
+        agent_binary()
+            .arg("--root")
+            .arg(&root)
+            .arg("--scope")
+            .arg("staged")
+            .arg("--format")
+            .arg("human"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+    assert_contains(&stdout, "Task index unsafe-review/agent-task-index/v1");
+    for task in value["tasks"].as_array().cloned().unwrap_or_default() {
+        let task_id = task["task_id"].as_str().unwrap_or_default();
+        assert_contains(&stdout, task_id);
+    }
+    Ok(())
+}
+
+#[test]
+fn help_output_mentions_agent_tasks() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("--help"),
+    )?;
+    assert_contains(
+        &String::from_utf8(output.stdout)?,
+        "agent        machine task index over local changes for LLM consumers",
+    );
+
+    let agent_help = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("agent")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(agent_help.stdout)?;
+    assert_contains(&stdout, "agent tasks");
+    assert_contains(&stdout, "--max-tasks");
+    assert_contains(&stdout, "[--staged|--unstaged|--worktree]");
+    Ok(())
 }

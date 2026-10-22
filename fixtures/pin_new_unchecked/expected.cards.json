@@ -35,12 +35,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `pin` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `pin_mut_unchecked`"
+          "summary": "1 related test file mentions owner `pin_mut_unchecked`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `pin_mut_unchecked`",
+    "reach": "1 related test file mentions owner `pin_mut_unchecked`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -59,6 +59,13 @@
         "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "pins_mut_reference",
+        "file": "src/lib.rs",
+        "line": 13
       }
     ],
     "missing": [

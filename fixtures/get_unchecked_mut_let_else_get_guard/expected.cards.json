@@ -40,7 +40,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `pick_after_let_else_get`"
+          "summary": "1 related test file mentions owner `pick_after_let_else_get`"
         },
         "witness": {
           "present": false,
@@ -51,7 +51,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "All inferred safety obligations have visible local discharge evidence",
-    "reach": "1 related test file(s) mention owner `pick_after_let_else_get`",
+    "reach": "1 related test file mentions owner `pick_after_let_else_get`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -65,6 +65,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test pick_after_let_else_get",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "picks_after_let_else_get",
+        "file": "src/lib.rs",
+        "line": 14
       }
     ],
     "missing": [

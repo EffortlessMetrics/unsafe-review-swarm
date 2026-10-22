@@ -43,7 +43,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool`"
+          "summary": "1 related test file mentions owner `copy_byte_to_bool`"
         },
         "witness": {
           "present": false,
@@ -67,7 +67,7 @@
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `copy_byte_to_bool`"
+          "summary": "1 related test file mentions owner `copy_byte_to_bool`"
         },
         "witness": {
           "present": false,
@@ -78,7 +78,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `copy_byte_to_bool`",
+    "reach": "1 related test file mentions owner `copy_byte_to_bool`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -92,6 +92,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test copy_byte_to_bool",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "copies_known_bool_byte",
+        "file": "src/lib.rs",
+        "line": 11
       }
     ],
     "missing": [

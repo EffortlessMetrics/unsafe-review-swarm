@@ -972,6 +972,11 @@ code 2: it executes the routed witness command only with the explicit
 default. `--author` is required with `--allow-heavy` because witness receipts
 record who ran the confirmation.
 
+Execution with `--diff` is refused: a card resolved from a saved patch
+cannot be executed because nothing shows the `--root` checkout is the
+reviewed tree. Check out the diff's tree and confirm without `--diff`
+instead. `--dry-run` with `--diff` stays allowed; it executes nothing.
+
 With `--allow-heavy`, `confirm` picks the `--command` override when given,
 otherwise the card's first witness route that carries a command. Cards that
 route only to `human-deep-review` (or carry no routed command) are refused

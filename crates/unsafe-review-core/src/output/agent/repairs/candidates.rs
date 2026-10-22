@@ -290,8 +290,8 @@ mod tests {
     use crate::domain::{
         CardId, Confidence, ContractEvidence, DischargeEvidence, EvidenceState, HazardKind,
         MissingEvidence, NextAction, OperationFamily, Priority, ProofPath, ReachEvidence,
-        ReviewClass, SafetyObligation, SourceLocation, UnsafeOperation, UnsafeSite, UnsafeSiteKind,
-        WitnessEvidence, WitnessKind, WitnessRoute,
+        ReviewClass, SafetyObligation, SourceLocation, SourceRole, UnsafeOperation, UnsafeSite,
+        UnsafeSiteKind, WitnessEvidence, WitnessKind, WitnessRoute,
     };
 
     fn candidate_card() -> ReviewCard {
@@ -313,10 +313,12 @@ mod tests {
                 public_api_surface: false,
                 changed: true,
                 snippet: "unsafe { *ptr }".to_string(),
+                role: SourceRole::Unknown,
             },
             operation: UnsafeOperation {
                 expression: "unsafe { *ptr }".to_string(),
                 family: OperationFamily::RawPointerDeref,
+                bound_name: None,
             },
             hazards: vec![HazardKind::PointerValidity],
             obligations: vec![],

@@ -1,9 +1,14 @@
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::{Path, PathBuf};
+use std::fs;
+use std::path::{Component, Path, PathBuf};
 
 #[derive(Clone, Debug, Default)]
 pub(crate) struct DiffIndex {
     pub(crate) changed_lines: BTreeMap<PathBuf, BTreeSet<usize>>,
+    /// Post-image anchors where deletions happened. Proximity queries
+    /// (`contains_near`, `contains_added_line`, `contains_in_range`) use
+    /// `changed_lines` only; impact analysis unions both.
+    pub(crate) deletion_anchors: BTreeMap<PathBuf, BTreeSet<usize>>,
 }
 
 impl DiffIndex {
@@ -31,10 +36,50 @@ impl DiffIndex {
         self.changed_lines.contains_key(path)
     }
 
+    /// Repo-relative paths of changed Rust files in `b/` (post-image) form.
+    /// Callers resolve these against the analysis root; paths with no file
+    /// under the root are unanalyzable and must be reported, never silently
+    /// skipped.
+    pub(crate) fn rust_paths(&self) -> impl Iterator<Item = &PathBuf> {
+        self.changed_lines.keys().filter(|path| is_rust_path(path))
+    }
+
+    /// Split changed paths missing from the root into innocent absences
+    /// (wrong tree: fail-closed candidates) and hostile refusals (traversal,
+    /// absolute, or symlink-escaping paths: never resolved by design, per the
+    /// #1883 hostile-input contract that pins exit-0 acceptance for them).
+    pub(crate) fn partition_unresolved(
+        &self,
+        root: &Path,
+        discovered: &BTreeSet<&PathBuf>,
+    ) -> (BTreeSet<PathBuf>, BTreeSet<PathBuf>) {
+        let canonical_root = fs::canonicalize(root).unwrap_or_else(|_| root.to_path_buf());
+        let mut innocent = BTreeSet::new();
+        let mut rejected = BTreeSet::new();
+        for path in self.rust_paths().filter(|path| !discovered.contains(path)) {
+            if path_escapes_root(root, &canonical_root, path) {
+                rejected.insert(path.clone());
+            } else {
+                innocent.insert(path.clone());
+            }
+        }
+        (innocent, rejected)
+    }
+
     pub(crate) fn contains_near(&self, path: &PathBuf, line: usize) -> bool {
         self.changed_lines
             .get(path)
             .is_some_and(|lines| lines.iter().any(|changed| changed.abs_diff(line) <= 6))
+    }
+
+    /// Exact membership: the line itself was added by the diff (new-file
+    /// coordinates). Unlike [`Self::contains_near`], proximity does not
+    /// count: nearby context lines are in scan scope but are not introduced
+    /// by the diff.
+    pub(crate) fn contains_added_line(&self, path: &PathBuf, line: usize) -> bool {
+        self.changed_lines
+            .get(path)
+            .is_some_and(|lines| lines.contains(&line))
     }
 
     pub(crate) fn contains_in_range(&self, path: &PathBuf, start: usize, end: usize) -> bool {
@@ -103,17 +148,102 @@ impl DiffParserState {
                 .insert(self.new_line);
             self.new_line = self.new_line.saturating_add(1);
         } else if raw.starts_with('-') {
-            // Removed lines do not advance the new-file coordinate.
+            // Removed lines do not advance the new-file coordinate, but the
+            // deletion anchor (the post-image line where text vanished) is
+            // retained so impact analysis can attribute removed guards.
+            // Proximity queries keep using `changed_lines` only.
+            self.index
+                .deletion_anchors
+                .entry(path.to_path_buf())
+                .or_default()
+                .insert(self.new_line);
         } else if raw.starts_with(' ') || raw.is_empty() {
             self.new_line = self.new_line.saturating_add(1);
         }
     }
 }
 
+/// True when a diff-named path must never resolve to a file: absolute
+/// paths, `..` traversals escaping the root, and symlink escapes. Same
+/// guard the scanner applies before any filesystem read.
+pub(crate) fn diff_path_escapes_root(root: &Path, canonical_root: &Path, rel: &Path) -> bool {
+    path_escapes_root(root, canonical_root, rel)
+}
+
+/// True when a diff path must never resolve to a file: absolute paths,
+/// `..` traversals escaping the root, and paths crossing a symlink that
+/// points outside the root. Lexical check first (no filesystem access), then
+/// the symlink walk over existing prefixes only.
+fn path_escapes_root(root: &Path, canonical_root: &Path, rel: &Path) -> bool {
+    let mut depth = 0i32;
+    for component in rel.components() {
+        match component {
+            Component::Prefix(_) | Component::RootDir => return true,
+            Component::CurDir => {}
+            Component::ParentDir => {
+                if depth == 0 {
+                    return true;
+                }
+                depth -= 1;
+            }
+            Component::Normal(_) => depth += 1,
+        }
+    }
+    // Lexically inside: refuse only when a symlink on the way out escapes.
+    let joined = root.join(rel);
+    let mut prefix = joined.as_path();
+    loop {
+        match fs::symlink_metadata(prefix) {
+            Ok(meta) if meta.file_type().is_symlink() => {
+                let target = fs::read_link(prefix).unwrap_or_else(|_| prefix.to_path_buf());
+                let resolved = if target.is_absolute() {
+                    target
+                } else {
+                    prefix.parent().unwrap_or(root).join(target)
+                };
+                let canonical = fs::canonicalize(&resolved).unwrap_or(resolved);
+                if !canonical.starts_with(canonical_root) {
+                    return true;
+                }
+            }
+            _ => {}
+        }
+        match prefix.parent() {
+            Some(parent) if parent.starts_with(root) && parent != root => {
+                prefix = parent;
+            }
+            _ => break,
+        }
+    }
+    false
+}
+
 fn is_rust_path(path: &Path) -> bool {
     path.extension()
         .and_then(|extension| extension.to_str())
         .is_some_and(|extension| extension == "rs")
+}
+
+/// Changed new-file lines per path for one diff source, for the
+/// same-owner impact inventory (#2319 PR1): added lines union deletion
+/// anchors, so a removed guard still attributes to its post-image owner.
+/// The pipeline proximity index is untouched. Unreadable diff files and
+/// repo scans yield an empty map with no rows claimed.
+pub fn changed_lines_in_diff(source: &crate::DiffSource) -> BTreeMap<PathBuf, BTreeSet<usize>> {
+    fn union(index: DiffIndex) -> BTreeMap<PathBuf, BTreeSet<usize>> {
+        let mut merged = index.changed_lines;
+        for (path, anchors) in index.deletion_anchors {
+            merged.entry(path).or_default().extend(anchors);
+        }
+        merged
+    }
+    match source {
+        crate::DiffSource::Text(text) => union(parse_unified_diff(text)),
+        crate::DiffSource::File(path) => std::fs::read_to_string(path)
+            .map(|text| union(parse_unified_diff(&text)))
+            .unwrap_or_default(),
+        crate::DiffSource::NoneRepoScan => BTreeMap::new(),
+    }
 }
 
 pub(crate) fn parse_unified_diff(input: &str) -> DiffIndex {
@@ -231,6 +361,19 @@ diff --git a/package.json b/package.json
         assert_eq!(index.changed_file_count(), 4);
         assert_eq!(index.changed_rust_file_count(), 1);
         assert_eq!(index.changed_non_rust_file_count(), 3);
+    }
+
+    #[test]
+    fn parse_unified_diff_anchors_deletions_without_moving_proximity() {
+        let diff = "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -8,3 +8,2 @@ fn read_checked() {\n     unchanged();\n-    removed_guard();\n     kept();\n";
+        let index = parse_unified_diff(diff);
+
+        let path = PathBuf::from("src/lib.rs");
+        assert!(index.changed_lines[&path].is_empty());
+        assert!(!index.contains_near(&path, 8));
+        // The removed line vanishes after new-file line 8, so the anchor is
+        // line 9 where the post-image resumes.
+        assert_eq!(index.deletion_anchors[&path], BTreeSet::from([9usize]));
     }
 
     #[test]

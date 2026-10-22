@@ -1,0 +1,30 @@
+diff --git a/src/control/tag.rs b/src/control/tag.rs
+index 95c7640cbb..05e478c13b 100644
+--- a/src/control/tag.rs
++++ b/src/control/tag.rs
+@@ -73,7 +73,7 @@ pub(crate) trait TagSliceExt {
+         self.fill_tag(Tag::EMPTY)
+     }
+ }
+-impl TagSliceExt for [Tag] {
++impl TagSliceExt for [mem::MaybeUninit<Tag>] {
+     #[inline]
+     fn fill_tag(&mut self, tag: Tag) {
+         // SAFETY: We have access to the entire slice, so, we can write to the entire slice.
+diff --git a/src/raw.rs b/src/raw.rs
+index 4bc1f7439e..6c5947e2b4 100644
+--- a/src/raw.rs
++++ b/src/raw.rs
+@@ -2642,9 +2642,9 @@ impl RawTableInner {
+         unsafe { self.ctrl.as_ptr().add(index).cast() }
+     }
+ 
+-    /// Gets the slice of all control bytes.
+-    fn ctrl_slice(&mut self) -> &mut [Tag] {
+-        // SAFETY: We've initialized all control bytes, and have the correct number.
++    /// Gets the slice of all control bytes, as possibily uninitialized tags.
++    fn ctrl_slice(&mut self) -> &mut [mem::MaybeUninit<Tag>] {
++        // SAFETY: We have the correct number of control bytes.
+         unsafe { slice::from_raw_parts_mut(self.ctrl.as_ptr().cast(), self.num_ctrl_bytes()) }
+     }
+ 

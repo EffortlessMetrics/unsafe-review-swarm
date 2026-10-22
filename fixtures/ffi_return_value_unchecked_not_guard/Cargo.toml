@@ -1,0 +1,4 @@
+[package]
+name = "ffi-return-value-unchecked-not-guard"
+version = "0.0.0"
+edition = "2024"

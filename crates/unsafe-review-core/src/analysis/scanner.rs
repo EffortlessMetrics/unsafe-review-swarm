@@ -21,6 +21,7 @@ use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
+pub(super) mod disposition;
 mod fallback_scan;
 mod file_scan;
 mod item_names;
@@ -30,6 +31,7 @@ mod js_shared_byte_source;
 mod owner_context;
 mod panic_from_safe_js;
 mod scan_site;
+pub(super) mod source_role;
 mod syntax_scan;
 pub(crate) mod text_detection;
 
@@ -73,6 +75,18 @@ fn context_slice(lines: &[&str], start: usize, end: usize) -> Vec<String> {
 }
 
 fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
+    detect_site_with_nonnull(line, true)
+}
+
+/// Shared text detector with the `NonNullUnchecked` rule optionally
+/// disabled. The syntax-first dispatcher uses this to re-detect a line whose
+/// structural disposition is a `NonNullUnchecked` clean miss, so the text
+/// path can neither resurrect the rejected family nor drop the real card
+/// (usually `UnsafeFnCall`) for that line.
+fn detect_site_with_nonnull(
+    line: &str,
+    apply_nonnull_rule: bool,
+) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if line.contains("unsafe impl") {
         return Some(match parse_impl_trait_name(line).as_deref() {
             Some("Send") => (
@@ -160,7 +174,7 @@ fn detect_site(line: &str) -> Option<(UnsafeSiteKind, OperationFamily)> {
     if contains_call_name(line, "get_unchecked") || contains_call_name(line, "get_unchecked_mut") {
         return Some((UnsafeSiteKind::Operation, OperationFamily::GetUnchecked));
     }
-    if let Some(family) = nonnull_operation_family(line) {
+    if apply_nonnull_rule && let Some(family) = nonnull_operation_family(line) {
         return Some((UnsafeSiteKind::Operation, family));
     }
     if contains_call_name(line, "new_unchecked") {
@@ -497,7 +511,7 @@ fn is_ident_continue(ch: char) -> bool {
 }
 
 #[derive(Clone, Debug)]
-struct DetectedSyntaxSite {
+pub(super) struct DetectedSyntaxSite {
     line: usize,
     end_line: usize,
     column: usize,
@@ -513,21 +527,28 @@ fn detect_syntax_sites(
     parsed: &ParsedSource,
     extern_names: &BTreeSet<String>,
     local_modules: &BTreeSet<String>,
-) -> Vec<DetectedSyntaxSite> {
+) -> (Vec<DetectedSyntaxSite>, disposition::NonNullDecisions) {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
     let unsafe_fn_ranges = unsafe_fn_ranges(parsed);
     let operation_block_ranges = operation_block_ranges(parsed, &unsafe_block_ranges);
+    let nonnull = disposition::nonnull_call_decisions(
+        &parsed.nodes,
+        &unsafe_block_ranges,
+        &unsafe_fn_ranges,
+        !parsed.parse_errors.is_empty(),
+    );
     for fact in &parsed.nodes {
-        let Some((kind, family)) = detect_syntax_site(
+        let Some((kind, family)) = detect_syntax_site(SyntaxSiteCtx {
             fact,
-            &parsed.text,
-            &unsafe_block_ranges,
-            &unsafe_fn_ranges,
-            &operation_block_ranges,
+            source: &parsed.text,
+            unsafe_block_ranges: &unsafe_block_ranges,
+            unsafe_fn_ranges: &unsafe_fn_ranges,
+            operation_block_ranges: &operation_block_ranges,
             extern_names,
             local_modules,
-        ) else {
+            nonnull: &nonnull,
+        }) else {
             continue;
         };
         let _span_len = fact.end.saturating_sub(fact.start);
@@ -550,7 +571,7 @@ fn detect_syntax_sites(
             .cmp(&right.line)
             .then(left.column.cmp(&right.column))
     });
-    sites
+    (sites, nonnull)
 }
 
 fn without_parent_duplicate_operations(sites: Vec<DetectedSyntaxSite>) -> Vec<DetectedSyntaxSite> {
@@ -730,15 +751,28 @@ fn syntax_site_uses_exact_range(kind: &UnsafeSiteKind) -> bool {
     )
 }
 
-fn detect_syntax_site(
-    fact: &SyntaxNodeFact,
-    source: &str,
-    unsafe_block_ranges: &[(usize, usize)],
-    unsafe_fn_ranges: &[(usize, usize)],
-    operation_block_ranges: &BTreeSet<(usize, usize)>,
-    extern_names: &BTreeSet<String>,
-    local_modules: &BTreeSet<String>,
-) -> Option<(UnsafeSiteKind, OperationFamily)> {
+struct SyntaxSiteCtx<'a> {
+    fact: &'a SyntaxNodeFact,
+    source: &'a str,
+    unsafe_block_ranges: &'a [(usize, usize)],
+    unsafe_fn_ranges: &'a [(usize, usize)],
+    operation_block_ranges: &'a BTreeSet<(usize, usize)>,
+    extern_names: &'a BTreeSet<String>,
+    local_modules: &'a BTreeSet<String>,
+    nonnull: &'a disposition::NonNullDecisions,
+}
+
+fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, OperationFamily)> {
+    let SyntaxSiteCtx {
+        fact,
+        source,
+        unsafe_block_ranges,
+        unsafe_fn_ranges,
+        operation_block_ranges,
+        extern_names,
+        local_modules,
+        nonnull,
+    } = ctx;
     if !syntax_kind_can_be_unsafe_site(&fact.kind) {
         return None;
     }
@@ -819,7 +853,9 @@ fn detect_syntax_site(
             Some((UnsafeSiteKind::UnsafeBlock, OperationFamily::Unknown))
         }
         "PREFIX_EXPR"
-            if is_raw_pointer_deref(&compact) && is_inside_range(fact, unsafe_block_ranges) =>
+            if is_raw_pointer_deref(&compact)
+                && !deref_operand_is_get_unchecked_call(&compact)
+                && is_inside_range(fact, unsafe_block_ranges) =>
         {
             let family = if prefix_deref_is_assignment_target(fact, source) {
                 OperationFamily::RawPointerWrite
@@ -870,6 +906,15 @@ fn detect_syntax_site(
             ) && !is_inside_range(fact, unsafe_block_ranges)
                 && !is_inside_range(fact, unsafe_fn_ranges)
             {
+                return None;
+            }
+            if matches!(
+                result,
+                Some((UnsafeSiteKind::Operation, OperationFamily::NonNullUnchecked,))
+            ) && matches!(
+                nonnull.disposition_for_node(fact.start, fact.end),
+                Some(disposition::FamilyDisposition::CleanMiss { .. })
+            ) {
                 return None;
             }
             result
@@ -968,6 +1013,92 @@ fn is_raw_pointer_deref(compact: &str) -> bool {
         }
     };
     inner.starts_with('*') && !inner.starts_with("**")
+}
+
+/// Returns true when `compact` is a dereference applied directly to a
+/// `get_unchecked` / `get_unchecked_mut` call result (`*slice.get_unchecked(i)`).
+/// Dereferencing the `&T` / `&mut T` those calls return cannot be UB by itself;
+/// the bounds obligation belongs to the `get_unchecked` card, so the deref arm
+/// must not emit a second card for the same expression.
+///
+/// Only a top-level call counts: `*foo(bar.get_unchecked(i))` dereferences
+/// whatever `foo` returns, so it still cards. One wrapping paren pair and the
+/// `&` / `&mut` borrow prefixes are transparent. Detection runs on the
+/// string/comment-masked projection so a marker inside a literal cannot
+/// suppress a genuine deref card.
+fn deref_operand_is_get_unchecked_call(compact: &str) -> bool {
+    let masked = syntax_detection_text(compact);
+    let after_borrow = masked
+        .strip_prefix("&mut ")
+        .or_else(|| masked.strip_prefix("& mut "))
+        .or_else(|| masked.strip_prefix("& "))
+        .map_or_else(|| masked.strip_prefix('&').unwrap_or(&masked), |rest| rest);
+    let Some(operand) = after_borrow.strip_prefix('*') else {
+        return false;
+    };
+    let mut operand = operand.trim_start();
+    if let Some(inner) = strip_one_wrapping_paren_pair(operand) {
+        operand = inner;
+    }
+    [".get_unchecked_mut(", ".get_unchecked("]
+        .iter()
+        .any(|marker| is_top_level_trailing_call(operand, marker))
+}
+
+/// Strip one paren pair that wraps the whole expression (`(expr)` -> `expr`).
+/// Returns None when the outer parens do not enclose the full text.
+fn strip_one_wrapping_paren_pair(text: &str) -> Option<&str> {
+    let inner = text.strip_prefix('(')?;
+    let mut depth = 0usize;
+    for (idx, ch) in inner.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' if depth == 0 => {
+                return (idx + 1 == inner.len()).then(|| &inner[..idx]);
+            }
+            ')' => depth -= 1,
+            _ => {}
+        }
+    }
+    None
+}
+
+/// Whether `marker` names a call whose argument list runs to the end of
+/// `text` at paren-depth zero, i.e. the call is the outermost expression.
+fn is_top_level_trailing_call(text: &str, marker: &str) -> bool {
+    let Some(pos) = text.find(marker) else {
+        return false;
+    };
+    if paren_depth(&text[..pos]) != 0 {
+        return false;
+    }
+    let mut depth = 0usize;
+    let call = &text[pos + marker.len() - 1..];
+    for (idx, ch) in call.char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.saturating_sub(1);
+                if depth == 0 {
+                    return idx + 1 == call.len();
+                }
+            }
+            _ => {}
+        }
+    }
+    false
+}
+
+fn paren_depth(text: &str) -> usize {
+    let mut depth = 0usize;
+    for ch in text.chars() {
+        match ch {
+            '(' => depth += 1,
+            ')' => depth = depth.saturating_sub(1),
+            _ => {}
+        }
+    }
+    depth
 }
 
 fn prefix_deref_is_assignment_target(fact: &SyntaxNodeFact, source: &str) -> bool {
@@ -1263,6 +1394,41 @@ mod tests {
     }
 
     #[test]
+    fn deref_of_get_unchecked_call_is_recognized() {
+        for compact in [
+            "*slice.get_unchecked(i)",
+            "*slice.get_unchecked_mut(i)",
+            "*(slice.get_unchecked(i))",
+            "&mut *slice.get_unchecked_mut(i)",
+            "*slice.get_unchecked(i + 1)",
+        ] {
+            assert!(
+                deref_operand_is_get_unchecked_call(compact),
+                "`{compact}` should count as deref-of-get_unchecked"
+            );
+        }
+    }
+
+    #[test]
+    fn deref_of_other_expressions_is_not_get_unchecked() {
+        for compact in [
+            // Genuine raw deref: no get_unchecked call at all.
+            "*ptr",
+            // Nested call: the dereferenced value is whatever `foo` returns.
+            "*foo(bar.get_unchecked(i))",
+            // Marker inside a string literal must not suppress the card.
+            "*ptr /* .get_unchecked(i) */",
+            // get_unchecked with trailing tokens is not a bare deref of the call.
+            "*slice.get_unchecked(i).field",
+        ] {
+            assert!(
+                !deref_operand_is_get_unchecked_call(compact),
+                "`{compact}` must still card as a deref"
+            );
+        }
+    }
+
+    #[test]
     fn text_detection_ignores_comment_only_unsafe_tokens() {
         let mut state = LineCommentState::default();
 
@@ -1490,6 +1656,13 @@ mod tests {
         );
         assert_eq!(
             detect_site("unsafe { slot.assume_init_read() }"),
+            Some((
+                UnsafeSiteKind::Operation,
+                OperationFamily::MaybeUninitAssumeInit
+            ))
+        );
+        assert_eq!(
+            detect_site("unsafe { MaybeUninit::array_assume_init(buf) }"),
             Some((
                 UnsafeSiteKind::Operation,
                 OperationFamily::MaybeUninitAssumeInit
@@ -1872,6 +2045,138 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
         assert!(sites.is_empty(), "unexpected sites: {sites:#?}");
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_first_homonym_new_unchecked_is_clean_miss_not_resurrected() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub fn build(p: *mut u8) -> *mut u8 {\n    unsafe { my_NonNull::new_unchecked(p) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        // The legacy line-substring rule still fires on this homonym; that is
+        // exactly the resurrection the structural disposition must suppress.
+        assert_eq!(
+            nonnull_operation_family("unsafe { my_NonNull::new_unchecked(p) }"),
+            Some(OperationFamily::NonNullUnchecked)
+        );
+
+        let result = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .sites
+                .iter()
+                .all(|site| site.operation.family != OperationFamily::NonNullUnchecked),
+            "homonym resurrected NonNullUnchecked: {:#?}",
+            result.sites
+        );
+        let entries: Vec<_> = result
+            .fallback_entries
+            .iter()
+            .filter(|entry| entry.family == OperationFamily::NonNullUnchecked)
+            .collect();
+        assert_eq!(entries.len(), 1, "entries: {:#?}", result.fallback_entries);
+        assert!(!entries[0].entered);
+        assert_eq!(entries[0].reason, "structural clean miss");
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_first_nested_homonym_keeps_outer_card_only() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "use core::ptr::NonNull;\n\npub fn nested(p: *mut u8) -> NonNull<u8> {\n    unsafe { NonNull::new_unchecked(\n    my_NonNull::new_unchecked(p)\n) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let result = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let nonnull: Vec<_> = result
+            .sites
+            .iter()
+            .filter(|site| site.operation.family == OperationFamily::NonNullUnchecked)
+            .collect();
+        assert_eq!(nonnull.len(), 1, "sites: {:#?}", result.sites);
+        assert!(
+            !nonnull[0].operation.expression.contains("my_NonNull"),
+            "homonym kept instead of the real call: {:#?}",
+            nonnull[0]
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_first_real_nonnull_call_stays_detected_with_entry() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "use core::ptr::NonNull;\n\npub fn build(p: *mut u8) -> NonNull<u8> {\n    unsafe { NonNull::new_unchecked(p) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let result = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        let nonnull: Vec<_> = result
+            .sites
+            .iter()
+            .filter(|site| site.operation.family == OperationFamily::NonNullUnchecked)
+            .collect();
+        assert_eq!(nonnull.len(), 1, "sites: {:#?}", result.sites);
+        let entries: Vec<_> = result
+            .fallback_entries
+            .iter()
+            .filter(|entry| entry.family == OperationFamily::NonNullUnchecked)
+            .collect();
+        assert_eq!(entries.len(), 1, "entries: {:#?}", result.fallback_entries);
+        assert!(entries[0].entered);
+        Ok(())
+    }
+
+    #[test]
+    fn syntax_first_other_new_unchecked_keeps_own_family_without_nonnull_card() -> Result<(), String>
+    {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "pub fn build(x: u8) -> u8 {\n    unsafe { Foo::new_unchecked(x) }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+
+        let result = scan_file(&root, &PathBuf::from("src/lib.rs"), None, true)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            result
+                .sites
+                .iter()
+                .all(|site| site.operation.family != OperationFamily::NonNullUnchecked),
+            "unexpected NonNull card: {:#?}",
+            result.sites
+        );
+        assert!(
+            result
+                .sites
+                .iter()
+                .any(|site| site.operation.family == OperationFamily::UnsafeFnCall),
+            "Foo::new_unchecked must keep its own family card: {:#?}",
+            result.sites
+        );
         Ok(())
     }
 

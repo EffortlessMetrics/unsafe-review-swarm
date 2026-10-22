@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 mod command;
 mod execute;
+mod latency;
 mod lsp;
 mod parse;
 

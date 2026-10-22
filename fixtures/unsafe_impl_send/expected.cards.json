@@ -36,12 +36,12 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `thread-safety` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
           "state": "present",
-          "summary": "1 related test file(s) mention owner `SharedCell`"
+          "summary": "1 related test file mentions owner `SharedCell`"
         },
         "witness": {
           "present": false,
@@ -52,7 +52,7 @@
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "No visible local guard detected",
-    "reach": "1 related test file(s) mention owner `SharedCell`",
+    "reach": "1 related test file mentions owner `SharedCell`",
     "witness": "No imported witness receipt was found",
     "witness_routes": [
       {
@@ -66,6 +66,13 @@
         "reason": "Shuttle can explore scheduler interleavings for focused concurrency invariants",
         "command": "cargo test SharedCell_shuttle -- --nocapture",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "constructs_shared_cell",
+        "file": "src/lib.rs",
+        "line": 16
       }
     ],
     "missing": [
