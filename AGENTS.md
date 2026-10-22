@@ -132,8 +132,8 @@ state. Progress measures the full user-defined outcome, never an agent-created
 Use these execution states precisely:
 
 - **`active`** — executable work remains.
-- **`in_progress`** — a command, workflow, runner, review, or other known
-  transition is running. A running check is `in_progress`, not `blocked`.
+- **`in-progress`** — a command, workflow, runner, review, or other known
+  transition is running. A running check is `in-progress`, not `blocked`.
 - **`waiting`** — an external process has a known automatic next transition.
   Keep the lane active, continue independent work, and resume the transition
   when its result arrives.
@@ -141,9 +141,10 @@ Use these execution states precisely:
   concrete failure, no available alternative advances the same obligation, and
   no independent work remains. Repeated polling, an unattempted operation, a
   missing pre-existing workflow, or a pending check is not a blocker.
-- **`owner_decision`** — the unresolved answer materially changes product or
+- **`owner-decision`** — the unresolved answer materially changes product or
   governance stance, destructive action, external commitment, credentials, or
-  an explicitly reserved irreversible operation.
+  an explicitly reserved irreversible operation outside the accepted contract.
+  An already-authorized behavior change is not a new owner decision.
 - **`complete`** — the user-defined outcome reached its named stop boundary.
 
 Capability claims require an attempted operation and concrete failure evidence.
@@ -151,7 +152,9 @@ Before saying an operation cannot be done, needs an administrator, lacks a
 runner, or must be performed by a human: discover the available capability,
 attempt the smallest safe operation, record the exact rejection, try available
 alternatives, and continue every independent seam. Externalize only the smallest
-genuinely missing action.
+genuinely missing action. Probes stay within the actor's existing authorization;
+a documented policy or schema restriction is sufficient evidence. Never attempt
+a destructive or separately reserved operation merely to test permission.
 
 Independent review does not mean human review. Independence comes from a
 distinct lens, fresh evidence, and an exact-head boundary. The author cannot

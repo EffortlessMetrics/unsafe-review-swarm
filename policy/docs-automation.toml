@@ -63,6 +63,7 @@ id = "agent-operating-contract"
 kind = "agent_operating_contract"
 path = "AGENTS.md"
 mode = "check"
+must_not_include = ["`in_progress`", "`owner_decision`", "**in progress**", "**owner decision**"]
 sources = [
   "docs/contributing/SWARM_TO_MAIN.md",
   "docs/contributing/spec-rails.md",
@@ -86,7 +87,7 @@ must_include = [
   "Coordination is execution",
   "A user-carried workplan is actionable direction",
   "Runtime goal and progress state is descriptive, never authority",
-  "A running check is `in_progress`, not `blocked`",
+  "A running check is `in-progress`, not `blocked`",
   "Capability claims require an attempted operation and concrete failure evidence",
   "Independent review does not mean human review",
   "Authority boundaries retain object identity",
@@ -99,6 +100,7 @@ id = "agent-orchestration-protocol"
 kind = "agent_operating_contract"
 path = "docs/contributing/AGENT-ORCHESTRATION.md"
 mode = "check"
+must_not_include = ["`in_progress`", "`owner_decision`", "**in progress**", "**owner decision**"]
 sources = [
   "AGENTS.md",
   "docs/contributing/LIFECYCLE_SURFACE_MAP.md",
@@ -107,7 +109,7 @@ sources = [
 must_include = [
   "Coordination is execution",
   "Runtime goal, status, and progress surfaces are descriptive only",
-  "A pending or running hosted check is in progress, not blocked",
+  "A pending or running hosted check is `in-progress`, not blocked",
   "Capability claims require receipts",
   "Independent review does not mean human review",
   "Authority boundaries retain object identity",
@@ -173,6 +175,7 @@ id = "opencode-coordinator-adapter"
 kind = "agent_operating_contract"
 path = ".opencode/agents/coordinator.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = [
   "AGENTS.md",
   "docs/contributing/AGENT-ORCHESTRATION.md",
@@ -191,6 +194,7 @@ id = "prepare-issue-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/prepare-issue/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "A plan, checklist, or quoted workplan supplied or adopted by the user is active direction",
@@ -203,6 +207,7 @@ id = "build-from-work-spec-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/build-from-work-spec/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "Once admission is settled, this skill moves into execution",
@@ -215,6 +220,7 @@ id = "review-current-head-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/review-current-head/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "Independent review does not mean human review",
@@ -227,6 +233,7 @@ id = "publish-pr-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/publish-pr/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "classify them as `in-progress` or `waiting`, not blocked",
@@ -239,6 +246,7 @@ id = "respond-to-feedback-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/respond-to-feedback/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "Do not externalize that work to the user",
@@ -251,6 +259,7 @@ id = "reconcile-merge-forward-progress"
 kind = "agent_operating_contract"
 path = ".opencode/skills/reconcile-merge/SKILL.md"
 mode = "check"
+must_not_include = [".allow/goals/active.toml", ".rails/goals/active.toml"]
 sources = ["AGENTS.md", "docs/contributing/AGENT-ORCHESTRATION.md"]
 must_include = [
   "stop for the owner decision",

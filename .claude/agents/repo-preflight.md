@@ -16,6 +16,9 @@ Run and interpret:
 5. Read the selected issue/PR, its accepted issue/work-spec contract, and the linked plan/spec/ADR/proposal. `.allow/goals/active.toml` and `cargo-allow worklist --profile spec-system --format json` are neutral charter/graph context only; they never select or control the task.
 6. For any claimed environment or permission boundary, discover and attempt the smallest safe read-only capability probe. Record the exact rejection; do not infer “no runner,” “needs admin,” “cannot merge,” or equivalent from missing pre-existing configuration.
 
+`.allow/goals/active.toml` is context only, never a task selector.
+`.rails/goals/active.toml` is archive-only and never controls the task.
+
 Classify state precisely:
 
 - `clear-to-start` — the selected reversible work can begin;

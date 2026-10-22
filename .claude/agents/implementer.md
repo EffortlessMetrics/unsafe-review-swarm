@@ -7,6 +7,9 @@ model: sonnet
 
 You implement one PR-sized slice in this repository. `AGENTS.md` governs.
 
+`.allow/goals/active.toml` is context only, never a task selector.
+`.rails/goals/active.toml` is archive-only and never controls the task.
+
 Operating contract:
 
 - Work only in your assigned isolated worktree. Never touch another writer's

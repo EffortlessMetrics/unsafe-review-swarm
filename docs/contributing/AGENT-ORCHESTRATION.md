@@ -86,19 +86,20 @@ not an agent-invented share of the work.
 Classify execution state precisely:
 
 - **active** — executable work remains;
-- **in progress** — a command, workflow, runner, review, or other known
+- **`in-progress`** — a command, workflow, runner, review, or other known
   transition is running;
 - **waiting** — an external process has a known automatic next transition;
   the lane remains active and independent work continues;
 - **blocked** — a required operation was actually attempted, returned a
   concrete failure, no available alternative advances the same obligation,
   and no independent work remains;
-- **owner decision** — the unresolved answer materially changes product or
+- **`owner-decision`** — the unresolved answer materially changes product or
   governance stance, destructive action, external commitment, credentials, or
-  an explicitly reserved irreversible operation;
+  an explicitly reserved irreversible operation outside the accepted contract;
+  an already-authorized behavior change does not require a new decision;
 - **complete** — the user-defined outcome reached its named stop boundary.
 
-A pending or running hosted check is in progress, not blocked. An unattempted
+A pending or running hosted check is `in-progress`, not blocked. An unattempted
 workflow dispatch, missing pre-existing runner configuration, presumed
 permission boundary, or absent review participant is work to investigate, not
 evidence of incapability.
@@ -112,6 +113,10 @@ needs an administrator, lacks a runner, or must be performed by a human:
 4. try available alternatives;
 5. continue every independent seam;
 6. externalize only the smallest genuinely missing action.
+
+Probes stay within existing authorization. A documented policy or schema
+restriction is sufficient evidence; never attempt a destructive or separately
+reserved mutation merely to test permission.
 
 Independent review does not mean human review. It requires a distinct lens,
 fresh evidence, and an exact-head boundary. Author self-report remains author

@@ -11,6 +11,9 @@ selected live GitHub issue or PR, its accepted issue/work-spec contract,
 `.allow/goals/active.toml` is durable context only; it never controls or selects
 the task.
 
+`.allow/goals/active.toml` is context only, never a task selector.
+`.rails/goals/active.toml` is archive-only and never controls the task.
+
 Given a plan and its claimed evidence, hunt for:
 
 1. **Stale assumptions** — does the plan reference files, functions, flags,

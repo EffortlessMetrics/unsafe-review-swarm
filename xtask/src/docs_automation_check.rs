@@ -30,6 +30,8 @@ const AGENT_GUIDANCE_REQUIRED: &[(&str, &[&str])] = &[
         ".claude/agents/repo-preflight.md",
         &[
             "neutral charter/graph context only",
+            "`.allow/goals/active.toml` is context only, never a task selector.",
+            "`.rails/goals/active.toml` is archive-only and never controls the task.",
             "A pending hosted check is `in-progress`, not blocked.",
             "attempt the smallest safe read-only capability probe",
             "controlling_contract:",
@@ -48,6 +50,8 @@ const AGENT_GUIDANCE_REQUIRED: &[(&str, &[&str])] = &[
         ".claude/agents/plan-refuter.md",
         &[
             "neutral charter",
+            "`.allow/goals/active.toml` is context only, never a task selector.",
+            "`.rails/goals/active.toml` is archive-only and never controls the task.",
             "False terminal states",
             "Boundary-object drift",
             "Review externalization",
@@ -58,6 +62,8 @@ const AGENT_GUIDANCE_REQUIRED: &[(&str, &[&str])] = &[
         ".claude/agents/implementer.md",
         &[
             "selected live GitHub issue or PR",
+            "`.allow/goals/active.toml` is context only, never a task selector.",
+            "`.rails/goals/active.toml` is archive-only and never controls the task.",
             "blocked-evidenced",
             "A running command, workflow, review, or hosted check is `in-progress`",
             "capability_receipts:",
@@ -74,6 +80,7 @@ const AGENT_GUIDANCE_REQUIRED: &[(&str, &[&str])] = &[
 ];
 
 const AGENT_GUIDANCE_FORBIDDEN: &[(&str, &[&str])] = &[
+    (".claude/agents/issue-factcheck.md", &["`blocked-external`"]),
     (
         ".claude/agents/repo-preflight.md",
         &[
@@ -209,24 +216,61 @@ fn check_docs_automation_impl() -> Result<usize, String> {
                 toml_str_array(required_text, DOCS_AUTOMATION_LEDGER, "must_include")?;
             require_docs_automation_text(id, &paths, &required_text)?;
         }
+        for path in &paths {
+            check_surface_forbidden_text(
+                table,
+                &path.display().to_string(),
+                &read_to_string(path)?,
+            )?;
+        }
     }
 
     check_committed_agent_guidance()?;
+    let lifecycle = "docs/contributing/LIFECYCLE_SURFACE_MAP.md";
+    check_agent_guidance_text(
+        lifecycle,
+        &read_to_string(Path::new(lifecycle))?,
+        &[],
+        &["`blocked-external`"],
+    )?;
     Ok(ids.len())
+}
+
+fn check_surface_forbidden_text(
+    table: &toml::map::Map<String, toml::Value>,
+    path: &str,
+    text: &str,
+) -> Result<(), String> {
+    if let Some(forbidden) = table.get("must_not_include") {
+        let forbidden = toml_str_array(forbidden, DOCS_AUTOMATION_LEDGER, "must_not_include")?;
+        check_agent_guidance_text(path, text, &[], &forbidden)?;
+    }
+    Ok(())
 }
 
 fn check_committed_agent_guidance() -> Result<(), String> {
     for (path, required) in AGENT_GUIDANCE_REQUIRED {
         require_file(path)?;
         let text = read_to_string(Path::new(path))?;
-        let mut forbidden: &[&str] = &[];
-        for (forbidden_path, terms) in AGENT_GUIDANCE_FORBIDDEN {
-            if path == forbidden_path {
-                forbidden = terms;
-                break;
-            }
+        check_committed_guidance_text(path, &text, required)?;
+    }
+    Ok(())
+}
+
+fn check_committed_guidance_text(path: &str, text: &str, required: &[&str]) -> Result<(), String> {
+    let mut forbidden: &[&str] = &[];
+    for (forbidden_path, terms) in AGENT_GUIDANCE_FORBIDDEN {
+        if path == *forbidden_path {
+            forbidden = terms;
+            break;
         }
-        check_agent_guidance_text(path, &text, required, forbidden)?;
+    }
+    check_agent_guidance_text(path, text, required, forbidden)?;
+    if path.starts_with(".claude/") {
+        for goal in [".allow/goals/active.toml", ".rails/goals/active.toml"] {
+            let stale = format!("Read the controlling stack before editing: `{goal}`");
+            check_agent_guidance_text(path, text, &[], &[&stale])?;
+        }
     }
     Ok(())
 }
@@ -416,6 +460,112 @@ mod tests {
         reject_docs_automation_external_path, repo_path_is_under_scope_root,
     };
     use crate::docs_automation_paths;
+
+    #[test]
+    fn docs_automation_declared_adapters_reject_both_singleton_routes() -> Result<(), String> {
+        let ledger: toml::Value = toml::from_str(include_str!("../../policy/docs-automation.toml"))
+            .map_err(|err| err.to_string())?;
+        let surfaces = super::toml_array(&ledger, "generated_or_checked", "test ledger")?;
+        let mut checked = 0;
+        for surface in surfaces {
+            let table = surface.as_table().ok_or("expected surface table")?;
+            let Some(path) = table.get("path").and_then(toml::Value::as_str) else {
+                continue;
+            };
+            if !path.starts_with(".opencode/") {
+                continue;
+            }
+            let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join(path);
+            let text = super::read_to_string(&source)?;
+            super::check_surface_forbidden_text(table, path, &text)?;
+            for goal in [".allow/goals/active.toml", ".rails/goals/active.toml"] {
+                let stale = format!("{text}\nRead the controlling stack before\nediting: `{goal}`");
+                let Err(error) = super::check_surface_forbidden_text(table, path, &stale) else {
+                    return Err(format!("{path} admitted stale routing through {goal}"));
+                };
+                assert!(error.contains(goal));
+            }
+            checked += 1;
+        }
+        assert_eq!(
+            checked, 7,
+            "all declared OpenCode adapters must be exercised"
+        );
+        for (path, required) in super::AGENT_GUIDANCE_REQUIRED {
+            if !path.starts_with(".claude/") {
+                continue;
+            }
+            let source = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+                .join("..")
+                .join(path);
+            let text = super::read_to_string(&source)?;
+            super::check_committed_guidance_text(path, &text, required)?;
+            for goal in [".allow/goals/active.toml", ".rails/goals/active.toml"] {
+                let stale = format!("{text}\nRead the controlling stack before\nediting: `{goal}`");
+                assert!(
+                    super::check_committed_guidance_text(path, &stale, required).is_err(),
+                    "{path}: {goal}"
+                );
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn docs_automation_rejects_old_factcheck_verdict_without_rejecting_new_one()
+    -> Result<(), String> {
+        let path = ".claude/agents/issue-factcheck.md";
+        super::check_committed_guidance_text(
+            path,
+            "Before returning `blocked-external-evidenced`,",
+            &[],
+        )?;
+        assert!(
+            super::check_committed_guidance_text(path, "Before returning `blocked-external`,", &[])
+                .is_err()
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn docs_automation_rejects_state_spelling_drift() -> Result<(), String> {
+        let ledger: toml::Value = toml::from_str(include_str!("../../policy/docs-automation.toml"))
+            .map_err(|err| err.to_string())?;
+        let mut checked = 0;
+        for surface in super::toml_array(&ledger, "generated_or_checked", "test ledger")? {
+            let table = surface.as_table().ok_or("expected surface table")?;
+            let path = table
+                .get("path")
+                .and_then(toml::Value::as_str)
+                .unwrap_or("");
+            if !matches!(
+                path,
+                "AGENTS.md" | "docs/contributing/AGENT-ORCHESTRATION.md"
+            ) {
+                continue;
+            }
+            super::check_surface_forbidden_text(table, path, "`in-progress` and `owner-decision`")?;
+            for stale in [
+                "`in_progress`",
+                "`owner_decision`",
+                "**in progress**",
+                "**owner decision**",
+            ] {
+                assert!(
+                    super::check_surface_forbidden_text(table, path, stale).is_err(),
+                    "{path}: {stale}"
+                );
+            }
+            checked += 1;
+        }
+        assert_eq!(
+            checked, 2,
+            "root and runtime-neutral state contracts must be exercised"
+        );
+        Ok(())
+    }
 
     #[test]
     fn docs_automation_glob_matches_publication_receipts() {

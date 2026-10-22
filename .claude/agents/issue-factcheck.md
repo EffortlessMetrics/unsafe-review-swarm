@@ -16,9 +16,9 @@ Run and interpret:
 3. Premise true? For every load-bearing claim (a path/symbol exists, a predicate has these consumers, this case is "noise", this is miscategorized), CHECK it against the code with grep/read. The premise is where issues are most often wrong. (Precedent: an issue asserted "unclassified-family == noise"; the data showed those cards were actionable missing-contract findings — building it would have gutted a core surface.)
 4. Buildable as written? Are the cited paths/symbols/commands real? Is the change one reason, or does it hide a shared-predicate / cross-surface blast radius that needs splitting?
 5. Separate a real stance decision from an operational unknown:
-   - **stance/owner decision:** changes product behavior, support posture, public claims, dependency trust, merge policy, self-unsafe acceptance, release identity, destructive action, external commitment, credentials, or an explicitly reserved irreversible operation;
+   - **stance/owner decision:** an unresolved choice outside the accepted contract that changes product behavior, support posture, public claims, dependency trust, merge policy, self-unsafe acceptance, release identity, destructive action, external commitment, credentials, or an explicitly reserved irreversible operation;
    - **operational work:** review, internal merge, workflow dispatch, runner discovery, repository-setting attempt, receipt regeneration, or a pending check under an already selected contract.
-6. Before returning `blocked-external`, discover the relevant capability, attempt the smallest safe read-only or non-destructive probe, record the exact rejection, check alternatives, and identify any independent work that remains. Missing pre-existing configuration is not proof the capability is unavailable.
+6. Before returning `blocked-external-evidenced`, discover the relevant capability, attempt the smallest safe read-only probe within existing authorization, record the exact rejection, check alternatives, and identify any independent work that remains. A documented policy or schema restriction is also evidence; never attempt a reserved mutation to test permission. Missing pre-existing configuration is not proof the capability is unavailable.
 
 Return an evidence packet, not an essay:
 
