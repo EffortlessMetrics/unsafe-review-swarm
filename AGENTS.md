@@ -147,6 +147,13 @@ Use these execution states precisely:
   An already-authorized behavior change is not a new owner decision.
 - **`complete`** — the user-defined outcome reached its named stop boundary.
 
+Adapter packet labels map to these execution states: `blocked-evidenced` and
+`blocked-external-evidenced` mean `blocked`; `owner-decision-needed` means
+`owner-decision`. A `scope-question` means `active` while the accepted contract
+can resolve it, or `owner-decision` when a material choice outside that contract
+is required. Finding verdicts such as `needs-plan-repair` describe the next work,
+not a new execution state.
+
 Capability claims require an attempted operation and concrete failure evidence.
 Before saying an operation cannot be done, needs an administrator, lacks a
 runner, or must be performed by a human: discover the available capability,
@@ -155,6 +162,10 @@ alternatives, and continue every independent seam. Externalize only the smallest
 genuinely missing action. Probes stay within the actor's existing authorization;
 a documented policy or schema restriction is sufficient evidence. Never attempt
 a destructive or separately reserved operation merely to test permission.
+When a documented restriction prevents the operation, use `owner-decision` for
+a required change of authority or contract, or remain `active` to repair an
+in-scope schema/input mismatch. Such a restriction alone does not satisfy the
+attempted-and-failed definition of `blocked`.
 
 Independent review does not mean human review. Independence comes from a
 distinct lens, fresh evidence, and an exact-head boundary. The author cannot

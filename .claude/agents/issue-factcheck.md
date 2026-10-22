@@ -28,7 +28,7 @@ premise_holds: yes | no | partial    (with file:line evidence)
 build_ready: yes | no
 corrections: <bullet repairs to the plan, each with file:line — empty if ready>
 blast_radius: <shared predicates / cross-surface consumers the change touches, or "local">
-capability_receipt: <attempt + exact result for any external/permission claim, or "not applicable">
+capability_receipt: <attempt + exact result, or documented policy/schema restriction with citation, for any external/permission claim; otherwise "not applicable">
 independent_work: <remaining executable seams, or "none">
 next_action: <one concrete reversible step or the smallest genuine owner decision>
 ```
@@ -38,6 +38,11 @@ A running check is `in-progress`; a known automatic transition is `waiting`.
 no alternative advances the obligation, and no independent work remains. One
 blocked substep does not block independent seams. Do not classify independent
 exact-head review as human-only review.
+For a documented restriction without a failed operation, use
+`owner-decision-needed` when authority or contract must change, or
+`needs-plan-repair` for an in-scope schema/input correction. These map to
+`owner-decision` and `active` respectively; the restriction alone is not
+`blocked-external-evidenced`.
 
 Cite file:line or exact GitHub/command evidence for every claim you confirm or
 refute. Default to verification over trusting the issue text. If the premise is

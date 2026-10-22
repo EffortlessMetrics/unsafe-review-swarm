@@ -63,7 +63,7 @@ id = "agent-operating-contract"
 kind = "agent_operating_contract"
 path = "AGENTS.md"
 mode = "check"
-must_not_include = ["`in_progress`", "`owner_decision`", "**in progress**", "**owner decision**"]
+must_not_include = ["in_progress", "owner_decision", "**in progress**", "**owner decision**"]
 sources = [
   "docs/contributing/SWARM_TO_MAIN.md",
   "docs/contributing/spec-rails.md",
@@ -93,6 +93,8 @@ must_include = [
   "Authority boundaries retain object identity",
   "Stop for the owner decision",
   "Progress measures the full user-defined outcome",
+  "Adapter packet labels map to these execution states",
+  "Such a restriction alone does not satisfy the attempted-and-failed definition of `blocked`",
 ]
 
 [[generated_or_checked]]
@@ -100,7 +102,7 @@ id = "agent-orchestration-protocol"
 kind = "agent_operating_contract"
 path = "docs/contributing/AGENT-ORCHESTRATION.md"
 mode = "check"
-must_not_include = ["`in_progress`", "`owner_decision`", "**in progress**", "**owner decision**"]
+must_not_include = ["in_progress", "owner_decision", "**in progress**", "**owner decision**"]
 sources = [
   "AGENTS.md",
   "docs/contributing/LIFECYCLE_SURFACE_MAP.md",
@@ -141,6 +143,8 @@ must_include = [
   "blocked-external-evidenced",
   "capability_receipt:",
   "One blocked substep does not block independent seams.",
+  "documented policy/schema restriction with citation",
+  "`needs-plan-repair` for an in-scope schema/input correction",
 ]
 
 [[generated_or_checked]]

@@ -117,6 +117,10 @@ needs an administrator, lacks a runner, or must be performed by a human:
 Probes stay within existing authorization. A documented policy or schema
 restriction is sufficient evidence; never attempt a destructive or separately
 reserved mutation merely to test permission.
+Record the cited restriction as the capability evidence. A required authority
+or contract change is `owner-decision`; an in-scope schema/input repair remains
+`active`. Neither is an attempted-and-failed `blocked` operation. Adapter verdict
+aliases map to execution states as defined in `AGENTS.md`.
 
 Independent review does not mean human review. It requires a distinct lens,
 fresh evidence, and an exact-head boundary. Author self-report remains author

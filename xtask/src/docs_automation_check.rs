@@ -548,6 +548,8 @@ mod tests {
             }
             super::check_surface_forbidden_text(table, path, "`in-progress` and `owner-decision`")?;
             for stale in [
+                "in_progress",
+                "owner_decision",
                 "`in_progress`",
                 "`owner_decision`",
                 "**in progress**",
