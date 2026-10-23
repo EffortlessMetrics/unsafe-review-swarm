@@ -54,7 +54,7 @@ Upstream Perl-specific policy-surface tests and helper scripts are excluded.
 python3 scripts/ci/test_check_pr_semantic_review_currentness.py
 python3 scripts/ci/test_review_owner_supersession.py
 python3 scripts/ci/test_review_owner_bootstrap.py
-python3 scripts/ci/test_bootstrap_admission.py
+python3 .ci/test-admission.py  # replacement caller; legacy suite retained in bootstrap commit
 bash -n scripts/ci/check-pr-review-convergence scripts/ci/check-pr-review-convergence-core
 ```
 
@@ -142,3 +142,19 @@ allows public-resource reads without the listed pull-request permission. No
 avoids the shared anonymous-IP budget; missing credentials, rate limiting and
 unavailable metadata still fail closed without an anonymous fallback. Native
 qualification must verify this existing-token path on the exact candidate.
+
+## Landed bootstrap and migration replacement
+
+Bootstrap #2396 landed in protected main at
+`1f99630ade468378c54057ed09635e4183ecaae8`. Its native product run
+[38970363541](https://github.com/EffortlessMetrics/unsafe-review-swarm/actions/runs/38970363541)
+qualified the legacy bootstrap candidate. The sections above preserve that
+source and landing contract; their pending-landing language is historical.
+
+Migration #2380 now incorporates this protected base and retains the three
+owner programs and their owner tests byte-for-byte. Its central caller replaces
+the legacy workflow and its legacy-only admission suite; replacement admission
+controls live in `.ci/test-admission.py`. Existing-token authentication and
+isolated Python imports are carried forward. The legacy guard remains active
+on main until #2380 itself qualifies and lands. Bootstrap success does not
+qualify the central pin, the replacement result path, artifacts or runtime fit.
