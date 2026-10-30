@@ -1,4 +1,5 @@
 mod alignment_discharge;
+mod asm_discharge;
 mod assignment_syntax;
 mod boolean_condition;
 mod bounds_discharge;
@@ -60,6 +61,7 @@ mod write_bytes;
 mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
+use self::asm_discharge::asm_discharge_state;
 pub(crate) use self::assignment_syntax::{
     contains_assignment_to_target, contains_simple_assignment_to,
 };
@@ -162,6 +164,7 @@ fn discharge_state_for(
     }
     match key {
         "alignment" => alignment_discharge_state(site, lower),
+        "asm" => asm_discharge_state(site),
         "bounds" | "valid-range" => bounds_discharge_state(site, lower),
         "capacity" => capacity_discharge_state(site, lower),
         "initialized" => initialized_discharge_state(site, lower),
@@ -304,6 +307,149 @@ mod tests {
                 .discharge
                 .present
         );
+    }
+
+    fn asm_discharge_summary(snippet: &str, context_after: Vec<&str>) -> String {
+        let obligations = vec![SafetyObligation::new(
+            "asm",
+            "inline assembly obeys register, memory, and target invariants",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let site = site_with_family(OperationFamily::InlineAsm, vec![], snippet, context_after);
+        obligation_evidence(&site, &obligations, &contract, &reach)[0]
+            .discharge
+            .summary
+            .clone()
+    }
+
+    #[test]
+    fn asm_nomem_contradiction_is_named_in_discharge() {
+        let summary = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7, options(nomem, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            summary,
+            "asm template addresses memory while options declare nomem"
+        );
+    }
+
+    #[test]
+    fn asm_nomem_contradiction_spans_context_lines() {
+        let summary = asm_discharge_summary(
+            "core::arch::asm!(",
+            vec![
+                "\"mov [{}], {}\",",
+                "in(reg) p, in(reg) 7,",
+                "options(nomem, nostack)",
+                ")",
+            ],
+        );
+        assert_eq!(
+            summary,
+            "asm template addresses memory while options declare nomem"
+        );
+    }
+
+    #[test]
+    fn asm_readonly_contradiction_is_named_in_discharge() {
+        let summary = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7, options(readonly, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            summary,
+            "asm template writes memory through its destination operand while options declare readonly"
+        );
+    }
+
+    #[test]
+    fn asm_multi_template_contradictions_are_named() {
+        let nomem = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\", \"mov [{}], {}\", in(reg) p, in(reg) 7, options(nomem, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            nomem,
+            "asm template addresses memory while options declare nomem"
+        );
+        let readonly = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\", \"mov [{}], {}\", in(reg) p, in(reg) 7, options(readonly, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            readonly,
+            "asm template writes memory through its destination operand while options declare readonly"
+        );
+    }
+
+    #[test]
+    fn asm_escaped_newline_templates_are_split() {
+        // Escaped separators stay two characters in the scanned literal.
+        let nomem = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\\n\\tmov [{}], {}\", in(reg) p, in(reg) 7, options(nomem, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            nomem,
+            "asm template addresses memory while options declare nomem"
+        );
+        let readonly = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\\n\\tmov [{}], {}\", in(reg) p, in(reg) 7, options(readonly, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            readonly,
+            "asm template writes memory through its destination operand while options declare readonly"
+        );
+        for snippet in [
+            "unsafe { core::arch::asm!(\"mov {}, {}\\n\\tlea {}, [{} + 4]\", out(reg) v, in(reg) 7, out(reg) a, in(reg) p, options(nomem, nostack)) }",
+            "unsafe { core::arch::asm!(\"cmp dword ptr [{}], 0\\n\\tnop\", in(reg) p, options(readonly, nostack)) }",
+        ] {
+            assert_eq!(
+                asm_discharge_summary(snippet, vec![]),
+                "No obligation-specific guard code was detected",
+                "{snippet}"
+            );
+        }
+    }
+
+    #[test]
+    fn asm_adjacent_call_options_do_not_leak() {
+        let summary = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7) }",
+            vec!["unsafe { core::arch::asm!(\"nop\", options(nomem, nostack)) }"],
+        );
+        assert_eq!(summary, "No obligation-specific guard code was detected");
+    }
+
+    #[test]
+    fn asm_sound_options_keep_generic_missing() {
+        for snippet in [
+            // Pure nomem: no memory operand anywhere.
+            "unsafe { core::arch::asm!(\"nop\", options(nomem, nostack)) }",
+            // Readonly memory read: bracket is the source operand.
+            "unsafe { core::arch::asm!(\"mov {}, [{}]\", out(reg) v, in(reg) p, options(readonly, nostack)) }",
+            // Output-operand write declares its write through the operand, not the template.
+            "unsafe { core::arch::asm!(\"mov {}, 7\", out(reg) v, options(nomem, nostack)) }",
+            // No options at all stays silent about contradictions.
+            "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7) }",
+            // lea computes an address without accessing memory.
+            "unsafe { core::arch::asm!(\"lea {}, [{} + 4]\", out(reg) v, in(reg) p, options(nomem, nostack)) }",
+            // cmp/test read their first operand; readonly permits reads.
+            "unsafe { core::arch::asm!(\"cmp dword ptr [{}], 0\", in(reg) p, options(readonly, nostack)) }",
+            "unsafe { core::arch::asm!(\"test dword ptr [{}], 1\", in(reg) p, options(readonly, nostack)) }",
+        ] {
+            assert_eq!(
+                asm_discharge_summary(snippet, vec![]),
+                "No obligation-specific guard code was detected",
+                "snippet: {snippet}"
+            );
+        }
     }
 
     #[test]
@@ -1475,7 +1621,7 @@ mod tests {
     #[test]
     fn unhandled_obligation_key_names_itself_in_discharge_summary() {
         let obligations = vec![SafetyObligation::new(
-            "asm",
+            "unhandled-obligation",
             "inline assembly operands and clobbers are valid",
         )];
         let contract = ContractEvidence::present("contract");
@@ -1495,7 +1641,7 @@ mod tests {
         assert!(!evidence[0].discharge.present);
         assert_eq!(
             evidence[0].discharge.summary,
-            "No obligation-specific guard code was detected for the `asm` obligation (no guard pattern is recognized for this obligation)"
+            "No obligation-specific guard code was detected for the `unhandled-obligation` obligation (no guard pattern is recognized for this obligation)"
         );
     }
 
