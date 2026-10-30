@@ -279,6 +279,33 @@ fn is_extern_boundary(line: &str) -> bool {
         || trimmed.starts_with("extern {")
 }
 
+/// Recognizes an extern block header, with optional outer attributes and
+/// `unsafe`. The text after the optional ABI must be empty or start with
+/// `{`. This rejects `extern "C" fn` items and `extern "C" fn()` pointer
+/// statics, which are not block headers.
+fn is_extern_block_header(line: &str) -> bool {
+    let mut rest = line.trim_start();
+    while rest.starts_with("#[") {
+        let Some(end) = rest.find(']') else {
+            return false;
+        };
+        rest = rest[end + 1..].trim_start();
+    }
+    let rest = rest.strip_prefix("unsafe").map_or(rest, str::trim_start);
+    let Some(after_extern) = rest.strip_prefix("extern") else {
+        return false;
+    };
+    let after_abi = after_extern.trim_start();
+    let tail = match after_abi.strip_prefix('"') {
+        Some(quoted) => match quoted.split_once('"') {
+            Some((_abi, tail)) => tail.trim_start(),
+            None => return false,
+        },
+        None => after_abi,
+    };
+    tail.is_empty() || tail.starts_with('{')
+}
+
 fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let mut in_extern = false;
@@ -302,7 +329,7 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
         {
             module_stack.push((module_name, brace_depth + 1));
         }
-        if is_extern_boundary(trimmed) {
+        if is_extern_block_header(trimmed) {
             in_extern = true;
         }
         if in_extern {
@@ -341,7 +368,7 @@ fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
         {
             module_stack.push((module_name, brace_depth + 1));
         }
-        if is_extern_boundary(trimmed) {
+        if is_extern_block_header(trimmed) {
             in_extern = true;
         }
         if in_extern {
@@ -370,11 +397,17 @@ fn shadowed_local_names(source: &str, start: usize) -> BTreeSet<String> {
     let prefix = &source[..start.min(source.len())];
     let scope_start = prefix.rfind("fn ").unwrap_or(0);
     let scope = &prefix[scope_start..];
-    // Fn parameters live in the first parenthesised segment after `fn `.
-    if let Some(paren) = scope.find('(')
-        && let Some(close) = scope[paren..].find(')')
+    // Fn parameters live in the parenthesised segment after `fn ` and any
+    // generic parameter list; nested fn-pointer types carry their own
+    // parentheses, so the close must be matched by depth.
+    let params_search = match scope.find('>') {
+        Some(gt) if scope[..gt].contains('<') => &scope[gt + 1..],
+        _ => scope,
+    };
+    if let Some(paren) = params_search.find('(')
+        && let Some(close) = matching_close_paren(params_search, paren)
     {
-        for param in scope[paren + 1..paren + close].split(',') {
+        for param in params_search[paren + 1..close].split(',') {
             let Some((binding, _ty)) = param.split_once(':') else {
                 continue;
             };
@@ -409,6 +442,23 @@ fn shadowed_local_names(source: &str, start: usize) -> BTreeSet<String> {
         cursor = &cursor[pos + "let ".len()..];
     }
     names
+}
+
+fn matching_close_paren(text: &str, open: usize) -> Option<usize> {
+    let mut depth = 0usize;
+    for (idx, ch) in text[open..].char_indices() {
+        match ch {
+            '(' => depth += 1,
+            ')' => {
+                depth = depth.checked_sub(1)?;
+                if depth == 0 {
+                    return Some(open + idx);
+                }
+            }
+            _ => {}
+        }
+    }
+    None
 }
 
 fn local_module_names(lines: &[&str]) -> BTreeSet<String> {
@@ -890,6 +940,20 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
     // BLOCK_EXPR nodes (the kind that reaches the FFI guard), and lazily —
     // the closure is only invoked when the guard is evaluated.
     let masked_compact_for_ffi = || syntax_detection_text(&compact);
+    // Bare extern-static family for this block, computed once and skipped
+    // entirely when the file declares no extern statics.
+    let extern_static_family = (fact.kind == "BLOCK_EXPR"
+        && (!extern_statics.immutable.is_empty() || !extern_statics.mutable.is_empty())
+        && compact.starts_with("unsafe {")
+        && !operation_block_ranges.contains(&(fact.start, fact.end)))
+    .then(|| {
+        extern_static_use_family(
+            &masked_compact_for_ffi(),
+            extern_statics,
+            &shadowed_local_names(source, fact.start),
+        )
+    })
+    .flatten();
     match fact.kind.as_str() {
         "FN" if declaration.contains("unsafe fn") => {
             Some((UnsafeSiteKind::UnsafeFn, OperationFamily::UnsafeDeclaration))
@@ -942,27 +1006,8 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
         }
-        "BLOCK_EXPR"
-            if compact.starts_with("unsafe {")
-                && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && extern_static_use_family(
-                    &masked_compact_for_ffi(),
-                    extern_statics,
-                    &shadowed_local_names(source, fact.start),
-                ) == Some(OperationFamily::Ffi) =>
-        {
-            Some((UnsafeSiteKind::Operation, OperationFamily::Ffi))
-        }
-        "BLOCK_EXPR"
-            if compact.starts_with("unsafe {")
-                && !operation_block_ranges.contains(&(fact.start, fact.end))
-                && extern_static_use_family(
-                    &masked_compact_for_ffi(),
-                    extern_statics,
-                    &shadowed_local_names(source, fact.start),
-                ) == Some(OperationFamily::StaticMut) =>
-        {
-            Some((UnsafeSiteKind::Operation, OperationFamily::StaticMut))
+        "BLOCK_EXPR" if extern_static_family.is_some() => {
+            extern_static_family.map(|family| (UnsafeSiteKind::Operation, family))
         }
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
@@ -1659,6 +1704,29 @@ mod tests {
         assert!(statics.mutable.contains("COUNTER"));
         assert!(!statics.immutable.contains("SAFE"));
         assert!(!statics.mutable.contains("ERRNO"));
+    }
+
+    #[test]
+    fn extern_collectors_ignore_fn_pointer_statics_and_following_locals() {
+        let lines = vec![
+            "static CB: extern \"C\" fn() = cb;",
+            "static LOCAL: i32 = 0;",
+            "extern \"C\" fn helper() {}",
+            "static ALSO_LOCAL: u32 = 0;",
+        ];
+        let statics = extern_static_names(&lines);
+        assert!(statics.immutable.is_empty(), "{statics:?}");
+        assert!(statics.mutable.is_empty(), "{statics:?}");
+        assert!(extern_fn_names(&lines).is_empty());
+    }
+
+    #[test]
+    fn shadowed_local_names_include_params_after_fn_pointer_params() {
+        let source = "pub fn f(cb: fn(i32), ERRNO: i32) -> i32 { unsafe { ERRNO } }";
+        let start = source.find("unsafe {").unwrap();
+        let names = shadowed_local_names(source, start);
+        assert!(names.contains("ERRNO"), "{names:?}");
+        assert!(names.contains("cb"), "{names:?}");
     }
 
     #[test]

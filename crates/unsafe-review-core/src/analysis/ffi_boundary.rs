@@ -18,17 +18,15 @@ pub(super) fn extern_static_use_family(
     statics: &ExternStaticNames,
     shadowed: &BTreeSet<String>,
 ) -> Option<OperationFamily> {
-    let mut mutable: Vec<&String> = statics.mutable.iter().collect();
-    mutable.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    if mutable
+    if statics
+        .mutable
         .iter()
         .any(|name| contains_bare_static_use(line, name, shadowed))
     {
         return Some(OperationFamily::StaticMut);
     }
-    let mut immutable: Vec<&String> = statics.immutable.iter().collect();
-    immutable.sort_by_key(|name| std::cmp::Reverse(name.len()));
-    if immutable
+    if statics
+        .immutable
         .iter()
         .any(|name| contains_bare_static_use(line, name, shadowed))
     {
