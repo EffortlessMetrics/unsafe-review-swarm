@@ -1721,12 +1721,15 @@ mod tests {
     }
 
     #[test]
-    fn shadowed_local_names_include_params_after_fn_pointer_params() {
+    fn shadowed_local_names_include_params_after_fn_pointer_params() -> Result<(), String> {
         let source = "pub fn f(cb: fn(i32), ERRNO: i32) -> i32 { unsafe { ERRNO } }";
-        let start = source.find("unsafe {").unwrap();
+        let start = source
+            .find("unsafe {")
+            .ok_or("test source must contain an unsafe block")?;
         let names = shadowed_local_names(source, start);
         assert!(names.contains("ERRNO"), "{names:?}");
         assert!(names.contains("cb"), "{names:?}");
+        Ok(())
     }
 
     #[test]
