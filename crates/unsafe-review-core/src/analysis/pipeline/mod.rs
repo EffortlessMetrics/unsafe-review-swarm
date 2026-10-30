@@ -1166,6 +1166,73 @@ mod tests {
     }
 
     #[test]
+    fn asm_contradiction_cards_route_to_code_fix_next_action() {
+        use crate::domain::{EvidenceState, ObligationEvidence, SafetyObligation};
+
+        let contradiction = |summary: &str| {
+            vec![ObligationEvidence {
+                obligation: SafetyObligation::new("asm", "inline asm obligations"),
+                contract: EvidenceState::missing("contract"),
+                discharge: EvidenceState::missing(summary),
+                reach: EvidenceState::missing("reach"),
+                witness: EvidenceState::missing("witness"),
+            }]
+        };
+        for (class, summary, public) in [
+            (
+                ReviewClass::ContractMissing,
+                "asm template addresses memory while options declare nomem",
+                true,
+            ),
+            (
+                ReviewClass::GuardMissing,
+                "asm template writes memory through its destination operand while options declare readonly",
+                false,
+            ),
+        ] {
+            let evidence = contradiction(summary);
+            let action = next_action_summary(
+                &class,
+                "inline_asm",
+                public,
+                "private",
+                &[],
+                &evidence,
+                false,
+                None,
+                &[],
+                "pending",
+            );
+            assert!(
+                action.contains("Review the self-contradictory `asm!` options manually and remove"),
+                "{class:?} contradiction next action `{action}` should route to the code fix"
+            );
+            assert!(!action.contains("# Safety"));
+            assert!(!action.contains("human deep-review receipt"));
+        }
+
+        // Sound inline_asm evidence keeps the existing manual-review routing.
+        let sound = contradiction("No obligation-specific guard code was detected");
+        let action = next_action_summary(
+            &ReviewClass::GuardMissing,
+            "inline_asm",
+            false,
+            "private",
+            &[],
+            &sound,
+            false,
+            None,
+            &[],
+            "pending",
+        );
+        assert!(
+            action.contains("register, memory, and target invariants"),
+            "sound asm action `{action}` should keep the manual invariant review"
+        );
+        assert!(!action.contains("self-contradictory"));
+    }
+
+    #[test]
     fn pin_unchecked_guard_missing_next_action_routes_to_manual_invariant_review() {
         let human_route = [test_witness_route(WitnessKind::HumanDeepReview)];
         let summary = next_action_summary(

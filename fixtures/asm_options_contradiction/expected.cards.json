@@ -62,12 +62,13 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.",
+    "next_action": "Review the self-contradictory `asm!` options manually and remove the `nomem`/`readonly` declaration or declare the memory access the template performs; no guard evidence can discharge a template that contradicts its declared options.",
     "verify_commands": [],
     "confirmation_cue": {
       "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7u32, options(nomem, nostack)) }`; confirm with external evidence before treating it as observed runtime behavior",
@@ -168,12 +169,13 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
-    "next_action": "Review the `inline_asm` register, memory, and target invariants manually; add explicit guard evidence, and attach a human deep-review receipt only as witness evidence.",
+    "next_action": "Review the self-contradictory `asm!` options manually and remove the `nomem`/`readonly` declaration or declare the memory access the template performs; no guard evidence can discharge a template that contradicts its declared options.",
     "verify_commands": [],
     "confirmation_cue": {
       "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7u32, options(readonly, nostack)) }`; confirm with external evidence before treating it as observed runtime behavior",

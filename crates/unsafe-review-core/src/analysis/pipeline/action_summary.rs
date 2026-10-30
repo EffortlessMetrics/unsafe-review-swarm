@@ -1,3 +1,4 @@
+use crate::analysis::evidence::{ASM_NOMEM_CONTRADICTION, ASM_READONLY_CONTRADICTION};
 use crate::domain::{ObligationEvidence, ReviewClass, WitnessKind, WitnessRoute};
 
 #[allow(
@@ -17,6 +18,14 @@ pub(super) fn next_action_summary(
     witness_confirmation: &str,
 ) -> String {
     match class {
+        // A self-contradictory asm! declaration is a code defect that
+        // documentation cannot discharge, so it pre-empts both the
+        // contract-docs and manual-review advice below.
+        ReviewClass::ContractMissing | ReviewClass::GuardMissing
+            if operation == "inline_asm" && has_asm_contradiction(obligation_evidence) =>
+        {
+            "Review the self-contradictory `asm!` options manually and remove the `nomem`/`readonly` declaration or declare the memory access the template performs; no guard evidence can discharge a template that contradicts its declared options.".to_string()
+        }
         ReviewClass::ContractMissing if public_api_surface => {
             "Add a precise public `# Safety` section that names the required caller obligations."
                 .to_string()
@@ -111,6 +120,15 @@ pub(super) fn next_action_summary(
         ReviewClass::Suppressed => "Suppressed card; keep the owner, reason, evidence, and review or expiry date current.".to_string(),
         _ => "Attach a focused witness receipt or mark the static limitation explicitly.".to_string(),
     }
+}
+
+fn has_asm_contradiction(obligation_evidence: &[ObligationEvidence]) -> bool {
+    obligation_evidence.iter().any(|evidence| {
+        evidence.obligation.key == "asm"
+            && !evidence.discharge.present
+            && (evidence.discharge.summary == ASM_NOMEM_CONTRADICTION
+                || evidence.discharge.summary == ASM_READONLY_CONTRADICTION)
+    })
 }
 
 fn has_witness_route(routes: &[WitnessRoute], kind: WitnessKind) -> bool {

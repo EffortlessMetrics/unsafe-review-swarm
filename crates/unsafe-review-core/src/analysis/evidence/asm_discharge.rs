@@ -1,9 +1,9 @@
 use crate::analysis::scanner::ScannedSite;
 use crate::domain::EvidenceState;
 
-pub(super) const ASM_NOMEM_CONTRADICTION: &str =
+pub(crate) const ASM_NOMEM_CONTRADICTION: &str =
     "asm template addresses memory while options declare nomem";
-pub(super) const ASM_READONLY_CONTRADICTION: &str =
+pub(crate) const ASM_READONLY_CONTRADICTION: &str =
     "asm template writes memory through its destination operand while options declare readonly";
 
 const GENERIC_MISSING: &str = "No obligation-specific guard code was detected";
