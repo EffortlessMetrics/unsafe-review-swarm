@@ -35,6 +35,21 @@ pub(super) fn extern_static_use_family(
     None
 }
 
+/// Family for a bare (non-call) use of a same-file file-local `static mut`
+/// inside an unsafe block. Only mutable file-local statics route; immutable
+/// file-local statics stay unrouted. `shadowed` holds same-scope safe binding
+/// names (locals/params) that hide the static for bare spellings.
+pub(super) fn local_static_mut_use_family(
+    line: &str,
+    statics: &BTreeSet<String>,
+    shadowed: &BTreeSet<String>,
+) -> Option<OperationFamily> {
+    statics
+        .iter()
+        .any(|name| contains_bare_static_use(line, name, shadowed))
+        .then_some(OperationFamily::StaticMut)
+}
+
 fn contains_bare_static_use(line: &str, path: &str, shadowed: &BTreeSet<String>) -> bool {
     let simple = path.rsplit("::").next().unwrap_or(path);
     if !path.contains("::") && (shadowed.contains(simple) || line_has_let_binding(line, simple)) {
@@ -405,6 +420,33 @@ mod tests {
         // Declaration spelling names the binding, not a use.
         assert_eq!(
             extern_static_use_family("static ERRNO: i32;", &statics, &none),
+            None
+        );
+    }
+
+    #[test]
+    fn local_static_mut_bare_uses_route_and_reject_shadowed() {
+        let statics = BTreeSet::from(["COUNTER".to_string(), "inner::COUNTER".to_string()]);
+        let none = BTreeSet::new();
+        assert_eq!(
+            local_static_mut_use_family("unsafe { COUNTER += 1 }", &statics, &none),
+            Some(OperationFamily::StaticMut)
+        );
+        assert_eq!(
+            local_static_mut_use_family("unsafe { inner::COUNTER }", &statics, &none),
+            Some(OperationFamily::StaticMut)
+        );
+        let shadowed = BTreeSet::from(["COUNTER".to_string()]);
+        assert_eq!(
+            local_static_mut_use_family("unsafe { COUNTER }", &statics, &shadowed),
+            None
+        );
+        assert_eq!(
+            local_static_mut_use_family("unsafe { let COUNTER = 7; COUNTER }", &statics, &none),
+            None
+        );
+        assert_eq!(
+            local_static_mut_use_family("static mut COUNTER: u32 = 0;", &statics, &none),
             None
         );
     }

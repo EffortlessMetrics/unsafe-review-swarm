@@ -2,6 +2,7 @@ use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::copy_operation::{copy_operation_family, is_incomplete_multiline_copy};
 use super::ffi_boundary::{
     ExternStaticNames, extern_static_use_family, ffi_boundary_applicability,
+    local_static_mut_use_family,
 };
 use super::maybeuninit_operation::maybeuninit_operation_family;
 use super::nonnull_operation::nonnull_operation_family;
@@ -389,6 +390,48 @@ fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
     statics
 }
 
+/// File-local (non-extern) `static mut` item names in this file. Entries
+/// carry the same bare and module-qualified spellings as extern fn names.
+/// Immutable file-local statics are not collected: reading a `Sync` static
+/// is not sound data-race freedom evidence, so those uses stay unrouted.
+fn static_mut_names(lines: &[&str]) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let mut in_extern = false;
+    let mut module_stack: Vec<(String, usize)> = Vec::new();
+    let mut brace_depth = 0usize;
+    let mut state = LineCommentState::default();
+    for raw in lines {
+        let detection_line = line_for_text_detection(raw, &mut state);
+        let trimmed = detection_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        while module_stack
+            .last()
+            .is_some_and(|(_name, depth)| brace_depth < *depth)
+        {
+            module_stack.pop();
+        }
+        if trimmed.contains('{')
+            && let Some(module_name) = parse_mod_name(trimmed)
+        {
+            module_stack.push((module_name, brace_depth + 1));
+        }
+        if is_extern_block_header(trimmed) {
+            in_extern = true;
+        }
+        if in_extern {
+            if trimmed.contains('}') {
+                in_extern = false;
+            }
+        } else if let Some((name, true)) = parse_static_decl(trimmed) {
+            insert_extern_call_paths(&mut names, &module_stack, &name);
+        }
+        brace_depth = update_brace_depth(trimmed, brace_depth);
+    }
+    names
+}
+
 /// Safe binding names introduced before `start` in the enclosing fn scope:
 /// `let` bindings and fn parameters. A bare extern-static spelling hidden
 /// by one of these names is a use of the safe binding, not the static.
@@ -672,6 +715,7 @@ fn detect_syntax_sites(
     parsed: &ParsedSource,
     extern_names: &BTreeSet<String>,
     extern_statics: &ExternStaticNames,
+    local_static_muts: &BTreeSet<String>,
     local_modules: &BTreeSet<String>,
 ) -> (Vec<DetectedSyntaxSite>, disposition::NonNullDecisions) {
     let mut sites = Vec::new();
@@ -693,6 +737,7 @@ fn detect_syntax_sites(
             operation_block_ranges: &operation_block_ranges,
             extern_names,
             extern_statics,
+            local_static_muts,
             local_modules,
             nonnull: &nonnull,
         }) else {
@@ -910,6 +955,7 @@ struct SyntaxSiteCtx<'a> {
     operation_block_ranges: &'a BTreeSet<(usize, usize)>,
     extern_names: &'a BTreeSet<String>,
     extern_statics: &'a ExternStaticNames,
+    local_static_muts: &'a BTreeSet<String>,
     local_modules: &'a BTreeSet<String>,
     nonnull: &'a disposition::NonNullDecisions,
 }
@@ -923,6 +969,7 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         operation_block_ranges,
         extern_names,
         extern_statics,
+        local_static_muts,
         local_modules,
         nonnull,
     } = ctx;
@@ -950,6 +997,20 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         extern_static_use_family(
             &masked_compact_for_ffi(),
             extern_statics,
+            &shadowed_local_names(source, fact.start),
+        )
+    })
+    .flatten();
+    // Bare file-local `static mut` family for this block, computed once and
+    // skipped entirely when the file declares no file-local `static mut`.
+    let local_static_mut_family = (fact.kind == "BLOCK_EXPR"
+        && !local_static_muts.is_empty()
+        && compact.starts_with("unsafe {")
+        && !operation_block_ranges.contains(&(fact.start, fact.end)))
+    .then(|| {
+        local_static_mut_use_family(
+            &masked_compact_for_ffi(),
+            local_static_muts,
             &shadowed_local_names(source, fact.start),
         )
     })
@@ -1008,6 +1069,9 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         }
         "BLOCK_EXPR" if extern_static_family.is_some() => {
             extern_static_family.map(|family| (UnsafeSiteKind::Operation, family))
+        }
+        "BLOCK_EXPR" if local_static_mut_family.is_some() => {
+            local_static_mut_family.map(|family| (UnsafeSiteKind::Operation, family))
         }
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
@@ -1856,6 +1920,156 @@ mod tests {
                 .all(|site| site.operation.family != OperationFamily::Ffi
                     && site.operation.family != OperationFamily::StaticMut),
             "bare uses outside an unsafe block must not route to extern static families: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn static_mut_names_collect_only_file_local_mutable_statics() {
+        let lines: Vec<&str> = vec![
+            "unsafe extern \"C\" {",
+            "    static mut EXTERNAL: u32;",
+            "}",
+            "static mut LOCAL: u32 = 0;",
+            "pub static mut PUBLIC_MUT: u32 = 0;",
+            "static IMMUTABLE: u32 = 0;",
+            "mod inner {",
+            "    static mut INNER: u32 = 0;",
+            "}",
+        ];
+        let names = static_mut_names(&lines);
+        assert!(names.contains("LOCAL"), "{names:?}");
+        assert!(names.contains("PUBLIC_MUT"), "{names:?}");
+        assert!(names.contains("inner::INNER"), "{names:?}");
+        assert!(!names.contains("EXTERNAL"), "{names:?}");
+        assert!(!names.contains("IMMUTABLE"), "{names:?}");
+    }
+
+    #[test]
+    fn local_static_mut_bare_use_cards_as_static_mut() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "static mut COUNTER: u32 = 0;\n\npub fn bump() -> u32 {\n    // SAFETY: callers serialize access to COUNTER.\n    unsafe { COUNTER += 1; COUNTER }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -6,1 +6,1 @@\n+    unsafe { COUNTER += 1; COUNTER }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(sites[0].operation.family, OperationFamily::StaticMut);
+        assert_eq!(sites[0].site.snippet, "unsafe { COUNTER += 1; COUNTER }");
+        Ok(())
+    }
+
+    #[test]
+    fn local_immutable_static_bare_use_does_not_route() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "static VALUE: u32 = 42;\n\npub fn read() -> u32 {\n    unsafe { VALUE }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -4,1 +4,1 @@\n+    unsafe { VALUE }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| site.operation.family != OperationFamily::StaticMut
+                    && site.operation.family != OperationFamily::Ffi),
+            "immutable file-local static must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_static_mut_same_name_safe_binding_does_not_route() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "static mut COUNTER: u32 = 0;\n\npub fn local_counter() -> u32 {\n    let COUNTER = 7;\n    // SAFETY: reads only the local binding above.\n    unsafe { COUNTER }\n}\n\npub fn param_counter(COUNTER: u32) -> u32 {\n    unsafe { COUNTER }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -6,1 +6,1 @@\n+    unsafe { COUNTER }\n@@ -10,1 +10,1 @@\n+    unsafe { COUNTER }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| !(site.site.kind == UnsafeSiteKind::Operation
+                    && site.operation.family == OperationFamily::StaticMut)),
+            "shadowed binding must not route to StaticMut: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_static_mut_declaration_line_is_not_a_bare_use() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), "static mut COUNTER: u32 = 0;\n")
+            .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,1 +1,1 @@\n+static mut COUNTER: u32 = 0;\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| site.site.kind != UnsafeSiteKind::Operation),
+            "declaration line must not double-card as a bare use: {sites:#?}"
+        );
+        assert!(
+            sites
+                .iter()
+                .any(|site| site.site.kind == UnsafeSiteKind::StaticMut),
+            "static mut declaration card is expected: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn local_static_mut_bare_use_outside_unsafe_block_does_not_route() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "static mut COUNTER: u32 = 0;\n\npub fn plain_bump() {\n    { COUNTER += 1; }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -4,1 +4,1 @@\n+    { COUNTER += 1; }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| !(site.site.kind == UnsafeSiteKind::Operation
+                    && site.operation.family == OperationFamily::StaticMut)),
+            "bare use outside an unsafe block must not route to StaticMut: {sites:#?}"
         );
         Ok(())
     }

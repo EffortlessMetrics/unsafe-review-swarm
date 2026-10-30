@@ -1,0 +1,5 @@
+diff --git a/src/lib.rs b/src/lib.rs
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -5,1 +5,1 @@
++    unsafe { COUNTER += 1; COUNTER }
