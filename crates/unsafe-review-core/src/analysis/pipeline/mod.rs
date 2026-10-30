@@ -1225,7 +1225,11 @@ mod tests {
             &[],
             "pending",
         );
-        assert!(action.contains("manually"), "sound asm action `{action}`");
+        assert!(
+            action.contains("register, memory, and target invariants"),
+            "sound asm action `{action}` should keep the manual invariant review"
+        );
+        assert!(!action.contains("self-contradictory"));
     }
 
     #[test]
