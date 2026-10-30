@@ -737,6 +737,27 @@ fn help_output_groups_and_lists_every_routable_command() -> Result<(), Box<dyn E
 const HELP_DESCRIPTION_COLUMN: usize = 15;
 
 #[test]
+fn doctor_names_missing_witness_tools_as_informational() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("doctor")
+            .arg("--root")
+            .arg(fixture_root("raw_pointer_alignment")),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains(
+            "missing witness tools are informational only: review and witness routing still work without them; install a tool only to run its opt-in witness"
+        ),
+        "doctor must give a next step for missing witness tools\nstdout:\n{stdout}"
+    );
+
+    Ok(())
+}
+
+#[test]
 fn first_pr_help_lists_current_bundle_artifacts() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
@@ -858,6 +879,28 @@ fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error
             "first-pr help must include exact external PR setup cue `{expected}`\nstdout:\n{stdout}"
         );
     }
+
+    Ok(())
+}
+
+#[test]
+fn explain_help_names_markdown_as_default_format() -> Result<(), Box<dyn Error>> {
+    let output = checked_output(
+        Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+            .arg("unsafe-review")
+            .arg("explain")
+            .arg("--help"),
+    )?;
+    let stdout = String::from_utf8(output.stdout)?;
+
+    assert!(
+        stdout.contains("- --format <name> markdown (default) or json"),
+        "explain help must name markdown as the default format\nstdout:\n{stdout}"
+    );
+    assert!(
+        !stdout.contains("json (default)"),
+        "explain help must not claim json is the default format\nstdout:\n{stdout}"
+    );
 
     Ok(())
 }

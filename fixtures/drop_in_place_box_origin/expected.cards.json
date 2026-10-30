@@ -119,6 +119,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "mentions_drop_owned_box",
+        "file": "src/lib.rs",
+        "line": 14
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

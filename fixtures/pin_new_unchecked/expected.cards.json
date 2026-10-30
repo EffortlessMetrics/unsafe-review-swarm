@@ -35,7 +35,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `pin` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
@@ -59,6 +59,13 @@
         "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "pins_mut_reference",
+        "file": "src/lib.rs",
+        "line": 13
       }
     ],
     "missing": [

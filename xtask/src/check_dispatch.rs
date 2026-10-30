@@ -29,6 +29,7 @@ pub(crate) fn dispatch_check(id: &str) -> Option<fn() -> Result<(), String>> {
         "surface-determinism" => crate::fixture_surfaces::check_surface_determinism,
         "real-pr-corpus" => crate::real_pr_corpus::check,
         "corpus-partitions" => crate::corpus_partitions::check,
+        "seam-batch" => crate::seam_batch::check,
         "evidence-loss-challenges" => crate::evidence_loss_challenges::check,
         "external-pilots" => crate::external_pilots::check,
         "dogfood" => crate::check_dogfood,

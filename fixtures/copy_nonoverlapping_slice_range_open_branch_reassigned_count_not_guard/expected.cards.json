@@ -38,7 +38,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `non-overlap` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
@@ -92,6 +92,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test copy_checked",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "leaves_destination_when_count_resets",
+        "file": "src/lib.rs",
+        "line": 16
       }
     ],
     "missing": [

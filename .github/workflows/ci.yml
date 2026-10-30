@@ -1,3 +1,5 @@
+# Bootstrap late-admission guard: no product work on draft/Ready/synchronize.
+# Uses the existing legacy floor, not the allowance-pending central 8ff route.
 name: CI
 
 # One tight CI gate, single required check, self-hosted-primary with
@@ -38,17 +40,14 @@ name: CI
 
 on:
   pull_request:
-  push:
-    branches: [main, master]
-  merge_group:
-  workflow_dispatch:
+    types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]
 
 permissions:
   contents: read
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+  cancel-in-progress: ${{ github.event.action != 'edited' }}
 
 defaults:
   run:
@@ -62,12 +61,197 @@ env:
   CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
 
 jobs:
+  admission:
+    name: Verify native PR admission
+    if: github.event.action == 'edited' && github.event.pull_request.draft == false && github.event.pull_request.head.repo.full_name == github.repository && github.event.pull_request.user.type == 'User' && github.event.sender.login == 'EffortlessSteven' && github.event.sender.type == 'User'
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      admitted: ${{ steps.request.outputs.admitted }}
+      request: ${{ steps.request.outputs.request }}
+    steps:
+      - name: Verify coordinator request and exact independent review
+        id: request
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          python3 -I - <<'PYTHON'
+          import datetime as dt
+          import json
+          import os
+          import re
+          import signal
+          import urllib.request
+          from pathlib import Path
+
+          REPO = 'EffortlessMetrics/unsafe-review-swarm'
+          COORDINATOR = 'EffortlessSteven'
+          SHA = re.compile(r'[0-9a-f]{40}')
+
+
+          def require(ok, reason):
+              if not ok:
+                  raise ValueError(reason)
+
+
+          def stamp(value):
+              require(isinstance(value, str), 'missing timestamp')
+              return dt.datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=dt.timezone.utc)
+
+
+          def record(body, kind):
+              require(isinstance(body, str), 'missing body')
+              prefix = '<!-- unsafe-review-' + kind + ': '
+              matches = re.findall(re.escape(prefix) + r'([^\n]+) -->', body)
+              require(body.count(prefix) == 1 and len(matches) == 1, 'missing or ambiguous ' + kind)
+              def unique(pairs):
+                  result = {}
+                  for key, value in pairs:
+                      require(key not in result, 'duplicate record field')
+                      result[key] = value
+                  return result
+              value = json.loads(matches[0], object_pairs_hook=unique)
+              require(isinstance(value, dict), 'invalid record')
+              return value
+
+
+          def subject(pr):
+              require(pr['state'] == 'open' and pr['draft'] is False, 'PR is not open and ready')
+              require(pr['head']['repo']['full_name'] == REPO and pr['head']['repo']['fork'] is False,
+                      'untrusted head repository')
+              require(pr['base']['repo']['full_name'] == REPO and pr['base']['ref'] == 'main', 'unexpected base')
+              require(pr['user']['type'] == 'User', 'bot source')
+              return dict(repository=REPO, pr=pr['number'], head=pr['head']['sha'], base=pr['base']['sha'])
+
+
+          def review_authority(api, path, request):
+              reviews = []
+              for page in range(1, 11):
+                  batch = api(path + '/reviews?per_page=100&page=' + str(page))
+                  require(isinstance(batch, list), 'unavailable review list')
+                  reviews.extend(batch)
+                  if len(batch) < 100:
+                      break
+              else:
+                  raise ValueError('review pagination exceeds bound')
+              receipts = []
+              for review in reviews:
+                  if review['user']['login'] != COORDINATOR or review['commit_id'] != request['head']:
+                      continue
+                  if '<!-- unsafe-review-independent-review-v1: ' not in (review.get('body') or ''):
+                      continue
+                  receipt = record(review['body'], 'independent-review-v1')
+                  if all(receipt.get(k) == request[k] for k in {'repository', 'pr', 'head', 'base'} | {'integration', 'tree'}):
+                      receipts.append((review, receipt))
+              require(receipts, 'missing independent exact-subject review')
+              review, receipt = max(receipts, key=lambda pair: (pair[0]['submitted_at'], pair[0]['id']))
+              require(set(receipt) == {'repository', 'pr', 'head', 'base'} | {'integration', 'tree', 'verdict', 'review_kind'}, 'invalid review schema')
+              require(review['id'] == request['review_id'] and review['state'] in ('APPROVED', 'COMMENTED')
+                      and review['user']['type'] == 'User' and receipt['review_kind'] == 'independent'
+                      and receipt['verdict'] == 'approved-for-proof', 'missing, stale, dismissed or adverse approval')
+              require(stamp(review['submitted_at']) <= stamp(request['issued_at']), 'request precedes review')
+              require(not any(r['user']['login'] == COORDINATOR and r['commit_id'] == request['head']
+                              and r['state'] == 'CHANGES_REQUESTED'
+                              and stamp(r['submitted_at']) >= stamp(review['submitted_at']) for r in reviews),
+                      'native review requests changes')
+              return review, receipt
+
+
+          def admit(event, env, api, now):
+              # This is the reviewed workflow program: no caller checkout or shell interpolation.
+              require(env['GITHUB_EVENT_NAME'] == 'pull_request' and event.get('action') == 'edited',
+                      'not a native PR admission edit')
+              require(env['GITHUB_REPOSITORY'] == REPO and env['GITHUB_RUN_ATTEMPT'] == '1', 'wrong repository or replay')
+              require(event['sender']['login'] == COORDINATOR and event['sender']['type'] == 'User'
+                      and env['GITHUB_ACTOR'] == COORDINATOR and env['GITHUB_TRIGGERING_ACTOR'] == COORDINATOR,
+                      'unauthorized coordinator')
+              expected = subject(event['pull_request'])
+              require(type(expected['pr']) is int and expected['pr'] > 0, 'invalid PR identity')
+              require(env['GITHUB_REF'] == 'refs/pull/' + str(expected['pr']) + '/merge', 'not the native merge ref')
+              require(SHA.fullmatch(env['GITHUB_SHA']) is not None, 'invalid integration SHA')
+              request = record(event['pull_request']['body'], 'admission-v1')
+              previous = event.get('changes', {}).get('body', {}).get('from')
+              require(isinstance(previous, str), 'body was not changed')
+              # An ordinary edit preserving a request cannot authorize another product run.
+              if '<!-- unsafe-review-admission-v1: ' in previous:
+                  old = record(previous, 'admission-v1')
+                  require(old.get('request_id') != request.get('request_id'), 'persistent request replay')
+              fields = set(expected) | {'integration', 'tree', 'coordinator', 'request_id', 'review_id', 'issued_at'}
+              require(set(request) == fields, 'invalid admission schema')
+              require(request['coordinator'] == COORDINATOR, 'request actor mismatch')
+              require(isinstance(request['request_id'], str)
+                      and re.fullmatch(r'[0-9a-f]{32}', request['request_id']) is not None, 'invalid request nonce')
+              require(type(request['review_id']) is int and request['review_id'] > 0, 'missing native review identity')
+              require(all(request.get(k) == v for k, v in expected.items()), 'event subject mismatch')
+              require(request['integration'] == env['GITHUB_SHA'], 'event integration mismatch')
+              require(all(isinstance(request[k], str) and SHA.fullmatch(request[k]) for k in ('head', 'base', 'integration', 'tree')),
+                      'invalid subject SHA')
+              issued = stamp(request['issued_at'])
+              edited = stamp(event['pull_request']['updated_at'])
+              require(0 <= (edited - issued).total_seconds() <= 60
+                      and 0 <= (now - issued).total_seconds() <= 600, 'expired or future request')
+              prefix = '/repos/' + REPO
+              path = prefix + '/pulls/' + str(expected['pr'])
+              current = api(path)
+              require(subject(current) == expected and current['body'] == event['pull_request']['body'], 'stale PR snapshot')
+              require(current['mergeable'] is True and current['merge_commit_sha'] == request['integration'], 'stale native integration')
+              merge = api(prefix + '/git/commits/' + request['integration'])
+              require(merge['sha'] == request['integration'] and merge['tree']['sha'] == request['tree']
+                      and [parent['sha'] for parent in merge['parents']] == [request['base'], request['head']],
+                      'integration tree or parents mismatch')
+              review_authority(api, path, request)
+              # Refresh after metadata reads; queued/racing edits cannot retain authority.
+              refreshed = api(path)
+              require(subject(refreshed) == expected and refreshed['body'] == current['body']
+                      and refreshed['merge_commit_sha'] == request['integration'] and refreshed['mergeable'] is True,
+                      'subject changed during admission')
+              review_authority(api, path, request)
+              return request
+
+
+          def public_api(path):
+              # Public repository reads use the existing contents-only job token.
+              # No additional permission is needed for these public resources.
+              token = os.environ.get('GITHUB_TOKEN')
+              require(bool(token), 'missing metadata token')
+              request = urllib.request.Request('https://api.github.com' + path,
+                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+                           'Authorization': 'Bearer ' + token})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  raw = response.read(2_000_001)
+              require(len(raw) <= 2_000_000, 'oversized API response')
+              return json.loads(raw)
+
+
+          if __name__ == '__main__':
+              def expired(signum, frame):
+                  raise TimeoutError('metadata admission deadline exceeded')
+              signal.signal(signal.SIGALRM, expired)
+              signal.alarm(120)
+              try:
+                  event_path = Path(os.environ['GITHUB_EVENT_PATH'])
+                  require(event_path.stat().st_size <= 1048576, 'oversized native event')
+                  request = admit(json.loads(event_path.read_text()), os.environ, public_api,
+                                  dt.datetime.now(dt.timezone.utc))
+                  # No result is emitted until every native authority check succeeds.
+                  # The legacy proof job refreshes authority before product entry.
+                  with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+                      output.write('admitted=true\nrequest=' + json.dumps(request, separators=(',', ':')) + '\n')
+              except Exception:
+                  raise SystemExit('::error::bootstrap native request refused')
+              finally:
+                  signal.alarm(0)
+          PYTHON
+
   # Minimal capacity router (NOT a required check). It decides where the single
   # gate runs: self-hosted primary when the owned fleet has idle trusted capacity,
   # gh-hosted overflow otherwise. It only reads org runner state and emits a
   # runs-on value; it never gates the merge and never runs the suite.
   route:
     name: Route CI runner
+    needs: admission
+    if: always()
     runs-on: ubuntu-latest
     timeout-minutes: 5
     outputs:
@@ -82,6 +266,8 @@ jobs:
         id: route
         env:
           GH_TOKEN: ${{ secrets.EM_RUNNER_READ_TOKEN }}
+          ADMISSION_RESULT: ${{ needs.admission.result }}
+          ADMITTED: ${{ needs.admission.outputs.admitted }}
         run: |
           set -uo pipefail
           # gh-hosted overflow is emitted as a JSON string; self-hosted as a JSON
@@ -95,6 +281,12 @@ jobs:
             echo "runner_kind=$2" >> "$GITHUB_OUTPUT"
             echo "route -> $2 ($3)"
           }
+          # Routine events allocate only cheap hosted control/result jobs.
+          # Never query inventory or select product capacity without admission.
+          if [[ "$ADMISSION_RESULT" != success || "$ADMITTED" != true ]]; then
+            emit "$GH" github "metadata only: no explicit native admission"
+            exit 0
+          fi
           # Fork PRs can never use trusted self-hosted runners (untrusted code, no
           # org secrets): always overflow to gh-hosted.
           if [[ "${{ github.event_name }}" == "pull_request" && "${{ github.event.pull_request.head.repo.fork }}" == "true" ]]; then
@@ -128,8 +320,8 @@ jobs:
           fi
 
   unsafe-review-rust-result:
-    # Single required check. The job conclusion reflects ONLY the mandatory
-    # deterministic core gate (final assert step). The advisory ub-review lane
+    # Single required check. Success requires native admission/currentness and
+    # the mandatory deterministic core gate (final assert step). The advisory ub-review lane
     # lives in the standalone ub-review.yml workflow and can never flip this
     # result. The job name is kept stable for branch protection.
     #
@@ -138,16 +330,148 @@ jobs:
     # turns the router's JSON value into either a runs-on string or label array
     # (both valid). The router never blocks the merge; only this gate does.
     name: Unsafe Review Rust Result
-    needs: route
+    needs: [admission, route]
+    if: always()
     runs-on: ${{ fromJSON(needs.route.outputs.runner) }}
     timeout-minutes: 60
+    env:
+      ADMISSION_RESULT: ${{ needs.admission.result }}
+      ADMITTED: ${{ needs.admission.outputs.admitted }}
+      ADMISSION_REQUEST: ${{ needs.admission.outputs.request }}
     permissions:
       contents: read
     steps:
+      - name: Require explicit native bootstrap admission
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: &native_subject_check |
+          set -euo pipefail
+          [[ "$ADMISSION_RESULT" == success && "$ADMITTED" == true ]] || exit 78
+          if [[ "${NATIVE_PHASE:-entry}" == final ]]; then
+            [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]
+            [[ "$(cat "target/ci-core/core_exit-${CORE_RUN_KEY}")" == 0 ]]
+          fi
+          python3 -I - <<'PYTHON'
+          import datetime as dt
+          import json
+          import os
+          import re
+          import signal
+          import urllib.request
+          from pathlib import Path
+
+          REPO = 'EffortlessMetrics/unsafe-review-swarm'
+          COORDINATOR = 'EffortlessSteven'
+          SHA = re.compile(r'[0-9a-f]{40}')
+
+
+          def require(ok, reason):
+              if not ok:
+                  raise ValueError(reason)
+
+
+          def stamp(value):
+              require(isinstance(value, str), 'missing timestamp')
+              return dt.datetime.strptime(value, '%Y-%m-%dT%H:%M:%SZ').replace(tzinfo=dt.timezone.utc)
+
+
+          def record(body, kind):
+              require(isinstance(body, str), 'missing body')
+              prefix = '<!-- unsafe-review-' + kind + ': '
+              matches = re.findall(re.escape(prefix) + r'([^\n]+) -->', body)
+              require(body.count(prefix) == 1 and len(matches) == 1, 'missing or ambiguous ' + kind)
+              def unique(pairs):
+                  result = {}
+                  for key, value in pairs:
+                      require(key not in result, 'duplicate record field')
+                      result[key] = value
+                  return result
+              value = json.loads(matches[0], object_pairs_hook=unique)
+              require(isinstance(value, dict), 'invalid record')
+              return value
+
+
+          def subject(pr):
+              require(pr['state'] == 'open' and pr['draft'] is False, 'PR is not open and ready')
+              require(pr['head']['repo']['full_name'] == REPO and pr['head']['repo']['fork'] is False,
+                      'untrusted head repository')
+              require(pr['base']['repo']['full_name'] == REPO and pr['base']['ref'] == 'main', 'unexpected base')
+              require(pr['user']['type'] == 'User', 'bot source')
+              return dict(repository=REPO, pr=pr['number'], head=pr['head']['sha'], base=pr['base']['sha'])
+
+
+          def review_authority(api, path, request):
+              reviews = []
+              for page in range(1, 11):
+                  batch = api(path + '/reviews?per_page=100&page=' + str(page))
+                  require(isinstance(batch, list), 'unavailable review list')
+                  reviews.extend(batch)
+                  if len(batch) < 100:
+                      break
+              else:
+                  raise ValueError('review pagination exceeds bound')
+              receipts = []
+              for review in reviews:
+                  if review['user']['login'] != COORDINATOR or review['commit_id'] != request['head']:
+                      continue
+                  if '<!-- unsafe-review-independent-review-v1: ' not in (review.get('body') or ''):
+                      continue
+                  receipt = record(review['body'], 'independent-review-v1')
+                  if all(receipt.get(k) == request[k] for k in {'repository', 'pr', 'head', 'base'} | {'integration', 'tree'}):
+                      receipts.append((review, receipt))
+              require(receipts, 'missing independent exact-subject review')
+              review, receipt = max(receipts, key=lambda pair: (pair[0]['submitted_at'], pair[0]['id']))
+              require(set(receipt) == {'repository', 'pr', 'head', 'base'} | {'integration', 'tree', 'verdict', 'review_kind'}, 'invalid review schema')
+              require(review['id'] == request['review_id'] and review['state'] in ('APPROVED', 'COMMENTED')
+                      and review['user']['type'] == 'User' and receipt['review_kind'] == 'independent'
+                      and receipt['verdict'] == 'approved-for-proof', 'missing, stale, dismissed or adverse approval')
+              require(stamp(review['submitted_at']) <= stamp(request['issued_at']), 'request precedes review')
+              require(not any(r['user']['login'] == COORDINATOR and r['commit_id'] == request['head']
+                              and r['state'] == 'CHANGES_REQUESTED'
+                              and stamp(r['submitted_at']) >= stamp(review['submitted_at']) for r in reviews),
+                      'native review requests changes')
+              return review, receipt
+
+
+          def public_api(path):
+              # Public repository reads use the existing contents-only job token.
+              # No additional permission is needed for these public resources.
+              token = os.environ.get('GITHUB_TOKEN')
+              require(bool(token), 'missing metadata token')
+              request = urllib.request.Request('https://api.github.com' + path,
+                  headers={'Accept': 'application/vnd.github+json', 'X-GitHub-Api-Version': '2022-11-28',
+                           'Authorization': 'Bearer ' + token})
+              with urllib.request.urlopen(request, timeout=20) as response:
+                  raw = response.read(2_000_001)
+              require(len(raw) <= 2_000_000, 'oversized API response')
+              return json.loads(raw)
+
+
+          def expired(signum, frame):
+              raise TimeoutError('bootstrap native refresh deadline exceeded')
+          signal.signal(signal.SIGALRM, expired)
+          signal.alarm(120)
+          require(os.environ['GITHUB_RUN_ATTEMPT'] == '1', 'bootstrap partial rerun is not admission')
+          require(os.environ['GITHUB_REPOSITORY'] == REPO
+                  and os.environ['GITHUB_ACTOR'] == COORDINATOR
+                  and os.environ['GITHUB_TRIGGERING_ACTOR'] == COORDINATOR,
+                  'bootstrap coordinator mismatch')
+          request = json.loads(os.environ['ADMISSION_REQUEST'])
+          path = '/repos/' + REPO + '/pulls/' + str(request['pr'])
+          current = public_api(path)
+          expected = {k: request[k] for k in ('repository', 'pr', 'head', 'base')}
+          require(subject(current) == expected and current['merge_commit_sha'] == request['integration']
+                  and current['mergeable'] is True and request['integration'] == os.environ['GITHUB_SHA'],
+                  'bootstrap subject drift')
+          require(record(current['body'], 'admission-v1') == request, 'request was revoked')
+          review_authority(public_api, path, request)
+          signal.alarm(0)
+          PYTHON
       - uses: actions/checkout@v7
         with:
           # Full history for the diff-scoped test skip and base comparisons.
           fetch-depth: 0
+          ref: ${{ github.sha }}
           persist-credentials: false
       - uses: dtolnay/rust-toolchain@1.98
         with:
@@ -173,12 +497,18 @@ jobs:
       # precontext facts and floor-time signal below stay advisory: they feed
       # the standalone ub-review workflow's cost-receipt composition and the
       # job summary, never the gate verdict.
+      - name: Refresh native authority immediately before product proof
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: *native_subject_check
       - name: Fast precontext and launch core gate
+        id: launch
         env:
           RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
           RUST_CACHE_HIT: ${{ steps.rust-cache.outputs.cache-hit }}
         run: |
           set +e
+          [[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]] || exit 78
           mkdir -p target/ci-core
           core_exit_path="target/ci-core/core_exit-${CORE_RUN_KEY}"
           # A self-hosted workspace may retain untracked target files between
@@ -315,7 +645,7 @@ jobs:
       # merge.
       - name: Assert core gate verdict
         id: core-verdict
-        if: ${{ always() }}
+        if: ${{ always() && needs.admission.outputs.admitted == 'true' && steps.launch.outcome == 'success' }}
         env:
           RUNNER_KIND: ${{ needs.route.outputs.runner_kind }}
         run: |
@@ -511,3 +841,11 @@ jobs:
             ${{ steps.core-verdict.outputs.diagnostics_path }}
           if-no-files-found: ignore
           retention-days: 7
+
+      - name: Revalidate exact native subject after product proof
+        if: success()
+        env:
+          NATIVE_PHASE: final
+          GITHUB_TOKEN: ${{ github.token }}
+        run: *native_subject_check
+

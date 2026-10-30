@@ -2507,6 +2507,9 @@ fn doctor(root: &Path) -> Result<(), String> {
     );
     println!("kani: {}", yes_no(tool_available("kani")));
     println!("crux: {}", yes_no(tool_available("crux")));
+    println!(
+        "missing witness tools are informational only: review and witness routing still work without them; install a tool only to run its opt-in witness"
+    );
     println!();
     println!("policy: advisory by default");
     println!("witness execution: not run by doctor or by default");
@@ -3909,11 +3912,11 @@ fn print_explain_help() {
     println!("unsafe-review explain: show full detail for a single ReviewCard");
     println!();
     println!("Usage:");
-    println!("  unsafe-review explain [--root .] [--format json|markdown] <card-id>");
+    println!("  unsafe-review explain [--root .] [--format markdown|json] <card-id>");
     println!();
     println!("Options:");
     println!("- --root <dir>    repository root (default: current directory)");
-    println!("- --format <name> json (default) or markdown");
+    println!("- --format <name> markdown (default) or json");
     println!("- --json          shorthand for --format json");
     println!("- --markdown      shorthand for --format markdown");
     println!();

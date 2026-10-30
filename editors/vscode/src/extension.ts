@@ -9,6 +9,7 @@ import {
   BundleParseError,
   BundleRange,
   BundleStructuredObject,
+  actionableDiagnostics,
   diagnosticCapSummaries,
   ParsedBundle,
   capDiagnosticsPerFile,
@@ -242,8 +243,15 @@ function applyDiagnostics(
   adapter.diagnosticsCollection.clear();
   adapter.diagnosticsByCardId.clear();
 
-  const capped = capDiagnosticsPerFile(bundle.diagnostics, settings.maxDiagnosticsPerFile);
-  const capSummaries = diagnosticCapSummaries(bundle.diagnostics, settings.maxDiagnosticsPerFile);
+  const renderable = actionableDiagnostics(bundle.diagnostics);
+  const nonActionableHidden = bundle.diagnostics.length - renderable.length;
+  if (nonActionableHidden > 0) {
+    adapter.output.appendLine(
+      `bundle note: ${nonActionableHidden} non-actionable diagnostic(s) not rendered (guarded, baseline-known, or suppressed); complete set remains in ${settings.bundlePath}`,
+    );
+  }
+  const capped = capDiagnosticsPerFile(renderable, settings.maxDiagnosticsPerFile);
+  const capSummaries = diagnosticCapSummaries(renderable, settings.maxDiagnosticsPerFile);
   for (const summary of capSummaries) {
     if (summary.hidden === 0) {
       continue;

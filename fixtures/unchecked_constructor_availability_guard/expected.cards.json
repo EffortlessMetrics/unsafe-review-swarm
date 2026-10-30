@@ -61,6 +61,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "constructs_when_available",
+        "file": "src/lib.rs",
+        "line": 37
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

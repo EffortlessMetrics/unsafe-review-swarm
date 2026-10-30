@@ -2,7 +2,7 @@ use crate::api::{AnalyzeOutput, Provenance, Scope, Summary};
 use crate::domain::coverage::compute_agent_lsp_readiness;
 use crate::domain::{
     AgentLspReadiness, BaselineState, CommentPlanStatus, Coverage, CoverageBlock, EvidenceState,
-    ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, ReviewCard,
+    ManualContext, ObligationEvidence, OperationFamily, OutcomeMovement, RelatedTest, ReviewCard,
     WitnessReceiptCoverage, WitnessRoute,
 };
 use crate::output::agent::card_has_scoped_repairs;
@@ -439,6 +439,7 @@ struct JsonCard<'a> {
     reach: &'a str,
     witness: &'a str,
     witness_routes: Vec<JsonWitnessRoute<'a>>,
+    related_tests: Vec<JsonRelatedTest<'a>>,
     missing: Vec<&'a str>,
     next_action: &'a str,
     verify_commands: &'a [String],
@@ -506,6 +507,11 @@ impl<'a> JsonCard<'a> {
             reach: &card.reach.summary,
             witness: &card.witness.summary,
             witness_routes: card.routes.iter().map(JsonWitnessRoute::from).collect(),
+            related_tests: card
+                .related_tests
+                .iter()
+                .map(JsonRelatedTest::from)
+                .collect(),
             missing: card
                 .missing
                 .iter()
@@ -534,6 +540,23 @@ impl<'a> From<&'a WitnessRoute> for JsonWitnessRoute<'a> {
             reason: &route.reason,
             command: route.command.as_deref(),
             required: route.required,
+        }
+    }
+}
+
+#[derive(Serialize)]
+struct JsonRelatedTest<'a> {
+    name: &'a str,
+    file: &'a str,
+    line: usize,
+}
+
+impl<'a> From<&'a RelatedTest> for JsonRelatedTest<'a> {
+    fn from(test: &'a RelatedTest) -> Self {
+        Self {
+            name: &test.name,
+            file: &test.file,
+            line: test.line,
         }
     }
 }
@@ -1551,6 +1574,15 @@ mod tests {
         );
         assert_eq!(value["cards"][0]["operation_family"], "raw_pointer_read");
         assert!(value["cards"][0]["obligation_evidence"].is_array());
+        let related = &value["cards"][0]["related_tests"];
+        assert!(related.is_array(), "cards.json must project related_tests");
+        assert!(
+            !related.as_array().is_none_or(|tests| tests.is_empty()),
+            "fixture card has reaching tests to project"
+        );
+        assert!(related[0]["name"].is_string());
+        assert!(related[0]["file"].is_string());
+        assert!(related[0]["line"].is_u64());
         assert_eq!(value["cards"][0]["witness_routes"][0]["kind"], "miri");
         assert!(
             value["cards"][0]["next_action"]

@@ -67,6 +67,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "allocates_infallibly",
+        "file": "src/lib.rs",
+        "line": 28
+      }
+    ],
     "missing": [
       "No witness receipt imported for this card"
     ],

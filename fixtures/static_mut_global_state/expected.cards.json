@@ -35,7 +35,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `global-state` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -67,6 +67,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No related test path was found by static search",

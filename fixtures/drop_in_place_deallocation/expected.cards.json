@@ -119,6 +119,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "drop_one_reaches_operation",
+        "file": "src/lib.rs",
+        "line": 16
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"

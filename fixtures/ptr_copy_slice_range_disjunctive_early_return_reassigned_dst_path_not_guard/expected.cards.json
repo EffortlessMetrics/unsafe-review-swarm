@@ -94,6 +94,13 @@
         "required": false
       }
     ],
+    "related_tests": [
+      {
+        "name": "copies_into_reassigned_destination_path",
+        "file": "src/lib.rs",
+        "line": 25
+      }
+    ],
     "missing": [
       "Missing visible local guard for inferred safety obligations",
       "No witness receipt imported for this card"

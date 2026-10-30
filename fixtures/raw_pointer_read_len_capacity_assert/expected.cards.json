@@ -138,7 +138,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `allocation` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
@@ -168,6 +168,13 @@
         "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
         "command": "cargo +nightly careful test read_full_array",
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "reaches_read_full_array",
+        "file": "src/lib.rs",
+        "line": 33
       }
     ],
     "missing": [

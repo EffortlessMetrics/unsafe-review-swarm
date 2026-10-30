@@ -37,7 +37,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `abi` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": false,
@@ -99,6 +99,7 @@
         "required": false
       }
     ],
+    "related_tests": [],
     "missing": [
       "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
       "Missing visible local guard for inferred safety obligations",

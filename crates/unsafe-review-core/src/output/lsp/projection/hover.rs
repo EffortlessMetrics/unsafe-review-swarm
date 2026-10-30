@@ -111,6 +111,13 @@ fn append_witness_route(text: &mut String, card: &ReviewCard) {
             route.reason
         ));
     }
+    for route in card.routes.iter().skip(1) {
+        text.push_str(&format!(
+            "- Also routed: `{}` because {}.\n",
+            route.kind.as_str(),
+            route.reason
+        ));
+    }
     text.push_str(
         "\nReach note: static related-test evidence does not prove the unsafe site executed.\n",
     );

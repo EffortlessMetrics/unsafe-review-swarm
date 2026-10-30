@@ -35,7 +35,7 @@
         "discharge": {
           "present": false,
           "state": "missing",
-          "summary": "No obligation-specific guard code was detected"
+          "summary": "No obligation-specific guard code was detected for the `unknown` obligation (no guard pattern is recognized for this obligation)"
         },
         "reach": {
           "present": true,
@@ -59,6 +59,13 @@
         "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
         "command": null,
         "required": false
+      }
+    ],
+    "related_tests": [
+      {
+        "name": "mentions_describe_api",
+        "file": "src/lib.rs",
+        "line": 14
       }
     ],
     "missing": [
