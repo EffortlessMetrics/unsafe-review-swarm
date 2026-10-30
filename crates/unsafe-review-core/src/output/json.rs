@@ -714,6 +714,8 @@ fn agent_lsp_readiness_str(readiness: AgentLspReadiness) -> &'static str {
 /// `#[cfg(test)]` drift test.  Lives at module scope so it is accessible from
 /// both a non-test `pub fn` and the test module below.
 const FIXTURE_GOLDENS: &[&str] = &[
+    "extern_static_mut_use",
+    "extern_static_read_ffi",
     "raw_pointer_alignment",
     "raw_pointer_alignment_debug_assert_only_not_guard",
     "raw_pointer_alignment_receipted",

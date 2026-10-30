@@ -1,0 +1,54 @@
+# Issue-linked work specification for extern static bare-use routing.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2289"
+kind = "correctness"
+objective = "Route bare uses of same-file extern statics inside unsafe blocks to the family of the static they name: immutable extern static reads to OperationFamily::Ffi and extern static mut uses to OperationFamily::StaticMut, instead of unknown/unknown."
+user_outcome = "A maintainer who reads an immutable extern static or touches an extern static mut inside an unsafe block sees a card with the real FFI ABI/ownership or static-mut global-state obligations for that use, not an unknown card. Safe code that merely shares the name keeps its existing behavior."
+claim_boundary = "This slice proves same-file extern static bare uses in unsafe blocks route by mutability with scanner/ffi unit tests and two blessed fixture goldens; it does not resolve statics across files, change declaration-side cards, projections, or any safety or execution claim."
+
+[scope]
+included = [
+    "Collection of extern static names alongside extern fn names in analysis/scanner, distinguishing immutable from mut, including module-qualified spellings",
+    "Threading of the collected extern statics through scanner/file_scan into detect_syntax_sites and SyntaxSiteCtx",
+    "Bare-use matching inside unsafe blocks gated on unsafe scope in analysis/ffi_boundary: immutable reads to Ffi, static mut uses to StaticMut, with boundary rules rejecting field/method receivers, unrelated qualified paths, call-shaped spellings, string/comment-masked tokens, and declaration spellings",
+    "Same-name safe bindings (let bindings and fn parameters in the enclosing scope, let bindings inside the block) do not route to the extern static families",
+    "Unit tests at the scanner/ffi seam covering collection, both routings, shadowing negatives, and declaration lines not double-carding as uses",
+    "Fixture pair extern_static_read_ffi (ffi card) and extern_static_mut_use (static_mut card) with calibration cases, blessed only for those fixtures",
+]
+excluded = [
+    "File-local (non-extern) static uses (#2290)",
+    "Cross-file or cross-crate extern static resolution and any use/import resolution beyond same-file module-qualified spellings",
+    "Any change to declaration-side extern block or static mut cards, card class, priority, or projections (CLI, JSON, Markdown, SARIF, LSP)",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Only bare uses inside an unsafe block route: a call-shaped spelling, a use outside an unsafe block, and a masked string/comment token never produce the Ffi or StaticMut use family from this slice."
+
+[[invariant]]
+id = "INV-2"
+text = "Mutability decides the family: immutable extern statics route to Ffi (FfiAbi/FfiOwnership hazards) and extern static mut routes to StaticMut (StaticMutGlobalState hazard); declaration lines themselves never double-card as uses."
+
+[[invariant]]
+id = "INV-3"
+text = "A same-name safe binding in scope shadows the extern static for bare spellings, so shadowed uses do not route to the extern static families."
+
+[[acceptance]]
+id = "AC-2289-PR1-1"
+text = "Immutable extern static bare reads inside unsafe blocks card as OperationFamily::Ffi and extern static mut bare uses card as OperationFamily::StaticMut."
+proof = ["cargo test -p unsafe-review-core --locked extern_static", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2289-PR1-2"
+text = "Same-name safe bindings, non-bare spellings, and declaration lines do not route as extern static uses."
+proof = ["cargo test -p unsafe-review-core --locked extern_static"]
+
+[[acceptance]]
+id = "AC-2289-PR1-3"
+text = "The fixture pair carries the routed families in blessed goldens and only affected goldens change."
+proof = ["cargo run --locked -p xtask -- bless-goldens extern_static_read_ffi", "cargo run --locked -p xtask -- bless-goldens extern_static_mut_use", "cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "2289-pr1-extern-static-bare-uses"
+notes = "Declaration-side extern/static cards and hazards mapping (Ffi to FfiAbi/FfiOwnership, StaticMut to StaticMutGlobalState) are consumed unchanged; #2290 file-local statics and cross-file resolution stay separate slices."

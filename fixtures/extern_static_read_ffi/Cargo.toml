@@ -1,0 +1,5 @@
+[package]
+name = "extern-static-read-ffi"
+version = "0.0.0"
+edition = "2024"
+publish = false
