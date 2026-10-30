@@ -19,6 +19,22 @@ pub(super) fn parse_mod_name(line: &str) -> Option<String> {
     parse_ident(rest)
 }
 
+/// Parses an extern-block `static` declaration, returning `(name, is_mut)`.
+/// Handles optional `pub` / `pub(...)` visibility prefixes.
+pub(super) fn parse_static_decl(line: &str) -> Option<(String, bool)> {
+    let mut rest = line.trim_start();
+    if let Some(after_pub) = rest.strip_prefix("pub ") {
+        rest = after_pub.trim_start();
+    } else if rest.starts_with("pub(") {
+        rest = rest.split_once(')')?.1.trim_start();
+    }
+    if let Some(after) = rest.strip_prefix("static mut ") {
+        return parse_ident(after.trim_start()).map(|name| (name, true));
+    }
+    let after = rest.strip_prefix("static ")?;
+    parse_ident(after.trim_start()).map(|name| (name, false))
+}
+
 pub(super) fn parse_trait_name(line: &str) -> Option<String> {
     let marker = "trait ";
     let pos = line.find(marker)?;

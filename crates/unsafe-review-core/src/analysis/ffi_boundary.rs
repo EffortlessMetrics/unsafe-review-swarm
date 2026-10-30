@@ -1,4 +1,75 @@
+use crate::domain::OperationFamily;
 use std::collections::BTreeSet;
+
+/// Same-file `extern` static names, split by mutability. Entries carry the
+/// same bare and module-qualified spellings as extern fn names.
+#[derive(Clone, Debug, Default, Eq, PartialEq)]
+pub(super) struct ExternStaticNames {
+    pub(super) immutable: BTreeSet<String>,
+    pub(super) mutable: BTreeSet<String>,
+}
+
+/// Family for a bare (non-call) use of a same-file extern static inside an
+/// unsafe block. Immutable reads are FFI boundary uses; `static mut` uses
+/// carry the global-state hazard. `shadowed` holds same-scope safe binding
+/// names (locals/params) that hide the extern static for bare spellings.
+pub(super) fn extern_static_use_family(
+    line: &str,
+    statics: &ExternStaticNames,
+    shadowed: &BTreeSet<String>,
+) -> Option<OperationFamily> {
+    let mut mutable: Vec<&String> = statics.mutable.iter().collect();
+    mutable.sort_by_key(|name| std::cmp::Reverse(name.len()));
+    if mutable
+        .iter()
+        .any(|name| contains_bare_static_use(line, name, shadowed))
+    {
+        return Some(OperationFamily::StaticMut);
+    }
+    let mut immutable: Vec<&String> = statics.immutable.iter().collect();
+    immutable.sort_by_key(|name| std::cmp::Reverse(name.len()));
+    if immutable
+        .iter()
+        .any(|name| contains_bare_static_use(line, name, shadowed))
+    {
+        return Some(OperationFamily::Ffi);
+    }
+    None
+}
+
+fn contains_bare_static_use(line: &str, path: &str, shadowed: &BTreeSet<String>) -> bool {
+    let simple = path.rsplit("::").next().unwrap_or(path);
+    if !path.contains("::") && (shadowed.contains(simple) || line_has_let_binding(line, simple)) {
+        return false;
+    }
+    let mut cursor = line;
+    let mut offset = 0usize;
+    while let Some(pos) = cursor.find(path) {
+        let absolute = offset + pos;
+        let before = line[..absolute].chars().next_back();
+        let starts_on_boundary =
+            before.is_none_or(|ch| !is_ident_continue(ch) && ch != ':' && ch != '.');
+        let after = &line[absolute + path.len()..];
+        let ends_on_boundary = after.chars().next().is_none_or(|ch| !is_ident_continue(ch));
+        // A call suffix or a further path segment is not a bare static use.
+        let after_trimmed = after.trim_start();
+        let not_call_or_path = !after_trimmed.starts_with('(') && !after.starts_with("::");
+        // Binding/declaration occurrences (`let NAME`, `static NAME`) name
+        // the binding, not a use of the extern static.
+        let prefix = line[..absolute].trim_end();
+        let is_binding = prefix.ends_with("let")
+            || prefix.ends_with("let mut")
+            || prefix.ends_with("static")
+            || prefix.ends_with("static mut");
+        if starts_on_boundary && ends_on_boundary && not_call_or_path && !is_binding {
+            return true;
+        }
+        let next = pos + path.len();
+        offset += next;
+        cursor = &cursor[next..];
+    }
+    false
+}
 
 #[derive(Clone, Debug, Eq, PartialEq)]
 struct FfiBoundaryApplicability {
@@ -53,6 +124,24 @@ fn ffi_boundary_match(
         return Some(FfiBoundaryApplicability::same_file_extern(call_path));
     }
     None
+}
+
+fn line_has_let_binding(line: &str, name: &str) -> bool {
+    for marker in ["let mut ", "let "] {
+        let mut cursor = line;
+        while let Some(pos) = cursor.find(marker) {
+            let before = cursor[..pos].chars().next_back();
+            let rest = cursor[pos + marker.len()..].trim_start();
+            if before.is_none_or(|ch| !is_ident_continue(ch)) && rest.starts_with(name) {
+                let after = &rest[name.len()..];
+                if after.chars().next().is_none_or(|ch| !is_ident_continue(ch)) {
+                    return true;
+                }
+            }
+            cursor = &cursor[pos + marker.len()..];
+        }
+    }
+    false
 }
 
 fn matching_extern_call_path<'a>(
@@ -250,6 +339,75 @@ mod tests {
             ),
             Some(FfiBoundaryApplicability::known_foreign_path("libc::strlen")),
             "top-level `libc::strlen` must still route to FFI"
+        );
+    }
+
+    fn statics_fixture() -> ExternStaticNames {
+        ExternStaticNames {
+            immutable: BTreeSet::from([
+                "ERRNO".to_string(),
+                "ffi::ERRNO".to_string(),
+                "crate::ffi::ERRNO".to_string(),
+            ]),
+            mutable: BTreeSet::from(["COUNTER".to_string(), "ffi::COUNTER".to_string()]),
+        }
+    }
+
+    #[test]
+    fn extern_static_bare_uses_route_by_mutability() {
+        let statics = statics_fixture();
+        let none = BTreeSet::new();
+        assert_eq!(
+            extern_static_use_family("unsafe { ERRNO }", &statics, &none),
+            Some(OperationFamily::Ffi)
+        );
+        assert_eq!(
+            extern_static_use_family("unsafe { ffi::ERRNO + 1 }", &statics, &none),
+            Some(OperationFamily::Ffi)
+        );
+        assert_eq!(
+            extern_static_use_family("unsafe { COUNTER += 1 }", &statics, &none),
+            Some(OperationFamily::StaticMut)
+        );
+        assert_eq!(
+            extern_static_use_family("unsafe { ffi::COUNTER }", &statics, &none),
+            Some(OperationFamily::StaticMut)
+        );
+    }
+
+    #[test]
+    fn extern_static_bare_uses_reject_safe_bindings_and_non_uses() {
+        let statics = statics_fixture();
+        let none = BTreeSet::new();
+        // Field/method receiver and unrelated qualified path are not bare uses.
+        assert_eq!(
+            extern_static_use_family("unsafe { x.ERRNO }", &statics, &none),
+            None
+        );
+        assert_eq!(
+            extern_static_use_family("unsafe { other::ERRNO }", &statics, &none),
+            None
+        );
+        // Call-shaped spelling is not a bare static use.
+        assert_eq!(
+            extern_static_use_family("unsafe { ERRNO() }", &statics, &none),
+            None
+        );
+        // A `let` binding in the block shadows the extern static.
+        assert_eq!(
+            extern_static_use_family("unsafe { let ERRNO = 7; ERRNO }", &statics, &none),
+            None
+        );
+        // A shadowed name recorded by the caller does not route.
+        let shadowed = BTreeSet::from(["ERRNO".to_string()]);
+        assert_eq!(
+            extern_static_use_family("unsafe { ERRNO }", &statics, &shadowed),
+            None
+        );
+        // Declaration spelling names the binding, not a use.
+        assert_eq!(
+            extern_static_use_family("static ERRNO: i32;", &statics, &none),
+            None
         );
     }
 

@@ -1,6 +1,8 @@
 use super::atomic_pointer_state::is_atomic_pointer_state_transition;
 use super::copy_operation::{copy_operation_family, is_incomplete_multiline_copy};
-use super::ffi_boundary::ffi_boundary_applicability;
+use super::ffi_boundary::{
+    ExternStaticNames, extern_static_use_family, ffi_boundary_applicability,
+};
 use super::maybeuninit_operation::maybeuninit_operation_family;
 use super::nonnull_operation::nonnull_operation_family;
 use super::slice_operation::slice_operation_family;
@@ -35,7 +37,7 @@ pub(super) mod source_role;
 mod syntax_scan;
 pub(crate) mod text_detection;
 
-use self::item_names::{parse_fn_name, parse_mod_name, parse_trait_name};
+use self::item_names::{parse_fn_name, parse_mod_name, parse_static_decl, parse_trait_name};
 #[cfg(test)]
 use self::owner_context::find_owner_declaration_index;
 use self::owner_context::{
@@ -316,6 +318,99 @@ fn extern_fn_names(lines: &[&str]) -> BTreeSet<String> {
     names
 }
 
+fn extern_static_names(lines: &[&str]) -> ExternStaticNames {
+    let mut statics = ExternStaticNames::default();
+    let mut in_extern = false;
+    let mut module_stack: Vec<(String, usize)> = Vec::new();
+    let mut brace_depth = 0usize;
+    let mut state = LineCommentState::default();
+    for raw in lines {
+        let detection_line = line_for_text_detection(raw, &mut state);
+        let trimmed = detection_line.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+        while module_stack
+            .last()
+            .is_some_and(|(_name, depth)| brace_depth < *depth)
+        {
+            module_stack.pop();
+        }
+        if trimmed.contains('{')
+            && let Some(module_name) = parse_mod_name(trimmed)
+        {
+            module_stack.push((module_name, brace_depth + 1));
+        }
+        if is_extern_boundary(trimmed) {
+            in_extern = true;
+        }
+        if in_extern {
+            if let Some((name, is_mut)) = parse_static_decl(trimmed) {
+                let target = if is_mut {
+                    &mut statics.mutable
+                } else {
+                    &mut statics.immutable
+                };
+                insert_extern_call_paths(target, &module_stack, &name);
+            }
+            if trimmed.contains('}') {
+                in_extern = false;
+            }
+        }
+        brace_depth = update_brace_depth(trimmed, brace_depth);
+    }
+    statics
+}
+
+/// Safe binding names introduced before `start` in the enclosing fn scope:
+/// `let` bindings and fn parameters. A bare extern-static spelling hidden
+/// by one of these names is a use of the safe binding, not the static.
+fn shadowed_local_names(source: &str, start: usize) -> BTreeSet<String> {
+    let mut names = BTreeSet::new();
+    let prefix = &source[..start.min(source.len())];
+    let scope_start = prefix.rfind("fn ").unwrap_or(0);
+    let scope = &prefix[scope_start..];
+    // Fn parameters live in the first parenthesised segment after `fn `.
+    if let Some(paren) = scope.find('(')
+        && let Some(close) = scope[paren..].find(')')
+    {
+        for param in scope[paren + 1..paren + close].split(',') {
+            let Some((binding, _ty)) = param.split_once(':') else {
+                continue;
+            };
+            let binding = binding
+                .trim()
+                .trim_start_matches("mut ")
+                .trim()
+                .trim_start_matches('&')
+                .trim()
+                .trim_start_matches("mut ")
+                .trim();
+            if !binding.is_empty()
+                && binding
+                    .chars()
+                    .all(|ch| ch == '_' || ch.is_ascii_alphanumeric())
+            {
+                names.insert(binding.to_string());
+            }
+        }
+    }
+    let mut cursor = scope;
+    while let Some(pos) = cursor.find("let ") {
+        let rest = cursor[pos + "let ".len()..].trim_start();
+        let rest = rest.strip_prefix("mut ").unwrap_or(rest).trim_start();
+        let name: String = rest
+            .chars()
+            .take_while(|ch| *ch == '_' || ch.is_ascii_alphanumeric())
+            .collect();
+        if !name.is_empty() {
+            names.insert(name);
+        }
+        cursor = &cursor[pos + "let ".len()..];
+    }
+    names
+}
+
 fn local_module_names(lines: &[&str]) -> BTreeSet<String> {
     let mut names = BTreeSet::new();
     let mut state = LineCommentState::default();
@@ -526,6 +621,7 @@ pub(super) struct DetectedSyntaxSite {
 fn detect_syntax_sites(
     parsed: &ParsedSource,
     extern_names: &BTreeSet<String>,
+    extern_statics: &ExternStaticNames,
     local_modules: &BTreeSet<String>,
 ) -> (Vec<DetectedSyntaxSite>, disposition::NonNullDecisions) {
     let mut sites = Vec::new();
@@ -546,6 +642,7 @@ fn detect_syntax_sites(
             unsafe_fn_ranges: &unsafe_fn_ranges,
             operation_block_ranges: &operation_block_ranges,
             extern_names,
+            extern_statics,
             local_modules,
             nonnull: &nonnull,
         }) else {
@@ -645,8 +742,12 @@ fn syntax_site_covers_fallback(
 ) -> bool {
     if *kind == UnsafeSiteKind::Operation && *family == OperationFamily::UnsafeFnCall {
         return syntax_sites.iter().any(|site| {
-            site.kind == UnsafeSiteKind::FfiCall
-                && site.family == OperationFamily::Ffi
+            ((site.kind == UnsafeSiteKind::FfiCall && site.family == OperationFamily::Ffi)
+                || (site.kind == UnsafeSiteKind::Operation
+                    && matches!(
+                        site.family,
+                        OperationFamily::Ffi | OperationFamily::StaticMut
+                    )))
                 && site.line <= line
                 && line <= site.end_line
         });
@@ -758,6 +859,7 @@ struct SyntaxSiteCtx<'a> {
     unsafe_fn_ranges: &'a [(usize, usize)],
     operation_block_ranges: &'a BTreeSet<(usize, usize)>,
     extern_names: &'a BTreeSet<String>,
+    extern_statics: &'a ExternStaticNames,
     local_modules: &'a BTreeSet<String>,
     nonnull: &'a disposition::NonNullDecisions,
 }
@@ -770,6 +872,7 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         unsafe_fn_ranges,
         operation_block_ranges,
         extern_names,
+        extern_statics,
         local_modules,
         nonnull,
     } = ctx;
@@ -838,6 +941,28 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
                 ) =>
         {
             Some((UnsafeSiteKind::FfiCall, OperationFamily::Ffi))
+        }
+        "BLOCK_EXPR"
+            if compact.starts_with("unsafe {")
+                && !operation_block_ranges.contains(&(fact.start, fact.end))
+                && extern_static_use_family(
+                    &masked_compact_for_ffi(),
+                    extern_statics,
+                    &shadowed_local_names(source, fact.start),
+                ) == Some(OperationFamily::Ffi) =>
+        {
+            Some((UnsafeSiteKind::Operation, OperationFamily::Ffi))
+        }
+        "BLOCK_EXPR"
+            if compact.starts_with("unsafe {")
+                && !operation_block_ranges.contains(&(fact.start, fact.end))
+                && extern_static_use_family(
+                    &masked_compact_for_ffi(),
+                    extern_statics,
+                    &shadowed_local_names(source, fact.start),
+                ) == Some(OperationFamily::StaticMut) =>
+        {
+            Some((UnsafeSiteKind::Operation, OperationFamily::StaticMut))
         }
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
@@ -1516,6 +1641,151 @@ mod tests {
         assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
         assert_eq!(sites[0].site.owner, Some("len".to_string()));
         assert_eq!(sites[0].site.snippet, "unsafe { strlen(ptr) }");
+        Ok(())
+    }
+
+    #[test]
+    fn extern_static_names_distinguish_mutability() {
+        let lines: Vec<&str> = vec![
+            "unsafe extern \"C\" {",
+            "    static ERRNO: i32;",
+            "    pub static mut COUNTER: u32;",
+            "    fn strlen(ptr: *const u8) -> usize;",
+            "}",
+            "static SAFE: i32 = 0;",
+        ];
+        let statics = extern_static_names(&lines);
+        assert!(statics.immutable.contains("ERRNO"));
+        assert!(statics.mutable.contains("COUNTER"));
+        assert!(!statics.immutable.contains("SAFE"));
+        assert!(!statics.mutable.contains("ERRNO"));
+    }
+
+    #[test]
+    fn extern_static_immutable_bare_read_cards_as_ffi() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    static ERRNO: i32;\n}\n\npub fn current_errno() -> i32 {\n    // SAFETY: ERRNO is set by the foreign runtime before this read.\n    unsafe { ERRNO }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    unsafe { ERRNO }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(sites[0].operation.family, OperationFamily::Ffi);
+        assert_eq!(sites[0].site.snippet, "unsafe { ERRNO }");
+        Ok(())
+    }
+
+    #[test]
+    fn extern_static_mut_bare_use_cards_as_static_mut() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    static mut COUNTER: u32;\n}\n\npub fn bump() -> u32 {\n    // SAFETY: callers serialize access to COUNTER.\n    unsafe { COUNTER += 1; COUNTER }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    unsafe { COUNTER += 1; COUNTER }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert_eq!(sites.len(), 1, "unexpected sites: {sites:#?}");
+        assert_eq!(sites[0].site.kind, UnsafeSiteKind::Operation);
+        assert_eq!(sites[0].operation.family, OperationFamily::StaticMut);
+        Ok(())
+    }
+
+    #[test]
+    fn extern_static_same_name_safe_binding_does_not_route() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    static ERRNO: i32;\n}\n\npub fn local_errno() -> i32 {\n    let ERRNO = 7;\n    // SAFETY: reads only the local binding above.\n    unsafe { ERRNO }\n}\n\npub fn plain_errno() -> i32 {\n    let ERRNO = 3;\n    ERRNO\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -8,1 +8,1 @@\n+    unsafe { ERRNO }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| site.operation.family != OperationFamily::Ffi
+                    && site.operation.family != OperationFamily::StaticMut),
+            "shadowed binding must not route to extern static families: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extern_static_declaration_line_is_not_a_bare_use() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    static ERRNO: i32;\n    static mut COUNTER: u32;\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -1,4 +1,4 @@\n+unsafe extern \"C\" {\n+    static ERRNO: i32;\n+    static mut COUNTER: u32;\n+}\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| site.site.kind != UnsafeSiteKind::Operation),
+            "declaration lines must not double-card as bare uses: {sites:#?}"
+        );
+        assert!(
+            sites
+                .iter()
+                .any(|site| site.site.kind == UnsafeSiteKind::ExternBlock),
+            "extern block declaration card is expected: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn extern_static_bare_use_outside_unsafe_block_does_not_route() -> Result<(), String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(
+            root.join("src/lib.rs"),
+            "unsafe extern \"C\" {\n    static ERRNO: i32;\n    static mut COUNTER: u32;\n}\n\npub fn plain_read() -> i32 {\n    { ERRNO }\n}\n\npub fn plain_bump() {\n    { COUNTER += 1; }\n}\n",
+        )
+        .map_err(|err| format!("write temp source failed: {err}"))?;
+        let diff = crate::input::diff::parse_unified_diff(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -7,1 +7,1 @@\n+    { ERRNO }\n@@ -11,1 +11,1 @@\n+    { COUNTER += 1; }\n",
+        );
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        assert!(
+            sites
+                .iter()
+                .all(|site| site.operation.family != OperationFamily::Ffi
+                    && site.operation.family != OperationFamily::StaticMut),
+            "bare uses outside an unsafe block must not route to extern static families: {sites:#?}"
+        );
         Ok(())
     }
 
