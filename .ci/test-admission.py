@@ -6,11 +6,12 @@ No live admission request, label, review approval or product run is produced.
 import copy
 import datetime as dt
 import json
+import tomllib
 from pathlib import Path
 import types
 import unittest
 
-ROOT = Path(__file__).resolve().parents[2]
+ROOT = Path(__file__).resolve().parents[1]
 WORKFLOW = (ROOT / '.github/workflows/ci.yml').read_text()
 SCRIPTS = [part.split('          PYTHON', 1)[0]
            for part in WORKFLOW.split("          python3 -I - <<'PYTHON'\n")[1:]]
@@ -51,9 +52,16 @@ class AdmissionTests(unittest.TestCase):
         self.merge = dict(sha='c' * 40, tree=dict(sha='d' * 40), parents=[dict(sha='b' * 40), dict(sha='a' * 40)])
         self.reviews = [self.review]
         self.reads = 0
+        self.owner_fault = None
 
     def api(self, path):
-        self.assertNotIn('/contents/', path, 'legacy bootstrap must not claim protected-base owners')
+        if '/contents/' in path:
+            owner = path.split('/contents/', 1)[1].split('?ref=', 1)[0]
+            self.assertTrue(path.endswith('?ref=' + self.request['base']))
+            result = dict(type='file', path=owner, size=100, sha='f' * 40)
+            if self.owner_fault:
+                result.update(self.owner_fault)
+            return result
         if '/reviews?' in path:
             return copy.deepcopy(self.reviews)
         if '/git/commits/' in path:
@@ -68,6 +76,22 @@ class AdmissionTests(unittest.TestCase):
         self.pr['body'] = marker('admission-v1', self.request)
         self.event['pull_request']['body'] = self.pr['body']
 
+    def test_read_scope_expansion_is_only_on_governed_proof(self):
+        before, after = WORKFLOW.split('\n  proof:\n', 1)
+        proof, result = after.split('\n  unsafe-review-rust-result:\n', 1)
+        expected = ('    permissions:\n      contents: read\n      actions: read\n'
+                    '      checks: read\n      pull-requests: read\n')
+        self.assertIn(expected, proof)
+        self.assertEqual(proof.count('    permissions:'), 1)
+        self.assertNotIn('    permissions:', before)
+        self.assertNotIn('    permissions:', result)
+        self.assertIn('permissions:\n  contents: read\n', before)
+        self.assertNotIn(': write', WORKFLOW)
+        with (ROOT / 'policy/workflow-allowlist.toml').open('rb') as stream:
+            policies = tomllib.load(stream)['workflow']
+        entry = next(p for p in policies if p['path'] == '.github/workflows/ci.yml')
+        self.assertEqual(set(entry['permissions'].split(', ')),
+                         {'contents: read', 'actions: read', 'checks: read', 'pull-requests: read'})
 
     def test_positive_exact_coordinator_review_and_integration(self):
         self.assertEqual(self.run_admission(), self.request)
@@ -100,8 +124,55 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_admission(lambda _: self.fail('must reject before API'))
 
+    def test_protected_base_owner_readiness_is_required(self):
+        for fault in (dict(type='dir'), dict(path='candidate/owner'), dict(size=0),
+                      dict(size=524289), dict(sha='missing')):
+            self.owner_fault = fault
+            with self.subTest(fault=fault), self.assertRaises(ValueError):
+                self.run_admission()
 
+    def test_current_native_driver_emits_only_after_real_checks(self):
+        import os, tempfile, urllib.request
+        from unittest.mock import patch
+        now = self.now
+        class Clock(dt.datetime):
+            @classmethod
+            def now(cls, tz=None):
+                return now
+        class Response:
+            def __init__(self, value):
+                self.raw = json.dumps(value).encode()
+            def __enter__(self): return self
+            def __exit__(self, *args): pass
+            def read(self, limit): return self.raw[:limit]
+        def transport(request, timeout):
+            self.assertEqual(request.get_header('Authorization'), 'Bearer fixture-token')
+            self.assertTrue(request.full_url.startswith('https://api.github.com/repos/' + ADMISSION.REPO))
+            return Response(self.api(request.full_url.removeprefix('https://api.github.com')))
+        with tempfile.TemporaryDirectory(prefix='unsafe-admission-driver-') as temporary:
+            event_path, output_path = Path(temporary)/'event.json', Path(temporary)/'output'
+            event_path.write_text(json.dumps(self.event))
+            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event_path), GITHUB_OUTPUT=str(output_path), GITHUB_TOKEN='fixture-token')
+            for fault in (dict(size=0), None):
+                self.owner_fault = fault
+                with patch.dict(os.environ, env, clear=True), patch.object(dt, 'datetime', Clock), \
+                     patch.object(urllib.request, 'urlopen', transport):
+                    if fault:
+                        with self.assertRaises(SystemExit):
+                            exec(compile(SOURCE, 'ci.yml/actual-main', 'exec'), {'__name__':'__main__'})
+                        self.assertFalse(output_path.exists())
+                    else:
+                        exec(compile(SOURCE, 'ci.yml/actual-main', 'exec'), {'__name__':'__main__'})
+                        lines = output_path.read_text().splitlines()
+                        self.assertEqual(lines[0], 'admitted=true')
+                        self.assertEqual(json.loads(lines[1].removeprefix('request=')), self.request)
 
+    def test_pinned_closed_selectors_cannot_be_omitted(self):
+        proof = WORKFLOW.split('\n  proof:\n')[1].split('\n  unsafe-review-rust-result:')[0]
+        for marker in ('@8ff77e5876b4a7808a58e053aa6248b1020e02d0',
+                       'proof_admission: native-review-v1', 'whole_run_deadline: native-run-1200s',
+                       'upload_artifacts: true', 'artifact_lane: failure-diagnostics'):
+            self.assertEqual(proof.count(marker), 1)
 
     def test_explicit_restoration_is_not_a_global_nonce_grant(self):
         # No global nonce registry: deliberate restoration remains subject to
@@ -231,106 +302,33 @@ class AdmissionTests(unittest.TestCase):
             with self.assertRaises(ValueError):
                 self.run_admission()
 
-
-
-
-    def test_native_guard_is_reused_before_setup_before_proof_and_after_proof(self):
-        job = WORKFLOW.split('  unsafe-review-rust-result:\n', 1)[1]
-        self.assertLess(job.index('run: &native_subject_check'), job.index('uses: actions/checkout'))
-        self.assertEqual(job.count('run: *native_subject_check'), 2)
-        self.assertLess(job.index('Refresh native authority immediately'), job.index('id: launch'))
-        self.assertIn("if: ${{ always() && needs.admission.outputs.admitted == 'true' && steps.launch.outcome == 'success' }}", job)
-        self.assertIn('NATIVE_PHASE: final', job)
-        self.assertNotIn(': write', WORKFLOW)
-        self.assertNotIn('workflow_dispatch:', WORKFLOW)
-        self.assertNotIn('merge_group:', WORKFLOW)
-        router = WORKFLOW.split('  route:\n',1)[1].split('  unsafe-review-rust-result:',1)[0]
-        self.assertLess(router.index('no explicit native admission'), router.index('gh api'))
-        self.assertIn('exit 78', job)
-
-    def test_actual_router_never_reads_inventory_without_admission(self):
-        import os, subprocess, tempfile
-        router = WORKFLOW.split('  route:\n',1)[1].split('  unsafe-review-rust-result:',1)[0]
-        script = router.split('        run: |\n',1)[1]
-        script = '\n'.join(line[10:] for line in script.splitlines())
-        script = script.replace('${{ github.event_name }}', 'pull_request').replace('${{ github.event.pull_request.head.repo.fork }}', 'false')
-        with tempfile.TemporaryDirectory() as temporary:
-            directory = Path(temporary)
-            gh = directory/'gh'
-            gh.write_text('#!/bin/sh\necho called > "$TRIPWIRE"\nexit 1\n')
-            gh.chmod(0o755)
-            for state in ('skipped', 'failure', 'success'):
-                output = directory/'output'
-                output.unlink(missing_ok=True)
-                env = dict(os.environ, PATH=temporary+':'+os.environ['PATH'], GH_TOKEN='fixture', ADMISSION_RESULT=state, ADMITTED='', GITHUB_OUTPUT=str(output), TRIPWIRE=str(directory/'tripwire'))
-                result = subprocess.run(['bash','-c',script], env=env, capture_output=True, text=True)
-                self.assertEqual(result.returncode, 0, result.stderr)
-                self.assertFalse((directory/'tripwire').exists())
-                self.assertIn('runner="ubuntu-latest"', output.read_text())
-
-    def test_actual_refresh_revokes_draft_changed_subject_and_dismissed_review(self):
+    def test_unadmitted_or_wrong_native_result_cannot_turn_green(self):
         import os
         from unittest.mock import patch
-        code = RESULT[RESULT.index('def expired('):]
-        # alarm wiring is tested through the actual program; fake API only.
-        env = dict(self.env, ADMISSION_REQUEST=json.dumps(self.request))
+        evidence = dict(schema='em-ci-rust-result.v1', repository=ADMISSION.REPO, sha='c' * 40,
+                        run_id='7', run_attempt='1', profile='standard', result='success',
+                        proof_outcome='success', proof_entered_at='2026-10-14T12:00:30Z')
+        env = dict(self.env, ADMISSION_RESULT='success', ADMITTED='true', PROOF_RESULT='success',
+                   EVIDENCE=json.dumps(evidence), RECEIPT_NAME='native-central-receipt', GITHUB_RUN_ID='7',
+                   ADMISSION_REQUEST=json.dumps(self.request))
         with patch.dict(os.environ, env, clear=True):
-            exec(compile(code, 'ci.yml/refresh', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
-            for mutate, restore in (
-                (lambda: self.pr.update(draft=True), lambda: self.pr.update(draft=False)),
-                (lambda: self.pr.update(body='revoked'), lambda: self.rewrite_request()),
-                (lambda: self.review.update(state='DISMISSED'), lambda: self.review.update(state='COMMENTED')),
-                (lambda: self.pr['base'].update(sha='f'*40), lambda: self.pr['base'].update(sha='b'*40)),
-            ):
-                mutate()
-                try:
-                    with self.assertRaises(ValueError):
-                        exec(compile(code, 'ci.yml/refresh', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
-                finally:
-                    import signal
-                    signal.alarm(0)
-                    restore()
-
-    def test_partial_rerun_cannot_reuse_prior_admission_outputs(self):
-        import os, signal
-        from unittest.mock import patch
-        code = RESULT[RESULT.index('def expired('):]
-        env = dict(self.env, ADMISSION_REQUEST=json.dumps(self.request))
-        for changed in (dict(GITHUB_RUN_ATTEMPT='2'), dict(GITHUB_ACTOR='other'),
-                        dict(GITHUB_TRIGGERING_ACTOR='other'), dict(GITHUB_REPOSITORY='other/repo')):
-            with self.subTest(changed=changed), patch.dict(os.environ, dict(env, **changed), clear=True):
-                try:
-                    with self.assertRaises(ValueError):
-                        exec(compile(code, 'ci.yml/refresh', 'exec'), dict(ADMISSION.__dict__, public_api=lambda _: self.fail('must reject before API')))
-                finally:
-                    signal.alarm(0)
-
-    def test_metadata_token_is_required_without_permission_expansion(self):
-        import os
-        from unittest.mock import patch
-        with patch.dict(os.environ, {}, clear=True), patch('urllib.request.urlopen') as transport:
-            with self.assertRaisesRegex(ValueError, 'missing metadata token'):
-                ADMISSION.public_api('/repos/' + ADMISSION.REPO + '/pulls/2396/reviews')
-            transport.assert_not_called()
-        self.assertEqual(WORKFLOW.count('GITHUB_TOKEN: ${{ github.token }}'), 4)
-        self.assertNotIn('pull-requests:', WORKFLOW)
-        self.assertNotIn(': write', WORKFLOW)
-        admission = WORKFLOW.split('  admission:\n', 1)[1].split('  route:\n', 1)[0]
-        gate = WORKFLOW.split('  unsafe-review-rust-result:\n', 1)[1]
-        self.assertNotIn('    permissions:', admission)
-        self.assertIn('    permissions:\n      contents: read\n', gate)
-        expected = {
-            'Verify coordinator request and exact independent review',
-            'Require explicit native bootstrap admission',
-            'Refresh native authority immediately before product proof',
-            'Revalidate exact native subject after product proof',
-        }
-        actual = set()
-        for step in WORKFLOW.split('      - name: ')[1:]:
-            if '          GITHUB_TOKEN: ${{ github.token }}' in step:
-                actual.add(step.splitlines()[0])
-        self.assertEqual(actual, expected)
-        self.assertFalse(any(line.startswith('      GITHUB_TOKEN:') for line in WORKFLOW.splitlines()))
+            exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+        with patch.dict(os.environ, env, clear=True):
+            self.review['state'] = 'DISMISSED'
+            with self.assertRaises(ValueError):
+                exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+            self.review['state'] = 'COMMENTED'
+            saved = self.pr['body']
+            self.pr['body'] = 'request revoked'
+            with self.assertRaises(ValueError):
+                exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
+            self.pr['body'] = saved
+        for changed in (dict(ADMISSION_RESULT='skipped'), dict(ADMITTED=''), dict(PROOF_RESULT='skipped'),
+                        dict(RECEIPT_NAME=''), dict(GITHUB_SHA='f' * 40), dict(GITHUB_RUN_ID='8'),
+                        dict(GITHUB_RUN_ATTEMPT='2')):
+            with patch.dict(os.environ, dict(env, **changed), clear=True):
+                with self.assertRaises(AssertionError):
+                    exec(compile(RESULT[RESULT.index("assert os.environ['ADMISSION_RESULT']"):], 'ci.yml/result', 'exec'), dict(ADMISSION.__dict__, public_api=self.api))
 
     def test_metadata_python_ignores_candidate_import_paths(self):
         import os, subprocess, tempfile
@@ -351,36 +349,25 @@ class AdmissionTests(unittest.TestCase):
             self.assertEqual(isolated.stdout.strip(), 'isolated')
         self.assertEqual(WORKFLOW.count("python3 -I - <<'PYTHON'"), 2)
 
-    def test_actual_driver_emits_only_after_authority_checks(self):
-        import os, tempfile, urllib.request
-        from unittest.mock import patch
-        now = self.now
-        class Clock(dt.datetime):
-            @classmethod
-            def now(cls, tz=None): return now
-        class Response:
-            def __init__(self, value): self.raw = json.dumps(value).encode()
-            def __enter__(self): return self
-            def __exit__(self, *args): pass
-            def read(self, limit): return self.raw[:limit]
-        def transport(request, timeout):
-            self.assertEqual(request.get_header('Authorization'), 'Bearer fixture-token')
-            self.assertTrue(request.full_url.startswith('https://api.github.com/repos/' + ADMISSION.REPO))
-            return Response(self.api(request.full_url.removeprefix('https://api.github.com')))
-        with tempfile.TemporaryDirectory() as temporary:
-            event, output = Path(temporary)/'event', Path(temporary)/'output'
-            event.write_text(json.dumps(self.event))
-            env = dict(os.environ, **self.env, GITHUB_EVENT_PATH=str(event), GITHUB_OUTPUT=str(output), GITHUB_TOKEN='fixture-token')
-            with patch.dict(os.environ, env, clear=True), patch.object(dt, 'datetime', Clock), patch.object(urllib.request, 'urlopen', transport):
-                self.review['state'] = 'DISMISSED'
-                with self.assertRaises(SystemExit):
-                    exec(compile(SOURCE, 'ci.yml/main', 'exec'), {'__name__':'__main__'})
-                self.assertFalse(output.exists())
-                self.review['state'] = 'COMMENTED'
-                exec(compile(SOURCE, 'ci.yml/main', 'exec'), {'__name__':'__main__'})
-                self.assertEqual(output.read_text().splitlines()[0], 'admitted=true')
 
+    def test_metadata_token_is_required_and_scoped_to_controls(self):
+        import os
+        from unittest.mock import patch
+        for source in (SOURCE, RESULT[:RESULT.index("assert os.environ['ADMISSION_RESULT']")]):
+            program = {}
+            exec(compile(source, 'ci.yml/control', 'exec'), program)
+            with patch.dict(os.environ, {}, clear=True), patch('urllib.request.urlopen') as transport:
+                with self.assertRaisesRegex(ValueError, 'missing metadata token'):
+                    program['public_api']('/repos/' + ADMISSION.REPO + '/pulls/2380/reviews')
+                transport.assert_not_called()
+        expected = {'Verify coordinator request and exact independent review',
+                    'Require admitted exact native product result'}
+        actual = {step.splitlines()[0] for step in WORKFLOW.split('      - name: ')[1:]
+                  if '          GITHUB_TOKEN: ${{ github.token }}' in step}
+        self.assertEqual(actual, expected)
+        self.assertEqual(WORKFLOW.count('GITHUB_TOKEN: ${{ github.token }}'), 2)
+        self.assertNotIn('GITHUB_TOKEN:', WORKFLOW.split('  proof:\n')[1].split('  unsafe-review-rust-result:')[0])
+        self.assertFalse(any(line.startswith('      GITHUB_TOKEN:') for line in WORKFLOW.splitlines()))
 
 if __name__ == '__main__':
     unittest.main()
-

@@ -1,13 +1,6 @@
-//! CI routing-contract gate (`check_ci_routing_contract`).
-//!
-//! Extracted from `main.rs` as part of #1806 (xtask modularization). Validates
-//! that `.github/workflows/ci.yml` keeps the single tight-gate CI contract:
-//! required markers for the one self-hosted-primary / gh-hosted-overflow gate,
-//! and forbidden markers that would reintroduce the retired size-routed
-//! multi-lane pile-of-checks. Also validates that the standalone advisory
-//! ub-review lane (`.github/workflows/ub-review.yml`) keeps its non-blocking
-//! advisory posture: SHA-pinned action, continue-on-error, fail-on-gate off,
-//! and fork/draft-guarded secret use.
+//! The central caller, retained repository proof and separate advisory lane.
+//! Consumer polling/physical routing is retired. Failure-evidence publication
+//! still requires native qualification on the selected central pin.
 
 /// Check a workflow's text against a lane contract: every `required` marker
 /// must be present and every `forbidden` marker absent. `lane` names the
@@ -61,6 +54,7 @@ fn check_private_staging_order(path: &str, text: &str) -> Result<(), String> {
 
 /// Require the structured test invocation to be part of the launched core
 /// gate, rather than accepting the `ci-test` prefix from the validator command.
+#[cfg(test)]
 fn check_core_gate_launch_order(path: &str, text: &str) -> Result<(), String> {
     let launch = r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#;
     let launch_index = text
@@ -83,6 +77,7 @@ fn check_core_gate_launch_order(path: &str, text: &str) -> Result<(), String> {
 /// Validate the bounded diagnostic artifact attached to a failed deterministic
 /// core gate. The upload may report evidence, but it must neither retain the
 /// raw log nor replace the final non-zero verdict with an advisory outcome.
+#[cfg(test)]
 fn check_core_failure_evidence_contract(path: &str, text: &str) -> Result<(), String> {
     check_lane_markers(
         path,
@@ -186,123 +181,215 @@ fn check_diagnostics_staging_order(path: &str, text: &str) -> Result<(), String>
     Ok(())
 }
 
-/// Keep bootstrap publication cheap without making absent proof a green check.
-fn check_bootstrap_admission_contract(path: &str, text: &str) -> Result<(), String> {
-    check_lane_markers(
-        path,
-        text,
-        "bootstrap late admission",
-        &[
-            "types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]",
-            "needs: [admission, route]",
-            "run: &native_subject_check |",
-            "Refresh native authority immediately before product proof",
-            "Revalidate exact native subject after product proof",
-            "steps.launch.outcome == 'success'",
-            "no explicit native admission",
-            "|| exit 78",
-        ],
-        &["workflow_dispatch:", "merge_group:"],
-    )?;
-    let guard = text
-        .find("run: &native_subject_check")
-        .ok_or_else(|| format!("{path} missing native guard"))?;
-    let checkout = text.find("uses: actions/checkout").unwrap_or(0);
-    let route_guard = text
-        .find("no explicit native admission")
-        .ok_or_else(|| format!("{path} missing router admission guard"))?;
-    let inventory = text.find("RESP=\"$(gh api").unwrap_or(0);
-    if guard >= checkout || route_guard >= inventory {
-        return Err(format!(
-            "{path} must reject absent admission before setup or inventory"
-        ));
-    }
-    Ok(())
-}
-
-/// Validate the single-gate CI routing contract in `.github/workflows/ci.yml`.
+/// Validate the admitted central caller and the repository's real proof.
 pub(crate) fn check_ci_routing_contract() -> Result<(), String> {
     let path = ".github/workflows/ci.yml";
     let text =
         std::fs::read_to_string(path).map_err(|err| format!("failed to read {path}: {err}"))?;
-    // Single tight CI gate, self-hosted-primary with gh-hosted overflow: a minimal
-    // `route` job (not a required check) picks the gate runner — an idle trusted
-    // self-hosted em-ci runner when the owned fleet has capacity, else
-    // `ubuntu-latest` overflow (bursts, capacity gaps, fork PRs). The gate stays a
-    // SINGLE job whose mandatory deterministic core floor (fmt + clippy + test +
-    // rustdoc + `xtask check-pr`) is the only hard blocker and the only required
-    // status check. The
-    // advisory ub-review LLM lane runs as its own standalone non-blocking workflow
-    // (validated below). The router never blocks the merge and never size-routes.
-    //
-    // The capacity router is allowed ONLY in its minimal self-hosted-primary /
-    // gh-overflow shape. The OLD size-routed multi-lane pile-of-checks must not
-    // reappear: no per-size lanes (cpx42/cx43/cx53), no separate normalized "Rust
-    // Small Result" required check, no budget opt-out fallback modes, and no
-    // repository-level runner discovery or the broken Docker Rust Small image.
-    check_lane_markers(
-        path,
-        &text,
-        "single-gate CI contract",
-        &[
-            // One required check, stable name for branch protection.
-            "name: Unsafe Review Rust Result",
-            // Capacity router: self-hosted primary, gh-hosted overflow.
-            "Route CI runner",
-            "EM_RUNNER_READ_TOKEN",
-            "gh api \"orgs/EffortlessMetrics/actions/runners",
-            "runner_kind",
-            // Trusted self-hosted label set (shared em-ci group, any idle size).
-            "self-hosted",
-            "em-ci",
-            "trusted-pr",
-            // The gate consumes the router's runs-on value; gh-hosted is the overflow.
-            "fromJSON(needs.route.outputs.runner)",
-            "runs-on: ubuntu-latest",
-            // Shared warmed setup, runner-kind agnostic.
-            "dtolnay/rust-toolchain@1.98",
-            "Swatinem/rust-cache@v2",
-            // Fast precontext writes the run record, the deterministic core gate
-            // runs in the background (guarded by a disk-headroom check), and the
-            // final assert decides the merge on the core verdict.
-            "Fast precontext and launch core gate",
-            "cargo run --locked -p xtask -- check-pr",
-            // Hosted rustdoc gate (#2203): the documented rustdoc baseline
-            // step must stay inside the required aggregate.
-            "_step doc env RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked",
-            "cargo doc --workspace --no-deps --locked",
-            "df -h",
-            "core_exit",
-            "Assert core gate verdict",
-            // The router must stay fork-safe: fork PRs always overflow to gh-hosted.
-            "github.event.pull_request.head.repo.fork",
-        ],
-        &[
-            "route-rust-small",
-            "router_target=",
-            "cpx42",
-            "cx43",
-            "cx53",
-            "Rust Small Fallback on GitHub Hosted",
-            "fallback_mode=full",
-            "no-github-fallback",
-            "Unsafe Review Rust Small Result",
-            "em-ci-rust:1.95",
-            "docker run --rm",
-            // The advisory ub-review lane moved to the standalone ub-review.yml
-            // workflow; an in-job copy would double-run (and double-post) the
-            // advisory review on every PR.
-            "EffortlessMetrics/ub-review@",
-        ],
-    )?;
-    check_core_failure_evidence_contract(path, &text)?;
-    check_bootstrap_admission_contract(path, &text)?;
-    if text.contains("repos/${") && text.contains("/actions/runners") {
+    check_central_caller_contract(path, &text)?;
+    let run = std::fs::read_to_string(".ci/run.sh").map_err(|err| err.to_string())?;
+    let core = std::fs::read_to_string(".ci/core.sh").map_err(|err| err.to_string())?;
+    let finalize = std::fs::read_to_string(".ci/finalize.sh").map_err(|err| err.to_string())?;
+    check_repository_proof_contract(&run, &core, &finalize)?;
+    check_ub_review_advisory_contract()?;
+    // This exact caller selects the published bounded failure-diagnostics lane.
+    // Source compatibility does not establish native upload/retention qualification.
+    Ok(())
+}
+
+fn check_central_caller_contract(path: &str, text: &str) -> Result<(), String> {
+    let jobs: Vec<&str> = text
+        .lines()
+        .filter_map(|line| line.strip_prefix("  "))
+        .filter(|line| !line.starts_with(' ') && line.ends_with(':'))
+        .collect();
+    if jobs
+        != [
+            "pull_request:",
+            "admission:",
+            "proof:",
+            "unsafe-review-rust-result:",
+        ]
+    {
         return Err(format!(
-            "{path} must not reintroduce repository runner discovery (org-level only)"
+            "{path} has unexpected or duplicate native admission jobs/events"
         ));
     }
-    check_ub_review_advisory_contract()
+    let proof = text
+        .split_once("\n  proof:\n")
+        .and_then(|(_, tail)| tail.split_once("\n  unsafe-review-rust-result:\n"))
+        .map(|(proof, _)| proof)
+        .ok_or_else(|| format!("{path} missing proof/result boundary"))?;
+    let inputs: Vec<&str> = proof
+        .split_once("\n    with:\n")
+        .map(|(_, tail)| {
+            tail.lines()
+                .take_while(|line| line.starts_with("      "))
+                .map(str::trim)
+                .collect()
+        })
+        .ok_or_else(|| format!("{path} missing closed central inputs"))?;
+    if proof.matches("    with:").count() != 1
+        || inputs
+            != [
+                "profile: standard",
+                "force_hosted: false",
+                "script: .ci/run.sh",
+                "fetch_depth: 0",
+                "proof_admission: native-review-v1",
+                "whole_run_deadline: native-run-1200s",
+                "upload_artifacts: true",
+                "artifact_lane: failure-diagnostics",
+            ]
+    {
+        return Err(format!(
+            "{path} must select exactly the reviewed closed central inputs"
+        ));
+    }
+    let permissions: Vec<&str> = proof
+        .split_once("\n    permissions:\n")
+        .map(|(_, tail)| {
+            tail.lines()
+                .take_while(|line| line.starts_with("      "))
+                .map(str::trim)
+                .collect()
+        })
+        .ok_or_else(|| format!("{path} missing governed caller read permissions"))?;
+    if proof.matches("    permissions:").count() != 1
+        || permissions
+            != [
+                "contents: read",
+                "actions: read",
+                "checks: read",
+                "pull-requests: read",
+            ]
+    {
+        return Err(format!(
+            "{path} caller permissions must contain only the four approved read scopes"
+        ));
+    }
+    check_lane_markers(
+        path,
+        proof,
+        "gated reusable proof",
+        &[],
+        &["runs-on:", "steps:", "secrets:"],
+    )?;
+    check_lane_markers(
+        path,
+        text,
+        "central pre-merge caller",
+        &[
+            "name: Unsafe Review Rust Result",
+            "pull_request:",
+            "types: [opened, reopened, edited, synchronize, ready_for_review, converted_to_draft, closed]",
+            "needs: [admission, proof]",
+            "name: Require admitted exact native product result",
+            "PROOF_RESULT: ${{ needs.proof.result }}",
+            "RECEIPT_NAME: ${{ needs.proof.outputs.receipt_name }}",
+            "name: Verify native PR admission",
+            "needs: admission",
+            "if: needs.admission.result == 'success' && needs.admission.outputs.admitted == 'true'",
+            "request['integration'] == env['GITHUB_SHA']",
+            "review['id'] == request['review_id']",
+            "event['sender']['login'] == COORDINATOR",
+            "env['GITHUB_RUN_ATTEMPT'] == '1'",
+            "old.get('request_id') != request.get('request_id')",
+            "current['mergeable'] is True and current['merge_commit_sha'] == request['integration']",
+            "refreshed['merge_commit_sha'] == request['integration']",
+            "assert os.environ['PROOF_RESULT'] == 'success'",
+            "assert evidence['sha'] == os.environ['GITHUB_SHA']",
+            "receipt['review_kind'] == 'independent'",
+            "receipt['verdict'] == 'approved-for-proof'",
+            "protected-base review owner unavailable",
+            "proof_admission: native-review-v1",
+            "whole_run_deadline: native-run-1200s",
+            "upload_artifacts: true",
+            "artifact_lane: failure-diagnostics",
+            "uses: EffortlessMetrics/em-ci-workflows/.github/workflows/rust.yml@8ff77e5876b4a7808a58e053aa6248b1020e02d0",
+            "profile: standard",
+            "force_hosted: false",
+            "script: .ci/run.sh",
+            "fetch_depth: 0",
+            "contents: read",
+        ],
+        &[
+            "merge_group:",
+            "workflow_dispatch:",
+            "push:",
+            "schedule:",
+            "runs-on: [self-hosted]",
+            "actions/checkout@",
+            "secrets:",
+            "EM_RUNNER_READ_TOKEN",
+            "/actions/runners",
+            "route:",
+            "contents: write",
+            "pull-requests: write",
+            "checks: write",
+            "actions: write",
+            "EffortlessMetrics/ub-review@",
+        ],
+    )
+}
+
+fn check_repository_proof_contract(run: &str, core: &str, finalize: &str) -> Result<(), String> {
+    check_lane_markers(
+        ".ci/run.sh",
+        run,
+        "central runtime",
+        &[
+            r#"[[ "$CARGO_TARGET_DIR" == "$RUNNER_TEMP/cargo-target" ]]"#,
+            r#"[[ "$(git rev-parse HEAD)" == "$GITHUB_SHA" ]]"#,
+            r#"CORE_RUN_KEY="${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT}""#,
+            r#"rm -f target/ci-core/core_exit "$core_exit_path""#,
+            r#"base_ref="${GITHUB_BASE_REF:-main}""#,
+            r#"select-core-mode.sh "origin/${base_ref}""#,
+            r#"python3 .ci/supervise.py --seconds "$proof_seconds" --grace 30 -- bash .ci/core.sh"#,
+            "metadata_budget proof",
+            r#"python3 .ci/supervise.py --seconds 5 --grace 1 -- python3 .ci/native_deadline.py "$1""#,
+            r#"python3 .ci/supervise.py --seconds "$finalize_seconds" --grace 10 -- bash .ci/finalize.sh || true"#,
+            "metadata_budget result",
+            r#"exit "$core_exit""#,
+        ],
+        &["/mnt/ci-scratch", "sudo ", "CARGO_TARGET_DIR=target"],
+    )?;
+    check_lane_markers(
+        ".ci/core.sh",
+        core,
+        "product proof",
+        &[
+            "cargo fmt --all --check",
+            "cargo clippy --workspace --all-targets --locked -- -D warnings",
+            r#"_step test env UNSAFE_REVIEW_CI_HANDOFF_DIR="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}" cargo run --locked -p xtask -- ci-test"#,
+            r#"_step doc env RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked"#,
+            "_step check-pr cargo run --locked -p xtask -- check-pr",
+            r#"exit "$core_rc""#,
+        ],
+        &["cargo test --workspace", "core_rc=0"],
+    )?;
+    check_lane_markers(
+        ".ci/finalize.sh",
+        finalize,
+        "bounded failure staging",
+        &[
+            r#"test "${core_exit}" = "0""#,
+            "$1 ~ /^(fmt|clippy|test|doc|check-pr)$/",
+            "head -n 80",
+            "head -c 16384",
+            r#"[ ! -L "$failure_summary_path" ]"#,
+            r#"[ ! -L "$failure_metadata_path" ]"#,
+            r#"diagnostics_source="${RUNNER_TEMP}/unsafe-review-structured-${CORE_RUN_KEY}/test-diagnostics.json""#,
+            r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#,
+        ],
+        &[
+            "cat target/ci-core/core.log",
+            "tail -n 80 target/ci-core/core.log",
+            "target/ci-core/redacted-excerpt.txt",
+        ],
+    )?;
+    check_private_staging_order(".ci/finalize.sh", finalize)?;
+    check_diagnostics_staging_order(".ci/finalize.sh", finalize)
 }
 
 /// Validate the standalone advisory ub-review lane contract in
@@ -469,6 +556,153 @@ mod tests {
         io::Write,
         process::{Command, Stdio},
     };
+
+    #[test]
+    fn central_caller_rejects_automatic_or_direct_execution() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        super::check_central_caller_contract("ci.yml", text)?;
+        for bad in [
+            "workflow_dispatch:",
+            "push:",
+            "runs-on: [self-hosted]",
+            "secrets: inherit",
+            "EM_RUNNER_READ_TOKEN",
+        ] {
+            if super::check_central_caller_contract("ci.yml", &format!("{text}\n{bad}\n")).is_ok() {
+                return Err(format!("accepted retired execution surface: {bad}"));
+            }
+        }
+        if super::check_central_caller_contract(
+            "ci.yml",
+            &text.replace("profile: standard", "profile: heavy"),
+        )
+        .is_ok()
+        {
+            return Err("accepted an unreviewed profile".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_requires_closed_admission_deadline_and_diagnostics() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for marker in [
+            "      proof_admission: native-review-v1\n",
+            "      whole_run_deadline: native-run-1200s\n",
+            "      upload_artifacts: true\n",
+            "      artifact_lane: failure-diagnostics\n",
+        ] {
+            if super::check_central_caller_contract("ci.yml", &text.replace(marker, "")).is_ok() {
+                return Err(format!("accepted missing central contract: {marker}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_rejects_extra_or_duplicate_inputs() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for extra in [
+            "result_script: .ci/other.sh",
+            "profile: heavy",
+            "upload_artifacts: false",
+            "artifact_lane: ripr",
+        ] {
+            let changed = text.replace(
+                "      fetch_depth: 0",
+                &format!("      fetch_depth: 0\n      {extra}"),
+            );
+            if super::check_central_caller_contract("ci.yml", &changed).is_ok() {
+                return Err(format!("accepted extra/duplicate central input: {extra}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_requires_each_approved_read_scope() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        super::check_central_caller_contract("ci.yml", text)?;
+        for scope in ["contents", "actions", "checks", "pull-requests"] {
+            let missing = text.replace(&format!("      {scope}: read\n"), "");
+            if super::check_central_caller_contract("ci.yml", &missing).is_ok() {
+                return Err(format!("accepted missing caller read scope: {scope}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn central_caller_rejects_extra_or_write_scopes() -> Result<(), String> {
+        let text = include_str!("../../.github/workflows/ci.yml");
+        for extra in [
+            "      issues: read\n",
+            "      packages: write\n",
+            "      id-token: write\n",
+            "      actions: read\n",
+        ] {
+            let expanded = text.replace(
+                "      contents: read\n",
+                &format!("      contents: read\n{extra}"),
+            );
+            if super::check_central_caller_contract("ci.yml", &expanded).is_ok() {
+                return Err(format!("accepted unapproved caller permission: {extra}"));
+            }
+        }
+        for scope in ["contents", "actions", "checks", "pull-requests"] {
+            let write = text.replace(
+                &format!("      {scope}: read"),
+                &format!("      {scope}: write"),
+            );
+            if super::check_central_caller_contract("ci.yml", &write).is_ok() {
+                return Err(format!("accepted caller write scope: {scope}"));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn extracted_proof_rejects_masked_product_failure() -> Result<(), String> {
+        let run = include_str!("../../.ci/run.sh");
+        let core = include_str!("../../.ci/core.sh");
+        let finalize = include_str!("../../.ci/finalize.sh");
+        if super::check_repository_proof_contract(
+            &run.replace("exit \"$core_exit\"", "exit 0"),
+            core,
+            finalize,
+        )
+        .is_ok()
+        {
+            return Err("accepted masked wrapper result".to_string());
+        }
+        if super::check_repository_proof_contract(
+            run,
+            &core.replace("exit \"$core_rc\"", "exit 0"),
+            finalize,
+        )
+        .is_ok()
+        {
+            return Err("accepted masked core result".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn shipped_native_admission_and_result_controls() -> Result<(), String> {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("..");
+        let output = Command::new("python3")
+            .arg(".ci/test-admission.py")
+            .current_dir(root)
+            .output()
+            .map_err(|err| format!("failed to run native admission controls: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "native admission controls failed: {}",
+                String::from_utf8_lossy(&output.stderr)
+            ));
+        }
+        Ok(())
+    }
 
     const FAILURE_EVIDENCE_FIXTURE: &str = r#"
 CORE_RUN_KEY: ${{ github.run_id }}-${{ github.run_attempt }}
@@ -815,11 +1049,15 @@ fi
 
     #[test]
     fn live_ci_workflow_satisfies_failure_evidence_contract() -> Result<(), String> {
-        let path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/ci.yml");
-        let text = std::fs::read_to_string(&path)
-            .map_err(|error| format!("failed to read {}: {error}", path.display()))?;
-        check_core_failure_evidence_contract(&path.display().to_string(), &text)
+        super::check_central_caller_contract(
+            "ci.yml",
+            include_str!("../../.github/workflows/ci.yml"),
+        )?;
+        super::check_repository_proof_contract(
+            include_str!("../../.ci/run.sh"),
+            include_str!("../../.ci/core.sh"),
+            include_str!("../../.ci/finalize.sh"),
+        )
     }
 
     #[test]
@@ -834,19 +1072,17 @@ fi
     fn required_gate_keeps_hosted_rustdoc_step() -> Result<(), String> {
         const DOC_STEP: &str =
             "_step doc env RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace --no-deps --locked";
-        let text = include_str!("../../.github/workflows/ci.yml");
-        super::check_core_failure_evidence_contract("ci.yml", text)?;
-        if text.matches(DOC_STEP).count() < 2 {
-            return Err(
-                "ci.yml must run the rustdoc baseline step in both core chains".to_string(),
-            );
+        let core = include_str!("../../.ci/core.sh");
+        let run = include_str!("../../.ci/run.sh");
+        let finalize = include_str!("../../.ci/finalize.sh");
+        super::check_repository_proof_contract(run, core, finalize)?;
+        if core.matches(DOC_STEP).count() != 2 {
+            return Err("core.sh must retain rustdoc in both chains".to_string());
         }
-        let stripped = text.replace(DOC_STEP, "");
-        let Err(error) = super::check_core_failure_evidence_contract("ci.yml", &stripped) else {
-            return Err("maintained gate accepted a workflow without the rustdoc step".to_string());
-        };
-        if !error.contains("cargo doc") {
-            return Err(format!("unexpected rustdoc rejection: {error}"));
+        if super::check_repository_proof_contract(run, &core.replace(DOC_STEP, ""), finalize)
+            .is_ok()
+        {
+            return Err("gate accepted missing rustdoc".to_string());
         }
         Ok(())
     }
@@ -874,8 +1110,8 @@ fi
 
     #[test]
     fn live_workflow_rejects_reordered_diagnostic_staging() -> Result<(), String> {
-        let text = include_str!("../../.github/workflows/ci.yml");
-        check_core_failure_evidence_contract("ci.yml", text)?;
+        let text = include_str!("../../.ci/finalize.sh");
+        super::check_diagnostics_staging_order("finalize.sh", text)?;
         let copy = r#"cp --no-dereference "$diagnostics_source" "$diagnostics_path""#;
         let validate = r#"cargo run --locked -p xtask -- ci-test-validate "$diagnostics_path""#;
         let expose = r#"echo "diagnostics_path=$diagnostics_path" >> "$GITHUB_OUTPUT""#;
@@ -884,7 +1120,8 @@ fi
                 .replace(earlier, "REORDERED_DIAGNOSTIC_OPERATION")
                 .replace(later, earlier)
                 .replace("REORDERED_DIAGNOSTIC_OPERATION", later);
-            let Err(error) = check_core_failure_evidence_contract("ci.yml", &reordered) else {
+            let Err(error) = super::check_diagnostics_staging_order("finalize.sh", &reordered)
+            else {
                 return Err(format!("accepted reordered diagnostic staging: {earlier}"));
             };
             if !error.contains("must copy diagnostics before validation") {
@@ -943,8 +1180,7 @@ clippy\t4\t0\tbare-secret-material\n";
 
     #[test]
     fn shipped_elapsed_expression_emits_numeric_retained_tsv_row() -> Result<(), String> {
-        let workflow_path =
-            std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.github/workflows/ci.yml");
+        let workflow_path = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../.ci/core.sh");
         let workflow = std::fs::read_to_string(&workflow_path)
             .map_err(|error| format!("failed to read {}: {error}", workflow_path.display()))?;
         let now_expression = workflow
@@ -1311,29 +1547,6 @@ clippy\t4\t0\tbare-secret-material\n";
             return Err(format!(
                 "unavailable diff selected {mode:?}, expected with-tests"
             ));
-        }
-        Ok(())
-    }
-}
-
-#[cfg(test)]
-mod bootstrap_admission_tests {
-    #[test]
-    fn missing_guard_is_rejected() -> Result<(), String> {
-        let workflow = include_str!("../../.github/workflows/ci.yml");
-        super::check_bootstrap_admission_contract("ci.yml", workflow)?;
-        for marker in [
-            "run: &native_subject_check |",
-            "steps.launch.outcome == 'success'",
-            "|| exit 78",
-        ] {
-            assert!(
-                super::check_bootstrap_admission_contract(
-                    "ci.yml",
-                    &workflow.replace(marker, "REMOVED")
-                )
-                .is_err()
-            );
         }
         Ok(())
     }
