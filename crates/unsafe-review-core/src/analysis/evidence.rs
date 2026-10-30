@@ -388,6 +388,37 @@ mod tests {
     }
 
     #[test]
+    fn asm_escaped_newline_templates_are_split() {
+        // Escaped separators stay two characters in the scanned literal.
+        let nomem = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\\n\\tmov [{}], {}\", in(reg) p, in(reg) 7, options(nomem, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            nomem,
+            "asm template addresses memory while options declare nomem"
+        );
+        let readonly = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\\n\\tmov [{}], {}\", in(reg) p, in(reg) 7, options(readonly, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            readonly,
+            "asm template writes memory through its destination operand while options declare readonly"
+        );
+        for snippet in [
+            "unsafe { core::arch::asm!(\"mov {}, {}\\n\\tlea {}, [{} + 4]\", out(reg) v, in(reg) 7, out(reg) a, in(reg) p, options(nomem, nostack)) }",
+            "unsafe { core::arch::asm!(\"cmp dword ptr [{}], 0\\n\\tnop\", in(reg) p, options(readonly, nostack)) }",
+        ] {
+            assert_eq!(
+                asm_discharge_summary(snippet, vec![]),
+                "No obligation-specific guard code was detected",
+                "{snippet}"
+            );
+        }
+    }
+
+    #[test]
     fn asm_adjacent_call_options_do_not_leak() {
         let summary = asm_discharge_summary(
             "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7) }",

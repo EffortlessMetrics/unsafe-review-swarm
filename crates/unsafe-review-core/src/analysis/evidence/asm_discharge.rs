@@ -176,8 +176,19 @@ fn asm_option_words(after_template: &str) -> Vec<String> {
 }
 
 /// Individual instructions of a template, split on statement separators.
+/// Escaped `\n` sequences in the scanned literal are two characters, so
+/// they are normalized first; a leading escaped `\t` is indentation.
 fn instructions(template: &str) -> impl Iterator<Item = &str> {
-    template.split([';', '\n']).map(str::trim)
+    template
+        .split([';', '\n'])
+        .flat_map(|piece| piece.split("\\n"))
+        .map(|piece| {
+            let mut instruction = piece.trim();
+            while let Some(rest) = instruction.strip_prefix("\\t") {
+                instruction = rest.trim_start();
+            }
+            instruction
+        })
 }
 
 fn mnemonic(instruction: &str) -> &str {
