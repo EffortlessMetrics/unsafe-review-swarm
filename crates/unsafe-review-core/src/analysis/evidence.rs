@@ -62,6 +62,7 @@ mod zeroed;
 
 use self::alignment_discharge::alignment_discharge_state;
 use self::asm_discharge::asm_discharge_state;
+pub(crate) use self::asm_discharge::{ASM_NOMEM_CONTRADICTION, ASM_READONLY_CONTRADICTION};
 pub(crate) use self::assignment_syntax::{
     contains_assignment_to_target, contains_simple_assignment_to,
 };

@@ -1,0 +1,48 @@
+# Issue-linked work specification for asm contradiction next-action routing.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2293"
+kind = "correctness"
+objective = "Route inline_asm cards whose asm discharge summary names an options contradiction (nomem/readonly versus a memory template) to the code-fix next action instead of documentation or manual-review advice."
+user_outcome = "A maintainer whose asm! options contradict the template sees the next action that can actually resolve the card: remove the nomem/readonly declaration or declare the memory access the template performs. Sound asm keeps its existing next action."
+claim_boundary = "This slice proves the two contradiction markers produced by #2291 route to the code fix for ContractMissing and GuardMissing cards, with unit tests and re-blessed goldens; it does not change detection, class, priority, projections, or any safety or execution claim."
+
+[scope]
+included = [
+    "First-match next-action arm in analysis/pipeline/action_summary for ContractMissing/GuardMissing inline_asm cards whose asm obligation discharge summary equals one of the two contradiction summaries from analysis/evidence/asm_discharge",
+    "Visibility widening of the two contradiction summary constants so the pipeline matches the exact producer strings instead of copying them",
+    "Unit tests: contradiction ContractMissing and GuardMissing route to the code fix (no # Safety or manual-review text), sound inline_asm keeps manual-review routing",
+    "Re-bless only the asm_options_contradiction fixture golden next_action lines",
+]
+excluded = [
+    "Markdown/SARIF projection of discharge notes (follow-up #2292)",
+    "Any change to asm contradiction detection patterns, card class, priority, or the binary present/missing evidence model",
+    "Witnessed-state receipt logic (GuardedUnwitnessed and later classes keep their existing routing)",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Only the two exact contradiction summaries trigger the code-fix route; the generic missing summary and sound asm keep the existing next actions byte-for-byte."
+
+[[invariant]]
+id = "INV-2"
+text = "The routing consumes the producer constants by reference, so marker wording cannot drift between the discharger and the router."
+
+[[acceptance]]
+id = "AC-2293-PR1-1"
+text = "Contradiction ContractMissing and GuardMissing inline_asm cards get the code-fix next action, not docs or manual-review advice."
+proof = ["cargo test -p unsafe-review-core --locked asm_contradiction_cards_route_to_code_fix"]
+
+[[acceptance]]
+id = "AC-2293-PR1-2"
+text = "Sound inline_asm cards keep the manual-invariant-review next action."
+proof = ["cargo test -p unsafe-review-core --locked next_action"]
+
+[[acceptance]]
+id = "AC-2293-PR1-3"
+text = "Complete cards carry the routed next action and only affected goldens change."
+proof = ["cargo test --workspace --all-targets --locked", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2293-pr1-asm-contradiction-next-action"
+notes = "Consumes the discharge-summary markers produced by UNSAFE-REVIEW-WORK-2291-PR1; #2292 projection of the same notes stays a separate slice."
