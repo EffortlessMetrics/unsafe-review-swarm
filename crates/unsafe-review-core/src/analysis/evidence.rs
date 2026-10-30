@@ -366,6 +366,35 @@ mod tests {
     }
 
     #[test]
+    fn asm_multi_template_contradictions_are_named() {
+        let nomem = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\", \"mov [{}], {}\", in(reg) p, in(reg) 7, options(nomem, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            nomem,
+            "asm template addresses memory while options declare nomem"
+        );
+        let readonly = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"nop\", \"mov [{}], {}\", in(reg) p, in(reg) 7, options(readonly, nostack)) }",
+            vec![],
+        );
+        assert_eq!(
+            readonly,
+            "asm template writes memory through its destination operand while options declare readonly"
+        );
+    }
+
+    #[test]
+    fn asm_adjacent_call_options_do_not_leak() {
+        let summary = asm_discharge_summary(
+            "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7) }",
+            vec!["unsafe { core::arch::asm!(\"nop\", options(nomem, nostack)) }"],
+        );
+        assert_eq!(summary, "No obligation-specific guard code was detected");
+    }
+
+    #[test]
     fn asm_sound_options_keep_generic_missing() {
         for snippet in [
             // Pure nomem: no memory operand anywhere.
@@ -376,6 +405,11 @@ mod tests {
             "unsafe { core::arch::asm!(\"mov {}, 7\", out(reg) v, options(nomem, nostack)) }",
             // No options at all stays silent about contradictions.
             "unsafe { core::arch::asm!(\"mov [{}], {}\", in(reg) p, in(reg) 7) }",
+            // lea computes an address without accessing memory.
+            "unsafe { core::arch::asm!(\"lea {}, [{} + 4]\", out(reg) v, in(reg) p, options(nomem, nostack)) }",
+            // cmp/test read their first operand; readonly permits reads.
+            "unsafe { core::arch::asm!(\"cmp dword ptr [{}], 0\", in(reg) p, options(readonly, nostack)) }",
+            "unsafe { core::arch::asm!(\"test dword ptr [{}], 1\", in(reg) p, options(readonly, nostack)) }",
         ] {
             assert_eq!(
                 asm_discharge_summary(snippet, vec![]),
