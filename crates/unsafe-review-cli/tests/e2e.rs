@@ -1411,7 +1411,7 @@ fn init_native_identity_windows_refusal(suffix: &str) -> Result<(), Box<dyn Erro
     // Keep creation, inspection and cleanup in the native Windows namespace.
     temp.path = fs::canonicalize(temp.path())?;
     let stem = "repo";
-    let alias = temp.path().join(&stem);
+    let alias = temp.path().join(stem);
     let root = temp.path().join(format!("{stem}{suffix}"));
     for path in [&root, &alias] {
         fs::create_dir_all(path.join(".github/workflows"))?;
