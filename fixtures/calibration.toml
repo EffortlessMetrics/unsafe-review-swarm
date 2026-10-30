@@ -537,6 +537,7 @@ required_core_fixtures = [
   "ffi_token_in_string_not_route",
   "extern_static_read_ffi",
   "extern_static_mut_use",
+  "static_mut_use",
   "ffi_safe_wrapper_only_no_cards",
   "ffi_return_value_checked_guard",
   "ffi_return_value_unchecked_not_guard",
@@ -5806,6 +5807,16 @@ expected_hazard = "ffi_abi"
 fixture = "extern_static_mut_use"
 kind = "positive"
 claim = "bare use of a same-file extern static mut inside an unsafe block routes to static_mut global-state review"
+support_tier = "Witness routing"
+expected_cards = 1
+expected_class = "requires_loom"
+expected_operation_family = "static_mut"
+expected_hazard = "static_mut_global_state"
+
+[[cases]]
+fixture = "static_mut_use"
+kind = "positive"
+claim = "bare use of a same-file file-local static mut inside an unsafe block routes to static_mut global-state review"
 support_tier = "Witness routing"
 expected_cards = 1
 expected_class = "requires_loom"

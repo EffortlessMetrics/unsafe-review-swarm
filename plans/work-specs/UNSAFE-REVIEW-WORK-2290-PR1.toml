@@ -1,0 +1,54 @@
+# Issue-linked work specification for file-local static mut bare-use routing.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2290"
+kind = "correctness"
+objective = "Route bare uses of same-file file-local static mut items inside unsafe blocks to OperationFamily::StaticMut, instead of unknown/unknown, reusing the extern static bare-use matching and shadowing semantics."
+user_outcome = "A maintainer who touches a file-local static mut inside an unsafe block sees a card with the real static-mut global-state obligations for that use, not an unknown card. Immutable file-local statics and safe code that merely shares the name keep their existing behavior."
+claim_boundary = "This slice proves same-file file-local static mut bare uses in unsafe blocks route to StaticMut with scanner/ffi unit tests and one blessed fixture golden; it does not resolve statics across files, route immutable static uses, change declaration-side cards, projections, or any safety or execution claim."
+
+[scope]
+included = [
+    "Collection of file-local static mut names alongside extern static names in analysis/scanner, excluding extern-block statics and immutable statics, including module-qualified spellings",
+    "Threading of the collected file-local static mut names through scanner/file_scan into detect_syntax_sites and SyntaxSiteCtx",
+    "Bare-use matching inside unsafe blocks in analysis/ffi_boundary reusing contains_bare_static_use: file-local static mut uses to StaticMut, with boundary rules rejecting field/method receivers, unrelated qualified paths, call-shaped spellings, string/comment-masked tokens, and declaration spellings",
+    "Same-name safe bindings (let bindings and fn parameters in the enclosing scope, let bindings inside the block) do not route to StaticMut",
+    "Unit tests at the scanner/ffi seam covering collection, routing, immutable and shadowed negatives, declaration lines not double-carding as uses, and uses outside unsafe blocks",
+    "Fixture static_mut_use (static_mut card) with calibration case, blessed only for that fixture",
+]
+excluded = [
+    "Cross-file or cross-crate static resolution and any use/import resolution beyond same-file module-qualified spellings",
+    "Immutable file-local static uses (Sync is not sound data-race freedom) and projections or access through raw pointers, references, or addr_of!/addr_of_mut!",
+    "Any change to declaration-side static mut cards, card class, priority, or projections (CLI, JSON, Markdown, SARIF, LSP)",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Only bare uses of a file-local static mut inside an unsafe block route: a call-shaped spelling, a use outside an unsafe block, an immutable static use, and a masked string/comment token never produce the StaticMut use family from this slice."
+
+[[invariant]]
+id = "INV-2"
+text = "Only mutability routes: file-local static mut routes to StaticMut (StaticMutGlobalState hazard); immutable file-local statics stay unrouted and declaration lines themselves never double-card as uses."
+
+[[invariant]]
+id = "INV-3"
+text = "A same-name safe binding in scope shadows the file-local static mut for bare spellings, so shadowed uses do not route to StaticMut."
+
+[[acceptance]]
+id = "AC-2290-PR1-1"
+text = "File-local static mut bare uses inside unsafe blocks card as OperationFamily::StaticMut."
+proof = ["cargo test -p unsafe-review-core --locked static_mut", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2290-PR1-2"
+text = "Immutable statics, same-name safe bindings, non-bare spellings, uses outside unsafe blocks, and declaration lines do not route as file-local static mut uses."
+proof = ["cargo test -p unsafe-review-core --locked static_mut"]
+
+[[acceptance]]
+id = "AC-2290-PR1-3"
+text = "The fixture carries the routed family in a blessed golden and only affected goldens change."
+proof = ["cargo run --locked -p xtask -- bless-goldens static_mut_use", "cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "2290-pr1-static-mut-bare-uses"
+notes = "Declaration-side static cards and hazards mapping (StaticMut to StaticMutGlobalState) are consumed unchanged; extern statics (#2289), cross-file resolution, immutable statics, and projections stay separate slices."
