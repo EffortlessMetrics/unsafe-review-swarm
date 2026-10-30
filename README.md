@@ -27,7 +27,7 @@
 </p>
 
 <p align="center">
-  <a href="docs/deferred/editor-extension.md"><img src="https://img.shields.io/badge/VS%20Code-extension%20planned-0078D4" alt="VS Code extension planned" /></a>
+  <a href="docs/editor/extension-mvp.md"><img src="https://img.shields.io/badge/VS%20Code-extension%20MVP%20in%20repo-0078D4" alt="VS Code extension MVP in repo" /></a>
   <a href="docs/deferred/editor-extension.md"><img src="https://img.shields.io/badge/Open%20VSX-planned-C160EF" alt="Open VSX extension planned" /></a>
 </p>
 
