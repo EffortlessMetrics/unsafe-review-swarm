@@ -80,3 +80,20 @@ du -sh target/  # should be minimal or absent if CARGO_TARGET_DIR is relocated
 Operational/workbench hardening only. No product behavior change; advisory
 trust boundary intact. This document does not commit machine-specific paths
 or gitignored settings.
+
+## Windows child Cargo paths
+
+The `xtask` CLI-child constructor keeps `cargo run --locked -p unsafe-review --`
+as the verification path. On Windows it uses Git's ordinary workspace-directory
+spelling only after checking that it resolves to the identical canonical
+directory. This avoids mixing ordinary and verbatim source paths in
+Cargo's workspace graph, which can invalidate warm units with
+`PathToSourceChanged` (#2173). Nested directories and layouts without a matching
+Git root retain their existing directory.
+
+This does not reuse an unchecked executable or suppress source-change detection.
+When investigating a warm rebuild, capture
+`CARGO_LOG=cargo::core::compiler::fingerprint=trace` on a small reproduction,
+record the first dirty reason, and distinguish initial compilation or a changed
+feature/profile graph from repeated work under identical inputs. Restore tracing
+afterward; do not run the whole gate solely to collect a fingerprint.
