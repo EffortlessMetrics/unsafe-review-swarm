@@ -1590,7 +1590,7 @@ mod tests {
     #[test]
     fn unhandled_obligation_key_names_itself_in_discharge_summary() {
         let obligations = vec![SafetyObligation::new(
-            "asm",
+            "unhandled-obligation",
             "inline assembly operands and clobbers are valid",
         )];
         let contract = ContractEvidence::present("contract");
@@ -1610,7 +1610,7 @@ mod tests {
         assert!(!evidence[0].discharge.present);
         assert_eq!(
             evidence[0].discharge.summary,
-            "No obligation-specific guard code was detected for the `asm` obligation (no guard pattern is recognized for this obligation)"
+            "No obligation-specific guard code was detected for the `unhandled-obligation` obligation (no guard pattern is recognized for this obligation)"
         );
     }
 
