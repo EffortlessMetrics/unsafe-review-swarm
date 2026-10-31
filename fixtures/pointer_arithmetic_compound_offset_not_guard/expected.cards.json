@@ -77,7 +77,7 @@
       }
     ],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: `debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach.",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose the local guard that discharges the `pointer_arithmetic` safety obligation.",

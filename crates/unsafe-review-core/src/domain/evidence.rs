@@ -106,6 +106,9 @@ pub struct RelatedTest {
     pub line: usize,
 }
 
+pub const GENERIC_GUARD_MISSING_MESSAGE: &str =
+    "Missing visible local guard for inferred safety obligations";
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MissingEvidence {
     pub kind: String,

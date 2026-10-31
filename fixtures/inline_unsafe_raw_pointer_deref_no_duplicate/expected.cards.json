@@ -178,7 +178,7 @@
       }
     ],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: Nullability guard code was detected, but it supports non-nullness only; pointer liveness remains unresolved",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `raw_pointer_deref` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",

@@ -2844,6 +2844,43 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn pr_summary_shows_specific_asm_contradiction_in_missing_column() -> Result<(), String> {
+        let output = fixture_output("asm_options_contradiction")?;
+        let rendered = render_pr_summary(&output);
+        assert!(
+            rendered.contains("asm template addresses memory while options declare nomem"),
+            "Markdown PR summary must show asm_nomem contradiction:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("asm template writes memory through its destination operand while options declare readonly"),
+            "Markdown PR summary must show asm_readonly contradiction:\n{rendered}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn pr_summary_generic_guard_missing_stays_byte_identical() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture should produce a card".to_string())?;
+        let guard = card
+            .missing
+            .iter()
+            .find(|missing| missing.kind == "guard")
+            .ok_or_else(|| "card should have guard missing evidence".to_string())?;
+        assert_eq!(
+            guard.message,
+            "Missing visible local guard for inferred safety obligations"
+        );
+        let rendered = render_pr_summary(&output);
+        assert!(rendered.contains("Missing visible local guard for inferred safety obligations"));
+        assert!(!rendered.contains("asm template addresses memory"));
+        Ok(())
+    }
+
     fn fixture_output(name: &str) -> Result<AnalyzeOutput, String> {
         let root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("../../fixtures")
