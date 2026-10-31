@@ -1,8 +1,10 @@
+use super::super::target_feature::{callee_target_feature, target_feature_callees};
 use super::{
     ScannedSite, detect_syntax_sites, disposition, extern_fn_names, extern_static_names,
     fallback_scan, js_buffer_reentry, js_native_ffi_byte_source, js_shared_byte_source,
     local_module_names, panic_from_safe_js, static_mut_names, syntax_scan, union_declarations,
 };
+use crate::domain::OperationFamily;
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
 use std::fs;
@@ -86,6 +88,15 @@ pub(crate) fn scan_file(
     out.extend(panic_from_safe_js::detect_panic_from_safe_js_sites(
         rel, diff, repo_mode, &lines,
     ));
+    let callees = target_feature_callees(&lines);
+    if !callees.is_empty() {
+        for site in &mut out {
+            if site.operation.family == OperationFamily::UnsafeFnCall {
+                site.callee_target_feature =
+                    callee_target_feature(&site.operation.expression, &callees);
+            }
+        }
+    }
     out.sort_by(|left, right| {
         left.site
             .location

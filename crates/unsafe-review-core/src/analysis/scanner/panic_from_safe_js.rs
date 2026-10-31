@@ -82,6 +82,7 @@ pub(super) fn detect_panic_from_safe_js_sites(
                 },
                 context_before,
                 context_after,
+                callee_target_feature: None,
             });
         }
     }

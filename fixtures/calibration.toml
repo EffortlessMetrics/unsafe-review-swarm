@@ -539,6 +539,7 @@ required_core_fixtures = [
   "extern_static_mut_use",
   "static_mut_use",
   "union_field_read",
+  "target_feature_detected_guard",
   "ffi_safe_wrapper_only_no_cards",
   "ffi_return_value_checked_guard",
   "ffi_return_value_unchecked_not_guard",
@@ -6928,3 +6929,12 @@ expected_cards = 1
 expected_class = "guard_missing"
 expected_operation_family = "union_field_read"
 expected_hazard = "invalid_value"
+[[cases]]
+fixture = "target_feature_detected_guard"
+kind = "positive"
+claim = "an is_x86_feature_detected branch guard for the callee target feature discharges the unsafe call"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "unsafe_unreached"
+expected_operation_family = "unsafe_fn_call"
+expected_hazard = "unknown"

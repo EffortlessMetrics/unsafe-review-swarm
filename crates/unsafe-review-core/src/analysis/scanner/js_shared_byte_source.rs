@@ -81,6 +81,7 @@ pub(super) fn detect_js_shared_byte_sites(
             },
             context_before,
             context_after,
+            callee_target_feature: None,
         });
     }
     sites

@@ -187,6 +187,7 @@ pub(super) fn fallback_site(input: FallbackSiteInput<'_>) -> Option<ScannedSite>
         },
         context_before: context_before_site(input.lines, input.idx),
         context_after: context_after_for(input.lines, input.idx, is_ffi_call),
+        callee_target_feature: None,
     })
 }
 
@@ -249,6 +250,7 @@ pub(super) fn syntax_site(
         },
         context_before,
         context_after,
+        callee_target_feature: None,
     })
 }
 

@@ -53,6 +53,10 @@ pub(crate) struct ScannedSite {
     pub(crate) operation: UnsafeOperation,
     pub(crate) context_before: Vec<String>,
     pub(crate) context_after: Vec<String>,
+    /// `(callee, feature)` when this site is an `UnsafeFnCall` to a
+    /// same-file callee declared with a single-feature
+    /// `#[target_feature(enable = "<feature>")]` attribute.
+    pub(crate) callee_target_feature: Option<(String, String)>,
 }
 
 pub(crate) use self::file_scan::scan_file;

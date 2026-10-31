@@ -1,0 +1,58 @@
+# Issue-linked work specification for target-feature guard discharge.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2285"
+kind = "correctness"
+objective = "Credit is_x86_feature_detected! guards for target-feature-gated unsafe-fn calls: for an UnsafeFnCall site whose callee carries #[target_feature(enable = \"<feature>\")], discharge the callee-contract obligation only when a dominating is_x86_feature_detected!(\"<same-feature>\") guard is present."
+user_outcome = "A maintainer whose SIMD call site is dominated by an is_x86_feature_detected! check for the same feature as the callee's target_feature attribute sees the callee-contract obligation discharged by a summary naming the feature-detection guard, instead of guard-missing. Wrong-feature, after-call, or non-dominating detections and unannotated callees stay guard-missing."
+claim_boundary = "This slice proves same-file, single-feature #[target_feature(enable = \"<feature>\")] callees with dominating branch, early-return, or assert is_x86_feature_detected! guards via scanner/evidence unit tests and one blessed fixture golden; it does not resolve callees across files, multi-feature enable lists, aarch64 detection macros, or any safety or execution claim."
+
+[scope]
+included = [
+    "Settled design (verbatim): Per file, collect callees declared with #[target_feature(enable = \"<feature>\")] (single-feature spelling only; multi-feature enable lists are out of the first cut) mapping callee name -> feature string.",
+    "Settled design (verbatim): For an UnsafeFnCall site whose callee is in that map, credit discharge of the callee-contract obligation only when a dominating is_x86_feature_detected!(\"<same-feature>\") guard is present in the site context in one of: positive branch form (call inside the if block), negated early-return form (if !detected { return ... } before the call), or assert form (assert!(detected!(...)) before the call).",
+    "Settled design (verbatim): Wrong-feature detection, detection after the call, a bare let-bound detection that does not dominate, and calls to callees without a target_feature attribute must NOT discharge.",
+    "Settled design (verbatim): Do not touch the TargetFeature family attribute card itself (target_feature_discharge.rs behavior unchanged), no aarch64 macro (is_aarch64_feature_detected), no multi-feature spellings.",
+    "Settled design (verbatim): Discharge summary must name the feature-detection guard specifically (not the generic guard text), flowing from ReviewCard like sibling discharge summaries.",
+    "Per-file callee-to-feature registry in analysis/target_feature collected from file lines in scanner/file_scan, threaded via ScannedSite (callee name and feature for an UnsafeFnCall site whose callee is in the registry) into the callee-contract discharge in evidence/callee_contract_discharge",
+    "Guard recognizer crediting only positive branch, negated early-return with an executable return, or runtime assert forms that dominate the callee call in the through-site context; bare let-bound detections, closed branches, wrong features, and detections after the call do not credit",
+    "Unit tests: positive branch form discharges, early-return form discharges, assert form discharges, wrong-feature does not, case-mismatched feature does not (feature literal matches case-exactly), detection-after-call does not, bare let-bound detection does not, assert inside a closed sibling branch does not, closure-local return is not an early return, unannotated callee does not, target_feature attribute card unchanged",
+    "Fixture target_feature_detected_guard registered in fixtures/calibration.toml and FIXTURE_GOLDENS in output/json.rs, blessed only for that fixture",
+]
+excluded = [
+    "Multi-feature enable lists and comma-joined feature spellings",
+    "is_aarch64_feature_detected! and any non-x86 detection macro",
+    "Cross-file or cross-crate callee resolution, method callees, and trait callees",
+    "Any change to the TargetFeature family attribute card or target_feature_discharge.rs behavior",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Discharge requires all three of: an UnsafeFnCall callee present in the same-file single-feature target_feature registry, an is_x86_feature_detected! detection for exactly that feature, and a dominating branch, early-return, or assert guard form before or enclosing the call; any missing leg never discharges."
+
+[[invariant]]
+id = "INV-2"
+text = "Wrong-feature detections, detections after the call, bare let-bound detections, closed branches, and unannotated callees never discharge the callee-contract obligation."
+
+[[invariant]]
+id = "INV-3"
+text = "The TargetFeature attribute card and its contract discharge are unchanged; the new summary names the feature-detection guard and flows only through ReviewCard obligation evidence."
+
+[[acceptance]]
+id = "AC-2285-PR1-1"
+text = "Positive branch, negated early-return, and assert is_x86_feature_detected! guards for the callee's feature discharge the callee-contract obligation with a summary naming the feature-detection guard."
+proof = ["cargo test --locked -p unsafe-review-core --lib target_feature", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2285-PR1-2"
+text = "Wrong-feature, after-call, bare let-bound, and unannotated-callee cases do not discharge, and the target_feature attribute card discharge is unchanged."
+proof = ["cargo test --locked -p unsafe-review-core --lib target_feature"]
+
+[[acceptance]]
+id = "AC-2285-PR1-3"
+text = "The target_feature_detected_guard fixture carries the discharged unsafe_fn_call card in its blessed golden and only affected goldens change."
+proof = ["cargo run --locked -p xtask -- bless-goldens target_feature_detected_guard", "cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "2285-pr1-feature-detected-guard"
+notes = "The per-file callee-to-feature registry is computed in scanner/file_scan and stored on ScannedSite for UnsafeFnCall sites; evidence/callee_contract_discharge consumes it with the through-site context so no projection gains a second truth. Cross-file callees, multi-feature spellings, and aarch64 macros remain follow-up slices."

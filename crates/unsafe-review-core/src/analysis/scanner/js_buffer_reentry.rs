@@ -122,6 +122,7 @@ fn js_buffer_materialize_after_reentry_site(
         },
         context_before,
         context_after,
+        callee_target_feature: None,
     })
 }
 
@@ -231,6 +232,7 @@ fn js_buffer_stale_span_use_site(
         },
         context_before,
         context_after,
+        callee_target_feature: None,
     })
 }
 

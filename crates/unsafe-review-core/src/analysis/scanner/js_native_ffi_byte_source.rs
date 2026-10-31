@@ -83,6 +83,7 @@ pub(super) fn detect_js_native_ffi_byte_sites(
             },
             context_before,
             context_after,
+            callee_target_feature: None,
         });
     }
     sites
