@@ -1,7 +1,7 @@
 use super::{
     ScannedSite, detect_syntax_sites, disposition, extern_fn_names, extern_static_names,
     fallback_scan, js_buffer_reentry, js_native_ffi_byte_source, js_shared_byte_source,
-    local_module_names, panic_from_safe_js, static_mut_names, syntax_scan,
+    local_module_names, panic_from_safe_js, static_mut_names, syntax_scan, union_declarations,
 };
 use crate::input::diff::DiffIndex;
 use std::collections::BTreeSet;
@@ -45,12 +45,14 @@ pub(crate) fn scan_file(
     let extern_statics = extern_static_names(&lines);
     let local_static_muts = static_mut_names(&lines);
     let local_modules = local_module_names(&lines);
+    let unions = union_declarations(&lines);
     let (syntax_sites, nonnull) = detect_syntax_sites(
         &parsed,
         &extern_names,
         &extern_statics,
         &local_static_muts,
         &local_modules,
+        &unions,
     );
     let syntax_index = syntax_scan::SyntaxSiteIndex::new(&parsed, &syntax_sites);
     let mut seen = BTreeSet::new();

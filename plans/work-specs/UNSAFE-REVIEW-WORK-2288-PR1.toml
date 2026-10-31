@@ -1,0 +1,57 @@
+# Issue-linked work specification for union field read routing.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2288"
+kind = "correctness"
+objective = "Route field accesses on typed union receivers inside unsafe blocks to OperationFamily::UnionFieldRead with an InvalidValue validity hazard, instead of unknown/unknown."
+user_outcome = "A maintainer who reads or writes a field of a union-typed local or parameter inside an unsafe block sees a card naming the live-variant validity obligation for that field, not an unknown card. Struct fields, unknown receivers, rebound names, and ManuallyDrop/raw-pointer paths keep their existing behavior."
+claim_boundary = "This slice proves same-file union declarations with typed receivers (annotated lets, union struct-literal lets, and fn parameters) route reads and writes inside unsafe blocks with scanner unit tests and one blessed fixture golden; it does not resolve unions across files, method receivers, field access through references or deref, generic unions, projections, or any safety or execution claim."
+
+[scope]
+included = [
+    "Design decision (settled; verbatim): receiver-type narrowing gated on declared union fields. Per file, collect union declarations (union name -> declared field names) from `union Name { ... }` items (including pub unions). Collect receiver bindings whose type is a collected union: `let NAME: UnionType`, `let NAME: Type = UnionType { ... }` struct-literal initialization (also `UnionType {` as a let initializer without annotation), and fn parameters `NAME: UnionType`. A field access `receiver.field` inside an unsafe block routes only when receiver is such a binding AND field is a declared field of that receiver's union type. Name-only field matching without a typed receiver is explicitly rejected (false positives on same-named struct fields).",
+    "Rejected alternatives: name-only registry (routes any receiver.field whose field name appears in any union declaration; rejected for false positives on same-named struct fields and unknown receivers) and deferral (leave union field reads as unknown/unknown until a type-aware backend exists; rejected because typed-receiver narrowing is precise enough for same-file unions and mirrors the merged extern/static machinery)",
+    "OperationFamily::UnionFieldRead (union_field_read) with InvalidValue and InitializedMemory hazards and the valid-variant safety obligation in analysis/obligations, mirroring sibling families so discharge and next-action machinery works",
+    "Per-file collection of union declarations (union name to declared field names) from union items including pub unions in analysis/union_field",
+    "Collection of receiver bindings whose type is a collected union: let NAME: UnionType, let NAME: UnionType = UnionType { ... }, let NAME = UnionType { ... } struct-literal initialization, and fn parameters NAME: UnionType",
+    "Routing of receiver.field inside an unsafe block only when the receiver is such a binding and the field is a declared field of that receiver's union type, threaded via SyntaxSiteCtx and scanner/file_scan with BLOCK_EXPR unsafe-gated arms computed before the match",
+    "Writes and reads both route because the hazard is live-variant validity, not direction; a let that rebinds the receiver to a non-union type suppresses routing and same-name struct receivers do not route",
+    "Unit tests: typed receiver read routes, write routes, struct receiver with same-named field does not route, untyped/unknown receiver does not route, rebound receiver does not route, a union let inside a closed inner scope does not retype an outer receiver of the same name (before or inside the unsafe block), field not declared on that union does not route, use outside an unsafe block does not route, and ManuallyDrop escape keeps raw_pointer_read",
+    "Fixture union_field_read (typed union read in an unsafe block) registered in fixtures/calibration.toml and FIXTURE_GOLDENS in output/json.rs, blessed only for that fixture",
+]
+excluded = [
+    "Name-only field matching without a typed receiver, explicitly rejected because it false-positives on same-named struct fields",
+    "Cross-file or cross-crate union resolution, method receivers (self.field where self is a union), field access through references or deref, and generic unions",
+    "Any change to ManuallyDrop<T> receivers or raw-pointer path families, declaration-side cards, or projections (CLI, JSON, Markdown, SARIF, LSP) beyond the new family string already projected from ReviewCard",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Routing requires all three of: a receiver binding typed as a collected same-file union, a field declared on that receiver's union type, and an enclosing unsafe block; any missing leg never produces UnionFieldRead."
+
+[[invariant]]
+id = "INV-2"
+text = "Writes and reads both route to UnionFieldRead because the hazard is live-variant validity (InvalidValue), not access direction."
+
+[[invariant]]
+id = "INV-3"
+text = "A later let binding of the same name to a non-union type suppresses routing, same-name struct receivers never route, and ManuallyDrop<T> receivers and raw-pointer paths keep their existing families."
+
+[[acceptance]]
+id = "AC-2288-PR1-1"
+text = "Typed union receiver reads and writes inside unsafe blocks card as OperationFamily::UnionFieldRead."
+proof = ["cargo test --locked -p unsafe-review-core --lib union_field", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2288-PR1-2"
+text = "Struct receivers, untyped or unknown receivers, rebound receivers, undeclared fields, and uses outside unsafe blocks do not route to UnionFieldRead, and a ManuallyDrop escape keeps raw_pointer_read."
+proof = ["cargo test --locked -p unsafe-review-core --lib union_field"]
+
+[[acceptance]]
+id = "AC-2288-PR1-3"
+text = "The union_field_read fixture carries the routed family in its blessed golden and only affected goldens change."
+proof = ["cargo run --locked -p xtask -- bless-goldens union_field_read", "cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-work-specs"]
+
+[[integration]]
+surface = "2288-pr1-union-field-reads"
+notes = "Hazards (InvalidValue, InitializedMemory) and the valid-variant obligation are consumed unchanged by classify, discharge, and next-action machinery; cross-file unions, method receivers, reference/deref field access, and generic unions remain follow-up slices."

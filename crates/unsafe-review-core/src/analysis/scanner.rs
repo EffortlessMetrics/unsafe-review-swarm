@@ -14,6 +14,7 @@ use super::transmute_operation::{
     is_incomplete_multiline_transmute, is_incomplete_multiline_transmute_copy,
     transmute_operation_family,
 };
+use super::union_field::{UnionDeclarations, union_declarations, union_field_use_family};
 use super::unsafe_impl::{parse_impl_owner, parse_impl_trait_name};
 use super::unwrap_operation::unwrap_operation_family;
 use super::utf8_operation::utf8_operation_family;
@@ -717,6 +718,7 @@ fn detect_syntax_sites(
     extern_statics: &ExternStaticNames,
     local_static_muts: &BTreeSet<String>,
     local_modules: &BTreeSet<String>,
+    unions: &UnionDeclarations,
 ) -> (Vec<DetectedSyntaxSite>, disposition::NonNullDecisions) {
     let mut sites = Vec::new();
     let unsafe_block_ranges = unsafe_block_ranges(parsed);
@@ -739,6 +741,7 @@ fn detect_syntax_sites(
             extern_statics,
             local_static_muts,
             local_modules,
+            unions,
             nonnull: &nonnull,
         }) else {
             continue;
@@ -957,6 +960,7 @@ struct SyntaxSiteCtx<'a> {
     extern_statics: &'a ExternStaticNames,
     local_static_muts: &'a BTreeSet<String>,
     local_modules: &'a BTreeSet<String>,
+    unions: &'a UnionDeclarations,
     nonnull: &'a disposition::NonNullDecisions,
 }
 
@@ -971,6 +975,7 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         extern_statics,
         local_static_muts,
         local_modules,
+        unions,
         nonnull,
     } = ctx;
     if !syntax_kind_can_be_unsafe_site(&fact.kind) {
@@ -1014,6 +1019,12 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
             &shadowed_local_names(source, fact.start),
         )
     })
+    .flatten();
+    let union_field_family = (fact.kind == "BLOCK_EXPR"
+        && !unions.is_empty()
+        && compact.starts_with("unsafe {")
+        && !operation_block_ranges.contains(&(fact.start, fact.end)))
+    .then(|| union_field_use_family(&masked_compact_for_ffi(), unions, source, fact.start))
     .flatten();
     match fact.kind.as_str() {
         "FN" if declaration.contains("unsafe fn") => {
@@ -1072,6 +1083,9 @@ fn detect_syntax_site(ctx: SyntaxSiteCtx<'_>) -> Option<(UnsafeSiteKind, Operati
         }
         "BLOCK_EXPR" if local_static_mut_family.is_some() => {
             local_static_mut_family.map(|family| (UnsafeSiteKind::Operation, family))
+        }
+        "BLOCK_EXPR" if union_field_family.is_some() => {
+            union_field_family.map(|family| (UnsafeSiteKind::Operation, family))
         }
         "BLOCK_EXPR"
             if compact.starts_with("unsafe {")
@@ -3301,6 +3315,169 @@ impl<T> Tagged<T> {\n\
             Some((UnsafeSiteKind::UnsafeFn, OperationFamily::UnsafeDeclaration)),
             "restricted-visibility named unsafe fn declaration must still be detected"
         );
+    }
+
+    fn scan_union_source(source: &str) -> Result<Vec<ScannedSite>, String> {
+        let root = unique_temp_dir()?;
+        fs::create_dir_all(root.join("src"))
+            .map_err(|err| format!("create temp src failed: {err}"))?;
+        fs::write(root.join("src/lib.rs"), source)
+            .map_err(|err| format!("write temp source failed: {err}"))?;
+        let added = source
+            .lines()
+            .map(|line| format!("+{line}"))
+            .collect::<Vec<_>>()
+            .join("\n");
+        let diff_text = format!(
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -0,0 +1,{} @@\n{added}\n",
+            source.lines().count()
+        );
+        let diff = crate::input::diff::parse_unified_diff(&diff_text);
+        let rel = PathBuf::from("src/lib.rs");
+        let sites = scan_file(&root, &rel, Some(&diff), false)?.sites;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp dir failed: {err}"))?;
+        Ok(sites)
+    }
+
+    fn has_union_family(sites: &[ScannedSite]) -> bool {
+        sites
+            .iter()
+            .any(|site| site.operation.family == OperationFamily::UnionFieldRead)
+    }
+
+    #[test]
+    fn union_field_typed_receiver_read_routes() -> Result<(), String> {
+        let param_src = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_param(w: Word) -> u64 {\n    // SAFETY: caller ensures bits is the active variant.\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(param_src)?;
+        assert!(
+            has_union_family(&sites),
+            "param receiver must route: {sites:#?}"
+        );
+        assert!(
+            sites
+                .iter()
+                .any(|site| site.site.kind == UnsafeSiteKind::Operation
+                    && site.operation.family == OperationFamily::UnionFieldRead),
+            "{sites:#?}"
+        );
+        let annotated_src = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_annotated() -> u64 {\n    let w: Word = Word { bits: 1 };\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(annotated_src)?;
+        assert!(
+            has_union_family(&sites),
+            "annotated receiver must route: {sites:#?}"
+        );
+        let literal_src = "union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_literal() -> u64 {\n    let w = Word { bits: 2 };\n    unsafe { w.bytes[0] as u64 }\n}\n";
+        let sites = scan_union_source(literal_src)?;
+        assert!(
+            has_union_family(&sites),
+            "literal-init receiver must route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_write_routes() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn write_field(mut w: Word) -> Word {\n    unsafe { w.bits = 42; }\n    w\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(has_union_family(&sites), "write must route: {sites:#?}");
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_struct_receiver_same_named_field_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub struct Holder { bits: u64 }\n\npub fn read_struct() -> u64 {\n    let s: Holder = Holder { bits: 1 };\n    unsafe { s.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "struct receiver must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_scope_exited_union_let_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub struct Holder { pub bits: u64 }\n\npub fn read_outer(s: Holder) -> u64 {\n    { let s: Word = Word { bits: 1 }; let _ = s; }\n    unsafe { s.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "scope-exited union let must not retype outer struct receiver: {sites:#?}"
+        );
+        // Same construct inside the unsafe block: inner let popped before access.
+        let source2 = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub struct Holder { pub bits: u64 }\n\npub fn read_outer2(s: Holder) -> u64 {\n    unsafe { { let s: Word = Word { bits: 1 }; let _ = s; } s.bits }\n}\n";
+        let sites = scan_union_source(source2)?;
+        assert!(
+            !has_union_family(&sites),
+            "in-block scope-exited union let must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_untyped_receiver_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn unknown_maker() -> u64 { 0 }\n\npub fn read_unknown() -> u64 {\n    let w = unknown_maker();\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "untyped receiver must not route: {sites:#?}"
+        );
+        // Unknown-name receiver with no binding at all also must not route.
+        let source2 = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_ghost() -> u64 {\n    unsafe { ghost.bits }\n}\n";
+        let sites = scan_union_source(source2)?;
+        assert!(
+            !has_union_family(&sites),
+            "unknown receiver must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_rebound_receiver_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub struct Holder { bits: u64 }\n\npub fn read_rebound() -> u64 {\n    let w: Word = Word { bits: 1 };\n    let w: Holder = Holder { bits: 2 };\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "rebound receiver must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_not_declared_on_that_union_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_wrong(w: Word) -> u64 {\n    unsafe { w.missing }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "undeclared field must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_outside_unsafe_block_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_plain(w: Word) -> u64 {\n    { w.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "outside unsafe must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_manuallydrop_escape_keeps_raw_pointer_read() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn escape(w: Word) -> u64 {\n    let md = std::mem::ManuallyDrop::new(w);\n    unsafe { std::ptr::read(&md.bits) }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            sites
+                .iter()
+                .any(|site| site.operation.family == OperationFamily::RawPointerRead),
+            "ManuallyDrop escape must keep raw_pointer_read: {sites:#?}"
+        );
+        assert!(
+            !has_union_family(&sites),
+            "ManuallyDrop escape must not route to union: {sites:#?}"
+        );
+        Ok(())
     }
 
     fn unique_temp_dir() -> Result<PathBuf, String> {

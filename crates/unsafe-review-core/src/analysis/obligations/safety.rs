@@ -66,6 +66,10 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
             "global-state",
             "all access is synchronized and does not violate aliasing rules",
         )),
+        OperationFamily::UnionFieldRead => single(SafetyObligation::new(
+            "valid-variant",
+            "union field access uses the currently active variant and yields a valid value for that field type",
+        )),
         OperationFamily::InlineAsm => single(SafetyObligation::new(
             "asm",
             "inline assembly obeys register, memory, and target invariants",

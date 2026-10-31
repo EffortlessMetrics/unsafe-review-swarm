@@ -1,0 +1,118 @@
+[
+  {
+    "id": "UR-union-field-read-src-lib-rs-read-bits-operation-union_field_read-bits-b8eb5ca0639f-invalid_value-c1",
+    "class": "guard_missing",
+    "priority": "high",
+    "confidence": "medium",
+    "proof_path": "source_route_only",
+    "site": {
+      "file": "src/lib.rs",
+      "line": 8,
+      "column": 5,
+      "kind": "operation",
+      "owner": "read_bits",
+      "visibility": "private",
+      "public_api_surface": false,
+      "snippet": "unsafe { w.bits }"
+    },
+    "operation": "unsafe { w.bits }",
+    "operation_family": "union_field_read",
+    "hazards": [
+      "invalid_value",
+      "initialized_memory"
+    ],
+    "obligations": [
+      "union field access uses the currently active variant and yields a valid value for that field type"
+    ],
+    "obligation_evidence": [
+      {
+        "key": "valid-variant",
+        "description": "union field access uses the currently active variant and yields a valid value for that field type",
+        "contract": {
+          "present": true,
+          "state": "present",
+          "summary": "Nearby `SAFETY:` comment was detected"
+        },
+        "discharge": {
+          "present": false,
+          "state": "missing",
+          "summary": "No obligation-specific guard code was detected for the `valid-variant` obligation (no guard pattern is recognized for this obligation)"
+        },
+        "reach": {
+          "present": false,
+          "state": "missing",
+          "summary": "No static test mention of owner `read_bits` was found"
+        },
+        "witness": {
+          "present": false,
+          "state": "missing",
+          "summary": "No imported witness receipt was found"
+        }
+      }
+    ],
+    "contract": "Nearby `SAFETY:` comment was detected",
+    "discharge": "No visible local guard detected",
+    "reach": "No static test mention of owner `read_bits` was found",
+    "witness": "No imported witness receipt was found",
+    "witness_routes": [
+      {
+        "kind": "miri",
+        "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+        "command": "cargo +nightly miri test read_bits",
+        "required": false
+      },
+      {
+        "kind": "cargo-careful",
+        "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+        "command": "cargo +nightly careful test read_bits",
+        "required": false
+      }
+    ],
+    "related_tests": [],
+    "missing": [
+      "Missing visible local guard for inferred safety obligations",
+      "No related test path was found by static search",
+      "No witness receipt imported for this card"
+    ],
+    "next_action": "Add or expose the local guard that discharges the `union_field_read` safety obligation.",
+    "verify_commands": [
+      "cargo +nightly miri test read_bits",
+      "cargo +nightly careful test read_bits"
+    ],
+    "confirmation_cue": {
+      "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { w.bits }`; confirm with external evidence before treating it as observed runtime behavior",
+      "build_this_first": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_bits",
+        "route_kind": "miri",
+        "summary": "No test reaches `read_bits` yet; write or identify a focused test for `read_bits` first, then build/run `cargo +nightly miri test read_bits` for this card; attach a matching receipt only if it confirms the route"
+      },
+      "minimal_repro": {
+        "kind": "verify_command",
+        "command": "cargo +nightly miri test read_bits",
+        "route_kind": "miri",
+        "steps": [
+          "Confirm ReviewCard `UR-union-field-read-src-lib-rs-read-bits-operation-union_field_read-bits-b8eb5ca0639f-invalid_value-c1` still maps to `unsafe { w.bits }` at `src/lib.rs:8:5` before upgrading confidence.",
+          "Write or identify a focused test for `read_bits` first (no test reaches it yet), then build/run `cargo +nightly miri test read_bits` as the smallest available command for this card.",
+          "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+        ],
+        "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+      },
+      "confirmation_step": "write or identify a focused test for `read_bits` first (no test reaches it yet), then build/run `cargo +nightly miri test read_bits` first, then attach a matching receipt if it confirms the route",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
+      "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+    },
+    "coverage": {
+      "contract_coverage": "present",
+      "guard_coverage": "missing",
+      "test_reach_coverage": "missing",
+      "witness_receipt_coverage": "missing",
+      "manual_context": "absent",
+      "baseline_state": "new",
+      "outcome_movement": "regressed",
+      "comment_plan_status": "selected",
+      "agent_lsp_readiness": "ready"
+    }
+  }
+]
