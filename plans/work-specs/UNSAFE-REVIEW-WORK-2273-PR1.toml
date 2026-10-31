@@ -1,0 +1,128 @@
+# Issue-linked work specification for receipt subject-applicability consumption (first PR).
+# Basis: main 83365f0d (2026-10-31). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2273
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2273"
+kind = "correctness"
+objective = "Wire the already-landed SubjectBinding::applicability into the canonical receipt loader and card-builder path for one controlled fixture: a saved witness/reach receipt contributes card evidence only when its recorded binding is Applicable against a current binding built from the same canonical facts used at capture. Stale/Unknown receipts are retained and displayed with the reason but never upgrade coverage. No receipt schema redesign."
+user_outcome = "A maintainer who re-reviews after changing source, scope, invocation, revision, or tree dirtiness sees the old receipt reported as stale/unknown with the reason instead of silently discharging witness evidence; an unchanged re-review still imports the receipt as applicable. Legacy unbound receipts stay readable but never count as current evidence."
+claim_boundary = "This slice proves consumer-side gating of receipt imports by subject applicability via unit tests, one controlled fixture, and CLI capture-save-rereview plus negative integrations; it does not redesign the receipt schema, repair the outcome comparator (#2230 PR3), serve the installed editor/agent loop (#1887), establish a universal semantic identity system, or make any safety, UB-free, Miri-clean, site-execution, or precision/recall claim."
+dependencies = ["#2265 execution terminal status on witness receipts (merged)", "#2267 subject binding on witness receipts (merged)"]
+blockers = []
+affected_files = ["crates/unsafe-review-core/src/domain/receipt.rs", "crates/unsafe-review-core/src/analysis/receipts.rs", "crates/unsafe-review-core/src/analysis/pipeline/card_builder.rs", "crates/unsafe-review-core/src/analysis/pipeline/mod.rs", "crates/unsafe-review-core/src/input/scope_git.rs", "crates/unsafe-review-cli/src/execute/confirm.rs"]
+affected_symbols = ["SubjectBinding::applicability", "ReceiptIndex::witness_evidence_for", "ReceiptIndex::reach_evidence_for", "build_card", "audit_receipts"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0044"]
+linked_adrs = []
+
+[scope]
+included = [
+    "Settled design (verbatim): The current-subject binding must be constructed from the same canonical facts used during capture. Avoid recomputing identity differently in the consumer.",
+    "One shared canonical current-binding constructor in core used by both capture (confirm.rs subject_binding switches to it) and the consumer, with identical digest inputs: card id, operation family, owner, source file, operation snippet.",
+    "Move the witness command-line parser (parse_command_line/Invocation grammar, verbatim) into core so the consumer re-derives the expected invocation digest from the card's currently-routed witness command; first routed command wins (same rule as confirm select_route); no routable command means invocation None and therefore Unknown, never applicable.",
+    "Consumer repo facts: head_commit via existing scope_git::discover_repo plus a new read-only repo-dirty probe in core (git status --porcelain observation only, never mutating, with the tool's own .unsafe-review/ receipt store excluded so a saved receipt never dirties the tree it evidences); scope from the analysis identity string, the same source capture records; capture (confirm git_dirty) delegates to the same core probe.",
+    "Minimal applicability repair: captured_complete is required only of the recorded side because completeness is a property of the recording, not of the current tree; output_digest, tool_version, and workdir remain uncompared provenance, never gates.",
+    "Hand-authored receipt kinds that carry no executable invocation identity (human-deep-review at reviewed strength, external-integration-test reach receipts) gate on every other leg but skip the invocation comparison via applicability_without_invocation; an executed shape (human-deep-review at ran/test_targeted/site_reached, which no import adapter produces) must still establish invocation identity through the full comparison.",
+    "One canonical file rendering for subject digests (SubjectBinding::subject_file_display, slash-normalized): capture and consumer both render through it so the same source file digests identically on Windows and Unix checkouts.",
+    "Card builder propagates the missing witness summary (absent, wrong-tool, stale, or unknown reason) into every obligation-level witness slot, keeping the top-level and obligation-level summaries identical as the check-fixtures gate requires; class and priority are untouched by stale/unknown receipts.",
+    "ReceiptIndex retains each receipt's subject binding; witness_evidence_for and reach_evidence_for take the per-card current binding; Applicable imports as today; Stale/Unknown yield missing-style evidence whose summary names the tool and the applicability reason; expired, wrong-tool, and duplicate semantics are unchanged and additionally reported.",
+    "Receipt audit reports stale/unknown with the reason; receipts whose card is absent from the current set are Unknown (no current card to compare) while keeping existing unmatched/stale reporting; verdict and summary stay displayed as historical evidence.",
+    "Stale/Unknown receipts never change card class or priority; a stale not_reproduced receipt keeps GuardedUnwitnessed urgency; a stale confirmed receipt remains historical adverse evidence in audit only; importing a receipt never marks the operation resolved because outcome movement stays baseline-derived; the witness summary carries the stale/unknown reason so the check-fixtures summary-consistency invariant holds.",
+    "Unit tests discriminating every acceptance leg, one controlled fixture for import gating, CLI integration covering capture, save, and re-review on the default discovery path, and one negative integration copying a valid receipt to a changed relevant source context to prove it no longer applies; no unwrap() in new tests.",
+]
+excluded = [
+    "Any receipt schema redesign or new subject-identity fields",
+    "Removing the analysis-scope leg from applicability (suggested by automated review; rejected: #2273 explicitly requires scope agreement on both sides and the Oct 23 maintainer note requires scope changes to stale-ify; confirm resolves cards repo-scoped by construction because diff execution is rejected as unsound, so repo-captured receipts import on repo-scoped re-review)",
+    "Outcome-comparator repair for comparable subject/evidence movement (follow-on #2230 PR3)",
+    "Installed editor/agent capture/save/discovery/re-review loop (follow-on #1887)",
+    "Universal semantic identity, complete history program, or new receipt kinds",
+    "Publication, release versioning, source promotion, and safety or execution claims",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Only Applicable receipts contribute witness or reach evidence; Stale, Unknown, expired, wrong-tool, and duplicate receipts never upgrade card coverage."
+
+[[invariant]]
+id = "INV-2"
+text = "The current binding is built from the same canonical facts as capture through one shared core constructor and one shared command parser; the consumer never recomputes identity differently."
+
+[[invariant]]
+id = "INV-3"
+text = "Legacy unbound receipts remain readable and explicitly weaker; they are always Unknown and never gain invented applicability."
+
+[[invariant]]
+id = "INV-4"
+text = "Stale or unknown receipts never change card class, priority, or resolved state; a stale not_reproduced receipt keeps urgency, a stale confirmed receipt stays historical adverse evidence in audit only, and importing a receipt never marks the operation resolved."
+
+[[invariant]]
+id = "INV-5"
+text = "The product stays advisory: no new safety, UB-free, execution, or precision/recall claim is introduced by consumer gating."
+
+[[acceptance]]
+id = "AC-2273-PR1-1"
+text = "Same subject, revision, scope, and invocation with complete capture imports as applicable on re-review."
+proof = ["cargo test -p unsafe-review-core receipts --locked"]
+
+[[acceptance]]
+id = "AC-2273-PR1-2"
+text = "Wrong source revision, owner/relevant context, scope, invocation, dirty-tree state, or incomplete capture cannot upgrade witness coverage; each leg is Stale or Unknown with the reason."
+proof = ["cargo test -p unsafe-review-core receipts --locked"]
+
+[[acceptance]]
+id = "AC-2273-PR1-3"
+text = "An unbound legacy receipt remains visible but Unknown; expired and wrong-tool receipts retain their existing rejection semantics in addition to subject applicability."
+proof = ["cargo test -p unsafe-review-core receipts --locked"]
+
+[[acceptance]]
+id = "AC-2273-PR1-4"
+text = "Stale/unknown receipts appear in the receipt audit and in witness explanation surfaces with the reason; a stale not_reproduced receipt does not lower urgency and a stale confirmed receipt is never presented as a current reproduction; only affected goldens change."
+proof = ["cargo test -p unsafe-review-core receipts --locked", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2273-PR1-5"
+text = "Public CLI integration covers capture, save, and re-review on the default discovery path."
+proof = ["cargo test -p unsafe-review-cli confirm --locked"]
+
+[[acceptance]]
+id = "AC-2273-PR1-6"
+text = "One negative integration copies a valid receipt to a changed relevant source context and proves it no longer applies."
+proof = ["cargo test -p unsafe-review --test e2e --locked"]
+
+[[acceptance]]
+id = "AC-2273-PR1-7"
+text = "Full lane gates pass with no new Clippy warnings and no unwrap() in new tests."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "card_witness_slot"
+expected = "Stale/Unknown receipts project into the card witness slot as missing-style evidence naming the tool and reason, keeping ReviewCard the single truth for all projections."
+
+[[integration]]
+surface = "receipt_audit"
+expected = "Receipt audit JSON and rendered surfaces report matched/applicable versus stale/unknown-with-reason, expired, wrong-tool, weaker, duplicate, and invalid without executing witnesses."
+
+[[integration]]
+surface = "confirm_save_rereview"
+expected = "confirm --allow-heavy execution writes a bound receipt that a later check/first-pr re-review in the same unchanged context imports as applicable."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and the exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Move the command parser verbatim into core and keep CLI dry-run, execute, and confirm tests green so capture digests cannot drift from consumer digests."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Discriminating unit tests pin both sides of the captured_complete repair so incomplete recordings stay Unknown while imports in a live tree keep working."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Build the consumer scope string from the same analysis-identity source capture records, and cover repo-versus-diff scope changes with explicit stale tests."
+
+[compatibility]
+posture = "Additive consumer gating; receipt files on disk are unchanged (loader only reads), old receipts still validate, and no analyzer, ReviewCard, release, or publication behavior changes beyond correctly gated imports."
+
+[rollback]
+strategy = "Revert the single delivery PR; no migration is involved because the schema is untouched and receipts remain readable by older binaries."

@@ -104,6 +104,35 @@ impl SubjectBinding {
         stable_hash_hex(&framed)
     }
 
+    /// Canonical file rendering for subject digests: lossy text with
+    /// backslashes normalized to forward slashes, so the same source file
+    /// digests identically on Windows and Unix checkouts.
+    ///
+    /// Both capture and consumer must render through this function; passing
+    /// a differently-rendered path (a display path, an absolute path, or a
+    /// platform-native path) silently changes the subject.
+    pub fn subject_file_display(path: &std::path::Path) -> String {
+        path.to_string_lossy().replace('\\', "/")
+    }
+
+    /// Canonical subject-digest inputs shared by capture and consumer.
+    ///
+    /// Both the `confirm` capture path and the receipt-import consumer must
+    /// feed exactly these five facts in this order: card identity, operation
+    /// family, owner (empty when the site has none), source file, and
+    /// operation snippet. A changed guard or ownership context changes the
+    /// subject even when the operation text does not, so callers must pass
+    /// the card's own values, never re-derived approximations.
+    pub fn digest_subject_for(
+        card_id: &str,
+        family: &str,
+        owner: &str,
+        file: &str,
+        snippet: &str,
+    ) -> String {
+        Self::digest_subject(&[card_id, family, owner, file, snippet])
+    }
+
     pub fn digest_output(output: &str) -> String {
         stable_hash_hex(output)
     }
@@ -133,6 +162,33 @@ impl SubjectBinding {
         recorded: Option<&SubjectBinding>,
         current: &SubjectBinding,
     ) -> SubjectApplicability {
+        Self::applicability_inner(recorded, current, true)
+    }
+
+    /// Applicability variant for receipts that carry no executable invocation
+    /// identity: hand-authored `human-deep-review` witness receipts at
+    /// `reviewed` strength and `external-integration-test` reach receipts.
+    ///
+    /// A manual review or external harness run is never one of the card's
+    /// routed witness invocations, so there is no current-side invocation to
+    /// compare against; requiring one would make every bound receipt of
+    /// these kinds permanently inapplicable. Every other leg — subject,
+    /// scope, revision, clean tree, capture completeness — gates exactly as
+    /// in `applicability`, so a changed context still blocks the import.
+    /// Invocation mismatch still blocks executed-tool witness imports
+    /// through `applicability`.
+    pub fn applicability_without_invocation(
+        recorded: Option<&SubjectBinding>,
+        current: &SubjectBinding,
+    ) -> SubjectApplicability {
+        Self::applicability_inner(recorded, current, false)
+    }
+
+    fn applicability_inner(
+        recorded: Option<&SubjectBinding>,
+        current: &SubjectBinding,
+        check_invocation: bool,
+    ) -> SubjectApplicability {
         let Some(recorded) = recorded else {
             return SubjectApplicability::Unknown {
                 reason: "unbound legacy receipt carries no subject identity".to_string(),
@@ -148,11 +204,16 @@ impl SubjectBinding {
                 reason: "analysis scope changed".to_string(),
             };
         }
-        if recorded.invocation_digest != current.invocation_digest
-            || recorded.invocation_digest.is_none()
+        if check_invocation
+            && (recorded.invocation_digest != current.invocation_digest
+                || recorded.invocation_digest.is_none())
         {
             // Different invocations are different executions, and a missing
-            // digest matches nothing, not even another missing digest.
+            // digest matches nothing, not even another missing digest. This
+            // leg only runs for executed witness tools; hand-authored
+            // human-review and external reach receipts carry no executable
+            // invocation identity and gate through
+            // `applicability_without_invocation` instead.
             return SubjectApplicability::Unknown {
                 reason: "executed invocation identity is not established on both sides".to_string(),
             };
@@ -178,7 +239,11 @@ impl SubjectBinding {
                 reason: "clean-tree provenance is not established on both sides".to_string(),
             };
         }
-        if recorded.captured_complete != Some(true) || current.captured_complete != Some(true) {
+        // Capture completeness is a property of the recording, not of the
+        // current tree: the consumer performs no capture, so only the
+        // recorded side must establish it. A partial recording can never
+        // qualify, and an unknown recording never counts as complete.
+        if recorded.captured_complete != Some(true) {
             return SubjectApplicability::Unknown {
                 reason: "output capture completeness is not established".to_string(),
             };
@@ -2087,6 +2152,84 @@ mod tests {
             SubjectBinding::applicability(Some(&revised), &current),
             SubjectApplicability::Stale { .. }
         ));
+    }
+
+    #[test]
+    fn capture_completeness_is_required_only_of_the_recording() {
+        // The consumer performs no capture, so a current binding honestly
+        // carries no completeness flag; a complete recording still applies.
+        let current = bound_subject();
+        let mut no_current_capture = current.clone();
+        no_current_capture.captured_complete = None;
+        assert_eq!(
+            SubjectBinding::applicability(Some(&current), &no_current_capture),
+            SubjectApplicability::Applicable
+        );
+
+        // An incomplete or unknown recording can never qualify, however.
+        let mut partial = current.clone();
+        partial.captured_complete = Some(false);
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&partial), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+        let mut unknown_capture = current.clone();
+        unknown_capture.captured_complete = None;
+        assert!(matches!(
+            SubjectBinding::applicability(Some(&unknown_capture), &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+    }
+
+    #[test]
+    fn unrouted_variant_skips_only_the_invocation_leg() -> Result<(), String> {
+        let current = bound_subject();
+        // Same binding applies without an invocation comparison.
+        let mut unrouted_current = current.clone();
+        unrouted_current.invocation_digest = None;
+        let mut unrouted_recorded = current.clone();
+        unrouted_recorded.invocation_digest = None;
+        assert_eq!(
+            SubjectBinding::applicability_without_invocation(
+                Some(&unrouted_recorded),
+                &unrouted_current
+            ),
+            SubjectApplicability::Applicable
+        );
+        // A changed subject still blocks the import.
+        let mut changed = current.clone();
+        changed.subject_digest = "different".to_string();
+        assert!(matches!(
+            SubjectBinding::applicability_without_invocation(Some(&changed), &current),
+            SubjectApplicability::Stale { .. }
+        ));
+        // An unbound legacy receipt stays Unknown, never applicable.
+        assert!(matches!(
+            SubjectBinding::applicability_without_invocation(None, &current),
+            SubjectApplicability::Unknown { .. }
+        ));
+        Ok(())
+    }
+
+    #[test]
+    fn digest_subject_for_matches_digest_subject_of_the_same_facts() {
+        let digest = SubjectBinding::digest_subject_for(
+            "UR-test-c1",
+            "nonnull_unchecked",
+            "owner",
+            "src/lib.rs",
+            "NonNull::new_unchecked(p)",
+        );
+        assert_eq!(
+            digest,
+            SubjectBinding::digest_subject(&[
+                "UR-test-c1",
+                "nonnull_unchecked",
+                "owner",
+                "src/lib.rs",
+                "NonNull::new_unchecked(p)",
+            ])
+        );
     }
 
     #[test]

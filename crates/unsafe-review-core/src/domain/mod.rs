@@ -3,6 +3,7 @@ pub mod coverage;
 mod evidence;
 mod hazard;
 mod ids;
+mod invocation;
 mod location;
 mod obligation;
 mod operation;
@@ -21,6 +22,7 @@ pub use evidence::{
 };
 pub use hazard::HazardKind;
 pub use ids::CardId;
+pub use invocation::{Invocation, parse_command_line};
 pub use location::SourceLocation;
 pub use obligation::SafetyObligation;
 pub(crate) use operation::SourceRole;

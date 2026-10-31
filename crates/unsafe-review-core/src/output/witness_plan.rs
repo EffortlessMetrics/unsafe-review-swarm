@@ -421,11 +421,15 @@ mod tests {
 
     #[test]
     fn witness_plan_shows_imported_receipts_and_remaining_gaps() -> Result<(), String> {
+        // The committed receipted fixture carries an unbound legacy receipt:
+        // it stays visible with the reason it cannot count as current
+        // evidence, while the static guard gap and receipt hint remain.
         let output = fixture_output("raw_pointer_alignment_receipted")?;
         let rendered = render(&output);
 
-        assert!(rendered.contains("Imported miri receipt"));
-        assert!(rendered.contains("expires_at: 2099-12-31"));
+        assert!(rendered.contains("cannot be shown to apply to the current subject"));
+        assert!(rendered.contains("unbound legacy receipt"));
+        assert!(rendered.contains("Saved `miri` receipt"));
         assert!(rendered.contains("Missing visible local guard"));
         assert!(rendered.contains("Receipt hint"));
         assert!(rendered.contains("not a site-execution claim"));

@@ -488,6 +488,42 @@ pub(crate) fn apply_cap_note<T>(mut items: Vec<T>, cap: Option<usize>) -> (Vec<T
     }
 }
 
+/// Read-only worktree dirtiness probe for receipt subject comparison.
+///
+/// Runs `git status --porcelain=v1` and reports whether the output is
+/// non-empty. Like every helper here, it only observes: it never writes
+/// objects, refs, index entries, or worktree bytes. Returns `None` when git
+/// is unavailable, the directory is not in a work tree, or the probe fails,
+/// so callers fail closed to Unknown applicability instead of inventing
+/// clean-tree evidence.
+///
+/// The tool's own receipt store (`.unsafe-review/`, at any depth) is
+/// excluded from the pathspec: a saved receipt must not dirty the tree it
+/// evidences, or no captured receipt could ever import on re-review.
+/// Every other untracked or modified path still reports dirty. Capture and
+/// consumer share this probe so both sides read the tree the same way.
+pub fn worktree_dirty(start: &Path) -> Option<bool> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(start)
+        .args([
+            "status",
+            "--porcelain=v1",
+            // Report untracked files individually regardless of the user's
+            // `status.showUntrackedFiles` setting: a hidden untracked source
+            // file must never read as clean-tree provenance.
+            "--untracked-files=all",
+            "--",
+            ":(exclude).unsafe-review",
+        ])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(!output.stdout.is_empty())
+}
+
 pub(crate) fn git_output(dir: &Path, args: &[&str], step: &str) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")
@@ -550,6 +586,76 @@ mod tests {
         if !unreadable.is_empty() || !non_regular.is_empty() {
             return Err("both fixtures are regular readable files".to_string());
         }
+        Ok(())
+    }
+
+    fn run_git(dir: &Path, args: &[&str]) -> Result<(), String> {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(dir)
+            .args(args)
+            .output()
+            .map_err(|err| format!("run git {args:?} failed: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn worktree_dirty_ignores_the_receipt_store_only() -> Result<(), String> {
+        // A saved receipt must not dirty the tree it evidences, or no
+        // captured receipt could ever import on re-review. Every other
+        // untracked or modified path still reports dirty.
+        let dir = unique_dir("scope-git-receipt-store")?;
+        run_git(&dir, &["init", "-q"])?;
+        run_git(&dir, &["config", "user.name", "receipt store test"])?;
+        run_git(&dir, &["config", "user.email", "receipt@example.test"])?;
+        std::fs::write(dir.join("src.rs"), "pub fn f() {}\n")
+            .map_err(|err| format!("write fixture failed: {err}"))?;
+        run_git(&dir, &["add", "-A"])?;
+        run_git(&dir, &["commit", "-qm", "base"])?;
+        if worktree_dirty(&dir) != Some(false) {
+            return Err("clean tree must report clean".to_string());
+        }
+
+        std::fs::create_dir_all(dir.join(".unsafe-review").join("receipts"))
+            .map_err(|err| format!("create receipt store failed: {err}"))?;
+        std::fs::write(
+            dir.join(".unsafe-review")
+                .join("receipts")
+                .join("miri.json"),
+            "{}\n",
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))?;
+        if worktree_dirty(&dir) != Some(false) {
+            return Err("the receipt store must not dirty the tree".to_string());
+        }
+
+        std::fs::write(dir.join("notes.txt"), "unrelated change\n")
+            .map_err(|err| format!("write change failed: {err}"))?;
+        if worktree_dirty(&dir) != Some(true) {
+            return Err("an unrelated untracked file must report dirty".to_string());
+        }
+        // The probe must not depend on the user's untracked-files display
+        // setting: hiding untracked files must never read as clean.
+        run_git(&dir, &["config", "status.showUntrackedFiles", "no"])?;
+        if worktree_dirty(&dir) != Some(true) {
+            return Err(
+                "untracked files must report dirty regardless of status.showUntrackedFiles"
+                    .to_string(),
+            );
+        }
+        run_git(&dir, &["config", "--unset", "status.showUntrackedFiles"])?;
+        std::fs::write(dir.join("src.rs"), "pub fn f() {}\n// touched\n")
+            .map_err(|err| format!("touch fixture failed: {err}"))?;
+        if worktree_dirty(&dir) != Some(true) {
+            return Err("a modified tracked file must report dirty".to_string());
+        }
+        let _ = std::fs::remove_dir_all(&dir);
         Ok(())
     }
 }

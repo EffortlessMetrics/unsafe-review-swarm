@@ -95,7 +95,7 @@ pub use input::impact::{
     AffectedSeam, ChangedItem, IMPACT_SCHEMA_VERSION, ImpactCause, ImpactInventory, ImpactSubject,
     relate_same_owner, render_impact_human,
 };
-pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo};
+pub use input::scope_git::{DiscoverOptions, RepoFacts, discover_repo, worktree_dirty};
 pub use input::stages::{
     AnalysisStage, FactRequirement, FactState, STAGE_SCHEMA_VERSION, StageCompleteness,
     StageConfigurationInput, StageInventory, StageRecord, assemble_stage_inventory,
@@ -120,9 +120,10 @@ pub use candidate::{
 };
 pub use domain::{
     CardId, CargoCarefulReceiptInput, ConcurrencyReceiptInput, Confidence, ContractEvidence,
-    DischargeEvidence, ExecutedReceiptInput, HazardKind, MiriReceiptInput, MissingEvidence,
-    NextAction, Priority, ProofPath, ProofReceiptInput, ReachEvidence, ReceiptCardIdKind,
-    RelatedTest, ReviewCard, ReviewClass, SafetyObligation, SanitizerReceiptInput, SourceLocation,
-    SubjectApplicability, SubjectBinding, TerminalStatus, UnsafeOperation, UnsafeSite,
-    WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind, WitnessReceipt, WitnessRoute,
+    DischargeEvidence, ExecutedReceiptInput, HazardKind, Invocation, MiriReceiptInput,
+    MissingEvidence, NextAction, Priority, ProofPath, ProofReceiptInput, ReachEvidence,
+    ReceiptCardIdKind, RelatedTest, ReviewCard, ReviewClass, SafetyObligation,
+    SanitizerReceiptInput, SourceLocation, SubjectApplicability, SubjectBinding, TerminalStatus,
+    UnsafeOperation, UnsafeSite, WITNESS_RECEIPT_SCHEMA_VERSION, WitnessEvidence, WitnessKind,
+    WitnessReceipt, WitnessRoute, parse_command_line,
 };
