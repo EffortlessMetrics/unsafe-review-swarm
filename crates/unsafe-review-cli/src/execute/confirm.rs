@@ -204,23 +204,10 @@ fn git_head(root: &Path) -> Option<String> {
 }
 
 fn git_dirty(root: &Path) -> Option<bool> {
-    let run = execute_with_timeout(
-        &[],
-        &[
-            "git".to_string(),
-            "-C".to_string(),
-            root.to_string_lossy().into_owned(),
-            "status".to_string(),
-            "--porcelain=v1".to_string(),
-        ],
-        root,
-        Duration::from_secs(10),
-    )
-    .ok()?;
-    if run.timed_out || run.terminal.exit_code != Some(0) {
-        return None;
-    }
-    Some(!run.output.trim().is_empty())
+    // One shared probe for capture and consumer: the receipt store is
+    // excluded on both sides so a saved receipt never dirties the tree it
+    // evidences. `None` carries no clean-tree evidence.
+    unsafe_review_core::worktree_dirty(root)
 }
 
 fn subject_binding(

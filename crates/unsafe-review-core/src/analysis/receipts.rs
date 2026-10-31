@@ -317,12 +317,16 @@ fn inapplicable_reason(
 
 /// Whether a receipt kind carries no executable invocation identity, so the
 /// consumer gates it on every applicability leg except invocation comparison.
-/// Exactly the hand-authored kinds: `human-deep-review` witness receipts and
-/// `external-integration-test` reach receipts. One shared rule for the
-/// loader, the card builder, and the audit surface so the three can never
-/// disagree on what "applicable" means.
+/// Exactly the hand-authored shapes: `human-deep-review` at `reviewed`
+/// strength and `external-integration-test` reach receipts. An executed
+/// shape (`human-deep-review` with `ran`/`test_targeted`/`site_reached`,
+/// which no import adapter produces) must still establish its invocation
+/// identity through the full comparison, so it compares Unknown rather than
+/// importing. One shared rule for the loader, the card builder, and the
+/// audit surface so the three can never disagree on what "applicable" means.
 fn skips_invocation_check(tool: &str, strength: &str) -> bool {
-    tool == "human-deep-review" || imports_reach_evidence(tool, strength)
+    (tool == "human-deep-review" && strength == "reviewed")
+        || imports_reach_evidence(tool, strength)
 }
 
 /// Decide whether a receipt may contribute evidence to the current subject.
@@ -2982,6 +2986,83 @@ mod tests {
             card.witness.summary
         );
         assert_eq!(card.witness.verdict, None);
+        Ok(())
+    }
+
+    #[test]
+    fn human_review_skips_invocation_check_only_at_reviewed_strength() -> Result<(), String> {
+        // `human-deep-review` at `reviewed` strength is the intended
+        // hand-authored shape: no invocation identity exists on either side,
+        // yet the receipt imports when every other leg matches.
+        let root = unique_temp_dir("unsafe-review-human-reviewed-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let mut reviewed_recorded = bound_subject();
+        reviewed_recorded.invocation_digest = None;
+        write_bound_receipt(
+            &receipts,
+            "human.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "human-deep-review",
+                strength: "reviewed",
+                expires_at: "2026-08-18",
+                command: "cargo test",
+                subject: Some(&reviewed_recorded),
+                verdict: None,
+            },
+        )?;
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let mut reviewed_current = current_subject();
+        reviewed_current.invocation_digest = None;
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::HumanDeepReview),
+            &reviewed_current,
+        );
+        assert!(
+            evidence.present,
+            "bound human-deep-review/reviewed receipt must import"
+        );
+
+        // An executed shape (`human-deep-review` at `ran`, which no import
+        // adapter produces) must still establish its invocation identity: a
+        // mismatched invocation never imports.
+        let root = unique_temp_dir("unsafe-review-human-ran-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let command = "cargo test";
+        let mut ran_recorded = bound_subject();
+        ran_recorded.invocation_digest = Some("COMPLETELY-DIFFERENT-INVOCATION".to_string());
+        write_bound_receipt(
+            &receipts,
+            "human.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "human-deep-review",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command,
+                subject: Some(&ran_recorded),
+                verdict: None,
+            },
+        )?;
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::HumanDeepReview, command),
+            &current_for_command(command)?,
+        );
+        assert!(!evidence.present);
+        assert!(
+            evidence.summary.contains("invocation identity"),
+            "unexpected summary: {}",
+            evidence.summary
+        );
         Ok(())
     }
 

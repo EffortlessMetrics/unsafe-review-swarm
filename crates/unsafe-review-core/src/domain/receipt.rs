@@ -166,8 +166,8 @@ impl SubjectBinding {
     }
 
     /// Applicability variant for receipts that carry no executable invocation
-    /// identity: hand-authored `human-deep-review` witness receipts and
-    /// `external-integration-test` reach receipts.
+    /// identity: hand-authored `human-deep-review` witness receipts at
+    /// `reviewed` strength and `external-integration-test` reach receipts.
     ///
     /// A manual review or external harness run is never one of the card's
     /// routed witness invocations, so there is no current-side invocation to
