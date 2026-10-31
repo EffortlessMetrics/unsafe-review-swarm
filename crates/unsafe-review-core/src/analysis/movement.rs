@@ -106,13 +106,15 @@ fn side_complete(output: &AnalyzeOutput) -> bool {
         && output.rejected_diff_files.is_empty()
 }
 
-/// Whether `head` covered `file`: a repo-scope analysis scans everything;
-/// a diff-scoped analysis covers only its candidate files.
-fn head_covers_file(head: &AnalyzeOutput, file: &std::path::Path) -> bool {
-    if head.scope == Scope::Repo {
+/// Whether an analysis side covered `file`: a repo-scope analysis scans
+/// everything; a diff-scoped analysis covers only its candidate files.
+/// Both disappearance directions consult this so a narrow scan can neither
+/// invent introductions nor confirm resolutions for files it never saw.
+fn side_covers_file(side: &AnalyzeOutput, file: &std::path::Path) -> bool {
+    if side.scope == Scope::Repo {
         return true;
     }
-    head.diff_scoped_files.contains(file)
+    side.diff_scoped_files.contains(file)
 }
 
 /// Evidence movement between two cards for the same subject.
@@ -246,18 +248,22 @@ pub fn evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -
             head_by_subject.get(&subject).cloned().unwrap_or_default();
         let entry = match (base_cards.as_slice(), head_cards.as_slice()) {
             ([base_card], [head_card]) => compare_subject(&subject, base_card, head_card),
-            ([], [head_card]) if base_complete => SubjectMovementEntry {
-                subject: subject.clone(),
-                base_card_id: None,
-                head_card_id: Some(head_card.id.0.clone()),
-                movement: SubjectMovement::Introduced,
-                reason: "subject is present at head and absent from the complete base analysis"
-                    .to_string(),
-                ledger_baseline_state: ledger_of(head_card).0,
-                ledger_outcome_movement: ledger_of(head_card).1,
-            },
+            ([], [head_card]) if base_complete
+                && side_covers_file(base, &head_card.site.location.file) =>
+            {
+                SubjectMovementEntry {
+                    subject: subject.clone(),
+                    base_card_id: None,
+                    head_card_id: Some(head_card.id.0.clone()),
+                    movement: SubjectMovement::Introduced,
+                    reason: "subject is present at head and absent from the complete base analysis that covered its file"
+                        .to_string(),
+                    ledger_baseline_state: ledger_of(head_card).0,
+                    ledger_outcome_movement: ledger_of(head_card).1,
+                }
+            }
             ([base_card], []) if head_complete
-                && head_covers_file(head, &base_card.site.location.file) =>
+                && side_covers_file(head, &base_card.site.location.file) =>
             {
                 SubjectMovementEntry {
                     subject: subject.clone(),
@@ -270,11 +276,17 @@ pub fn evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -
                     ledger_outcome_movement: ledger_of(base_card).1,
                 }
             }
-            ([], _) if !base_complete => unknown_entry(
+            ([], [_]) if !base_complete => unknown_entry(
                 &subject,
                 &[],
                 head_cards.as_slice(),
                 "the base analysis is incomplete, so a head-only subject cannot be introduced",
+            ),
+            ([], [_]) => unknown_entry(
+                &subject,
+                &[],
+                head_cards.as_slice(),
+                "the base analysis did not cover the subject's file, so a head-only subject cannot be introduced",
             ),
             ([], _) => unknown_entry(
                 &subject,

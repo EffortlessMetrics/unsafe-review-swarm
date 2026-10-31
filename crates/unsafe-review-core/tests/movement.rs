@@ -437,6 +437,99 @@ fn unresolved_diff_entries_force_unknown() -> Result<(), String> {
 }
 
 #[test]
+fn narrow_base_scan_cannot_introduce_uncovered_subjects() -> Result<(), String> {
+    // A diff-scoped base that never scanned lib.rs must not report its
+    // head-only cards as introduced, even though the base side is otherwise
+    // complete. This is the introduced-direction mirror of the uncovered
+    // head rule.
+    let (base_root, head_root) = fixture_pair(BASE_LIB)?;
+    for root in [&base_root, &head_root] {
+        fs::write(
+            root.join("src/other.rs"),
+            "pub fn helper() -> u32 {\n    41\n}\n",
+        )
+        .map_err(|error| format!("write other.rs failed: {error}"))?;
+        fs::write(
+            root.join("change.diff"),
+            "diff --git a/src/other.rs b/src/other.rs\n--- /dev/null\n+++ b/src/other.rs\n@@ -0,0 +1,3 @@\n+pub fn helper() -> u32 {\n+    41\n+}\n",
+        )
+        .map_err(|error| format!("write change.diff failed: {error}"))?;
+    }
+    let base = analyze_diff(&base_root, "change.diff")?;
+    let head = analyze_repo(&head_root, None)?;
+    assert!(
+        head.summary.scan_capped == false,
+        "test setup must stay uncapped"
+    );
+    let report = evaluate_base_head_movement(&base, &head);
+    for entry in &report.subjects {
+        assert_eq!(
+            entry.movement,
+            SubjectMovement::Unknown,
+            "a base that never scanned the file must not report introduced: {}",
+            entry.subject
+        );
+        assert!(
+            entry.reason.contains("did not cover"),
+            "unexpected reason: {}",
+            entry.reason
+        );
+    }
+    assert_reconciled(&report);
+    cleanup(&base_root)?;
+    cleanup(&head_root)?;
+    Ok(())
+}
+
+#[test]
+fn diff_scoped_base_covering_the_file_can_introduce() -> Result<(), String> {
+    // A diff-scoped base that DID scan lib.rs and found no peek_word card
+    // licenses a genuine introduction at head.
+    let trimmed = BASE_LIB.replace(
+        "\npub fn peek_word(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n",
+        "\n",
+    );
+    let (base_root, head_root) = fixture_pair(&trimmed)?;
+    // Head regains the operation: copying the full fixture over the head
+    // root keeps both checkouts otherwise identical.
+    write_crate(&head_root, BASE_LIB)?;
+    for root in [&base_root, &head_root] {
+        fs::write(
+            root.join("change.diff"),
+            "diff --git a/src/lib.rs b/src/lib.rs\n--- a/src/lib.rs\n+++ b/src/lib.rs\n@@ -0,0 +1 @@\n+// touch\n",
+        )
+        .map_err(|error| format!("write change.diff failed: {error}"))?;
+    }
+    let base = analyze_diff(&base_root, "change.diff")?;
+    assert!(
+        base.diff_scoped_files
+            .iter()
+            .any(|file| file.ends_with("src/lib.rs") || file.ends_with("src\\lib.rs")),
+        "base must cover the subject file: {:?}",
+        base.diff_scoped_files
+    );
+    let head = analyze_repo(&head_root, None)?;
+    let report = evaluate_base_head_movement(&base, &head);
+    // peek-word is absent from the covering base scan and present at head.
+    let introduced: Vec<&str> = report
+        .subjects
+        .iter()
+        .filter(|entry| entry.movement == SubjectMovement::Introduced)
+        .map(|entry| entry.subject.as_str())
+        .collect();
+    assert!(
+        introduced
+            .iter()
+            .any(|subject| subject.contains("peek-word")),
+        "covering base scan must license the introduction: {introduced:?}"
+    );
+    assert_reconciled(&report);
+    cleanup(&base_root)?;
+    cleanup(&head_root)?;
+    Ok(())
+}
+
+#[test]
 fn renamed_owner_splits_subjects_without_collapse() -> Result<(), String> {
     // Same operation text under a different owner is a different subject:
     // resolved plus introduced, never a silent match.
