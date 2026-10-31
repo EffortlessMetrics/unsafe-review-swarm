@@ -68,7 +68,7 @@ pub(crate) fn obligations_for(family: &OperationFamily) -> Vec<SafetyObligation>
         )),
         OperationFamily::UnionFieldRead => single(SafetyObligation::new(
             "valid-variant",
-            "union field access uses the currently active variant and yields a valid value for that field type",
+            "union storage is initialized and contains a valid value for the accessed field type",
         )),
         OperationFamily::InlineAsm => single(SafetyObligation::new(
             "asm",

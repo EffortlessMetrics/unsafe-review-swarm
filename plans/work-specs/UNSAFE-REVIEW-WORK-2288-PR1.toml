@@ -20,7 +20,7 @@ included = [
 ]
 excluded = [
     "Name-only field matching without a typed receiver, explicitly rejected because it false-positives on same-named struct fields",
-    "Cross-file or cross-crate union resolution, method receivers (self.field where self is a union), field access through references or deref, and generic unions",
+    "Cross-file or cross-crate union resolution, method receivers (self.field where self is a union), field access through references or deref (reference-typed receivers never route), generic unions, and receiver rebinding through match-arm or closure parameters (let and for patterns do shadow as non-union)",
     "Any change to ManuallyDrop<T> receivers or raw-pointer path families, declaration-side cards, or projections (CLI, JSON, Markdown, SARIF, LSP) beyond the new family string already projected from ReviewCard",
     "Publication, release versioning, source promotion, and safety or execution claims",
 ]

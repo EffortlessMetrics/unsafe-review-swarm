@@ -115,7 +115,9 @@ fn is_ident_continue(ch: char) -> bool {
 /// Last path segment of a type spelling, e.g. `crate::Word` -> `Word`,
 /// `ManuallyDrop<Word>` -> `ManuallyDrop`, `Word` -> `Word`.
 fn type_base_name(ty: &str) -> String {
-    let ty = ty.trim().trim_start_matches('&').trim();
+    // Reference types are out of scope: keep the leading `&` so the base
+    // name never matches a declared union.
+    let ty = ty.trim();
     let ty = ty.strip_prefix("mut ").unwrap_or(ty).trim();
     let ty = ty.split('<').next().unwrap_or(ty).trim();
     let ty = ty.split('[').next().unwrap_or(ty).trim();
@@ -213,15 +215,101 @@ fn parse_let_binding(
     Some((name, union_ty, text.len() - rest.len() + name_len))
 }
 
-fn apply_params(state: &mut BindingState, scope: &str, unions: &UnionDeclarations) {
-    let params_search = match scope.find('>') {
-        Some(gt) if scope[..gt].contains('<') => &scope[gt + 1..],
-        _ => scope,
+/// Pattern text up to the top-level `=` or `;` that ends the pattern.
+fn pattern_segment(text: &str) -> &str {
+    let mut depth = 0usize;
+    for (idx, ch) in text.char_indices() {
+        match ch {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth = depth.saturating_sub(1),
+            '=' | ';' if depth == 0 => return &text[..idx],
+            _ => {}
+        }
+    }
+    text
+}
+
+fn record_pattern_idents(state: &mut BindingState, pattern: &str) {
+    let mut i = 0usize;
+    while i < pattern.len() {
+        if is_ident_start(pattern.as_bytes()[i] as char)
+            && let Some(name) = parse_ident(&pattern[i..])
+        {
+            if name != "mut" && name != "ref" {
+                state.insert(name.clone(), None);
+            }
+            i += name.len();
+            continue;
+        }
+        i += pattern[i..].chars().next().map_or(1, |ch| ch.len_utf8());
+    }
+}
+
+/// Apply a `let` at `text` (starting with "let "). Plain identifier
+/// bindings keep their typed union value; any other pattern records every
+/// pattern identifier as a non-union shadow.
+fn apply_let(state: &mut BindingState, text: &str, unions: &UnionDeclarations) {
+    let Some(rest) = text.strip_prefix("let ") else {
+        return;
     };
-    if let Some(paren) = params_search.find('(')
-        && let Some(close) = matching_close_paren(params_search, paren)
+    let trimmed = rest
+        .trim_start()
+        .strip_prefix("mut ")
+        .unwrap_or(rest.trim_start());
+    let plain = parse_ident(trimmed).is_some_and(|name| {
+        let after = trimmed[name.len()..].trim_start();
+        after.is_empty() || after.starts_with(':') || after.starts_with('=')
+    });
+    if plain && let Some((name, union_ty, _)) = parse_let_binding(text, unions) {
+        state.insert(name, union_ty);
+    } else {
+        record_pattern_idents(state, pattern_segment(rest));
+    }
+}
+
+/// Apply a `for` pattern at `text` (starting with "for "): identifiers
+/// before the top-level ` in ` are non-union shadows.
+fn apply_for(state: &mut BindingState, text: &str) {
+    let Some(rest) = text.strip_prefix("for ") else {
+        return;
+    };
+    let mut depth = 0usize;
+    let mut end = rest.len();
+    for (idx, ch) in rest.char_indices() {
+        match ch {
+            '(' | '[' | '{' => depth += 1,
+            ')' | ']' | '}' => depth = depth.saturating_sub(1),
+            _ if depth == 0 && rest[idx..].starts_with(" in ") => {
+                end = idx;
+                break;
+            }
+            _ => {}
+        }
+    }
+    record_pattern_idents(state, &rest[..end]);
+}
+
+fn apply_params(state: &mut BindingState, scope: &str, unions: &UnionDeclarations) {
+    // The parameter list opens at the first `(` outside generic angle
+    // brackets; a `>` from a generic argument in a parameter type (for
+    // example `Vec<u8>`) must not skip the list.
+    let mut angle_depth = 0usize;
+    let mut paren = None;
+    for (idx, ch) in scope.char_indices() {
+        match ch {
+            '<' => angle_depth += 1,
+            '>' => angle_depth = angle_depth.saturating_sub(1),
+            '(' if angle_depth == 0 => {
+                paren = Some(idx);
+                break;
+            }
+            _ => {}
+        }
+    }
+    if let Some(paren) = paren
+        && let Some(close) = matching_close_paren(scope, paren)
     {
-        for param in split_top_level_commas(&params_search[paren + 1..close]) {
+        for param in split_top_level_commas(&scope[paren + 1..close]) {
             let Some((binding, ty)) = param.split_once(':') else {
                 continue;
             };
@@ -296,15 +384,17 @@ fn apply_scoped_text(state: &mut BindingState, text: &str, unions: &UnionDeclara
                 state.pop_scope();
                 i += 1;
             }
-            _ if text[i..].starts_with("let ")
+            _ if (text[i..].starts_with("let ") || text[i..].starts_with("for "))
                 && (i == 0
                     || text[..i]
                         .chars()
                         .next_back()
                         .is_none_or(|ch| !is_ident_continue(ch))) =>
             {
-                if let Some((name, union_ty, _)) = parse_let_binding(&text[i..], unions) {
-                    state.insert(name, union_ty);
+                if text[i..].starts_with("let ") {
+                    apply_let(state, &text[i..], unions);
+                } else {
+                    apply_for(state, &text[i..]);
                 }
                 i += 4;
             }
@@ -356,16 +446,18 @@ pub(super) fn union_field_use_family(
             }
             _ => {}
         }
-        // let binding?
-        if block[i..].starts_with("let ")
+        // let / for binding?
+        if (block[i..].starts_with("let ") || block[i..].starts_with("for "))
             && (i == 0
                 || block[..i]
                     .chars()
                     .next_back()
                     .is_none_or(|ch| !is_ident_continue(ch)))
         {
-            if let Some((name, union_ty, _)) = parse_let_binding(&block[i..], unions) {
-                state.insert(name, union_ty);
+            if block[i..].starts_with("let ") {
+                apply_let(&mut state, &block[i..], unions);
+            } else {
+                apply_for(&mut state, &block[i..]);
             }
             i += 4;
             continue;

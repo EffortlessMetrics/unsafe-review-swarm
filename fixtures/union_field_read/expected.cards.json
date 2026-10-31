@@ -22,12 +22,12 @@
       "initialized_memory"
     ],
     "obligations": [
-      "union field access uses the currently active variant and yields a valid value for that field type"
+      "union storage is initialized and contains a valid value for the accessed field type"
     ],
     "obligation_evidence": [
       {
         "key": "valid-variant",
-        "description": "union field access uses the currently active variant and yields a valid value for that field type",
+        "description": "union storage is initialized and contains a valid value for the accessed field type",
         "contract": {
           "present": true,
           "state": "present",

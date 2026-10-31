@@ -3413,6 +3413,39 @@ impl<T> Tagged<T> {\n\
     }
 
     #[test]
+    fn union_field_reference_receiver_does_not_route() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_ref(w: &Word) -> u64 {\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "reference receiver is out of scope and must not route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_if_let_pattern_shadows_receiver() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub struct Holder { pub bits: u64 }\n\npub fn read_shadowed(s: Word, o: Option<Holder>) -> u64 {\n    if let Some(s) = o { unsafe { s.bits } } else { 0 }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            !has_union_family(&sites),
+            "if-let pattern binding must shadow the union parameter: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn union_field_param_before_generic_typed_param_routes() -> Result<(), String> {
+        let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn read_gen(w: Word, v: Vec<u8>) -> u64 {\n    let _ = v;\n    unsafe { w.bits }\n}\n";
+        let sites = scan_union_source(source)?;
+        assert!(
+            has_union_family(&sites),
+            "union param before a generic-typed param must route: {sites:#?}"
+        );
+        Ok(())
+    }
+
+    #[test]
     fn union_field_untyped_receiver_does_not_route() -> Result<(), String> {
         let source = "pub union Word { bits: u64, bytes: [u8; 8] }\n\npub fn unknown_maker() -> u64 { 0 }\n\npub fn read_unknown() -> u64 {\n    let w = unknown_maker();\n    unsafe { w.bits }\n}\n";
         let sites = scan_union_source(source)?;
