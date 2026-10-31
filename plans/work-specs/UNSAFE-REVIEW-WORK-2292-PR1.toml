@@ -1,0 +1,56 @@
+# Issue-linked work specification for per-obligation discharge projection.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2292"
+kind = "correctness"
+objective = "Project specific per-obligation discharge summaries (present=false) into the ReviewCard guard MissingEvidence message so Markdown PR summary and SARIF result messages show the diagnosis instead of only the generic guard text, while generic summaries stay byte-identical."
+user_outcome = "A reviewer reading the Markdown PR summary missing-evidence column or a SARIF result message for an asm_nomem or asm_readonly contradiction card sees the exact contradiction (for example 'asm template addresses memory while options declare nomem') without opening ReviewCard JSON; generic guard-missing cards read exactly as before."
+claim_boundary = "This slice changes only the guard MissingEvidence projection in analysis/pipeline/card_builder and the SARIF result message placement for non-generic guard missing text; it does not change card class, priority, confidence, proof path, the evidence model, discharge detection, or any safety, UB-free, Miri-clean, site-execution, proof, or calibrated precision/recall claim. ReviewCard JSON obligation_evidence was already correct and is unchanged in shape."
+
+[scope]
+included = [
+    "In crates/unsafe-review-core/src/analysis/pipeline/card_builder.rs, where the guard MissingEvidence is derived from summarize_discharge, collect missing (present=false) obligation discharge summaries that are specific and project them into the single guard MissingEvidence message",
+    "Exact choice (single-message shape): specific summaries are appended after the generic guard text as 'Missing visible local guard for inferred safety obligations: <specific>[; <specific>...]', deduplicated in obligation order; when no specific summary exists the message is byte-identical to the previous generic text",
+    "Generic/specific predicate: a missing discharge summary is generic iff it equals one of the discharge families' generic missing constants ('No obligation-specific guard code was detected', 'No length or bounds guard code was detected', 'No alignment guard code was detected', 'No capacity guard code was detected', 'No nullability guard code was detected', 'No pointer-liveness evidence was detected', 'No Vec::from_raw_parts same-origin pointer/capacity evidence was detected', 'No return-value check with a diverging error arm was detected', 'No initialization evidence was detected') or the per-key fallback 'No obligation-specific guard code was detected for the `<key>` obligation (no guard pattern is recognized for this obligation)'; inequality with those constants (not substring matching on asm text) defines specific, so every discharge family benefits",
+    "Shared constant GENERIC_GUARD_MISSING_MESSAGE in domain/evidence (re-exported from domain) holding the generic guard MissingEvidence text, used by card_builder and the SARIF renderer",
+    "Markdown: output/markdown.rs missing_summary already joins card.missing messages and is used by the PR-summary card table, reviewer cockpit, top-card and detail surfaces, so the projected text flows with no renderer change (verified by test)",
+    "SARIF placement: output/sarif.rs result message.text is 'class: next_action' and did not render card.missing (properties.missing_evidence already did); sarif_result_message now appends '; <guard missing message>' to message.text only when the guard missing message differs from GENERIC_GUARD_MISSING_MESSAGE, so specific diagnoses appear in the SARIF result message and generic SARIF messages stay byte-identical",
+    "Unit tests in card_builder (specific appended, generic byte-identical, present/duplicate not projected), Markdown PR-summary tests and SARIF message tests proving both asm contradiction strings appear and generic cards are unchanged, using the asm_options_contradiction fixture and a generic fixture following existing fixture_output test patterns",
+    "xtask fixture checker (xtask/src/main.rs summary_is_discharge_missing) accepts the appended form (generic text followed by ': <specific>') in addition to the exact generic text, so check-fixtures validates the new projection without weakening the missing-axis requirement",
+    "Regenerating only affected fixture goldens via bless-goldens per affected fixture (asm_options_contradiction, drop_in_place_deallocation, inline_unsafe_raw_pointer_deref_no_duplicate, pointer_arithmetic_compound_offset_not_guard, pointer_arithmetic_num_ctrl_bytes_guard, pointer_arithmetic_other_offset_not_guard, pointer_arithmetic_reassigned_offset_not_guard, pointer_arithmetic_shadowed_offset_not_guard, pointer_arithmetic_stale_bound_not_guard, raw_pointer_alignment_debug_assert_only_not_guard, raw_pointer_bounds_debug_assert_only_not_guard, raw_pointer_read_len_capacity_assert, raw_pointer_read_len_capacity_assert_shadowed_origin_not_guard, raw_pointer_write_assignment), plus calibration snapshot and badge regeneration only if counts change (card/class counts do not change, so none was needed)",
+]
+excluded = [
+    "Any change to discharge detection, obligation evidence summaries themselves, card class/priority/confidence/proof-path, next_action routing, or the ReviewCard JSON shape (JSON already carried the specific summaries in obligation_evidence)",
+    "Substring or asm-specific matching to define specificity, and any new evidence kind or second missing-evidence entry",
+    "Changes to other missing-evidence kinds (contract, reach, witness), CLI/LSP/agent projections beyond the card.missing flow-through, publication, release, or source promotion",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Generic discharge summaries stay byte-identical: a card whose missing discharge summaries are all generic keeps the exact guard message 'Missing visible local guard for inferred safety obligations' and an unchanged SARIF result message."
+
+[[invariant]]
+id = "INV-2"
+text = "Specificity is defined by inequality with the discharge families' generic missing summary constants (including the per-key fallback), never by substring matching on asm or any other site text."
+
+[[invariant]]
+id = "INV-3"
+text = "Only missing (present=false) discharge entries project, each specific summary at most once in obligation order, appended after the generic guard text in the single existing guard MissingEvidence entry (kind stays 'guard')."
+
+[[acceptance]]
+id = "AC-2292-PR1-1"
+text = "asm_nomem and asm_readonly contradiction cards show their specific summaries in the Markdown PR summary missing-evidence text and in the SARIF result message text."
+proof = ["cargo test --locked -p unsafe-review-core --lib pr_summary_shows_specific_asm_contradiction_in_missing_column", "cargo test --locked -p unsafe-review-core --lib sarif_message_shows_specific_asm_contradictions"]
+
+[[acceptance]]
+id = "AC-2292-PR1-2"
+text = "Generic guard-missing cards are byte-identical to before in the guard MissingEvidence message and in the SARIF result message."
+proof = ["cargo test --locked -p unsafe-review-core --lib generic", "cargo run --locked -p xtask -- check-fixtures"]
+
+[[acceptance]]
+id = "AC-2292-PR1-3"
+text = "Workspace proof passes and only affected fixture goldens change."
+proof = ["cargo fmt --check", "cargo test --locked -p unsafe-review-core --lib", "cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-policy", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "2292-pr1-discharge-projection"
+notes = "Canonical ReviewCard projection: card.missing is the single source consumed by Markdown missing_summary (PR summary, repo posture, card detail), SARIF properties.missing_evidence, and the new SARIF message.text append for non-generic guard text; no second truth is created in any renderer."

@@ -1,5 +1,5 @@
 use crate::api::AnalyzeOutput;
-use crate::domain::{ReviewCard, ReviewClass, WitnessRoute};
+use crate::domain::{GENERIC_GUARD_MISSING_MESSAGE, ReviewCard, ReviewClass, WitnessRoute};
 use crate::output::REVIEWCARD_TRUST_BOUNDARY as TRUST_BOUNDARY;
 use crate::util::path_display;
 use serde::Serialize;
@@ -118,13 +118,23 @@ struct SarifResult {
     properties: SarifResultProperties,
 }
 
+fn sarif_result_message(card: &ReviewCard) -> String {
+    let mut text = format!("{}: {}", card.class.as_str(), card.next_action.summary);
+    if let Some(guard) = card.missing.iter().find(|missing| missing.kind == "guard")
+        && guard.message != GENERIC_GUARD_MISSING_MESSAGE
+    {
+        text.push_str(&format!("; {}", guard.message));
+    }
+    text
+}
+
 impl From<&ReviewCard> for SarifResult {
     fn from(card: &ReviewCard) -> Self {
         Self {
             rule_id: card.class.as_str(),
             level: card.class.sarif_level(),
             message: SarifText {
-                text: format!("{}: {}", card.class.as_str(), card.next_action.summary),
+                text: sarif_result_message(card),
             },
             locations: vec![SarifLocation::from(card)],
             properties: SarifResultProperties::from(card),
@@ -544,6 +554,46 @@ mod tests {
         assert!(
             full_desc.contains("baseline") || full_desc.contains("inherited"),
             "baseline_known rule fullDescription should mention baseline or inherited: {full_desc}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sarif_message_shows_specific_asm_contradictions() -> Result<(), String> {
+        let output = fixture_output("asm_options_contradiction")?;
+        let rendered = render(&output);
+        let value = parse_json(&rendered)?;
+        let results = value["runs"][0]["results"]
+            .as_array()
+            .ok_or_else(|| "SARIF results must be an array".to_string())?;
+        let messages: Vec<&str> = results
+            .iter()
+            .filter_map(|result| result["message"]["text"].as_str())
+            .collect();
+        assert!(
+            messages.iter().any(|message| message
+                .contains("asm template addresses memory while options declare nomem")),
+            "SARIF message must show asm_nomem contradiction: {messages:?}"
+        );
+        assert!(
+            messages.iter().any(|message| message.contains(
+                "asm template writes memory through its destination operand while options declare readonly"
+            )),
+            "SARIF message must show asm_readonly contradiction: {messages:?}"
+        );
+        Ok(())
+    }
+
+    #[test]
+    fn sarif_message_generic_guard_missing_stays_byte_identical() -> Result<(), String> {
+        let output = fixture_output("raw_pointer_alignment")?;
+        let value = parse_json(&render(&output))?;
+        let message = value["runs"][0]["results"][0]["message"]["text"]
+            .as_str()
+            .ok_or_else(|| "SARIF result should have a message".to_string())?;
+        assert!(
+            !message.contains("Missing visible local guard"),
+            "generic SARIF message must stay as before: {message}"
         );
         Ok(())
     }

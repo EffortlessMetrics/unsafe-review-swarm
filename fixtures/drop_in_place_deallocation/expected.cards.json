@@ -127,7 +127,7 @@
       }
     ],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: Nullability guard code was detected, but it supports non-nullness only; pointer liveness remains unresolved",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `drop_in_place` safety obligations: (1) pointer is valid for dropping one value, (2) pointed-to value is initialized, (3) value will not be dropped again or observed after drop.",

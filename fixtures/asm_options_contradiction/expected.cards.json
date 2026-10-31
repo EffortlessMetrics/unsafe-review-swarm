@@ -64,7 +64,7 @@
     ],
     "related_tests": [],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: asm template addresses memory while options declare nomem",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],
@@ -171,7 +171,7 @@
     ],
     "related_tests": [],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: asm template writes memory through its destination operand while options declare readonly",
       "No related test path was found by static search",
       "No witness receipt imported for this card"
     ],

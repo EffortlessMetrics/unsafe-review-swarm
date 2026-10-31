@@ -16,8 +16,8 @@ pub use coverage::{
     OutcomeMovement, WitnessReceiptCoverage,
 };
 pub use evidence::{
-    ContractEvidence, DischargeEvidence, EvidenceState, MissingEvidence, ObligationEvidence,
-    ReachEvidence, RelatedTest,
+    ContractEvidence, DischargeEvidence, EvidenceState, GENERIC_GUARD_MISSING_MESSAGE,
+    MissingEvidence, ObligationEvidence, ReachEvidence, RelatedTest,
 };
 pub use hazard::HazardKind;
 pub use ids::CardId;

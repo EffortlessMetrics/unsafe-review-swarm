@@ -1,8 +1,53 @@
 use crate::analysis::{classify, evidence, obligations, receipts, witness};
 use crate::domain::{
-    ContractEvidence, MissingEvidence, NextAction, OperationFamily, Priority, ProofPath,
-    ReviewCard, ReviewClass, WitnessKind, WitnessRoute,
+    ContractEvidence, GENERIC_GUARD_MISSING_MESSAGE, MissingEvidence, NextAction,
+    ObligationEvidence, OperationFamily, Priority, ProofPath, ReviewCard, ReviewClass, WitnessKind,
+    WitnessRoute,
 };
+
+const GENERIC_DISCHARGE_SUMMARIES: &[&str] = &[
+    "No obligation-specific guard code was detected",
+    "No length or bounds guard code was detected",
+    "No alignment guard code was detected",
+    "No capacity guard code was detected",
+    "No nullability guard code was detected",
+    "No pointer-liveness evidence was detected",
+    "No Vec::from_raw_parts same-origin pointer/capacity evidence was detected",
+    "No return-value check with a diverging error arm was detected",
+    "No initialization evidence was detected",
+];
+
+fn is_generic_discharge_summary(evidence: &ObligationEvidence) -> bool {
+    let summary = evidence.discharge.summary.as_str();
+    GENERIC_DISCHARGE_SUMMARIES.contains(&summary)
+        || summary
+            == format!(
+                "No obligation-specific guard code was detected for the `{}` obligation (no guard pattern is recognized for this obligation)",
+                evidence.obligation.key
+            )
+}
+
+fn specific_discharge_summaries(evidence: &[ObligationEvidence]) -> Vec<&str> {
+    let mut summaries: Vec<&str> = Vec::new();
+    for entry in evidence {
+        if !entry.discharge.present
+            && !is_generic_discharge_summary(entry)
+            && !summaries.contains(&entry.discharge.summary.as_str())
+        {
+            summaries.push(entry.discharge.summary.as_str());
+        }
+    }
+    summaries
+}
+
+fn guard_missing_message(evidence: &[ObligationEvidence]) -> String {
+    let specific = specific_discharge_summaries(evidence);
+    if specific.is_empty() {
+        GENERIC_GUARD_MISSING_MESSAGE.to_string()
+    } else {
+        format!("{}: {}", GENERIC_GUARD_MISSING_MESSAGE, specific.join("; "))
+    }
+}
 
 pub(super) struct CardBuildContext<'a> {
     pub root: &'a std::path::Path,
@@ -60,7 +105,7 @@ pub(super) fn build_card(
     if !discharge.present {
         missing.push(MissingEvidence::new(
             "guard",
-            "Missing visible local guard for inferred safety obligations",
+            guard_missing_message(&obligation_evidence),
         ));
     }
     if reach.state == "unreached" {
@@ -242,5 +287,81 @@ fn operation_contract_override(family: &OperationFamily) -> Option<ContractEvide
             "Stable-byte-source native FFI heuristic uses byte-stability evidence, not unsafe API safety docs",
         )),
         _ => None,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::domain::{EvidenceState, SafetyObligation};
+
+    fn evidence(key: &str, summary: &str, present: bool) -> ObligationEvidence {
+        let discharge = if present {
+            EvidenceState::present(summary)
+        } else {
+            EvidenceState::missing(summary)
+        };
+        ObligationEvidence {
+            obligation: SafetyObligation::new(key, "desc"),
+            contract: EvidenceState::missing("contract"),
+            discharge,
+            reach: EvidenceState::missing("reach"),
+            witness: EvidenceState::missing("witness"),
+        }
+    }
+
+    #[test]
+    fn specific_discharge_is_appended_after_generic_guard_text() {
+        for summary in [
+            "asm template addresses memory while options declare nomem",
+            "asm template writes memory through its destination operand while options declare readonly",
+        ] {
+            let message = guard_missing_message(&[evidence("asm", summary, false)]);
+            assert_eq!(
+                message,
+                format!("{GENERIC_GUARD_MISSING_MESSAGE}: {summary}")
+            );
+        }
+    }
+
+    #[test]
+    fn generic_discharge_stays_byte_identical() {
+        for (key, summary) in [
+            ("asm", "No obligation-specific guard code was detected"),
+            ("bounds", "No length or bounds guard code was detected"),
+            ("alignment", "No alignment guard code was detected"),
+            (
+                "unhandled",
+                "No obligation-specific guard code was detected for the `unhandled` obligation (no guard pattern is recognized for this obligation)",
+            ),
+        ] {
+            assert_eq!(
+                guard_missing_message(&[evidence(key, summary, false)]),
+                GENERIC_GUARD_MISSING_MESSAGE
+            );
+        }
+    }
+
+    #[test]
+    fn present_and_duplicate_discharge_do_not_project() {
+        let present = guard_missing_message(&[evidence(
+            "asm",
+            "asm template addresses memory while options declare nomem",
+            true,
+        )]);
+        assert_eq!(present, GENERIC_GUARD_MISSING_MESSAGE);
+        let dup = guard_missing_message(&[
+            evidence(
+                "asm",
+                "asm template addresses memory while options declare nomem",
+                false,
+            ),
+            evidence(
+                "asm",
+                "asm template addresses memory while options declare nomem",
+                false,
+            ),
+        ]);
+        assert_eq!(dup.matches("asm template addresses memory").count(), 1);
     }
 }

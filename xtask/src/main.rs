@@ -6896,6 +6896,7 @@ fn summary_is_contract_missing(summary: &str) -> bool {
 
 fn summary_is_discharge_missing(summary: &str) -> bool {
     summary == "Missing visible local guard for inferred safety obligations"
+        || summary.starts_with("Missing visible local guard for inferred safety obligations: ")
 }
 
 fn summary_is_witness_missing(summary: &str) -> bool {

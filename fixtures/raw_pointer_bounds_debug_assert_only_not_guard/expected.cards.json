@@ -178,7 +178,7 @@
       }
     ],
     "missing": [
-      "Missing visible local guard for inferred safety obligations",
+      "Missing visible local guard for inferred safety obligations: `debug_assert!` documents the intended invariant in debug builds, but it is not release-runtime guard evidence. Add an executable guard, witness receipt, or focused test reach.",
       "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `raw_pointer_write` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) buffer has enough bytes for the accessed type, (3) pointer is aligned for the accessed type, (4) memory is initialized for the accessed type, (5) access remains inside one live allocation.",
