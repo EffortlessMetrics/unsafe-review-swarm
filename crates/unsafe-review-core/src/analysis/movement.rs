@@ -127,6 +127,9 @@ enum EvidenceMovement {
     Same,
 }
 
+/// The caller guarantees identical obligation key sets (see
+/// `compare_subject`, which maps key-set drift to Unknown before calling
+/// here); the per-key lookup below is total under that contract.
 fn compare_evidence(before: &ReviewCard, after: &ReviewCard) -> EvidenceMovement {
     let mut improved = false;
     // Contract presence.
@@ -146,11 +149,6 @@ fn compare_evidence(before: &ReviewCard, after: &ReviewCard) -> EvidenceMovement
         .iter()
         .map(|evidence| (evidence.obligation.key.as_str(), evidence.discharge.present))
         .collect();
-    if before_by_key.keys().ne(after_by_key.keys()) {
-        // Different obligation sets are not cleanly comparable; the caller
-        // maps this to Unknown rather than forcing a direction.
-        return EvidenceMovement::Same;
-    }
     for (key, before_present) in &before_by_key {
         let after_present = after_by_key[key];
         match (*before_present, after_present) {
