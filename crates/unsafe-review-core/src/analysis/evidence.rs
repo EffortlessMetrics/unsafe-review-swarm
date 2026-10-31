@@ -453,6 +453,14 @@ mod tests {
         if callee_contract_present(&string_site)? {
             return Err("string-literal guard text must not discharge".to_string());
         }
+        let raw_site = target_feature_call_site(
+            vec!["let s = r#\"assert!(std::is_x86_feature_detected!(\\\"avx2\\\"));\"#;"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&raw_site)? {
+            return Err("raw-string guard text must not discharge".to_string());
+        }
         Ok(())
     }
 
@@ -461,6 +469,7 @@ mod tests {
         for body in [
             "returned += 1;",
             "return_code = 1;",
+            "returnValue = 1;",
             "if cond { return 0; }",
         ] {
             let guard = format!("if !std::is_x86_feature_detected!(\"avx2\") {{ {body} }}");

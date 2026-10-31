@@ -11,6 +11,9 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
     // bare-callable free functions; they are not registered.
     let mut block_depth = 0isize;
     let mut method_block_depth: Option<isize> = None;
+    // An impl/trait header whose opening brace lands on a later line is
+    // still a method block once the brace arrives.
+    let mut pending_method_header = false;
     for (idx, raw) in lines.iter().enumerate() {
         let trimmed_start = raw.trim_start();
         if method_block_depth.is_none()
@@ -18,9 +21,12 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
                 || trimmed_start.starts_with("impl<")
                 || trimmed_start.starts_with("trait ")
                 || trimmed_start.starts_with("trait<"))
-            && raw.contains('{')
         {
+            pending_method_header = true;
+        }
+        if pending_method_header && raw.contains('{') {
             method_block_depth = Some(block_depth);
+            pending_method_header = false;
         }
         let in_method_block = method_block_depth.is_some();
         let delta = raw.matches('{').count() as isize - raw.matches('}').count() as isize;
@@ -183,6 +189,24 @@ mod tests {
         }
         if callee_target_feature("sum_avx2(data)", &free).is_none() {
             return Err("bare call must be attributed".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn impl_method_with_brace_on_next_line_is_not_collected() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "struct W;",
+            "impl W",
+            "{",
+            "#[target_feature(enable = \"avx2\")]",
+            "fn sum_avx2(&self, data: &[f32]) -> f32 { 0.0 }",
+            "}",
+        ]);
+        if callees.contains_key("sum_avx2") {
+            return Err(
+                "impl method with brace on the next line must not be registered".to_string(),
+            );
         }
         Ok(())
     }
