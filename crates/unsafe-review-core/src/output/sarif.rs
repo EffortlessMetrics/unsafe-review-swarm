@@ -591,9 +591,10 @@ mod tests {
         let message = value["runs"][0]["results"][0]["message"]["text"]
             .as_str()
             .ok_or_else(|| "SARIF result should have a message".to_string())?;
-        assert!(
-            !message.contains("Missing visible local guard"),
-            "generic SARIF message must stay as before: {message}"
+        assert_eq!(
+            message,
+            "guard_missing: Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
+            "generic SARIF message must stay byte-identical"
         );
         Ok(())
     }
