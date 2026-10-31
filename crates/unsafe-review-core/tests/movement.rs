@@ -464,6 +464,79 @@ fn renamed_owner_splits_subjects_without_collapse() -> Result<(), String> {
 }
 
 #[test]
+fn unknown_verdicts_name_their_exact_cause() -> Result<(), String> {
+    // Capped head: the base-only subject reports head incompleteness.
+    let trimmed = BASE_LIB.replace(
+        "\npub fn peek_word(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n",
+        "\n",
+    );
+    let (base_root, head_root) = fixture_pair(&trimmed)?;
+    let base = analyze_repo(&base_root, None)?;
+    let capped = analyze_repo(&head_root, Some(0))?;
+    let capped_report = evaluate_base_head_movement(&base, &capped);
+    let capped_entry = capped_report
+        .subjects
+        .iter()
+        .find(|entry| entry.movement == SubjectMovement::Unknown)
+        .ok_or_else(|| "capped head must yield unknown".to_string())?;
+    assert!(
+        capped_entry.reason.contains("head analysis is incomplete"),
+        "unexpected reason: {}",
+        capped_entry.reason
+    );
+    cleanup(&base_root)?;
+    cleanup(&head_root)?;
+
+    // Uncovered file: the diff-scoped head resolves its named file but
+    // never scans the subject's file.
+    let (base_root, head_root) = fixture_pair(&trimmed)?;
+    fs::write(head_root.join("src/other.rs"), "pub fn helper() -> u32 {\n    41\n}\n")
+        .map_err(|error| format!("write other.rs failed: {error}"))?;
+    fs::write(
+        head_root.join("change.diff"),
+        "diff --git a/src/other.rs b/src/other.rs\n--- /dev/null\n+++ b/src/other.rs\n@@ -0,0 +1,3 @@\n+pub fn helper() -> u32 {\n+    41\n+}\n",
+    )
+    .map_err(|error| format!("write change.diff failed: {error}"))?;
+    let narrowed = analyze_diff(&head_root, "change.diff")?;
+    let narrowed_report = evaluate_base_head_movement(&base, &narrowed);
+    let narrowed_entry = narrowed_report
+        .subjects
+        .iter()
+        .find(|entry| entry.movement == SubjectMovement::Unknown)
+        .ok_or_else(|| "uncovered head must yield unknown".to_string())?;
+    assert!(
+        narrowed_entry.reason.contains("did not cover"),
+        "unexpected reason: {}",
+        narrowed_entry.reason
+    );
+    cleanup(&base_root)?;
+    cleanup(&head_root)?;
+
+    // Duplicates: identical subjects on one side name the ambiguity.
+    let duplicated = format!(
+        "{BASE_LIB}\npub fn peek_word(ptr: *const u32) -> u32 {{\n    unsafe {{ *ptr }}\n}}\n"
+    );
+    let (base_root, head_root) = fixture_pair(&duplicated)?;
+    let dup_base = analyze_repo(&base_root, None)?;
+    let dup_head = analyze_repo(&head_root, None)?;
+    let dup_report = evaluate_base_head_movement(&dup_base, &dup_head);
+    let dup_entry = dup_report
+        .subjects
+        .iter()
+        .find(|entry| entry.movement == SubjectMovement::Unknown)
+        .ok_or_else(|| "duplicates must yield unknown".to_string())?;
+    assert!(
+        dup_entry.reason.contains("duplicate subject identity"),
+        "unexpected reason: {}",
+        dup_entry.reason
+    );
+    assert_reconciled(&dup_report);
+    cleanup(&base_root)?;
+    cleanup(&head_root)?;
+    Ok(())
+}
+
+#[test]
 fn duplicate_subjects_are_unknown_never_forced() -> Result<(), String> {
     let duplicated = format!(
         "{BASE_LIB}\n/// # Safety\n///\n/// Caller guarantees `ptr` is valid.\npub fn peek_word(ptr: *const u32) -> u32 {{\n    unsafe {{ *ptr }}\n}}\n"

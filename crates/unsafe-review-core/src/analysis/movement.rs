@@ -157,7 +157,11 @@ fn compare_evidence(before: &ReviewCard, after: &ReviewCard) -> EvidenceMovement
             _ => {}
         }
     }
-    // Witness presence and verdict.
+    // Witness presence and verdict. Any verdict change on a present
+    // witness is new observation (improved knowledge), never a repair
+    // verdict: a confirmed observation keeps the defect open by product
+    // rule, and a verdict-less import closes witness coverage without
+    // resolving the underlying operation.
     match (before.witness.present, after.witness.present) {
         (true, false) => return EvidenceMovement::Regressed,
         (false, true) => improved = true,
@@ -221,7 +225,6 @@ pub fn evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -
             .or_default()
             .push(card);
     }
-    let mut subjects: Vec<SubjectMovementEntry> = Vec::new();
     let mut keys: Vec<String> = base_by_subject.keys().cloned().collect();
     for key in head_by_subject.keys() {
         if !base_by_subject.contains_key(key) {
@@ -267,11 +270,35 @@ pub fn evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -
                     ledger_outcome_movement: ledger_of(base_card).1,
                 }
             }
+            ([], _) if !base_complete => unknown_entry(
+                &subject,
+                &[],
+                head_cards.as_slice(),
+                "the base analysis is incomplete, so a head-only subject cannot be introduced",
+            ),
+            ([], _) => unknown_entry(
+                &subject,
+                &[],
+                head_cards.as_slice(),
+                "duplicate subject identity at head prevents a clean verdict",
+            ),
+            (_, []) if !head_complete => unknown_entry(
+                &subject,
+                base_cards.as_slice(),
+                &[],
+                "the head analysis is incomplete, so a base-only subject cannot be resolved",
+            ),
+            (_, []) => unknown_entry(
+                &subject,
+                base_cards.as_slice(),
+                &[],
+                "the head analysis did not cover the subject's file, so a base-only subject cannot be resolved",
+            ),
             _ => unknown_entry(
                 &subject,
-                base_cards.first(),
-                head_cards.first(),
-                "duplicate subject identity or an incomplete analysis side prevents a clean verdict",
+                base_cards.as_slice(),
+                head_cards.as_slice(),
+                "duplicate subject identity on base, head, or both prevents a clean verdict",
             ),
         };
         match entry.movement {
@@ -297,18 +324,17 @@ pub fn evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -
 }
 
 /// Unknown verdict with the best available identity context: the first
-/// base card when present, else the first head card. The union key
-/// guarantees at least one side is non-empty.
+/// base card when present, else the first head card.
 fn unknown_entry(
     subject: &str,
-    base_card: Option<&&ReviewCard>,
-    head_card: Option<&&ReviewCard>,
+    base_cards: &[&ReviewCard],
+    head_cards: &[&ReviewCard],
     reason: &str,
 ) -> SubjectMovementEntry {
-    let (base_id, head_id, ledger) = match (base_card, head_card) {
+    let (base_id, head_id, ledger) = match (base_cards.first(), head_cards.first()) {
         (Some(base_card), _) => (
             Some(base_card.id.0.clone()),
-            head_card.map(|card| card.id.0.clone()),
+            head_cards.first().map(|card| card.id.0.clone()),
             ledger_of(base_card),
         ),
         (None, Some(head_card)) => (None, Some(head_card.id.0.clone()), ledger_of(head_card)),
