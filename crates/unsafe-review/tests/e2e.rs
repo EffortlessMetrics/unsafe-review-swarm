@@ -7,7 +7,7 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
-use unsafe_review_core::WitnessReceipt;
+use unsafe_review_core::{SubjectBinding, WitnessReceipt, parse_command_line};
 
 #[test]
 fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Box<dyn Error>> {
@@ -4521,6 +4521,42 @@ fn confirm_dry_run_and_execution_preserve_current_card_and_receipt_provenance()
         Some(WitnessReceipt::command_hash(&command_text))
     );
     assert_eq!(receipt.verdict.as_deref(), Some("not_reproduced"));
+    // The executed receipt must bind the observation to the reviewed
+    // subject through the same canonical facts the import consumer
+    // re-derives: card identity, operation family, owner, file, snippet,
+    // scope, invocation digest, and capture completeness.
+    let subject = receipt.subject.as_ref().ok_or("missing subject")?;
+    assert_eq!(subject.scope.as_deref(), Some("repo"));
+    let executed = parse_command_line(&command_text)
+        .map_err(|err| format!("parse executed command failed: {err}"))?;
+    assert_eq!(
+        subject.invocation_digest.as_deref(),
+        Some(executed.digest().as_str()),
+        "subject must record the executed invocation digest"
+    );
+    assert_eq!(subject.captured_complete, Some(true));
+    let card_json = run_success_in_dir(
+        [
+            os("check"),
+            os("--root"),
+            os("."),
+            os("--diff"),
+            os("change.diff"),
+            os("--format"),
+            os("json"),
+        ],
+        &root,
+    )?;
+    let cards = parse_json(&stdout_text(&card_json)?)?;
+    let site = &cards["cards"][0]["site"];
+    let expected_subject = SubjectBinding::digest_subject_for(
+        &card_id,
+        "raw_pointer_read",
+        json_str(&site["owner"], "cards[0].site.owner")?,
+        json_str(&site["file"], "cards[0].site.file")?,
+        json_str(&site["snippet"], "cards[0].site.snippet")?,
+    );
+    assert_eq!(subject.subject_digest, expected_subject);
     let recorded_at = receipt
         .recorded_at
         .as_deref()
@@ -6925,6 +6961,9 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
 
 #[test]
 fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(), Box<dyn Error>> {
+    // The committed receipted fixture carries an unbound legacy receipt: it
+    // must stay visible with the reason it cannot count as current evidence
+    // while the static guard gap stays open.
     let fixture = fixture_root("raw_pointer_alignment_receipted");
 
     let json = run_success([
@@ -6945,13 +6984,13 @@ fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(),
         card["witness"]
             .as_str()
             .unwrap_or("")
-            .contains("Imported miri receipt")
+            .contains("cannot be shown to apply to the current subject")
     );
     assert!(
         card["witness"]
             .as_str()
             .unwrap_or("")
-            .contains("expires_at: 2099-12-31")
+            .contains("unbound legacy receipt")
     );
     let missing = card["missing"]
         .as_array()
@@ -6961,7 +7000,7 @@ fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(),
             .unwrap_or("")
             .contains("Missing visible local guard")
     }));
-    assert!(!missing.iter().any(|item| {
+    assert!(missing.iter().any(|item| {
         item.as_str()
             .unwrap_or("")
             .contains("No witness receipt imported")
@@ -6972,11 +7011,189 @@ fn check_json_imports_witness_receipts_without_hiding_guard_gaps() -> Result<(),
     assert!(
         obligations
             .iter()
-            .all(|evidence| evidence["witness"]["present"] == true)
+            .all(|evidence| evidence["witness"]["present"] == false)
     );
+    assert!(obligations.iter().all(|evidence| {
+        evidence["witness"]["summary"]
+            .as_str()
+            .unwrap_or("")
+            .contains("unbound legacy receipt")
+    }));
     assert!(obligations.iter().any(|evidence| {
         evidence["key"] == "alignment" && evidence["discharge"]["present"] == false
     }));
+
+    Ok(())
+}
+
+fn git(root: &Path, args: &[&str]) -> Result<String, Box<dyn Error>> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )
+        .into());
+    }
+    Ok(String::from_utf8(output.stdout)?)
+}
+
+// #2273 first-PR consumer proof: a receipt bound to the current subject
+// imports as applicable on a clean tree at the same revision; moving the
+// revision and then dirtying the tree makes the same receipt stale and then
+// unknown, without ever upgrading witness coverage.
+#[test]
+fn bound_receipt_imports_when_applicable_and_goes_stale_on_context_change()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-receipt-applicability-e2e")?;
+    let root = temp.path().join("fixture root");
+    copy_dir_all(&fixture_root("raw_pointer_alignment"), &root)?;
+    git(&root, &["init", "-q"])?;
+    git(&root, &["config", "user.name", "receipt e2e"])?;
+    git(&root, &["config", "user.email", "receipt@example.test"])?;
+    // The receipt store is ignored so saved receipts do not dirty the tree
+    // they evidence; any other change still reports dirty.
+    fs::write(root.join(".gitignore"), ".unsafe-review/\n")?;
+    git(&root, &["add", "-A"])?;
+    git(&root, &["commit", "-qm", "fixture base"])?;
+    let head = git(&root, &["rev-parse", "HEAD"])?;
+    let head = head.trim().to_string();
+
+    let check = || -> Result<Value, Box<dyn Error>> {
+        let output = run_success_in_dir(
+            [
+                os("check"),
+                os("--root"),
+                os("."),
+                os("--diff"),
+                os("change.diff"),
+                os("--format"),
+                os("json"),
+            ],
+            &root,
+        )?;
+        parse_json(&stdout_text(&output)?)
+    };
+
+    let baseline = check()?;
+    assert_eq!(baseline["summary"]["cards"], 1);
+    let card = &baseline["cards"][0];
+    let card_id = json_str(&card["id"], "cards[0].id")?.to_string();
+    let family = json_str(&card["operation_family"], "cards[0].operation_family")?.to_string();
+    let owner = json_str(&card["site"]["owner"], "cards[0].site.owner")?.to_string();
+    // The JSON projection renders a missing owner as the UNKNOWN_OWNER
+    // placeholder; capture hashes the empty string in that case.
+    let owner = if owner == "unknown" { "" } else { &owner }.to_string();
+    let file = json_str(&card["site"]["file"], "cards[0].site.file")?.to_string();
+    let snippet = json_str(&card["site"]["snippet"], "cards[0].site.snippet")?.to_string();
+    let command = json_str(&card["verify_commands"][0], "cards[0].verify_commands[0]")?.to_string();
+    assert!(
+        card["missing"]
+            .as_array()
+            .ok_or("missing should be an array")?
+            .iter()
+            .any(|item| {
+                item.as_str()
+                    .unwrap_or("")
+                    .contains("No witness receipt imported")
+            }),
+        "baseline must show the witness gap before any receipt exists"
+    );
+
+    // Record a bound receipt mirroring the analyzed card: same canonical
+    // subject facts, same scope, same revision, clean tree, complete
+    // capture, and the invocation digest of the routed command.
+    let invocation = parse_command_line(&command)
+        .map_err(|err| format!("parse routed command failed: {err}"))?;
+    let recorded = SubjectBinding {
+        subject_digest: SubjectBinding::digest_subject_for(
+            &card_id, &family, &owner, &file, &snippet,
+        ),
+        invocation_digest: Some(invocation.digest()),
+        scope: Some("diff".to_string()),
+        head_commit: Some(head),
+        repo_dirty: Some(false),
+        workdir: None,
+        output_digest: None,
+        captured_complete: Some(true),
+        tool_version: None,
+    };
+    let command_hash = WitnessReceipt::command_hash(&command);
+    let receipt = serde_json::json!({
+        "schema_version": "0.1",
+        "card_id": card_id,
+        "tool": "miri",
+        "strength": "ran",
+        "author": "e2e/applicability",
+        "recorded_at": "2026-05-18T00:00:00Z",
+        "expires_at": "2099-12-31",
+        "summary": "e2e bound miri receipt",
+        "command": command,
+        "command_hash": command_hash,
+        "limitations": ["e2e only"],
+        "verdict": "not_reproduced",
+        "subject": recorded,
+    });
+    let receipt_dir = root.join(".unsafe-review").join("receipts");
+    fs::create_dir_all(&receipt_dir)?;
+    fs::write(
+        receipt_dir.join("miri.json"),
+        serde_json::to_string_pretty(&receipt)?,
+    )?;
+
+    // Applicable on the clean tree at the same revision: witness imports.
+    let applicable = check()?;
+    let witness = applicable["cards"][0]["witness"]
+        .as_str()
+        .ok_or("witness should render as a string")?;
+    assert!(
+        witness.contains("Imported miri receipt"),
+        "applicable receipt must import: {witness}"
+    );
+
+    // Dirty the tree without committing: clean-tree provenance is gone, so
+    // the receipt is unknown and still upgrades nothing.
+    fs::write(
+        root.join("Cargo.toml"),
+        fs::read_to_string(root.join("Cargo.toml"))? + "# dirty\n",
+    )?;
+    let dirty = check()?;
+    let witness = dirty["cards"][0]["witness"]
+        .as_str()
+        .ok_or("witness should render as a string")?;
+    assert!(
+        witness.contains("cannot be shown to apply") && witness.contains("clean-tree provenance"),
+        "dirty tree must report the unknown reason: {witness}"
+    );
+
+    // Move the revision under the receipt with an unrelated commit: the
+    // same receipt is now stale and must not upgrade coverage.
+    git(&root, &["add", "-A"])?;
+    git(&root, &["commit", "-qm", "context change"])?;
+    let stale = check()?;
+    let witness = stale["cards"][0]["witness"]
+        .as_str()
+        .ok_or("witness should render as a string")?;
+    assert!(
+        witness.contains("stale") && witness.contains("source revision changed"),
+        "moved revision must report the stale reason: {witness}"
+    );
+    assert!(
+        stale["cards"][0]["missing"]
+            .as_array()
+            .ok_or("missing should be an array")?
+            .iter()
+            .any(|item| {
+                item.as_str()
+                    .unwrap_or("")
+                    .contains("No witness receipt imported")
+            }),
+        "stale receipt must leave the witness gap open"
+    );
 
     Ok(())
 }
@@ -7169,8 +7386,18 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
             .iter()
             .any(|status| status == "matched")
     );
+    // The unbound legacy receipt stays visible but explicitly not
+    // applicable: it must surface unknown_subject with the reason and
+    // never import as current evidence.
     assert!(
         receipt["statuses"]
+            .as_array()
+            .ok_or("statuses should be an array")?
+            .iter()
+            .any(|status| status == "unknown_subject")
+    );
+    assert!(
+        !receipt["statuses"]
             .as_array()
             .ok_or("statuses should be an array")?
             .iter()
@@ -7211,16 +7438,17 @@ fn receipt_audit_reports_matching_saved_receipts_without_running_witnesses()
     assert!(markdown.contains("# unsafe-review receipt audit"));
     assert!(markdown.contains("## Reviewer front panel"));
     assert!(markdown.contains("- Matched receipt metadata: 1"));
-    assert!(markdown.contains("- Receipts imported as current witness evidence: 1"));
+    assert!(markdown.contains("- Receipts imported as current witness evidence: 0"));
     assert!(markdown.contains("- Receipts without a current card match: 0 unmatched, 0 stale"));
     assert!(markdown.contains("- Problem flags: none"));
+    assert!(markdown.contains("matched, unknown_subject"));
     assert!(markdown.contains("keep matching receipt metadata attached to the review record"));
     assert!(markdown.contains("do not erase missing contracts"));
     assert!(markdown.contains("Duplicate"));
     assert!(markdown.contains("Matched target"));
     assert!(markdown.contains("Summary"));
     assert!(markdown.contains("focused fixture witness passed"));
-    assert!(markdown.contains("imports_witness_evidence, matched"));
+    assert!(markdown.contains("matched, unknown_subject"));
     assert!(markdown.contains("core/fixtures"));
     assert!(markdown.contains("2026-05-18T00:00:00Z"));
     assert!(markdown.contains("2099-12-31"));

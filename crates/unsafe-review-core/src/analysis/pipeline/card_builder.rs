@@ -55,6 +55,7 @@ pub(super) struct CardBuildContext<'a> {
     pub receipt_index: &'a receipts::ReceiptIndex,
     pub policy_state: &'a crate::policy::PolicyState,
     pub identity_counts: &'a mut std::collections::BTreeMap<String, usize>,
+    pub tree_facts: &'a receipts::CurrentTreeFacts,
 }
 
 pub(super) fn build_card(
@@ -71,11 +72,30 @@ pub(super) fn build_card(
     let contract = evidence::contract_evidence(&scanned_site);
     let contract_for_classification = operation_contract_override(&scanned_site.operation.family)
         .unwrap_or_else(|| contract.clone());
-    let (reach, related_tests) =
+    let (static_reach, related_tests) =
         evidence::reach_evidence(ctx.root, scanned_site.site.owner.as_ref());
     let id =
         super::card_identity::card_id(ctx.package, &scanned_site, &hazards, ctx.identity_counts);
-    let reach = ctx.receipt_index.reach_evidence_for(&id, reach);
+    // Probe routes from static reach carry the same commands as the final
+    // routes (`reached` only adjusts reason text), so the invocation digest
+    // re-derived here is stable regardless of receipt-augmented reach.
+    let probe_routes = witness::routes_for(
+        &hazards,
+        scanned_site.site.owner.as_ref(),
+        static_reach.state != "unreached",
+    );
+    let current = receipts::current_binding_for_parts(
+        &id.0,
+        scanned_site.operation.family.as_str(),
+        scanned_site.site.owner.as_deref(),
+        &scanned_site.site.location.file,
+        &scanned_site.site.snippet,
+        &probe_routes,
+        ctx.tree_facts,
+    );
+    let reach = ctx
+        .receipt_index
+        .reach_evidence_for(&id, static_reach, &current);
     let mut obligation_evidence = evidence::obligation_evidence(
         &scanned_site,
         &obligations,
@@ -120,7 +140,9 @@ pub(super) fn build_card(
         .filter_map(|route| route.command.clone())
         .collect::<Vec<_>>();
 
-    let witness_evidence = ctx.receipt_index.witness_evidence_for(&id, &routes);
+    let witness_evidence = ctx
+        .receipt_index
+        .witness_evidence_for(&id, &routes, &current);
 
     if witness_evidence.present {
         for evidence in &mut obligation_evidence {
@@ -139,21 +161,26 @@ pub(super) fn build_card(
             class = ReviewClass::GuardedAndWitnessed;
             priority = Priority::Low;
         }
-    } else if class == ReviewClass::GuardedUnwitnessed
-        && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
-    {
-        // A receipt exists but its tool does not match any routed witness tool.
-        // Only upgrade from GuardedUnwitnessed: the card is otherwise sound
-        // (contract + guard + reach present) but the receipt is broken.
-        // Surfacing it as WitnessMismatch lets every output surface treat it as
-        // an open actionable condition (see is_actionable() in classification.rs).
-        class = ReviewClass::WitnessMismatch;
-        // Propagate the mismatch summary into the obligation-level witness slot
-        // so that the top-level card.witness.summary and each obligation's
-        // evidence.witness.summary remain consistent (the check-fixtures gate
-        // enforces this invariant).
+    } else {
+        // Missing, mismatched, stale, or unknown: no imported receipt counts
+        // as current evidence. Every obligation-level witness slot carries
+        // the same missing summary as the top-level card witness slot so
+        // that the two remain consistent (the check-fixtures gate enforces
+        // this invariant); the summary names the cause — absent, wrong
+        // tool, stale, or unknown subject — while the card keeps its
+        // urgency and the witness gap stays open.
         for evidence in &mut obligation_evidence {
             evidence.witness = crate::domain::EvidenceState::missing(&witness_evidence.summary);
+        }
+        if class == ReviewClass::GuardedUnwitnessed
+            && ctx.receipt_index.has_tool_mismatch_for(&id, &routes)
+        {
+            // A receipt exists but its tool does not match any routed witness tool.
+            // Only upgrade from GuardedUnwitnessed: the card is otherwise sound
+            // (contract + guard + reach present) but the receipt is broken.
+            // Surfacing it as WitnessMismatch lets every output surface treat it as
+            // an open actionable condition (see is_actionable() in classification.rs).
+            class = ReviewClass::WitnessMismatch;
         }
     }
 

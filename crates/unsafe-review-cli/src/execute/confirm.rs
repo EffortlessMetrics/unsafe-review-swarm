@@ -7,9 +7,9 @@ use std::time::{Duration, Instant, SystemTime, UNIX_EPOCH};
 
 use unsafe_review_core::{
     AnalysisMode, AnalyzeInput, CargoCarefulReceiptInput, ConcurrencyReceiptInput,
-    ExecutedReceiptInput, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
+    ExecutedReceiptInput, Invocation, MiriReceiptInput, PolicyMode, ProofReceiptInput, ReviewCard,
     SanitizerReceiptInput, Scope, SubjectBinding, TerminalStatus, WitnessKind, WitnessReceipt,
-    WitnessRoute, analyze,
+    WitnessRoute, analyze, parse_command_line,
 };
 
 use crate::command::{CheckOptions, ConfirmOptions};
@@ -67,9 +67,9 @@ pub(super) fn run(options: ConfirmOptions) -> Result<(), String> {
     reject_diff_execution(&options)?;
     println!("command provenance: {}", command_source.label());
     println!("parsed program: {}", invocation.program);
-    println!("parsed argv: {}", invocation.describe_argv());
+    println!("parsed argv: {}", describe_argv(&invocation));
     if !invocation.env.is_empty() {
-        println!("parsed env: {}", invocation.describe_env());
+        println!("parsed env: {}", describe_env(&invocation));
     }
     let execution = execute_with_timeout(
         &invocation.env,
@@ -162,9 +162,9 @@ fn print_dry_run(
     println!("command: {command_text}");
     println!("command provenance: {}", command_source.label());
     println!("parsed program: {}", invocation.program);
-    println!("parsed argv: {}", invocation.describe_argv());
+    println!("parsed argv: {}", describe_argv(invocation));
     if !invocation.env.is_empty() {
-        println!("parsed env: {}", invocation.describe_env());
+        println!("parsed env: {}", describe_env(invocation));
     }
     println!("working directory: {}", options.root.display());
     println!("timeout: {}s", options.timeout_seconds);
@@ -234,18 +234,14 @@ fn subject_binding(
 ) -> SubjectBinding {
     let owner = card.site.owner.as_deref().unwrap_or("");
     SubjectBinding {
-        subject_digest: SubjectBinding::digest_subject(&[
+        subject_digest: SubjectBinding::digest_subject_for(
             &card.id.0,
             card.operation.family.as_str(),
             owner,
-            &card.site.location.file.to_string_lossy(),
+            &SubjectBinding::subject_file_display(&card.site.location.file),
             &card.site.snippet,
-        ]),
-        invocation_digest: Some(SubjectBinding::digest_invocation(
-            &invocation.program,
-            &invocation.args,
-            &invocation.env,
-        )),
+        ),
+        invocation_digest: Some(invocation.digest()),
         scope: Some(scope.to_string()),
         head_commit: git_head(root),
         repo_dirty: git_dirty(root),
@@ -444,162 +440,20 @@ fn build_receipt(lane: ConfirmLane, fields: ReceiptFields) -> Result<WitnessRece
     WitnessReceipt::from_executed_output(input)
 }
 
-type EnvAssignments = Vec<(String, String)>;
-
-/// One parsed witness invocation: program, arguments, environment
-/// overrides, and provenance. This single value feeds the dry-run preview,
-/// the process spawner, and the receipt identity, so the previewed command
-/// is the executed command.
-///
-/// Grammar (no shell involved): whitespace separates words; single quotes
-/// preserve bytes literally; double quotes preserve literally except that
-/// backslash escapes only `"` and `\` (so Windows paths survive); a
-/// backslash outside quotes escapes the next character; shell
-/// metacharacters (`| & ; < > ( ) $` and backtick) are rejected explicitly
-/// instead of being reinterpreted.
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct Invocation {
-    program: String,
-    args: Vec<String>,
-    env: EnvAssignments,
+/// Presentation helpers for the parsed witness invocation. Parsing itself
+/// lives in core (`unsafe_review_core::parse_command_line`) so capture and
+/// the receipt-import consumer share one grammar; these description helpers
+/// stay CLI-side because they only shape terminal output.
+fn describe_argv(invocation: &Invocation) -> String {
+    format!("{:?}", invocation.exec_argv())
 }
 
-impl Invocation {
-    fn exec_argv(&self) -> Vec<String> {
-        let mut argv = Vec::with_capacity(self.args.len() + 1);
-        argv.push(self.program.clone());
-        argv.extend(self.args.iter().cloned());
-        argv
-    }
-
-    fn describe_argv(&self) -> String {
-        format!("{:?}", self.exec_argv())
-    }
-
-    fn describe_env(&self) -> String {
-        // Keys only: values may carry secrets from user-authored witness
-        // commands, and this string is printed to the terminal (plus any
-        // CI log capturing stdout).
-        let keys: Vec<&str> = self.env.iter().map(|(key, _)| key.as_str()).collect();
-        format!("{keys:?} (values redacted)")
-    }
-}
-
-fn parse_command_line(command: &str) -> Result<Invocation, String> {
-    let words = split_command_words(command)?;
-    let mut env = Vec::new();
-    let mut words = words.into_iter();
-    let mut program = None;
-    for word in words.by_ref() {
-        if program.is_none()
-            && let Some(assignment) = env_assignment(&word)
-        {
-            env.push(assignment);
-            continue;
-        }
-        program = Some(word);
-        break;
-    }
-    let Some(program) = program else {
-        return Err(
-            "witness command has no executable to run after environment assignments".to_string(),
-        );
-    };
-    Ok(Invocation {
-        program,
-        args: words.collect(),
-        env,
-    })
-}
-
-fn split_command_words(command: &str) -> Result<Vec<String>, String> {
-    let mut words = Vec::new();
-    let mut current = String::new();
-    let mut started = false;
-    let mut chars = command.chars().peekable();
-    while let Some(ch) = chars.next() {
-        match ch {
-            ch if ch.is_whitespace() => {
-                if started {
-                    words.push(std::mem::take(&mut current));
-                    started = false;
-                }
-            }
-            '\'' => {
-                started = true;
-                loop {
-                    match chars.next() {
-                        None => {
-                            return Err(
-                                "witness command has an unterminated single quote".to_string()
-                            );
-                        }
-                        Some('\'') => break,
-                        Some(next) => current.push(next),
-                    }
-                }
-            }
-            '"' => {
-                started = true;
-                loop {
-                    match chars.next() {
-                        None => {
-                            return Err(
-                                "witness command has an unterminated double quote".to_string()
-                            );
-                        }
-                        Some('"') => break,
-                        // Inside double quotes only `"` and `\` are escapable,
-                        // so Windows paths like `"C:\tools\runner"` survive
-                        // unchanged. Every other backslash stays literal.
-                        Some('\\') => match chars.peek() {
-                            Some('"') | Some('\\') => {
-                                current.push(chars.next().unwrap_or('\\'));
-                            }
-                            _ => current.push('\\'),
-                        },
-                        Some(next) => current.push(next),
-                    }
-                }
-            }
-            '\\' => {
-                let Some(escaped) = chars.next() else {
-                    return Err("witness command has a trailing backslash".to_string());
-                };
-                started = true;
-                current.push(escaped);
-            }
-            '|' | '&' | ';' | '<' | '>' | '(' | ')' | '$' | '`' => {
-                return Err(format!(
-                    "witness command contains unsupported shell syntax `{ch}`; quote it to pass it literally or run the pipeline manually and import a receipt"
-                ));
-            }
-            _ => {
-                started = true;
-                current.push(ch);
-            }
-        }
-    }
-    if started {
-        words.push(current);
-    }
-    Ok(words)
-}
-
-fn env_assignment(token: &str) -> Option<(String, String)> {
-    let (name, value) = token.split_once('=')?;
-    let mut chars = name.chars();
-    let first = chars.next()?;
-    if !(first.is_ascii_alphabetic() || first == '_') {
-        return None;
-    }
-    if !name
-        .chars()
-        .all(|ch| ch.is_ascii_alphanumeric() || ch == '_')
-    {
-        return None;
-    }
-    Some((name.to_string(), value.to_string()))
+fn describe_env(invocation: &Invocation) -> String {
+    // Keys only: values may carry secrets from user-authored witness
+    // commands, and this string is printed to the terminal (plus any
+    // CI log capturing stdout).
+    let keys: Vec<&str> = invocation.env.iter().map(|(key, _)| key.as_str()).collect();
+    format!("{keys:?} (values redacted)")
 }
 
 fn describe_terminal(terminal: TerminalStatus) -> String {
@@ -1537,7 +1391,7 @@ mod tests {
     #[test]
     fn describe_env_redacts_assignment_values() -> Result<(), String> {
         let invocation = parse_command_line("AWS_SECRET_ACCESS_KEY=hunter2 cargo test")?;
-        let shown = invocation.describe_env();
+        let shown = describe_env(&invocation);
         assert!(shown.contains("AWS_SECRET_ACCESS_KEY"));
         assert!(!shown.contains("hunter2"));
         Ok(())

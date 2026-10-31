@@ -488,6 +488,27 @@ pub(crate) fn apply_cap_note<T>(mut items: Vec<T>, cap: Option<usize>) -> (Vec<T
     }
 }
 
+/// Read-only worktree dirtiness probe for receipt subject comparison.
+///
+/// Runs `git status --porcelain=v1` and reports whether the output is
+/// non-empty. Like every helper here, it only observes: it never writes
+/// objects, refs, index entries, or worktree bytes. Returns `None` when git
+/// is unavailable, the directory is not in a work tree, or the probe fails,
+/// so callers fail closed to Unknown applicability instead of inventing
+/// clean-tree evidence.
+pub fn worktree_dirty(start: &Path) -> Option<bool> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(start)
+        .args(["status", "--porcelain=v1"])
+        .output()
+        .ok()?;
+    if !output.status.success() {
+        return None;
+    }
+    Some(!output.stdout.is_empty())
+}
+
 pub(crate) fn git_output(dir: &Path, args: &[&str], step: &str) -> Result<String, String> {
     let output = Command::new("git")
         .arg("-C")

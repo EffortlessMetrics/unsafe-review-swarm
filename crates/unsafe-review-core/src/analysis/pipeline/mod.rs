@@ -16,6 +16,7 @@ use crate::api::{
 };
 use crate::domain::ReviewCard;
 use crate::freshness::AnalysisIdentity;
+use crate::input::scope_git::{discover_repo, worktree_dirty};
 use crate::input::workspace;
 use crate::policy::PolicyState;
 use std::collections::{BTreeMap, BTreeSet};
@@ -70,6 +71,19 @@ fn default_discovery_for(input: &AnalyzeInput) -> DiscoveryOptions {
     } else {
         DiscoveryOptions::default()
     }
+}
+
+/// Read-only current-tree facts for receipt subject comparison.
+///
+/// Returns `(head_commit, repo_dirty)`, failing soft to `(None, None)` when
+/// `root` is not in a git work tree or a probe fails. `None` facts carry no
+/// evidence, so bound receipts compare Unknown rather than applicable.
+fn current_repo_facts(root: &Path) -> (Option<String>, Option<bool>) {
+    let Ok(facts) = discover_repo(root) else {
+        return (None, None);
+    };
+    let dirty = worktree_dirty(&facts.toplevel);
+    (facts.head_commit, dirty)
 }
 
 fn analyze_with_receipts(
@@ -127,6 +141,18 @@ fn analyze_with_receipts(
         receipts::ReceiptIndex::load(&input.root)?
     } else {
         receipts::ReceiptIndex::default()
+    };
+    // Current-tree facts for receipt subject comparison, probed once per
+    // analysis. Fail soft to `None` outside a git work tree or when a probe
+    // fails: missing facts carry no clean-tree or revision evidence, so
+    // bound receipts compare Unknown instead of inventing applicability.
+    let tree_facts = {
+        let (repo_head, repo_dirty) = current_repo_facts(&input.root);
+        receipts::CurrentTreeFacts {
+            scope: input.scope.as_str().to_string(),
+            head_commit: repo_head,
+            repo_dirty,
+        }
     };
     // A diff was *supplied* when the source is Text or File (even if the
     // parsed index is empty — an empty `git diff` is a valid zero-change diff,
@@ -222,6 +248,7 @@ fn analyze_with_receipts(
             receipt_index: &receipt_index,
             policy_state: &policy_state,
             identity_counts: &mut identity_counts,
+            tree_facts: &tree_facts,
         };
         for scanned_site in file_result.sites {
             cards.push(card_builder::build_card(&mut build_ctx, scanned_site));
@@ -6696,11 +6723,15 @@ unsafe extern "C" {
     fn imported_receipt_marks_witness_evidence_present_by_exact_card_identity() -> Result<(), String>
     {
         let root = copy_fixture_to_temp("raw_pointer_alignment", "unsafe-review-receipt-match")?;
-        let card_id = single_card("raw_pointer_alignment", &fixture_output_at(&root)?)?
-            .id
-            .0
-            .clone();
-        write_receipt(&root, &card_id)?;
+        git_init_for_receipts(&root)?;
+        let first = fixture_output_at(&root)?;
+        let scope = first.scope.as_str().to_string();
+        let probed = first
+            .cards
+            .into_iter()
+            .next()
+            .ok_or_else(|| "raw_pointer_alignment should emit exactly one card".to_string())?;
+        write_bound_receipt_for_card(&root, &probed, &scope, "miri", "ran")?;
 
         let output = fixture_output_at(&root)?;
         let card = single_card("raw_pointer_alignment receipt", &output)?;
@@ -6777,11 +6808,13 @@ unsafe extern "C" {
     fn ffi_human_review_receipt_marks_witness_evidence_present_only() -> Result<(), String> {
         let root =
             copy_fixture_to_temp("ffi_missing_boundary_contract", "unsafe-review-ffi-receipt")?;
-        let card_id = single_card("ffi_missing_boundary_contract", &fixture_output_at(&root)?)?
-            .id
-            .0
-            .clone();
-        write_receipt_with_tool_and_strength(&root, &card_id, "human-deep-review", "reviewed")?;
+        git_init_for_receipts(&root)?;
+        let first = fixture_output_at(&root)?;
+        let scope = first.scope.as_str().to_string();
+        let probed = first.cards.into_iter().next().ok_or_else(|| {
+            "ffi_missing_boundary_contract should emit exactly one card".to_string()
+        })?;
+        write_bound_receipt_for_card(&root, &probed, &scope, "human-deep-review", "reviewed")?;
 
         let output = fixture_output_at(&root)?;
         let card = single_card("ffi_missing_boundary_contract receipt", &output)?;
@@ -6824,13 +6857,16 @@ unsafe extern "C" {
             "ffi_missing_boundary_contract",
             "unsafe-review-external-reach-receipt",
         )?;
-        let card_id = single_card("ffi_missing_boundary_contract", &fixture_output_at(&root)?)?
-            .id
-            .0
-            .clone();
-        write_receipt_with_tool_and_strength(
+        git_init_for_receipts(&root)?;
+        let first = fixture_output_at(&root)?;
+        let scope = first.scope.as_str().to_string();
+        let probed = first.cards.into_iter().next().ok_or_else(|| {
+            "ffi_missing_boundary_contract should emit exactly one card".to_string()
+        })?;
+        write_bound_receipt_for_card(
             &root,
-            &card_id,
+            &probed,
+            &scope,
             "external-integration-test",
             "site_reached",
         )?;
@@ -6870,10 +6906,11 @@ unsafe extern "C" {
 
         assert_eq!(card.operation.family, OperationFamily::RawPointerRead);
         assert_eq!(card.class, ReviewClass::GuardMissing);
-        assert!(card.witness.present);
-        assert!(card.witness.summary.contains("miri"));
-        assert!(card.witness.summary.contains("ran"));
-        assert!(!card.missing.iter().any(|missing| missing.kind == "witness"));
+        // The committed fixture receipt is an unbound legacy receipt: it
+        // stays visible with the reason it cannot count as current evidence.
+        assert!(!card.witness.present);
+        assert!(card.witness.summary.contains("unbound legacy receipt"));
+        assert!(card.missing.iter().any(|missing| missing.kind == "witness"));
         assert!(card.missing.iter().any(|missing| missing.kind == "guard"));
         assert!(
             !obligation_discharge_present(card, "alignment"),
@@ -6882,7 +6919,8 @@ unsafe extern "C" {
         assert!(
             card.obligation_evidence
                 .iter()
-                .all(|evidence| evidence.witness.present)
+                .all(|evidence| !evidence.witness.present),
+            "the unbound legacy receipt must not satisfy witness evidence"
         );
         Ok(())
     }
@@ -7030,10 +7068,6 @@ evidence = "test fixture"
         .map_err(|err| format!("write policy ledger failed: {err}"))
     }
 
-    fn write_receipt(root: &Path, card_id: &str) -> Result<(), String> {
-        write_receipt_with_strength(root, card_id, "ran")
-    }
-
     fn write_receipt_with_strength(
         root: &Path,
         card_id: &str,
@@ -7073,6 +7107,105 @@ evidence = "test fixture"
   "command": "{command}",
   "limitations": ["fixture only"]
 }}"#
+            ),
+        )
+        .map_err(|err| format!("write receipt failed: {err}"))
+    }
+
+    /// Initialize a git work tree in `root` with its current contents
+    /// committed and the receipt store ignored, for bound-receipt tests.
+    fn git_init_for_receipts(root: &Path) -> Result<(), String> {
+        for args in [
+            vec!["init", "-q"],
+            vec!["config", "user.name", "receipt test"],
+            vec!["config", "user.email", "receipt@example.test"],
+        ] {
+            run_git(root, &args)?;
+        }
+        fs::write(root.join(".gitignore"), ".unsafe-review/\n")
+            .map_err(|err| format!("write test gitignore failed: {err}"))?;
+        run_git(root, &["add", "-A"])?;
+        run_git(root, &["commit", "-qm", "fixture base"])?;
+        Ok(())
+    }
+
+    fn run_git(root: &Path, args: &[&str]) -> Result<String, String> {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .map_err(|err| format!("run git {args:?} failed: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        String::from_utf8(output.stdout)
+            .map_err(|err| format!("git {args:?} output is not UTF-8: {err}"))
+    }
+
+    /// Write a bound receipt for `card` into `root`, mirroring the analyzed
+    /// card through the same constructor the card builder uses at import
+    /// time. Capture completeness is established on the recorded side, so
+    /// the receipt imports as applicable on the clean tree.
+    fn write_bound_receipt_for_card(
+        root: &Path,
+        card: &ReviewCard,
+        scope: &str,
+        tool: &str,
+        strength: &str,
+    ) -> Result<(), String> {
+        let command = card
+            .routes
+            .iter()
+            .find_map(|route| route.command.clone())
+            .ok_or_else(|| format!("card {} has no routable command", card.id.0))?;
+        let facts = match discover_repo(root) {
+            Ok(facts) => receipts::CurrentTreeFacts {
+                scope: scope.to_string(),
+                head_commit: facts.head_commit,
+                repo_dirty: worktree_dirty(&facts.toplevel),
+            },
+            Err(_) => receipts::CurrentTreeFacts {
+                scope: scope.to_string(),
+                head_commit: None,
+                repo_dirty: None,
+            },
+        };
+        let mut recorded = receipts::current_binding_for_parts(
+            &card.id.0,
+            card.operation.family.as_str(),
+            card.site.owner.as_deref(),
+            &card.site.location.file,
+            &card.site.snippet,
+            &card.routes,
+            &facts,
+        );
+        recorded.captured_complete = Some(true);
+        let subject = serde_json::to_value(&recorded)
+            .map_err(|err| format!("serialize test subject failed: {err}"))?;
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create {} failed: {err}", receipt_dir.display()))?;
+        fs::write(
+            receipt_dir.join(format!("{}.json", tool.replace('-', "_"))),
+            format!(
+                r#"{{
+  "schema_version": "0.1",
+  "card_id": "{card_id}",
+  "tool": "{tool}",
+  "strength": "{strength}",
+  "author": "core/fixtures",
+  "recorded_at": "2026-05-18T00:00:00Z",
+  "expires_at": "2099-12-31",
+  "summary": "focused fixture witness passed",
+  "command": "{command}",
+  "limitations": ["fixture only"],
+  "subject": {subject}
+}}"#,
+                card_id = card.id.0,
             ),
         )
         .map_err(|err| format!("write receipt failed: {err}"))

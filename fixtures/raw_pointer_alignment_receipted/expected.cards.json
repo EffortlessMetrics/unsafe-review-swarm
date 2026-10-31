@@ -50,9 +50,9 @@
           "summary": "1 related test file mentions owner `read_header`"
         },
         "witness": {
-          "present": true,
-          "state": "present",
-          "summary": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt"
         }
       },
       {
@@ -74,9 +74,9 @@
           "summary": "1 related test file mentions owner `read_header`"
         },
         "witness": {
-          "present": true,
-          "state": "present",
-          "summary": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt"
         }
       },
       {
@@ -98,9 +98,9 @@
           "summary": "1 related test file mentions owner `read_header`"
         },
         "witness": {
-          "present": true,
-          "state": "present",
-          "summary": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt"
         }
       },
       {
@@ -122,9 +122,9 @@
           "summary": "1 related test file mentions owner `read_header`"
         },
         "witness": {
-          "present": true,
-          "state": "present",
-          "summary": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt"
         }
       },
       {
@@ -146,16 +146,16 @@
           "summary": "1 related test file mentions owner `read_header`"
         },
         "witness": {
-          "present": true,
-          "state": "present",
-          "summary": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only"
+          "present": false,
+          "state": "missing",
+          "summary": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt"
         }
       }
     ],
     "contract": "Nearby `SAFETY:` comment was detected",
     "discharge": "Some inferred safety obligations are missing local guard evidence",
     "reach": "1 related test file mentions owner `read_header`",
-    "witness": "Imported miri receipt with `ran` strength: focused fixture witness passed; author: core/fixtures; recorded_at: 2026-05-18T00:00:00Z; expires_at: 2099-12-31; command: cargo +nightly miri test read_header; command_hash: 3e163b0bce29ff2e; limitations: fixture only",
+    "witness": "Saved `miri` receipt cannot be shown to apply to the current subject: unbound legacy receipt carries no subject identity; attach a current matching receipt",
     "witness_routes": [
       {
         "kind": "miri",
@@ -178,7 +178,8 @@
       }
     ],
     "missing": [
-      "Missing visible local guard for inferred safety obligations"
+      "Missing visible local guard for inferred safety obligations",
+      "No witness receipt imported for this card"
     ],
     "next_action": "Add or expose local guards for these `raw_pointer_read` safety obligations: (1) pointer is live and dereferenceable for the accessed type, (2) pointer is aligned for the accessed type, (3) memory is initialized for the accessed type, (4) access remains inside one live allocation.",
     "verify_commands": [
@@ -205,15 +206,15 @@
         "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
       },
       "confirmation_step": "build/run `cargo +nightly miri test read_header` first, then attach a matching receipt if it confirms the route",
-      "runtime_executed": true,
-      "confirmation_state": "executed",
+      "runtime_executed": false,
+      "confirmation_state": "pending",
       "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
     },
     "coverage": {
       "contract_coverage": "present",
       "guard_coverage": "missing",
       "test_reach_coverage": "missing",
-      "witness_receipt_coverage": "present",
+      "witness_receipt_coverage": "missing",
       "manual_context": "absent",
       "baseline_state": "new",
       "outcome_movement": "regressed",

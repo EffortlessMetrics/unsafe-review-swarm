@@ -3,8 +3,8 @@ use crate::candidate::{
     ManualCandidate, ManualCandidateOracleMap, ManualCandidateProofMode, load_manual_candidates,
 };
 use crate::domain::{
-    CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, WitnessEvidence, WitnessReceipt,
-    WitnessRoute,
+    CardId, ReachEvidence, ReceiptCardIdKind, ReviewCard, SubjectApplicability, SubjectBinding,
+    WitnessEvidence, WitnessReceipt, WitnessRoute, parse_command_line,
 };
 use crate::util::path_display;
 use serde::Serialize;
@@ -26,12 +26,16 @@ pub(crate) struct ReceiptIndex {
 #[derive(Clone, Debug)]
 struct ImportedReceipt {
     tool: String,
+    strength: String,
     evidence: WitnessEvidence,
+    subject: Option<SubjectBinding>,
 }
 
 #[derive(Clone, Debug)]
 struct ImportedReachReceipt {
     evidence: ReachEvidence,
+    subject: Option<SubjectBinding>,
+    strength: String,
 }
 
 #[derive(Clone, Debug)]
@@ -81,7 +85,9 @@ impl ReceiptIndex {
                         receipt.card_id.clone(),
                         ImportedReceipt {
                             tool: receipt.tool.clone(),
+                            strength: receipt.strength.clone(),
                             evidence: receipt.evidence.clone(),
+                            subject: receipt.subject.clone(),
                         },
                     )
                     .is_some()
@@ -104,6 +110,8 @@ impl ReceiptIndex {
                                     receipt.evidence.summary
                                 ),
                             },
+                            subject: receipt.subject.clone(),
+                            strength: receipt.strength.clone(),
                         },
                     )
                     .is_some()
@@ -127,14 +135,27 @@ impl ReceiptIndex {
         &self,
         id: &CardId,
         static_reach: ReachEvidence,
+        current: &SubjectBinding,
     ) -> ReachEvidence {
         if static_reach.state != "unreached" {
             return static_reach;
         }
-        self.reach_by_card_id
-            .get(&id.0)
-            .map(|receipt| receipt.evidence.clone())
-            .unwrap_or(static_reach)
+        let Some(receipt) = self.reach_by_card_id.get(&id.0) else {
+            return static_reach;
+        };
+        // A stale or inapplicable reach receipt never upgrades reach: the
+        // static finding stands and the audit surface carries the reason.
+        if inapplicable_reason(
+            "external-integration-test",
+            &receipt.strength,
+            receipt.subject.as_ref(),
+            current,
+        )
+        .is_some()
+        {
+            return static_reach;
+        }
+        receipt.evidence.clone()
     }
 
     /// Returns `true` when an imported receipt exists for `id` but its tool
@@ -156,6 +177,7 @@ impl ReceiptIndex {
         &self,
         id: &CardId,
         routes: &[WitnessRoute],
+        current: &SubjectBinding,
     ) -> WitnessEvidence {
         let route_tools = routes
             .iter()
@@ -163,6 +185,17 @@ impl ReceiptIndex {
             .collect::<Vec<_>>();
         if let Some(receipt) = self.by_card_id.get(&id.0) {
             if route_tools.iter().any(|tool| *tool == receipt.tool) {
+                // A stale or inapplicable receipt never upgrades witness
+                // coverage: report the reason as missing evidence so the card
+                // keeps its urgency and the explanation names the cause.
+                if let Some(reason) = inapplicable_reason(
+                    &receipt.tool,
+                    &receipt.strength,
+                    receipt.subject.as_ref(),
+                    current,
+                ) {
+                    return WitnessEvidence::missing_with(reason);
+                }
                 return receipt.evidence.clone();
             }
             return WitnessEvidence::missing_with(format!(
@@ -201,6 +234,108 @@ impl ReceiptIndex {
             ));
         }
         WitnessEvidence::missing()
+    }
+}
+
+/// Current-tree facts for receipt subject comparison, probed once per
+/// analysis or audit.
+///
+/// `None` facts carry no clean-tree or revision evidence, so bound receipts
+/// compare Unknown rather than inventing applicability.
+#[derive(Clone, Debug)]
+pub(crate) struct CurrentTreeFacts {
+    pub scope: String,
+    pub head_commit: Option<String>,
+    pub repo_dirty: Option<bool>,
+}
+
+/// Build the current subject binding for a card from the same canonical
+/// facts the `confirm` capture path records.
+///
+/// The expected invocation digest is re-derived by parsing the card's
+/// currently-routed witness command with the shared command grammar (first
+/// route carrying a command wins, the same rule `confirm` uses to select
+/// the executed route). A card with no routable command, or an unparseable
+/// one, yields no invocation identity and therefore never compares
+/// applicable. Capture completeness, output digest, workdir, and tool
+/// version are properties of a recording, not of the current tree, so the
+/// consumer leaves them empty.
+pub(crate) fn current_binding_for_parts(
+    card_id: &str,
+    family: &str,
+    owner: Option<&str>,
+    file: &std::path::Path,
+    snippet: &str,
+    routes: &[WitnessRoute],
+    facts: &CurrentTreeFacts,
+) -> SubjectBinding {
+    SubjectBinding {
+        subject_digest: SubjectBinding::digest_subject_for(
+            card_id,
+            family,
+            owner.unwrap_or(""),
+            &SubjectBinding::subject_file_display(file),
+            snippet,
+        ),
+        invocation_digest: first_routed_command(routes)
+            .and_then(|command| parse_command_line(command).ok())
+            .map(|invocation| invocation.digest()),
+        scope: Some(facts.scope.clone()),
+        head_commit: facts.head_commit.clone(),
+        repo_dirty: facts.repo_dirty,
+        workdir: None,
+        output_digest: None,
+        captured_complete: None,
+        tool_version: None,
+    }
+}
+
+fn first_routed_command(routes: &[WitnessRoute]) -> Option<&str> {
+    routes.iter().find_map(|route| route.command.as_deref())
+}
+
+/// Returns the stale/unknown reason when a recorded binding does not apply
+/// to the current subject, or `None` when the receipt may contribute
+/// evidence.
+fn inapplicable_reason(
+    tool: &str,
+    strength: &str,
+    recorded: Option<&SubjectBinding>,
+    current: &SubjectBinding,
+) -> Option<String> {
+    let applicability = applicability_for_receipt(tool, strength, recorded, current);
+    match applicability {
+        SubjectApplicability::Applicable => None,
+        SubjectApplicability::Stale { reason } => Some(format!(
+            "Saved `{tool}` receipt is stale for the current subject: {reason}; attach a current matching receipt"
+        )),
+        SubjectApplicability::Unknown { reason } => Some(format!(
+            "Saved `{tool}` receipt cannot be shown to apply to the current subject: {reason}; attach a current matching receipt"
+        )),
+    }
+}
+
+/// Whether a receipt kind carries no executable invocation identity, so the
+/// consumer gates it on every applicability leg except invocation comparison.
+/// Exactly the hand-authored kinds: `human-deep-review` witness receipts and
+/// `external-integration-test` reach receipts. One shared rule for the
+/// loader, the card builder, and the audit surface so the three can never
+/// disagree on what "applicable" means.
+fn skips_invocation_check(tool: &str, strength: &str) -> bool {
+    tool == "human-deep-review" || imports_reach_evidence(tool, strength)
+}
+
+/// Decide whether a receipt may contribute evidence to the current subject.
+fn applicability_for_receipt(
+    tool: &str,
+    strength: &str,
+    recorded: Option<&SubjectBinding>,
+    current: &SubjectBinding,
+) -> SubjectApplicability {
+    if skips_invocation_check(tool, strength) {
+        SubjectBinding::applicability_without_invocation(recorded, current)
+    } else {
+        SubjectBinding::applicability(recorded, current)
     }
 }
 
@@ -363,6 +498,22 @@ fn audit_receipts_with_date(
         ..ReceiptAuditSummary::default()
     };
     let duplicate_import_keys = duplicate_receipt_import_keys(&records);
+    // Current-tree facts for subject comparison, probed once per audit.
+    // Fail soft to `None` outside a git work tree or when a probe fails:
+    // missing facts carry no clean-tree or revision evidence, so bound
+    // receipts compare Unknown instead of inventing applicability.
+    let tree_facts = match crate::input::scope_git::discover_repo(&output.root) {
+        Ok(facts) => CurrentTreeFacts {
+            scope: output.scope.as_str().to_string(),
+            head_commit: facts.head_commit,
+            repo_dirty: crate::input::scope_git::worktree_dirty(&facts.toplevel),
+        },
+        Err(_) => CurrentTreeFacts {
+            scope: output.scope.as_str().to_string(),
+            head_commit: None,
+            repo_dirty: None,
+        },
+    };
     let mut receipts = Vec::new();
 
     for record in records {
@@ -372,6 +523,7 @@ fn audit_receipts_with_date(
             &manual_candidates,
             audit_date,
             &duplicate_import_keys,
+            &tree_facts,
         );
         count_statuses(&mut summary, &entry.statuses);
         receipts.push(entry);
@@ -430,6 +582,7 @@ struct ParsedReceipt {
     expires_at: String,
     strength: String,
     tool: String,
+    subject: Option<SubjectBinding>,
 }
 
 fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
@@ -446,8 +599,9 @@ fn parse_receipt_file(path: &Path) -> Result<ParsedReceipt, String> {
             .with_runtime_executed(records_runtime_execution(&receipt.tool, &receipt.strength))
             .with_verdict(receipt.verdict.clone()),
         expires_at: receipt.expires_at.clone().unwrap_or_default(),
-        strength: receipt.strength,
-        tool: receipt.tool,
+        strength: receipt.strength.clone(),
+        tool: receipt.tool.clone(),
+        subject: receipt.subject.clone(),
     })
 }
 
@@ -547,6 +701,7 @@ fn audit_receipt_record(
     manual_candidates: &BTreeMap<String, ManualCandidate>,
     audit_date: &str,
     duplicate_import_keys: &BTreeSet<(String, String)>,
+    tree_facts: &CurrentTreeFacts,
 ) -> ReceiptAuditEntry {
     let mut statuses = BTreeSet::new();
     let mut issues = Vec::new();
@@ -652,6 +807,38 @@ fn audit_receipt_record(
                 receipt.strength
             ));
         }
+        // Subject applicability gates imports exactly as the card builder
+        // gates them: stale or unknown receipts stay visible with the reason
+        // but never count as current evidence.
+        let current = current_binding_for_parts(
+            &card.id.0,
+            card.operation.family.as_str(),
+            card.site.owner.as_deref(),
+            &card.site.location.file,
+            &card.site.snippet,
+            &card.routes,
+            tree_facts,
+        );
+        match applicability_for_receipt(
+            &receipt.tool,
+            &receipt.strength,
+            receipt.subject.as_ref(),
+            &current,
+        ) {
+            SubjectApplicability::Applicable => {}
+            SubjectApplicability::Stale { reason } => {
+                statuses.insert("stale".to_string());
+                issues.push(format!(
+                    "receipt is stale for the current subject: {reason}"
+                ));
+            }
+            SubjectApplicability::Unknown { reason } => {
+                statuses.insert("unknown_subject".to_string());
+                issues.push(format!(
+                    "receipt cannot be shown to apply to the current subject: {reason}"
+                ));
+            }
+        }
     } else if let Some(_candidate) = matched_manual_candidate {
         statuses.insert("manual_candidate".to_string());
         statuses.insert("matched".to_string());
@@ -684,10 +871,11 @@ fn audit_receipt_record(
         ));
     }
 
-    if receipt_imports_current_witness_evidence(&receipt, &statuses, &route_tools) {
+    let applicable = !statuses.contains("stale") && !statuses.contains("unknown_subject");
+    if receipt_imports_current_witness_evidence(&receipt, &statuses, &route_tools, applicable) {
         statuses.insert("imports_witness_evidence".to_string());
     }
-    if receipt_imports_current_reach_evidence(&receipt, &statuses) {
+    if receipt_imports_current_reach_evidence(&receipt, &statuses, applicable) {
         statuses.insert("imports_reach_evidence".to_string());
     }
 
@@ -716,8 +904,10 @@ fn receipt_imports_current_witness_evidence(
     receipt: &WitnessReceipt,
     statuses: &BTreeSet<String>,
     route_tools: &[String],
+    applicable: bool,
 ) -> bool {
-    statuses.contains("matched")
+    applicable
+        && statuses.contains("matched")
         && !statuses.contains("manual_candidate")
         && !statuses.contains("invalid")
         && !statuses.contains("expired")
@@ -729,8 +919,10 @@ fn receipt_imports_current_witness_evidence(
 fn receipt_imports_current_reach_evidence(
     receipt: &WitnessReceipt,
     statuses: &BTreeSet<String>,
+    applicable: bool,
 ) -> bool {
-    statuses.contains("matched")
+    applicable
+        && statuses.contains("matched")
         && !statuses.contains("manual_candidate")
         && !statuses.contains("invalid")
         && !statuses.contains("expired")
@@ -886,37 +1078,66 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        fs::write(
-            receipts.join("miri.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "miri",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2099-12-31",
-  "summary": "focused witness passed",
-  "command": "cargo +nightly miri test read_header",
-  "limitations": ["fixture only"]
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write receipt failed: {err}"))?;
+        let command = "cargo +nightly miri test read_header";
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        write_bound_receipt(
+            &receipts,
+            "miri.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "miri",
+                strength: "ran",
+                expires_at: "2099-12-31",
+                command,
+                subject: Some(&recorded),
+                verdict: None,
+            },
+        )?;
 
         let index = ReceiptIndex::load(&root)?;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
-        let evidence = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::Miri, command),
+            &current_for_command(command)?,
+        );
         assert!(evidence.present);
         assert!(evidence.summary.contains("miri"));
-        assert!(evidence.summary.contains("ran"));
         assert!(evidence.summary.contains("core/fixtures"));
-        assert!(evidence.summary.contains("2099-12-31"));
         assert!(evidence.summary.contains("fixture only"));
         assert!(evidence.runtime_executed);
+        Ok(())
+    }
+
+    #[test]
+    fn receipt_index_treats_unbound_legacy_receipts_as_unknown() -> Result<(), String> {
+        let root = unique_temp_dir("unsafe-review-legacy-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let command = "cargo +nightly miri test read_header";
+        write_receipt(&receipts, "miri.json", card_id, "miri", "ran", "2099-12-31")?;
+
+        let index = ReceiptIndex::load(&root)?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        // A legacy receipt with no subject binding stays readable in audit
+        // but never imports as current evidence, even when every other leg
+        // would match.
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::Miri, command),
+            &current_for_command(command)?,
+        );
+        assert!(!evidence.present);
+        assert!(
+            evidence.summary.contains("unbound legacy receipt"),
+            "unexpected summary: {}",
+            evidence.summary
+        );
         Ok(())
     }
 
@@ -927,28 +1148,31 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        fs::write(
-            receipts.join("miri.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "miri",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
-  "verdict": "not_reproduced"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write receipt failed: {err}"))?;
+        let command = "cargo +nightly miri test read_header";
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        write_bound_receipt(
+            &receipts,
+            "miri.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "miri",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command,
+                subject: Some(&recorded),
+                verdict: Some("not_reproduced"),
+            },
+        )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
-        let evidence = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::Miri, command),
+            &current_for_command(command)?,
+        );
         assert!(evidence.present);
         assert!(evidence.runtime_executed);
         assert_eq!(evidence.verdict.as_deref(), Some("not_reproduced"));
@@ -1019,8 +1243,11 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        let evidence = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::Miri),
+            &current_subject(),
+        );
         assert!(!evidence.present);
         assert!(evidence.summary.contains("expired"));
         Ok(())
@@ -1047,8 +1274,11 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        let evidence = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::Miri),
+            &current_subject(),
+        );
         assert!(!evidence.present);
         assert!(evidence.summary.contains("configured"));
         Ok(())
@@ -1068,8 +1298,11 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
-        let evidence = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::Miri),
+            &current_subject(),
+        );
         assert!(!evidence.present);
         assert!(
             evidence
@@ -1087,13 +1320,20 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        write_receipt(
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = None;
+        write_bound_receipt(
             &receipts,
             "external-reach.json",
             card_id,
-            "external-integration-test",
-            "site_reached",
-            "2026-08-18",
+            BoundReceiptFixture {
+                tool: "external-integration-test",
+                strength: "site_reached",
+                expires_at: "2026-08-18",
+                command: "bun test test/js/sab-copy-to-unshared.test.ts",
+                subject: Some(&recorded),
+                verdict: None,
+            },
         )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
@@ -1101,19 +1341,27 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 1);
+        // Reach receipts attest site reach through an external harness, so
+        // no invocation identity is compared; every other leg still gates.
+        let mut current = current_subject();
+        current.invocation_digest = None;
         let reach = index.reach_evidence_for(
             &CardId(card_id.to_string()),
             ReachEvidence {
                 state: "unreached".to_string(),
                 summary: "No static test mention of owner `read` was found".to_string(),
             },
+            &current,
         );
         assert_eq!(reach.state, "external_reached");
         assert!(reach.summary.contains("external-integration-test"));
         assert!(reach.summary.contains("site_reached"));
 
-        let witness = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let witness = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_for(WitnessKind::Miri),
+            &current,
+        );
         assert!(!witness.present);
         assert!(witness.summary.contains("external-integration-test"));
         Ok(())
@@ -1126,14 +1374,36 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        write_receipt(&receipts, "miri.json", card_id, "miri", "ran", "2026-08-18")?;
-        write_receipt(
+        let command = "cargo +nightly miri test read_header";
+        let mut miri_recorded = bound_subject();
+        miri_recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        write_bound_receipt(
+            &receipts,
+            "miri.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "miri",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command,
+                subject: Some(&miri_recorded),
+                verdict: None,
+            },
+        )?;
+        let mut reach_recorded = bound_subject();
+        reach_recorded.invocation_digest = None;
+        write_bound_receipt(
             &receipts,
             "external-reach.json",
             card_id,
-            "external-integration-test",
-            "site_reached",
-            "2026-08-18",
+            BoundReceiptFixture {
+                tool: "external-integration-test",
+                strength: "site_reached",
+                expires_at: "2026-08-18",
+                command: "bun test test/js/sab-copy-to-unshared.test.ts",
+                subject: Some(&reach_recorded),
+                verdict: None,
+            },
         )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
@@ -1141,16 +1411,24 @@ mod tests {
 
         fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
         assert_eq!(validated, 2);
-        let witness = index
-            .witness_evidence_for(&CardId(card_id.to_string()), &routes_for(WitnessKind::Miri));
+        let mut witness_current = current_subject();
+        witness_current.invocation_digest = Some(parse_command_line(command)?.digest());
+        let witness = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::Miri, command),
+            &witness_current,
+        );
         assert!(witness.present);
         assert!(witness.summary.contains("miri"));
+        let mut reach_current = current_subject();
+        reach_current.invocation_digest = None;
         let reach = index.reach_evidence_for(
             &CardId(card_id.to_string()),
             ReachEvidence {
                 state: "unreached".to_string(),
                 summary: "No static test mention of owner `read` was found".to_string(),
             },
+            &reach_current,
         );
         assert_eq!(reach.state, "external_reached");
         Ok(())
@@ -1415,6 +1693,9 @@ mod tests {
         assert_eq!(report.summary.receipts, 7);
         assert_eq!(report.summary.matched, 5);
         assert_eq!(report.summary.unmatched, 1);
+        // Only the card-less stale.json counts as stale: the matched
+        // receipts carry no subject binding, so they compare
+        // unknown_subject rather than importing.
         assert_eq!(report.summary.stale, 1);
         assert_eq!(report.summary.expired, 1);
         assert_eq!(report.summary.wrong_identity, 1);
@@ -1471,6 +1752,20 @@ mod tests {
                 .iter()
                 .any(|status| status == "imports_witness_evidence")
         );
+        // The unbound matched receipt is visible but explicitly not
+        // applicable: it must surface unknown_subject with the reason.
+        assert!(
+            matched_entry
+                .statuses
+                .iter()
+                .any(|status| status == "unknown_subject")
+        );
+        assert!(
+            matched_entry
+                .issues
+                .iter()
+                .any(|issue| issue.contains("unbound legacy receipt"))
+        );
         assert_eq!(
             matched_entry.recorded_at.as_deref(),
             Some("2025-12-18T00:00:00Z")
@@ -1489,28 +1784,12 @@ mod tests {
 
     #[test]
     fn receipt_audit_marks_only_importable_current_witness_receipts() -> Result<(), String> {
-        let importable_root = copy_fixture_to_temp(
+        let (importable_root, importable_output, importable_card_id) = bound_audit_setup(
             "raw_pointer_alignment",
             "unsafe-review-receipt-audit-importable",
-        )?;
-        let importable_output = analyze_fixture_root(&importable_root)?;
-        let importable_card_id = importable_output
-            .cards
-            .first()
-            .ok_or_else(|| "fixture produced no card".to_string())?
-            .id
-            .0
-            .clone();
-        let importable_dir = importable_root.join(".unsafe-review").join("receipts");
-        fs::create_dir_all(&importable_dir)
-            .map_err(|err| format!("create receipt dir failed: {err}"))?;
-        write_receipt(
-            &importable_dir,
-            "miri-ran.json",
-            &importable_card_id,
             "miri",
             "ran",
-            "2026-08-18",
+            None,
         )?;
 
         let importable_report = audit_receipts_with_date(&importable_output, "2026-05-18")?;
@@ -1523,6 +1802,13 @@ mod tests {
                 .statuses
                 .iter()
                 .any(|status| status == "imports_witness_evidence")
+        );
+        assert_eq!(
+            importable_entry
+                .matched_card
+                .as_ref()
+                .map(|card| card.id.as_str()),
+            Some(importable_card_id.as_str())
         );
 
         let configured_root = copy_fixture_to_temp(
@@ -1632,28 +1918,12 @@ mod tests {
 
     #[test]
     fn receipt_audit_marks_external_integration_reach_receipts() -> Result<(), String> {
-        let root = copy_fixture_to_temp(
+        let (root, output, card_id) = bound_audit_setup(
             "ffi_missing_boundary_contract",
             "unsafe-review-receipt-audit-external-reach",
-        )?;
-        let output = analyze_fixture_root(&root)?;
-        let card_id = output
-            .cards
-            .first()
-            .ok_or_else(|| "fixture produced no card".to_string())?
-            .id
-            .0
-            .clone();
-        let receipt_dir = root.join(".unsafe-review").join("receipts");
-        fs::create_dir_all(&receipt_dir)
-            .map_err(|err| format!("create receipt dir failed: {err}"))?;
-        write_receipt(
-            &receipt_dir,
-            "external-reach.json",
-            &card_id,
             "external-integration-test",
             "site_reached",
-            "2026-08-18",
+            None,
         )?;
 
         let report = audit_receipts_with_date(&output, "2026-05-18")?;
@@ -1680,9 +1950,19 @@ mod tests {
                 .any(|status| status == "imports_witness_evidence")
         );
         assert!(!entry.statuses.iter().any(|status| status == "wrong_tool"));
+        assert!(
+            !entry
+                .statuses
+                .iter()
+                .any(|status| status == "unknown_subject")
+        );
         assert_eq!(
             entry.receipt_tool.as_deref(),
             Some("external-integration-test")
+        );
+        assert_eq!(
+            entry.matched_card.as_ref().map(|card| card.id.as_str()),
+            Some(card_id.as_str())
         );
         Ok(())
     }
@@ -1971,31 +2251,276 @@ mod tests {
         strength: &str,
         expires_at: &str,
     ) -> Result<(), String> {
-        let command = if tool == "external-integration-test" {
-            "bun test test/js/sab-copy-to-unshared.test.ts"
-        } else {
-            "cargo test"
-        };
-        let command_hash = WitnessReceipt::command_hash(command);
-        fs::write(
-            dir.join(name),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "{tool}",
-  "strength": "{strength}",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "{expires_at}",
-  "summary": "focused witness",
-  "command": "{command}",
-  "command_hash": "{command_hash}",
-  "limitations": ["fixture only"]
-}}"#
-            ),
+        write_bound_receipt(
+            dir,
+            name,
+            card_id,
+            BoundReceiptFixture {
+                tool,
+                strength,
+                expires_at,
+                command: if tool == "external-integration-test" {
+                    "bun test test/js/sab-copy-to-unshared.test.ts"
+                } else {
+                    "cargo test"
+                },
+                subject: None,
+                verdict: None,
+            },
         )
-        .map_err(|err| format!("write receipt {name} failed: {err}"))
+    }
+
+    /// Fixture receipt fields: the store identity plus the tool claim.
+    /// One struct keeps the test-only writer under the argument-count lint.
+    struct BoundReceiptFixture<'a> {
+        tool: &'a str,
+        strength: &'a str,
+        expires_at: &'a str,
+        command: &'a str,
+        subject: Option<&'a SubjectBinding>,
+        verdict: Option<&'a str>,
+    }
+
+    /// Write a receipt file, optionally bound to a subject and verdict.
+    ///
+    /// `None` subject preserves the legacy unbound shape; bound receipts
+    /// serialize the full subject binding for applicability gating. The
+    /// command is explicit so bound fixtures can carry the routed command
+    /// their invocation digest was derived from.
+    fn write_bound_receipt(
+        dir: &Path,
+        name: &str,
+        card_id: &str,
+        receipt: BoundReceiptFixture,
+    ) -> Result<(), String> {
+        let command_hash = WitnessReceipt::command_hash(receipt.command);
+        let receipt = serde_json::json!({
+            "schema_version": "0.1",
+            "card_id": card_id,
+            "tool": receipt.tool,
+            "strength": receipt.strength,
+            "author": "core/fixtures",
+            "recorded_at": "2025-12-18T00:00:00Z",
+            "expires_at": receipt.expires_at,
+            "summary": "focused witness",
+            "command": receipt.command,
+            "command_hash": command_hash,
+            "limitations": ["fixture only"],
+            "verdict": receipt.verdict,
+            "subject": receipt.subject,
+        });
+        let text = serde_json::to_string_pretty(&receipt)
+            .map_err(|err| format!("serialize bound receipt failed: {err}"))?;
+        fs::write(dir.join(name), text).map_err(|err| format!("write receipt {name} failed: {err}"))
+    }
+
+    /// Fully bound subject: every identity leg established.
+    fn bound_subject() -> SubjectBinding {
+        SubjectBinding {
+            subject_digest: "test-subject".to_string(),
+            invocation_digest: Some("test-invocation".to_string()),
+            scope: Some("repo".to_string()),
+            head_commit: Some("abc123".to_string()),
+            repo_dirty: Some(false),
+            workdir: Some(".".to_string()),
+            output_digest: Some("test-output".to_string()),
+            captured_complete: Some(true),
+            tool_version: Some("0.5.0".to_string()),
+        }
+    }
+
+    /// Current-tree side of a comparison: capture-only facts are honestly
+    /// empty, so only the tree-side legs are established.
+    fn current_subject() -> SubjectBinding {
+        let mut current = bound_subject();
+        current.workdir = None;
+        current.output_digest = None;
+        current.captured_complete = None;
+        current.tool_version = None;
+        current
+    }
+
+    /// Current binding whose invocation matches `command` under the shared
+    /// command grammar — the same digest the consumer re-derives from a
+    /// routed witness command.
+    fn current_for_command(command: &str) -> Result<SubjectBinding, String> {
+        let mut current = current_subject();
+        let invocation = parse_command_line(command)?;
+        current.invocation_digest = Some(invocation.digest());
+        Ok(current)
+    }
+
+    /// Initialize a git work tree in `root` with its current contents
+    /// committed and the receipt store ignored, returning the HEAD sha.
+    ///
+    /// The `.unsafe-review/` ignore keeps saved receipts from dirtying the
+    /// tree they evidence; any other untracked or modified file still
+    /// reports dirty, failing closed to Unknown applicability.
+    fn git_init_commit(root: &Path) -> Result<String, String> {
+        run_git(root, &["init", "-q"])?;
+        run_git(root, &["config", "user.name", "receipt test"])?;
+        run_git(root, &["config", "user.email", "receipt@example.test"])?;
+        fs::write(root.join(".gitignore"), ".unsafe-review/\n")
+            .map_err(|err| format!("write test gitignore failed: {err}"))?;
+        run_git(root, &["add", "-A"])?;
+        run_git(root, &["commit", "-qm", "fixture base"])?;
+        let output = run_git(root, &["rev-parse", "HEAD"])?;
+        Ok(output.trim().to_string())
+    }
+
+    fn run_git(root: &Path, args: &[&str]) -> Result<String, String> {
+        let output = std::process::Command::new("git")
+            .arg("-C")
+            .arg(root)
+            .args(args)
+            .output()
+            .map_err(|err| format!("run git {args:?} failed: {err}"))?;
+        if !output.status.success() {
+            return Err(format!(
+                "git {args:?} failed: {}",
+                String::from_utf8_lossy(&output.stderr).trim()
+            ));
+        }
+        String::from_utf8(output.stdout)
+            .map_err(|err| format!("git {args:?} output is not UTF-8: {err}"))
+    }
+
+    /// Copy `fixture` to a temp dir, initialize a git work tree there, and
+    /// analyze it without receipts. The returned output supplies the card
+    /// facts a bound receipt must mirror.
+    fn git_analyzed_root(
+        fixture: &str,
+        prefix: &str,
+    ) -> Result<(PathBuf, crate::api::AnalyzeOutput), String> {
+        let root = copy_fixture_to_temp(fixture, prefix)?;
+        git_init_commit(&root)?;
+        let output = analyze_fixture_root(&root)?;
+        Ok((root, output))
+    }
+
+    /// Copy `fixture` to a git work tree, analyze it, and write a bound
+    /// receipt for its first card. Returns the root, the analysis output,
+    /// and the card id. The binding mirrors the analyzed card, so the audit
+    /// and loader import it as applicable on the clean tree.
+    fn bound_audit_setup(
+        fixture: &str,
+        prefix: &str,
+        tool: &str,
+        strength: &str,
+        verdict: Option<&str>,
+    ) -> Result<(PathBuf, crate::api::AnalyzeOutput, String), String> {
+        let (root, output) = git_analyzed_root(fixture, prefix)?;
+        let card_id = output
+            .cards
+            .first()
+            .map(|card| card.id.0.clone())
+            .ok_or_else(|| "fixture produced no card".to_string())?;
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?;
+        let command = card
+            .routes
+            .iter()
+            .find_map(|route| route.command.clone())
+            .ok_or_else(|| format!("card {} has no routable command", card.id.0))?;
+        let head = run_git(&root, &["rev-parse", "HEAD"])?;
+        let facts = CurrentTreeFacts {
+            scope: output.scope.as_str().to_string(),
+            head_commit: Some(head.trim().to_string()),
+            repo_dirty: Some(false),
+        };
+        let mut recorded = current_binding_for_parts(
+            &card.id.0,
+            card.operation.family.as_str(),
+            card.site.owner.as_deref(),
+            &card.site.location.file,
+            &card.site.snippet,
+            &card.routes,
+            &facts,
+        );
+        recorded.captured_complete = Some(true);
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_bound_receipt(
+            &receipt_dir,
+            &format!("{tool}.json"),
+            &card_id,
+            BoundReceiptFixture {
+                tool,
+                strength,
+                expires_at: "2026-08-18",
+                command: &command,
+                subject: Some(&recorded),
+                verdict,
+            },
+        )?;
+        Ok((root, output, card_id))
+    }
+
+    /// Write a bound receipt for the first card of `output` into `root` and
+    /// return its card id.
+    ///
+    /// The binding mirrors the analyzed card through
+    /// `current_binding_for_parts` — the same constructor the card builder
+    /// uses at import time — with capture completeness established on the
+    /// recorded side, so the receipt imports as applicable on a clean tree
+    /// at the same revision.
+    fn write_bound_receipt_for_first_card(
+        root: &Path,
+        output: &crate::api::AnalyzeOutput,
+        tool: &str,
+        verdict: Option<&str>,
+    ) -> Result<String, String> {
+        let card = output
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card".to_string())?;
+        let command = card
+            .routes
+            .iter()
+            .find_map(|route| route.command.clone())
+            .ok_or_else(|| format!("card {} has no routable command", card.id.0))?;
+        let facts = match crate::input::scope_git::discover_repo(root) {
+            Ok(facts) => CurrentTreeFacts {
+                scope: output.scope.as_str().to_string(),
+                head_commit: facts.head_commit,
+                repo_dirty: crate::input::scope_git::worktree_dirty(&facts.toplevel),
+            },
+            Err(_) => CurrentTreeFacts {
+                scope: output.scope.as_str().to_string(),
+                head_commit: None,
+                repo_dirty: None,
+            },
+        };
+        let mut recorded = current_binding_for_parts(
+            &card.id.0,
+            card.operation.family.as_str(),
+            card.site.owner.as_deref(),
+            &card.site.location.file,
+            &card.site.snippet,
+            &card.routes,
+            &facts,
+        );
+        recorded.captured_complete = Some(true);
+        let receipt_dir = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipt_dir)
+            .map_err(|err| format!("create receipt dir failed: {err}"))?;
+        write_bound_receipt(
+            &receipt_dir,
+            &format!("{tool}.json"),
+            &card.id.0,
+            BoundReceiptFixture {
+                tool,
+                strength: "ran",
+                expires_at: "2099-12-31",
+                command: &command,
+                subject: Some(&recorded),
+                verdict,
+            },
+        )?;
+        Ok(card.id.0.clone())
     }
 
     fn manual_candidate_json() -> &'static str {
@@ -2053,23 +2578,22 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        fs::write(
-            receipts.join("asan.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "asan",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
-  "verdict": "confirmed",
-  "summary": "asan runtime run: sanitizer signal observed"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write receipt failed: {err}"))?;
+        let command = "cargo test";
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        write_bound_receipt(
+            &receipts,
+            "asan.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "asan",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command: "cargo test",
+                subject: Some(&recorded),
+                verdict: Some("confirmed"),
+            },
+        )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
 
@@ -2077,7 +2601,8 @@ mod tests {
 
         let evidence = index.witness_evidence_for(
             &CardId(card_id.to_string()),
-            &routes_for(WitnessKind::AddressSanitizer),
+            &routes_with_command(WitnessKind::AddressSanitizer, command),
+            &current_for_command(command)?,
         );
         // A `confirmed` sanitizer receipt satisfies witness coverage: the site
         // was reached and the sanitizer fired. It does NOT clear the safety
@@ -2110,23 +2635,22 @@ mod tests {
         fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
         let card_id =
             "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
-        fs::write(
-            receipts.join("tsan.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "tsan",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2026-08-18",
-  "verdict": "not_reproduced",
-  "summary": "tsan runtime run: clean runtime run, no sanitizer signal observed"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write receipt failed: {err}"))?;
+        let command = "cargo test";
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        write_bound_receipt(
+            &receipts,
+            "tsan.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "tsan",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command: "cargo test",
+                subject: Some(&recorded),
+                verdict: Some("not_reproduced"),
+            },
+        )?;
 
         let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
 
@@ -2134,7 +2658,8 @@ mod tests {
 
         let evidence = index.witness_evidence_for(
             &CardId(card_id.to_string()),
-            &routes_for(WitnessKind::ThreadSanitizer),
+            &routes_with_command(WitnessKind::ThreadSanitizer, command),
+            &current_for_command(command)?,
         );
         // A `not_reproduced` receipt satisfies witness coverage. It is a
         // single-run observation, not a safety claim.
@@ -2234,11 +2759,10 @@ mod tests {
         // retired: the card stays `guarded_unwitnessed` (actionable) with its
         // hazard-derived priority intact, because a reproduced failure still
         // requires attention. The safety obligation is NOT cleared.
-        let root = copy_fixture_to_temp(
+        let (root, output) = git_analyzed_root(
             "box_from_raw_box_origin",
             "unsafe-review-confirmed-receipt-priority",
         )?;
-        let output = analyze_fixture_root(&root)?;
         let card = output
             .cards
             .first()
@@ -2255,29 +2779,9 @@ mod tests {
             "medium",
             "baseline priority must be medium"
         );
-        let card_id = card.id.0.clone();
 
-        // Write a miri receipt with `confirmed` verdict for this card.
-        let receipt_dir = root.join(".unsafe-review").join("receipts");
-        fs::create_dir_all(&receipt_dir)
-            .map_err(|err| format!("create receipt dir failed: {err}"))?;
-        fs::write(
-            receipt_dir.join("miri-confirmed.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "miri",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2099-12-31",
-  "verdict": "confirmed",
-  "summary": "miri run: UB hypothesis reproduced"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write confirmed receipt failed: {err}"))?;
+        // Write a bound miri receipt with `confirmed` verdict for this card.
+        write_bound_receipt_for_first_card(&root, &output, "miri", Some("confirmed"))?;
 
         // Analyze WITH the receipt loaded.
         let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
@@ -2339,41 +2843,12 @@ mod tests {
         // That single observation is not a safety claim, so the witness work
         // stays open with the hazard-derived priority intact — no urgency
         // reduction as though verification succeeded.
-        let root = copy_fixture_to_temp(
+        let (root, output) = git_analyzed_root(
             "box_from_raw_box_origin",
             "unsafe-review-not-reproduced-priority",
         )?;
-        let card_id = {
-            let output = analyze_fixture_root(&root)?;
-            output
-                .cards
-                .first()
-                .ok_or_else(|| "fixture produced no card".to_string())?
-                .id
-                .0
-                .clone()
-        };
 
-        let receipt_dir = root.join(".unsafe-review").join("receipts");
-        fs::create_dir_all(&receipt_dir)
-            .map_err(|err| format!("create receipt dir failed: {err}"))?;
-        fs::write(
-            receipt_dir.join("miri-not-reproduced.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "miri",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2099-12-31",
-  "verdict": "not_reproduced",
-  "summary": "miri run: no UB observed in this run — not a safety claim"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write not_reproduced receipt failed: {err}"))?;
+        write_bound_receipt_for_first_card(&root, &output, "miri", Some("not_reproduced"))?;
 
         let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
 
@@ -2418,41 +2893,12 @@ mod tests {
         // An `inconclusive` receipt: the run settled nothing. Adequacy stays
         // unresolved and urgency must not drop as though verification
         // succeeded: the card stays open with its hazard-derived priority.
-        let root = copy_fixture_to_temp(
+        let (root, output) = git_analyzed_root(
             "box_from_raw_box_origin",
             "unsafe-review-inconclusive-keeps-open",
         )?;
-        let card_id = {
-            let output = analyze_fixture_root(&root)?;
-            output
-                .cards
-                .first()
-                .ok_or_else(|| "fixture produced no card".to_string())?
-                .id
-                .0
-                .clone()
-        };
 
-        let receipt_dir = root.join(".unsafe-review").join("receipts");
-        fs::create_dir_all(&receipt_dir)
-            .map_err(|err| format!("create receipt dir failed: {err}"))?;
-        fs::write(
-            receipt_dir.join("miri-inconclusive.json"),
-            format!(
-                r#"{{
-  "schema_version": "0.1",
-  "card_id": "{card_id}",
-  "tool": "miri",
-  "strength": "ran",
-  "author": "core/fixtures",
-  "recorded_at": "2025-12-18T00:00:00Z",
-  "expires_at": "2099-12-31",
-  "verdict": "inconclusive",
-  "summary": "miri run: harness setup failed before the site executed"
-}}"#
-            ),
-        )
-        .map_err(|err| format!("write inconclusive receipt failed: {err}"))?;
+        write_bound_receipt_for_first_card(&root, &output, "miri", Some("inconclusive"))?;
 
         let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
 
@@ -2490,6 +2936,55 @@ mod tests {
         Ok(())
     }
 
+    #[test]
+    fn stale_receipt_never_upgrades_card_coverage() -> Result<(), String> {
+        // A receipt bound to an older revision must not upgrade coverage
+        // after the source moves: the card keeps missing witness evidence
+        // naming the stale reason, with urgency and class untouched, while
+        // the recorded verdict stays visible in the audit surface.
+        let (root, output) =
+            git_analyzed_root("box_from_raw_box_origin", "unsafe-review-stale-keeps-open")?;
+        write_bound_receipt_for_first_card(&root, &output, "miri", Some("not_reproduced"))?;
+
+        // Move the revision under the receipt with an unrelated commit; the
+        // card identity is unaffected but the subject revision changed.
+        fs::write(root.join("README.md"), "unrelated context change\n")
+            .map_err(|err| format!("write context change failed: {err}"))?;
+        run_git(&root, &["add", "-A"])?;
+        run_git(&root, &["commit", "-qm", "context change"])?;
+
+        let output_with_receipt = pipeline::analyze(analyze_input(&root))?;
+
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+
+        let card = output_with_receipt
+            .cards
+            .first()
+            .ok_or_else(|| "fixture produced no card after receipt import".to_string())?;
+        assert_eq!(
+            card.class.as_str(),
+            "guarded_unwitnessed",
+            "stale receipt must keep card guarded_unwitnessed"
+        );
+        assert_eq!(
+            card.priority.as_str(),
+            "medium",
+            "stale receipt must preserve priority (not lower to low)"
+        );
+        assert!(
+            !card.witness.present,
+            "stale receipt must not satisfy witness coverage"
+        );
+        assert!(
+            card.witness.summary.contains("stale")
+                && card.witness.summary.contains("source revision changed"),
+            "stale witness summary must name the reason: {}",
+            card.witness.summary
+        );
+        assert_eq!(card.witness.verdict, None);
+        Ok(())
+    }
+
     fn routes_for(kind: WitnessKind) -> Vec<WitnessRoute> {
         vec![WitnessRoute {
             kind,
@@ -2497,5 +2992,133 @@ mod tests {
             command: None,
             required: false,
         }]
+    }
+
+    fn routes_with_command(kind: WitnessKind, command: &str) -> Vec<WitnessRoute> {
+        vec![WitnessRoute {
+            kind,
+            reason: "fixture route".to_string(),
+            command: Some(command.to_string()),
+            required: false,
+        }]
+    }
+
+    /// Load one bound `miri ran` receipt and query it against `current`,
+    /// returning the witness summary. The routes share one command whose
+    /// digest the current side always carries, so only the recorded legs
+    /// under test can block the import.
+    fn gated_witness_summary(
+        recorded: &SubjectBinding,
+        current: &SubjectBinding,
+    ) -> Result<(bool, String), String> {
+        let root = unique_temp_dir("unsafe-review-gated-receipt-index")?;
+        let receipts = root.join(".unsafe-review").join("receipts");
+        fs::create_dir_all(&receipts).map_err(|err| format!("create receipt dir failed: {err}"))?;
+        let card_id =
+            "UR-crate-src-lib-rs-owner-operation-raw_pointer_read-read-deadbeef1234-alignment-c1";
+        let command = "cargo +nightly miri test read_header";
+        write_bound_receipt(
+            &receipts,
+            "miri.json",
+            card_id,
+            BoundReceiptFixture {
+                tool: "miri",
+                strength: "ran",
+                expires_at: "2026-08-18",
+                command,
+                subject: Some(recorded),
+                verdict: None,
+            },
+        )?;
+        let index = ReceiptIndex::load_with_date(&root, "2026-05-18")?;
+        fs::remove_dir_all(&root).map_err(|err| format!("remove temp root failed: {err}"))?;
+        let mut gated_current = current.clone();
+        gated_current.invocation_digest = Some(parse_command_line(command)?.digest());
+        let evidence = index.witness_evidence_for(
+            &CardId(card_id.to_string()),
+            &routes_with_command(WitnessKind::Miri, command),
+            &gated_current,
+        );
+        Ok((evidence.present, evidence.summary))
+    }
+
+    /// Recorded binding whose invocation matches `command` under the shared
+    /// grammar — the applicable side of the gating matrix.
+    fn recorded_for_command(command: &str) -> Result<SubjectBinding, String> {
+        let mut recorded = bound_subject();
+        recorded.invocation_digest = Some(parse_command_line(command)?.digest());
+        Ok(recorded)
+    }
+
+    #[test]
+    fn receipt_index_gates_imports_on_subject_applicability() -> Result<(), String> {
+        let command = "cargo +nightly miri test read_header";
+        // Identical bindings import.
+        let (present, _) =
+            gated_witness_summary(&recorded_for_command(command)?, &current_subject())?;
+        assert!(present, "identical bindings must import as applicable");
+
+        // A changed subject, scope, or revision is stale, never importing.
+        let mut changed = recorded_for_command(command)?;
+        changed.subject_digest = "changed-subject".to_string();
+        let (present, summary) = gated_witness_summary(&changed, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("reviewed subject changed"), "{summary}");
+
+        let mut rescoped = recorded_for_command(command)?;
+        rescoped.scope = Some("diff".to_string());
+        let (present, summary) = gated_witness_summary(&rescoped, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("analysis scope changed"), "{summary}");
+
+        let mut revised = recorded_for_command(command)?;
+        revised.head_commit = Some("def456".to_string());
+        let (present, summary) = gated_witness_summary(&revised, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("source revision changed"), "{summary}");
+
+        // A changed invocation, a missing invocation, a dirty tree, or an
+        // incomplete capture is unknown, never importing.
+        let mut reinvoked = recorded_for_command(command)?;
+        reinvoked.invocation_digest = Some("other-invocation".to_string());
+        let (present, summary) = gated_witness_summary(&reinvoked, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("invocation identity"), "{summary}");
+
+        let mut uninvoked = recorded_for_command(command)?;
+        uninvoked.invocation_digest = None;
+        let (present, summary) = gated_witness_summary(&uninvoked, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("invocation identity"), "{summary}");
+
+        let mut dirty_recorded = recorded_for_command(command)?;
+        dirty_recorded.repo_dirty = Some(true);
+        let (present, summary) = gated_witness_summary(&dirty_recorded, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("clean-tree provenance"), "{summary}");
+
+        let mut dirty_current = current_subject();
+        dirty_current.repo_dirty = Some(true);
+        let (present, summary) =
+            gated_witness_summary(&recorded_for_command(command)?, &dirty_current)?;
+        assert!(!present);
+        assert!(summary.contains("clean-tree provenance"), "{summary}");
+
+        let mut partial = recorded_for_command(command)?;
+        partial.captured_complete = Some(false);
+        let (present, summary) = gated_witness_summary(&partial, &current_subject())?;
+        assert!(!present);
+        assert!(summary.contains("capture completeness"), "{summary}");
+
+        // Revisionless bindings on both sides carry no revision identity.
+        let mut revisionless_recorded = recorded_for_command(command)?;
+        revisionless_recorded.head_commit = None;
+        let mut revisionless_current = current_subject();
+        revisionless_current.head_commit = None;
+        let (present, summary) =
+            gated_witness_summary(&revisionless_recorded, &revisionless_current)?;
+        assert!(!present);
+        assert!(summary.contains("source revision unavailable"), "{summary}");
+        Ok(())
     }
 }
