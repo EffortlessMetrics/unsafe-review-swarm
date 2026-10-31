@@ -4,11 +4,13 @@
 
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::atomic::{AtomicU64, Ordering};
 use std::time::{SystemTime, UNIX_EPOCH};
 use unsafe_review_core::{
-    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewCard, Scope, analyze,
-    compare_outcome_json, render_json,
+    AnalysisMode, AnalyzeInput, AnalyzeOutput, DiffSource, PolicyMode, ReviewCard, Scope,
+    SubjectBinding, WitnessReceipt, analyze, compare_outcome_json, discover_repo,
+    parse_command_line, render_json, worktree_dirty,
 };
 
 static NEXT_ROOT: AtomicU64 = AtomicU64::new(0);
@@ -62,6 +64,37 @@ struct Observation {
     after_json: String,
 }
 
+fn git(root: &Path, args: &[&str]) -> Result<String, String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .args(args)
+        .output()
+        .map_err(|error| format!("run git {args:?}: {error}"))?;
+    if !output.status.success() {
+        return Err(format!(
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        ));
+    }
+    String::from_utf8(output.stdout)
+        .map_err(|error| format!("git {args:?} output is not UTF-8: {error}"))
+}
+
+/// Initialize a git work tree in `root` with its copied contents committed
+/// and the receipt store ignored, so saved receipts do not dirty the tree
+/// they evidence.
+fn git_init_fixture(root: &Path) -> Result<(), String> {
+    git(root, &["init", "-q"])?;
+    git(root, &["config", "user.name", "witness observation test"])?;
+    git(root, &["config", "user.email", "witness@example.test"])?;
+    fs::write(root.join(".gitignore"), ".unsafe-review/\n")
+        .map_err(|error| format!("write test gitignore: {error}"))?;
+    git(root, &["add", "-A"])?;
+    git(root, &["commit", "-qm", "fixture base"])?;
+    Ok(())
+}
+
 fn analyze_root(root: &Path) -> Result<AnalyzeOutput, String> {
     analyze(AnalyzeInput {
         root: root.to_path_buf(),
@@ -84,6 +117,7 @@ fn selected_card<'a>(output: &'a AnalyzeOutput, id: &str) -> Result<&'a ReviewCa
 
 fn observe(tool: &str, verdict: Option<&str>) -> Result<Observation, String> {
     let root = FixtureRoot::new()?;
+    git_init_fixture(&root.0)?;
     let before = analyze_root(&root.0)?;
     let mut candidates = before.cards.iter().filter(|card| {
         card.operation.family.as_str() == "box_from_raw"
@@ -106,6 +140,38 @@ fn observe(tool: &str, verdict: Option<&str>) -> Result<Observation, String> {
     // Serialize before adding the receipt; do not let a later directory read
     // contaminate the pre-import snapshot.
     let before_json = render_json(&before);
+    // Bind the synthetic receipt to the analyzed card through the same
+    // canonical facts the consumer re-derives, so the import exercises the
+    // applicable path. The expected invocation is the card's first routed
+    // command; unrouted tools (loom) stay wrong-tool regardless.
+    let command = original
+        .routes
+        .iter()
+        .find_map(|route| route.command.clone())
+        .ok_or_else(|| format!("card {id} has no routable command"))?;
+    let invocation =
+        parse_command_line(&command).map_err(|error| format!("parse command: {error}"))?;
+    let facts = discover_repo(&root.0)
+        .map(|facts| (facts.head_commit, worktree_dirty(&facts.toplevel)))
+        .unwrap_or((None, None));
+    let owner = original.site.owner.as_deref().unwrap_or("");
+    let recorded = SubjectBinding {
+        subject_digest: SubjectBinding::digest_subject_for(
+            &id,
+            original.operation.family.as_str(),
+            owner,
+            &SubjectBinding::subject_file_display(&original.site.location.file),
+            &original.site.snippet,
+        ),
+        invocation_digest: Some(invocation.digest()),
+        scope: Some(before.scope.as_str().to_string()),
+        head_commit: facts.0,
+        repo_dirty: facts.1,
+        workdir: None,
+        output_digest: None,
+        captured_complete: Some(true),
+        tool_version: None,
+    };
     let directory = root.0.join(".unsafe-review/receipts");
     fs::create_dir_all(&directory).map_err(|error| format!("create receipts: {error}"))?;
     let mut receipt = serde_json::json!({
@@ -117,8 +183,18 @@ fn observe(tool: &str, verdict: Option<&str>) -> Result<Observation, String> {
         "recorded_at": "2025-12-18T00:00:00Z",
         "expires_at": "2099-12-31",
         "summary": "Synthetic saved observation for a classification regression",
-        "limitations": ["Synthetic fixture receipt; no witness tool was executed by this test"]
+        "command": command,
+        "limitations": ["Synthetic fixture receipt; no witness tool was executed by this test"],
+        "subject": recorded,
     });
+    receipt["command_hash"] = serde_json::Value::String(WitnessReceipt::command_hash(
+        receipt["command"]
+            .as_str()
+            .ok_or_else(|| "synthetic receipt command must be a string".to_string())?,
+    ));
+    if let Some(value) = verdict {
+        receipt["verdict"] = serde_json::Value::String(value.to_string());
+    }
     if let Some(value) = verdict {
         receipt["verdict"] = serde_json::Value::String(value.to_string());
     }
