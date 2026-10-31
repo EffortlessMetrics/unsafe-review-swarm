@@ -457,10 +457,7 @@ fn narrow_base_scan_cannot_introduce_uncovered_subjects() -> Result<(), String> 
     }
     let base = analyze_diff(&base_root, "change.diff")?;
     let head = analyze_repo(&head_root, None)?;
-    assert!(
-        head.summary.scan_capped == false,
-        "test setup must stay uncapped"
-    );
+    assert!(!head.summary.scan_capped, "test setup must stay uncapped");
     let report = evaluate_base_head_movement(&base, &head);
     for entry in &report.subjects {
         assert_eq!(
