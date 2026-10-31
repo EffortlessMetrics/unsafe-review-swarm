@@ -19,11 +19,21 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
     let mut pending_method_header = false;
     for (idx, raw) in lines.iter().enumerate() {
         let trimmed_start = raw.trim_start();
+        // Header prefixes (`pub`, `unsafe`) do not change block kind.
+        let header = trimmed_start
+            .strip_prefix("pub ")
+            .unwrap_or(trimmed_start)
+            .trim_start();
+        let header = header
+            .strip_prefix("unsafe ")
+            .unwrap_or(header)
+            .trim_start();
+        let header = header.strip_prefix("pub ").unwrap_or(header).trim_start();
         if method_block_depth.is_none()
-            && (trimmed_start.starts_with("impl ")
-                || trimmed_start.starts_with("impl<")
-                || trimmed_start.starts_with("trait ")
-                || trimmed_start.starts_with("trait<"))
+            && (header.starts_with("impl ")
+                || header.starts_with("impl<")
+                || header.starts_with("trait ")
+                || header.starts_with("trait<"))
         {
             pending_method_header = true;
         }
@@ -239,6 +249,21 @@ mod tests {
             return Err(
                 "same-named callees with different features must stay unattributed".to_string(),
             );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn unsafe_impl_method_is_not_collected() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "struct W;",
+            "unsafe impl Send for W {",
+            "#[target_feature(enable = \"avx2\")]",
+            "fn sum_avx2(&self, data: &[f32]) -> f32 { 0.0 }",
+            "}",
+        ]);
+        if callees.contains_key("sum_avx2") {
+            return Err("method inside an unsafe impl must not be registered".to_string());
         }
         Ok(())
     }
