@@ -332,6 +332,7 @@ mod tests {
             },
             context_before: Vec::new(),
             context_after: after.iter().map(ToString::to_string).collect(),
+            callee_target_feature: None,
         }
     }
 

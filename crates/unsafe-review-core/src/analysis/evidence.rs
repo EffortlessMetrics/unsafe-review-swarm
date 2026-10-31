@@ -173,7 +173,7 @@ fn discharge_state_for(
         "pointer-live" => pointer_live_discharge_state(site, lower),
         "ownership" => ownership_discharge_state(family, &site.operation.expression, lower),
         "callee-contract" => {
-            callee_contract_discharge_state(family, &site.operation.expression, lower)
+            callee_contract_discharge_state(site, family, &site.operation.expression, lower)
         }
         "valid-value" => valid_value_discharge_state(site, lower),
         "layout" => layout_discharge_state(site, lower),
@@ -235,7 +235,235 @@ mod tests {
             },
             context_before: context_before.into_iter().map(str::to_string).collect(),
             context_after: context_after.into_iter().map(str::to_string).collect(),
+            callee_target_feature: None,
         }
+    }
+
+    fn target_feature_call_site(
+        context_before: Vec<&str>,
+        context_after: Vec<&str>,
+        callee_target_feature: Option<(&str, &str)>,
+    ) -> ScannedSite {
+        let mut site = site_with_family(
+            OperationFamily::UnsafeFnCall,
+            context_before,
+            "unsafe { sum_avx2(data) }",
+            context_after,
+        );
+        site.callee_target_feature =
+            callee_target_feature.map(|(name, feature)| (name.to_string(), feature.to_string()));
+        site
+    }
+
+    fn callee_contract_present(site: &ScannedSite) -> Result<bool, String> {
+        let obligations = vec![SafetyObligation::new(
+            "callee-contract",
+            "callee safety preconditions are satisfied",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        discharge_present(
+            &obligation_evidence(site, &obligations, &contract, &reach),
+            "callee-contract",
+        )
+    }
+
+    fn callee_contract_summary(site: &ScannedSite) -> Result<String, String> {
+        let obligations = vec![SafetyObligation::new(
+            "callee-contract",
+            "callee safety preconditions are satisfied",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        obligation_evidence(site, &obligations, &contract, &reach)
+            .into_iter()
+            .find_map(|item| {
+                (item.obligation.key == "callee-contract").then_some(item.discharge.summary)
+            })
+            .ok_or_else(|| "missing `callee-contract` obligation evidence".to_string())
+    }
+
+    #[test]
+    fn target_feature_positive_branch_discharges() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["if std::is_x86_feature_detected!(\"avx2\") {"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if !callee_contract_present(&site)? {
+            return Err("positive branch guard should discharge".to_string());
+        }
+        let summary = callee_contract_summary(&site)?;
+        if summary
+            != "Target-feature detection guard (`is_x86_feature_detected!`) was detected for the callee"
+        {
+            return Err(format!("unexpected discharge summary: {summary}"));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_early_return_discharges() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["if !std::is_x86_feature_detected!(\"avx2\") { return 0; }"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if !callee_contract_present(&site)? {
+            return Err("early-return guard should discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_assert_discharges() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["assert!(std::is_x86_feature_detected!(\"avx2\"));"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if !callee_contract_present(&site)? {
+            return Err("assert guard should discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_wrong_feature_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["if std::is_x86_feature_detected!(\"sse2\") {"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("wrong-feature guard must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_detection_after_call_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec![],
+            vec!["assert!(std::is_x86_feature_detected!(\"avx2\"));"],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("detection after the call must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_bare_let_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["let has_avx2 = std::is_x86_feature_detected!(\"avx2\");"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("bare let-bound detection must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_assert_in_closed_branch_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec![
+                "if data.is_empty() {",
+                "assert!(std::is_x86_feature_detected!(\"avx2\"));",
+                "}",
+            ],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("assert inside a closed sibling branch must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_closure_return_is_not_early_return() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec![
+                "if !std::is_x86_feature_detected!(\"avx2\") {",
+                "let _f = || { return; };",
+                "}",
+            ],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("closure-local return must not count as an early return".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_case_mismatched_feature_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["if std::is_x86_feature_detected!(\"AVX2\") {"],
+            vec![],
+            Some(("sum_avx2", "avx2")),
+        );
+        if callee_contract_present(&site)? {
+            return Err("case-mismatched feature string must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_unannotated_callee_does_not_discharge() -> Result<(), String> {
+        let site = target_feature_call_site(
+            vec!["if std::is_x86_feature_detected!(\"avx2\") {"],
+            vec![],
+            None,
+        );
+        if callee_contract_present(&site)? {
+            return Err("unannotated callee must not discharge".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn target_feature_attribute_card_unchanged() -> Result<(), String> {
+        let obligations = vec![SafetyObligation::new(
+            "target-feature",
+            "callers only execute this path on supported hardware",
+        )];
+        let contract = ContractEvidence::present("contract");
+        let reach = ReachEvidence {
+            state: "owner_reached".to_string(),
+            summary: "reached".to_string(),
+        };
+        let site = site_with_family(
+            OperationFamily::TargetFeature,
+            vec![],
+            "#[target_feature(enable = \"avx2\")]",
+            vec![],
+        );
+        let evidence = obligation_evidence(&site, &obligations, &contract, &reach);
+        let item = evidence
+            .first()
+            .ok_or_else(|| "missing target-feature evidence".to_string())?;
+        if !item.discharge.present
+            || item.discharge.summary
+                != "Documented target-feature declaration is a caller-contract site; local guard evidence is not expected at the attribute"
+        {
+            return Err(format!(
+                "target_feature card discharge changed: {}",
+                item.discharge.summary
+            ));
+        }
+        Ok(())
     }
 
     fn discharge_present(evidence: &[ObligationEvidence], key: &str) -> Result<bool, String> {

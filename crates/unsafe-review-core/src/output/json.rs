@@ -718,6 +718,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "extern_static_read_ffi",
     "static_mut_use",
     "union_field_read",
+    "target_feature_detected_guard",
     "raw_pointer_alignment",
     "raw_pointer_alignment_debug_assert_only_not_guard",
     "raw_pointer_alignment_receipted",

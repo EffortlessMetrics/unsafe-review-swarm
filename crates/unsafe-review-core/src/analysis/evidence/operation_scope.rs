@@ -117,6 +117,7 @@ mod tests {
             },
             context_before: context_before.into_iter().map(str::to_string).collect(),
             context_after: Vec::new(),
+            callee_target_feature: None,
         }
     }
 
