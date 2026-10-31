@@ -490,8 +490,11 @@ fn unknown_verdicts_name_their_exact_cause() -> Result<(), String> {
     // Uncovered file: the diff-scoped head resolves its named file but
     // never scans the subject's file.
     let (base_root, head_root) = fixture_pair(&trimmed)?;
-    fs::write(head_root.join("src/other.rs"), "pub fn helper() -> u32 {\n    41\n}\n")
-        .map_err(|error| format!("write other.rs failed: {error}"))?;
+    fs::write(
+        head_root.join("src/other.rs"),
+        "pub fn helper() -> u32 {\n    41\n}\n",
+    )
+    .map_err(|error| format!("write other.rs failed: {error}"))?;
     fs::write(
         head_root.join("change.diff"),
         "diff --git a/src/other.rs b/src/other.rs\n--- /dev/null\n+++ b/src/other.rs\n@@ -0,0 +1,3 @@\n+pub fn helper() -> u32 {\n+    41\n+}\n",
