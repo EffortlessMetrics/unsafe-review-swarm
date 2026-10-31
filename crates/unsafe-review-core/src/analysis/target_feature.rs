@@ -1,3 +1,4 @@
+use super::scanner::text_detection::{LineCommentState, line_for_text_detection};
 use std::collections::BTreeMap;
 
 pub(super) type TargetFeatureCallees = BTreeMap<String, String>;
@@ -17,7 +18,11 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
     // An impl/trait header whose opening brace lands on a later line is
     // still a method block once the brace arrives.
     let mut pending_method_header = false;
+    // Brace depth is counted on comment/string-elided code so a brace
+    // inside a literal or comment cannot open or close a block.
+    let mut detection_state = LineCommentState::default();
     for (idx, raw) in lines.iter().enumerate() {
+        let code_line = line_for_text_detection(raw, &mut detection_state);
         let trimmed_start = raw.trim_start();
         // Header prefixes (`pub`, `unsafe`) do not change block kind.
         let header = trimmed_start
@@ -37,12 +42,13 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
         {
             pending_method_header = true;
         }
-        if pending_method_header && raw.contains('{') {
+        if pending_method_header && code_line.contains('{') {
             method_block_depth = Some(block_depth);
             pending_method_header = false;
         }
         let in_method_block = method_block_depth.is_some();
-        let delta = raw.matches('{').count() as isize - raw.matches('}').count() as isize;
+        let delta =
+            code_line.matches('{').count() as isize - code_line.matches('}').count() as isize;
         if !in_method_block && let Some(feature) = parse_single_target_feature(raw) {
             for following in lines.iter().skip(idx + 1).take(8) {
                 let trimmed = following.trim_start();
@@ -264,6 +270,22 @@ mod tests {
         ]);
         if callees.contains_key("sum_avx2") {
             return Err("method inside an unsafe impl must not be registered".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn brace_in_literal_inside_impl_does_not_end_method_block() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "struct W;",
+            "impl W {",
+            "const END: &str = \"}\";",
+            "#[target_feature(enable = \"avx2\")]",
+            "fn sum_avx2(&self, data: &[f32]) -> f32 { 0.0 }",
+            "}",
+        ]);
+        if callees.contains_key("sum_avx2") {
+            return Err("literal brace must not end the impl method block early".to_string());
         }
         Ok(())
     }

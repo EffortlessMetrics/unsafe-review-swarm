@@ -465,6 +465,21 @@ mod tests {
     }
 
     #[test]
+    fn target_feature_named_value_early_return_discharges() -> Result<(), String> {
+        for body in ["return None;", "return Err(());", "return false;"] {
+            let guard = format!("if !std::is_x86_feature_detected!(\"avx2\") {{ {body} }}");
+            let site =
+                target_feature_call_site(vec![guard.as_str()], vec![], Some(("sum_avx2", "avx2")));
+            if !callee_contract_present(&site)? {
+                return Err(format!(
+                    "named-value early return `{body}` should discharge"
+                ));
+            }
+        }
+        Ok(())
+    }
+
+    #[test]
     fn target_feature_return_like_identifiers_do_not_discharge() -> Result<(), String> {
         for body in [
             "returned += 1;",

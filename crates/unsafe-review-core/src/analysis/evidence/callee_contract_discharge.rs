@@ -223,19 +223,27 @@ fn guard_block_returns(body: &str) -> bool {
                 let before_ok =
                     i == 0 || !(bytes[i - 1] == b'_' || bytes[i - 1].is_ascii_alphanumeric());
                 if before_ok {
-                    // Compacted code merges `return` with a numeric
-                    // value (`return0;`). Identifiers that merely start
-                    // with `return` (`returned`, `return_code`,
-                    // `returnValue`) have a letter or `_` continuation
-                    // and do not count; named-value returns are a
-                    // conservative miss.
+                    // Compacted code merges `return` with its value
+                    // (`return0;`, `returnNone;`, `returnErr(..)`).
+                    // Identifiers that merely start with `return` are
+                    // assignments or variables: an `=` after the merged
+                    // identifier, or a lowercase/`_` continuation that
+                    // is not `true`/`false`, does not count.
                     let ident: String = body[i..]
                         .chars()
                         .take_while(|ch| *ch == '_' || ch.is_ascii_alphanumeric())
                         .collect();
                     let rest = &ident["return".len().min(ident.len())..];
+                    let after = body[i + ident.len()..].chars().next();
                     if ident == "return"
                         || rest.chars().next().is_some_and(|ch| ch.is_ascii_digit())
+                        || ((rest
+                            .chars()
+                            .next()
+                            .is_some_and(|ch| ch.is_ascii_uppercase())
+                            || rest == "true"
+                            || rest == "false")
+                            && after != Some('='))
                     {
                         return true;
                     }
