@@ -5589,6 +5589,7 @@ fn fixture_known_operation_family(operation_family: &str) -> bool {
             | "unsafe_impl_send_sync"
             | "ffi"
             | "static_mut"
+            | "union_field_read"
             | "inline_asm"
             | "target_feature"
             | "panic_from_safe_js"

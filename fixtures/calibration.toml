@@ -538,6 +538,7 @@ required_core_fixtures = [
   "extern_static_read_ffi",
   "extern_static_mut_use",
   "static_mut_use",
+  "union_field_read",
   "ffi_safe_wrapper_only_no_cards",
   "ffi_return_value_checked_guard",
   "ffi_return_value_unchecked_not_guard",
@@ -6918,3 +6919,12 @@ kind = "false_positive_control"
 claim = "a safe free function named unreachable_unchecked called outside any unsafe scope is not carded as hint::unreachable_unchecked"
 support_tier = "Core operation smoke slice"
 expected_cards = 0
+[[cases]]
+fixture = "union_field_read"
+kind = "positive"
+claim = "typed union field read inside an unsafe block routes to union field validity review"
+support_tier = "Core operation smoke slice"
+expected_cards = 1
+expected_class = "guard_missing"
+expected_operation_family = "union_field_read"
+expected_hazard = "invalid_value"

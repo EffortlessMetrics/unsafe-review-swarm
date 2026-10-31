@@ -717,6 +717,7 @@ const FIXTURE_GOLDENS: &[&str] = &[
     "extern_static_mut_use",
     "extern_static_read_ffi",
     "static_mut_use",
+    "union_field_read",
     "raw_pointer_alignment",
     "raw_pointer_alignment_debug_assert_only_not_guard",
     "raw_pointer_alignment_receipted",

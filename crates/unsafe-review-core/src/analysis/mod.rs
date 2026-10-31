@@ -15,6 +15,7 @@ mod static_mut;
 pub(crate) mod syntax;
 mod target_feature;
 mod transmute_operation;
+mod union_field;
 mod unsafe_impl;
 mod unwrap_operation;
 mod utf8_operation;
