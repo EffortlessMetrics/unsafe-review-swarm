@@ -7,23 +7,42 @@ pub(super) type TargetFeatureCallees = BTreeMap<String, String>;
 /// name to feature string. Multi-feature enable lists are out of scope.
 pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
     let mut callees = BTreeMap::new();
+    // Callees declared inside `impl`/`trait` blocks are methods, not
+    // bare-callable free functions; they are not registered.
+    let mut block_depth = 0isize;
+    let mut method_block_depth: Option<isize> = None;
     for (idx, raw) in lines.iter().enumerate() {
-        let Some(feature) = parse_single_target_feature(raw) else {
-            continue;
-        };
-        for following in lines.iter().skip(idx + 1).take(8) {
-            let trimmed = following.trim_start();
-            if trimmed.is_empty()
-                || trimmed.starts_with("#[")
-                || trimmed.starts_with("///")
-                || trimmed.starts_with("//")
-            {
-                continue;
+        let trimmed_start = raw.trim_start();
+        if method_block_depth.is_none()
+            && (trimmed_start.starts_with("impl ")
+                || trimmed_start.starts_with("impl<")
+                || trimmed_start.starts_with("trait ")
+                || trimmed_start.starts_with("trait<"))
+            && raw.contains('{')
+        {
+            method_block_depth = Some(block_depth);
+        }
+        let in_method_block = method_block_depth.is_some();
+        let delta = raw.matches('{').count() as isize - raw.matches('}').count() as isize;
+        if !in_method_block && let Some(feature) = parse_single_target_feature(raw) {
+            for following in lines.iter().skip(idx + 1).take(8) {
+                let trimmed = following.trim_start();
+                if trimmed.is_empty()
+                    || trimmed.starts_with("#[")
+                    || trimmed.starts_with("///")
+                    || trimmed.starts_with("//")
+                {
+                    continue;
+                }
+                if let Some(name) = parse_fn_name_simple(trimmed) {
+                    callees.insert(name, feature);
+                }
+                break;
             }
-            if let Some(name) = parse_fn_name_simple(trimmed) {
-                callees.insert(name, feature);
-            }
-            break;
+        }
+        block_depth += delta;
+        if method_block_depth.is_some_and(|start| block_depth <= start) {
+            method_block_depth = None;
         }
     }
     callees
@@ -49,12 +68,19 @@ pub(super) fn callee_target_feature(
     expression: &str,
     callees: &TargetFeatureCallees,
 ) -> Option<(String, String)> {
+    // Attribute only when every registry callee called in the expression
+    // agrees on one feature; mixed-feature expressions stay unattributed.
+    let mut matched: Option<(&String, &String)> = None;
     for (name, feature) in callees {
         if contains_call_name(expression, name) {
-            return Some((name.clone(), feature.clone()));
+            match matched {
+                None => matched = Some((name, feature)),
+                Some((_, matched_feature)) if matched_feature != feature => return None,
+                _ => {}
+            }
         }
     }
-    None
+    matched.map(|(name, feature)| (name.clone(), feature.clone()))
 }
 
 fn parse_single_target_feature(line: &str) -> Option<String> {
@@ -89,7 +115,10 @@ fn contains_call_name(line: &str, name: &str) -> bool {
     while let Some(pos) = cursor.find(name) {
         let before = cursor[..pos].chars().next_back();
         let after = &cursor[pos + name.len()..];
-        let starts_on_boundary = before.is_none_or(|ch| !is_ident_continue(ch));
+        // Bare calls only: a preceding `.` (method) or `:` (path) means
+        // the name does not denote the registered free function.
+        let starts_on_boundary =
+            before.is_none_or(|ch| !is_ident_continue(ch) && ch != '.' && ch != ':');
         if starts_on_boundary && call_suffix(after) {
             return true;
         }
@@ -116,7 +145,7 @@ fn is_ident_continue(ch: char) -> bool {
 
 #[cfg(test)]
 mod tests {
-    use super::target_feature_callees;
+    use super::{callee_target_feature, target_feature_callees};
 
     #[test]
     fn collects_single_feature_callee() -> Result<(), String> {
@@ -128,6 +157,48 @@ mod tests {
             Some("avx2") => Ok(()),
             other => Err(format!("expected avx2 for sum_avx2, got {other:?}")),
         }
+    }
+
+    #[test]
+    fn impl_method_is_not_collected_and_calls_must_be_bare() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "struct W;",
+            "impl W {",
+            "#[target_feature(enable = \"avx2\")]",
+            "fn sum_avx2(&self, data: &[f32]) -> f32 { 0.0 }",
+            "}",
+        ]);
+        if callees.contains_key("sum_avx2") {
+            return Err("impl method must not be registered as a bare callee".to_string());
+        }
+        let free = target_feature_callees(&[
+            "#[target_feature(enable = \"avx2\")]",
+            "pub fn sum_avx2(data: &[f32]) -> f32 { 0.0 }",
+        ]);
+        if callee_target_feature("x.sum_avx2(data)", &free).is_some() {
+            return Err("method call must not be attributed to the free callee".to_string());
+        }
+        if callee_target_feature("other::sum_avx2(data)", &free).is_some() {
+            return Err("path call must not be attributed to the free callee".to_string());
+        }
+        if callee_target_feature("sum_avx2(data)", &free).is_none() {
+            return Err("bare call must be attributed".to_string());
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_feature_expression_is_not_attributed() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "#[target_feature(enable = \"avx2\")]",
+            "pub fn a_avx2(data: &[f32]) -> f32 { 0.0 }",
+            "#[target_feature(enable = \"sse4.1\")]",
+            "pub fn b_sse(data: &[f32]) -> f32 { 0.0 }",
+        ]);
+        if callee_target_feature("a_avx2(x); b_sse(y)", &callees).is_some() {
+            return Err("mixed-feature expression must stay unattributed".to_string());
+        }
+        Ok(())
     }
 
     #[test]
