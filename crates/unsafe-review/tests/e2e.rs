@@ -7,7 +7,10 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 use std::process::{Command, Output, Stdio};
 use std::time::{SystemTime, UNIX_EPOCH};
-use unsafe_review_core::{SubjectBinding, WitnessReceipt, parse_command_line};
+use unsafe_review_core::{
+    AnalysisMode, AnalyzeInput, DiffSource, PolicyMode, Scope, SubjectBinding, SubjectMovement,
+    WitnessReceipt, evaluate_base_head_movement, parse_command_line,
+};
 
 #[test]
 fn check_artifact_formats_context_and_explain_work_end_to_end() -> Result<(), Box<dyn Error>> {
@@ -10723,5 +10726,95 @@ diff --git a/src/a.rs b/src/a.rs\n\
         value["summary"]
     );
 
+    Ok(())
+}
+
+fn write_movement_crate(root: &Path, lib_rs: &str) -> Result<(), Box<dyn Error>> {
+    fs::create_dir_all(root.join("src"))?;
+    fs::write(
+        root.join("Cargo.toml"),
+        "[package]\nname = \"movement-e2e\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )?;
+    fs::write(root.join("src/lib.rs"), lib_rs)?;
+    Ok(())
+}
+
+fn analyze_movement_root(root: &Path) -> Result<unsafe_review_core::AnalyzeOutput, Box<dyn Error>> {
+    Ok(unsafe_review_core::analyze(AnalyzeInput {
+        root: root.to_path_buf(),
+        scope: Scope::Repo,
+        diff: DiffSource::NoneRepoScan,
+        mode: AnalysisMode::Repo,
+        policy: PolicyMode::Advisory,
+        include_unchanged_tests: true,
+        max_cards: None,
+    })?)
+}
+
+// #2271 PR1: base/head movement through the public core API on two analyzed
+// fixture checkouts. Mirrors the issue Sep 18 probe: a byte-identical card
+// on an unchanged line is inherited context, not a PR introduction, while a
+// genuinely new operation is introduced.
+#[test]
+fn base_head_movement_distinguishes_introduced_from_inherited() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-movement-e2e")?;
+    let base = temp.path().join("base");
+    let head = temp.path().join("head");
+    let shared = "pub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n";
+    write_movement_crate(&base, shared)?;
+    write_movement_crate(
+        &head,
+        &format!(
+            "{shared}\n// context above the new operation\npub fn peek_value(ptr: *const u32) -> u32 {{\n    unsafe {{ *ptr }}\n}}\n"
+        ),
+    )?;
+
+    let base_output = analyze_movement_root(&base)?;
+    let head_output = analyze_movement_root(&head)?;
+    assert!(!base_output.cards.is_empty(), "base must produce cards");
+    assert!(
+        head_output.cards.len() > base_output.cards.len(),
+        "head must add the new operation card"
+    );
+    let report = evaluate_base_head_movement(&base_output, &head_output);
+    assert_eq!(
+        report.summary.subjects,
+        report.subjects.len(),
+        "movement summary must reconcile with per-card entries"
+    );
+    let total = report.summary.introduced
+        + report.summary.worsened
+        + report.summary.improved
+        + report.summary.resolved
+        + report.summary.inherited
+        + report.summary.unknown;
+    assert_eq!(total, report.summary.subjects);
+
+    let introduced: Vec<&str> = report
+        .subjects
+        .iter()
+        .filter(|entry| entry.movement == SubjectMovement::Introduced)
+        .map(|entry| entry.subject.as_str())
+        .collect();
+    assert_eq!(
+        introduced.len(),
+        1,
+        "exactly the new operation must be introduced: {introduced:?}"
+    );
+    assert!(
+        introduced[0].contains("peek-value"),
+        "introduced subject must be the new operation: {}",
+        introduced[0]
+    );
+    for entry in &report.subjects {
+        if entry.subject.contains("read-header") {
+            assert_eq!(
+                entry.movement,
+                SubjectMovement::Inherited,
+                "byte-identical context card must be inherited, not introduced"
+            );
+        }
+    }
+    assert_eq!(report.summary.inherited, report.summary.subjects - 1);
     Ok(())
 }

@@ -1,4 +1,4 @@
-use crate::analysis::{pipeline, receipts};
+use crate::analysis::{movement, pipeline, receipts};
 use crate::domain::{CardId, ReviewCard};
 use crate::freshness::AnalysisIdentity;
 use crate::input::aperture::{AnalysisAperture, render_aperture_human};
@@ -1417,6 +1417,10 @@ fn days_in_month(year: u32, month: u32) -> u64 {
     }
 }
 
+pub use movement::{
+    MovementReport, MovementSummary, SubjectMovement, SubjectMovementEntry,
+    evaluate_base_head_movement,
+};
 pub use outcome::OutcomeReport;
 pub use policy_report::PolicyReport;
 pub use receipts::ReceiptAuditReport;

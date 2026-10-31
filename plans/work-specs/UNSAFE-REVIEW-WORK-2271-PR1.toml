@@ -1,0 +1,108 @@
+# Issue-linked work specification for base/head movement evaluation (first PR).
+# Basis: main 7c74338b (2026-10-31). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271"
+kind = "correctness"
+objective = "Add an explicit base/head movement evaluator over canonical cards and obligations: compare two complete comparable AnalyzeOutputs subject-by-subject on exact card identity and classify each subject as introduced, worsened, improved, resolved, inherited context, or unknown/not-comparable, recording existing baseline-ledger movement side by side without rewriting it. Characterize the evaluator on one small owned fixture plus the Crossbeam development input (manual PR-body table, not holdout evidence)."
+user_outcome = "A maintainer running a base/head PR review sees context cards reported as inherited rather than introduced merely because no saved baseline exists; genuinely new operations report introduced; guard additions/removals report improved/worsened without claiming resolution; removals report resolved only under complete comparable analyses; ambiguous or incomparable cases report unknown instead of a false verdict."
+claim_boundary = "This slice proves additive base/head subject attribution via unit tests, one owned fixture pair, a CLI-driven synthetic pair e2e, and a manual Crossbeam characterization table; it does not rewrite policy/baseline semantics, the outcome comparator, or any projection; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release claim."
+
+[scope]
+included = [
+    "Settled design (verbatim): matching key is the canonical card identity with the per-run -cN counter stripped (identical file/owner/family/operation/snippet base); same base part on both sides is the same subject; duplicate base parts within one side are ambiguous and yield unknown, never forced into introduced/resolved.",
+    "Settled design (verbatim): per-subject verdicts are introduced (head-only), resolved (base-only under complete comparable analyses), inherited context (both present, no evidence regression), improved (evidence improved while the gap stays open; never resolved, never safe), worsened (evidence regressed), and unknown/not-comparable (ambiguous identity, incomplete/capped/failed analyses, scope mismatch, wrong-root/rejected-path inputs).",
+    "Settled design (verbatim): evidence comparison is per-obligation discharge presence plus witness presence/verdict on the same subject; stronger evidence is never blanket completion and a stale or unknown receipt never drives improvement.",
+    "Settled design (verbatim): comparability is per-side completeness plus per-side file coverage, not scope equality. Head-only subjects report introduced only when the base analysis is complete AND covered the subject's file (repo scope, or the file is in the base candidate set); base-only subjects report resolved only when the head analysis is complete AND covers the subject's file; both-present subjects compare evidence directly regardless of scope; anything else is unknown. Failed analyses produce no output to compare and wrong-root pairs are indistinguishable from legitimate base/head checkouts, so both are caller responsibility, never a clean verdict from this evaluator.",
+    "A new pure core evaluator evaluate_base_head_movement(base: &AnalyzeOutput, head: &AnalyzeOutput) -> MovementReport in a new analysis/movement module with public core API so the CLI e2e can drive it through real check runs; no CLI surface changes in this PR.",
+    "MovementReport carries per-subject entries (base/head card ids, new base/head verdict, reason, plus the existing ledger-derived baseline_state/outcome_movement for side-by-side compatibility) and summary counts for both vocabularies that reconcile exactly with the card set.",
+    "Unit tests for every acceptance leg (untouched card inherited without a ledger, new operation introduced, guard add/remove improved/worsened, removal resolved only when complete, line-number-only moves still match, owner/operation divergence never collapses, duplicates ambiguous, capped/partial/scope-mismatched unknown, counts reconcile, ledger behavior unchanged).",
+    "One small owned base/head fixture pair plus a CLI-driven synthetic pair e2e mirroring the issue's Sep 18 probe (byte-identical untouched card reports inherited, new operation reports introduced).",
+    "Manual Crossbeam development-input characterization with before/after movement tables recorded in the PR body; the input is not turned into holdout evidence.",
+]
+excluded = [
+    "Any rewrite of policy/baseline semantics, SPEC-0030 counters, the outcome comparator (output/outcome), or existing projections (json/agent/lsp/markdown/comment-plan/badges).",
+    "CLI base/head double-analysis flow, new CLI subcommands, automatic baseline creation, and fuzzy/proximity subject matching.",
+    "Full cross-file movement matching, universal route selection, site-reach instrumentation, history/typed-model expansion (#2300 program), and measurement/calibration claims (#2224/#2231).",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "A pre-existing card on an unchanged or context line is never reported as PR-introduced merely because no saved baseline exists; introduction requires head-presence without a comparable base subject."
+
+[[invariant]]
+id = "INV-2"
+text = "Stronger evidence is never blanket completion: improved keeps the gap open, unknown/stale receipts never drive improvement, and resolved requires genuine absence under complete comparable analyses."
+
+[[invariant]]
+id = "INV-3"
+text = "Ambiguous duplicate subjects and incomparable analyses (capped, partial, failed, scope-mismatched, wrong-root/rejected-path) yield unknown, never a forced introduced/resolved verdict."
+
+[[invariant]]
+id = "INV-4"
+text = "Existing baseline-ledger movement is preserved byte-identically; the new base/head verdicts are recorded side by side and existing projections, counters, and goldens do not change."
+
+[[invariant]]
+id = "INV-5"
+text = "Summary counts and per-card verdicts reconcile exactly; the evaluator introduces no display-only classifier and no second truth."
+
+[[acceptance]]
+id = "AC-2271-PR1-1"
+text = "Untouched cards report inherited context without any saved baseline; genuinely new unsafe operations report introduced."
+proof = ["cargo test --locked -p unsafe-review-core movement"]
+
+[[acceptance]]
+id = "AC-2271-PR1-2"
+text = "Guard addition/removal on an existing card reports improved/worsened with the gap still open; operation removal reports resolved only under complete comparable analyses."
+proof = ["cargo test --locked -p unsafe-review-core movement"]
+
+[[acceptance]]
+id = "AC-2271-PR1-3"
+text = "Line-number-only moves still match; different owners/operations never collapse; duplicate subjects and narrowed-side (capped/unresolved/rejected) analyses report unknown; counts reconcile exactly; ledger movement unchanged."
+proof = ["cargo test --locked -p unsafe-review-core movement", "cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2271-PR1-4"
+text = "CLI-driven synthetic base/head pair e2e (mirroring the issue probe): byte-identical card inherited, new operation introduced, through real check runs."
+proof = ["cargo test -p unsafe-review --test e2e --locked"]
+
+[[acceptance]]
+id = "AC-2271-PR1-5"
+text = "Manual Crossbeam development-input characterization with before/after movement tables in the PR body; existing ledger behavior and goldens unchanged."
+proof = ["cargo run --locked -p xtask -- check-fixtures", "cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2271-PR1-6"
+text = "Full lane gates pass with no new Clippy warnings and no unwrap() in new tests."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "movement_report"
+expected = "The MovementReport carries per-subject new verdicts plus existing ledger baseline_state/outcome_movement side by side so compatibility can be judged without changing any projection."
+
+[[integration]]
+surface = "outcome_module_boundary"
+expected = "The outcome comparator (owned by #2230) is untouched; R06-TRUTH-02's outcome half stays with #2230 while this evaluator supplies the movement half."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results, the Crossbeam before/after movement tables, and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Keep the evaluator pure and additive (two AnalyzeOutputs in, report out); no pipeline wiring means no projection drift and goldens stay byte-identical."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Pin every acceptance leg with discriminating unit tests first, including duplicate-identity and incompleteness negatives, so the matcher cannot silently collapse distinct subjects."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Characterize Crossbeam manually in the PR body without adding it as fixture goldens, preserving its exposed development-input status and avoiding holdout contamination."
+
+[compatibility]
+posture = "Additive core API plus tests; no analyzer, ReviewCard, ledger, outcome, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the new movement module, its tests, and the work spec; no migration is involved because existing movement paths are untouched."
