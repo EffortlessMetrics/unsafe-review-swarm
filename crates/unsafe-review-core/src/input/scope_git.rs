@@ -506,7 +506,16 @@ pub fn worktree_dirty(start: &Path) -> Option<bool> {
     let output = Command::new("git")
         .arg("-C")
         .arg(start)
-        .args(["status", "--porcelain=v1", "--", ":(exclude).unsafe-review"])
+        .args([
+            "status",
+            "--porcelain=v1",
+            // Report untracked files individually regardless of the user's
+            // `status.showUntrackedFiles` setting: a hidden untracked source
+            // file must never read as clean-tree provenance.
+            "--untracked-files=all",
+            "--",
+            ":(exclude).unsafe-review",
+        ])
         .output()
         .ok()?;
     if !output.status.success() {
@@ -631,6 +640,16 @@ mod tests {
         if worktree_dirty(&dir) != Some(true) {
             return Err("an unrelated untracked file must report dirty".to_string());
         }
+        // The probe must not depend on the user's untracked-files display
+        // setting: hiding untracked files must never read as clean.
+        run_git(&dir, &["config", "status.showUntrackedFiles", "no"])?;
+        if worktree_dirty(&dir) != Some(true) {
+            return Err(
+                "untracked files must report dirty regardless of status.showUntrackedFiles"
+                    .to_string(),
+            );
+        }
+        run_git(&dir, &["config", "--unset", "status.showUntrackedFiles"])?;
         std::fs::write(dir.join("src.rs"), "pub fn f() {}\n// touched\n")
             .map_err(|err| format!("touch fixture failed: {err}"))?;
         if worktree_dirty(&dir) != Some(true) {
