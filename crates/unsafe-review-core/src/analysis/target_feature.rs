@@ -7,6 +7,9 @@ pub(super) type TargetFeatureCallees = BTreeMap<String, String>;
 /// name to feature string. Multi-feature enable lists are out of scope.
 pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
     let mut callees = BTreeMap::new();
+    // A bare name declared with two different features (for example in
+    // sibling modules) is ambiguous and is never attributed.
+    let mut ambiguous: std::collections::BTreeSet<String> = std::collections::BTreeSet::new();
     // Callees declared inside `impl`/`trait` blocks are methods, not
     // bare-callable free functions; they are not registered.
     let mut block_depth = 0isize;
@@ -41,7 +44,16 @@ pub(super) fn target_feature_callees(lines: &[&str]) -> TargetFeatureCallees {
                     continue;
                 }
                 if let Some(name) = parse_fn_name_simple(trimmed) {
-                    callees.insert(name, feature);
+                    if ambiguous.contains(&name) {
+                        // Already poisoned; stay unattributed.
+                    } else if let Some(existing) = callees.get(&name) {
+                        if existing != &feature {
+                            callees.remove(&name);
+                            ambiguous.insert(name);
+                        }
+                    } else {
+                        callees.insert(name, feature);
+                    }
                 }
                 break;
             }
@@ -206,6 +218,26 @@ mod tests {
         if callees.contains_key("sum_avx2") {
             return Err(
                 "impl method with brace on the next line must not be registered".to_string(),
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn same_name_with_different_features_is_not_collected() -> Result<(), String> {
+        let callees = target_feature_callees(&[
+            "mod a {",
+            "#[target_feature(enable = \"avx2\")]",
+            "pub fn accumulate(data: &[f32]) -> f32 { 0.0 }",
+            "}",
+            "mod b {",
+            "#[target_feature(enable = \"sse4.1\")]",
+            "pub fn accumulate(data: &[f32]) -> f32 { 0.0 }",
+            "}",
+        ]);
+        if callees.contains_key("accumulate") {
+            return Err(
+                "same-named callees with different features must stay unattributed".to_string(),
             );
         }
         Ok(())
