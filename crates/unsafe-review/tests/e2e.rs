@@ -7284,6 +7284,131 @@ fn bound_receipt_imports_when_applicable_and_goes_stale_on_context_change()
 }
 
 #[test]
+fn confirm_live_override_receipt_flows_through_import_as_unknown() -> Result<(), Box<dyn Error>> {
+    // #2273 AC8 live round trip: the receipt is genuinely executed by
+    // confirm, not hand-mirrored. The --command override helper is the
+    // only live-executable shape (the routed cargo-miri verification is
+    // not e2e-runnable), so the import consumer must report it unknown
+    // with the invocation-mismatch reason while the gap stays open.
+    let temp = TempDir::new("unsafe-review-live-receipt-e2e")?;
+    let root = temp.path().join("fixture root");
+    copy_dir_all(&fixture_root("raw_pointer_alignment"), &root)?;
+    git(&root, &["init", "-q"])?;
+    git(&root, &["config", "user.name", "receipt e2e"])?;
+    git(&root, &["config", "user.email", "receipt@example.test"])?;
+    // The receipt store and helper build artifacts are ignored so saved
+    // receipts and the harness binary do not dirty the tree they evidence.
+    fs::write(
+        root.join(".gitignore"),
+        ".unsafe-review/\nmiri_confirm_helper*\n",
+    )?;
+    build_confirm_helper(&root)?;
+    git(&root, &["add", "-A"])?;
+    git(&root, &["commit", "-qm", "fixture base"])?;
+
+    // Repo scope on both sides: confirm records scope repo, and the
+    // re-review must derive the same current scope.
+    let review = || -> Result<Value, Box<dyn Error>> {
+        let output = run_success_in_dir(
+            [
+                os("repo"),
+                os("--root"),
+                os("."),
+                os("--format"),
+                os("json"),
+            ],
+            &root,
+        )?;
+        parse_json(&stdout_text(&output)?)
+    };
+
+    let baseline = review()?;
+    assert_eq!(baseline["summary"]["cards"], 1);
+    let card_id = json_str(&baseline["cards"][0]["id"], "cards[0].id")?.to_string();
+    assert!(
+        !baseline["cards"][0]["witness"]
+            .as_str()
+            .unwrap_or("")
+            .contains("Imported"),
+        "baseline must show the witness gap before any receipt exists"
+    );
+
+    // Forward slashes: parse_command_line consumes backslashes as
+    // escapes, so the Windows `.\` helper prefix never survives parsing.
+    let command_text = format!(
+        "./miri_confirm_helper{} success",
+        std::env::consts::EXE_SUFFIX
+    );
+    let receipt_path = temp.path().join("live receipt.json");
+    run_success_in_dir(
+        vec![
+            os("confirm"),
+            os("--root"),
+            os("."),
+            os("--allow-heavy"),
+            os("--author"),
+            os("e2e/live-receipt"),
+            os("--expires-at"),
+            os("2027-12-31"),
+            os("--command"),
+            OsString::from(&command_text),
+            os("--out"),
+            receipt_path.as_os_str().to_os_string(),
+            OsString::from(&card_id),
+        ],
+        &root,
+    )?;
+
+    // The executed receipt binds the real observation: invocation digest
+    // of the command that ran, complete capture, repo scope.
+    let receipt: WitnessReceipt = serde_json::from_str(&fs::read_to_string(&receipt_path)?)?;
+    assert_eq!(receipt.card_id, card_id);
+    let executed = parse_command_line(&command_text)
+        .map_err(|err| format!("parse executed command failed: {err}"))?;
+    let subject = receipt.subject.as_ref().ok_or("missing subject")?;
+    assert_eq!(
+        subject.invocation_digest.as_deref(),
+        Some(executed.digest().as_str()),
+        "subject must record the executed invocation digest"
+    );
+    assert_eq!(subject.captured_complete, Some(true));
+    assert_eq!(subject.scope.as_deref(), Some("repo"));
+
+    // Install the live receipt and re-review: the routed verification is
+    // a different invocation, so the import must read unknown with the
+    // invocation reason while the gap stays open and actionable.
+    let receipt_dir = root.join(".unsafe-review").join("receipts");
+    fs::create_dir_all(&receipt_dir)?;
+    fs::copy(&receipt_path, receipt_dir.join("miri.json"))?;
+    let rereview = review()?;
+    assert_eq!(rereview["summary"]["cards"], 1);
+    let card = &rereview["cards"][0];
+    let witness = card["witness"]
+        .as_str()
+        .ok_or("witness should render as a string")?;
+    assert!(
+        witness.contains("cannot be shown to apply")
+            && witness.contains("executed invocation identity is not established on both sides"),
+        "live override receipt must report the invocation reason: {witness}"
+    );
+    assert!(
+        card["missing"]
+            .as_array()
+            .ok_or("missing should be an array")?
+            .iter()
+            .any(|item| {
+                item.as_str()
+                    .unwrap_or("")
+                    .contains("No witness receipt imported")
+            }),
+        "unknown import must leave the witness gap open: {}",
+        card["missing"]
+    );
+
+    Ok(())
+}
+
+#[test]
 fn receipt_template_writes_valid_receipt_json_without_running_witnesses()
 -> Result<(), Box<dyn Error>> {
     let temp = TempDir::new("unsafe-review-receipt-template-e2e")?;
