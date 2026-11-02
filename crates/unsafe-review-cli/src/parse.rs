@@ -1443,6 +1443,13 @@ fn parse_first_pr(args: Vec<String>) -> Result<FirstPrOptions, String> {
         for name in crate::execute::first_pr_artifact_names() {
             protected.push(("bundle artifact", options.out_dir.join(name)));
         }
+        // movement.json rides the same bundle write path but is deliberately
+        // NOT part of FIRST_PR_ARTIFACTS (the 18-file manifest/byte-identical
+        // guarantee): keep that list untouched and protect the additive file
+        // here only. The name must match MOVEMENT_JSON_ARTIFACT in execute.rs;
+        // the latency receipt is written after the bundle, so without this it
+        // would silently clobber movement.json.
+        protected.push(("bundle artifact", options.out_dir.join("movement.json")));
         let borrowed: Vec<(&str, &std::path::Path)> = protected
             .iter()
             .map(|(flag, path)| (*flag, path.as_path()))
@@ -3148,16 +3155,19 @@ mod tests {
 
     #[test]
     fn latency_out_inside_bundle_dir_is_rejected() -> Result<(), String> {
-        let bundled = parse(args([
-            "unsafe-review",
-            "first-pr",
-            "--out-dir=target/review",
-            "--latency-out=target/review/cards.json",
-        ]));
-        assert!(
-            bundled.is_err(),
-            "a receipt must not overwrite a bundle artifact"
-        );
+        for artifact in ["target/review/cards.json", "target/review/movement.json"] {
+            let latency = format!("--latency-out={artifact}");
+            let bundled = parse(args([
+                "unsafe-review",
+                "first-pr",
+                "--out-dir=target/review",
+                latency.as_str(),
+            ]));
+            assert!(
+                bundled.is_err(),
+                "a receipt must not overwrite a bundle artifact ({artifact})"
+            );
+        }
         Ok(())
     }
 

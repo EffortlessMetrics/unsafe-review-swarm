@@ -60,6 +60,46 @@ impl MaterializedBase {
     pub(crate) fn path(&self) -> &Path {
         &self.worktree
     }
+
+    /// The analysis root corresponding to the requested `--root`: the
+    /// requested root relative to the work-tree toplevel, resolved under
+    /// this worktree. A requested root at the toplevel maps to the worktree
+    /// itself; a nested `--root` maps to the matching subtree so the base
+    /// census covers exactly the tree the head side analyzed. A requested
+    /// root outside the repository tree cannot be mapped and reports
+    /// [`BaseMaterializationError::NotARepo`] with the cause, so the caller
+    /// degrades to an honest unknown section instead of analyzing an
+    /// unrelated directory.
+    pub(crate) fn analysis_root_for(
+        &self,
+        root: &Path,
+    ) -> Result<PathBuf, BaseMaterializationError> {
+        let rel = relative_to_toplevel(&self.anchor, root)?;
+        Ok(self.worktree.join(rel))
+    }
+}
+
+/// Express `root` relative to the work-tree `toplevel`. Both sides are
+/// canonicalized first so verbatim-prefix (`\\?\`) and separator
+/// differences on Windows cannot fake an outside-the-tree mismatch.
+fn relative_to_toplevel(toplevel: &Path, root: &Path) -> Result<PathBuf, BaseMaterializationError> {
+    let canonical_toplevel =
+        std::fs::canonicalize(toplevel).unwrap_or_else(|_| toplevel.to_path_buf());
+    let canonical_root =
+        std::fs::canonicalize(root).map_err(|err| BaseMaterializationError::NotARepo {
+            root: root.to_path_buf(),
+            detail: format!("could not resolve the requested root: {err}"),
+        })?;
+    canonical_root
+        .strip_prefix(&canonical_toplevel)
+        .map(Path::to_path_buf)
+        .map_err(|err| BaseMaterializationError::NotARepo {
+            root: root.to_path_buf(),
+            detail: format!(
+                "requested root is outside the repository tree rooted at {} ({err})",
+                toplevel.display()
+            ),
+        })
 }
 
 impl Drop for MaterializedBase {
@@ -104,14 +144,22 @@ fn repo_toplevel(root: &Path) -> Result<PathBuf, BaseMaterializationError> {
     Ok(PathBuf::from(toplevel))
 }
 
-/// Resolve a base ref to a full commit SHA, or report [`BaseMaterializationError::UnknownSha`].
+/// Resolve a base ref to the merge-base commit SHA with HEAD, or report
+/// [`BaseMaterializationError::UnknownSha`].
+///
+/// The head side of this surface is diff-scoped through `git diff
+/// <base>...HEAD`, whose three-dot range is anchored at the merge base, not
+/// the base tip. Materializing the tip on a diverged base would compare the
+/// head against a tree the diff never covered; resolving the merge base
+/// keeps both sides anchored at the same commit. The original ref string is
+/// kept in the error taxonomy for provenance; it is never silently replaced.
 fn resolve_base_sha(anchor: &Path, base_ref: &str) -> Result<String, BaseMaterializationError> {
     let output = ProcessCommand::new("git")
         .arg("-C")
         .arg(anchor)
-        .arg("rev-parse")
-        .arg("--verify")
-        .arg(format!("{base_ref}^{{commit}}"))
+        .arg("merge-base")
+        .arg(base_ref)
+        .arg("HEAD")
         .output()
         .map_err(|err| BaseMaterializationError::UnknownSha {
             base_ref: base_ref.to_string(),
@@ -127,7 +175,7 @@ fn resolve_base_sha(anchor: &Path, base_ref: &str) -> Result<String, BaseMateria
     if sha.is_empty() {
         return Err(BaseMaterializationError::UnknownSha {
             base_ref: base_ref.to_string(),
-            detail: "git rev-parse returned empty output".to_string(),
+            detail: "git merge-base returned empty output".to_string(),
         });
     }
     Ok(sha)
@@ -172,7 +220,7 @@ pub(crate) fn materialize_base(
     base_ref: &str,
 ) -> Result<MaterializedBase, BaseMaterializationError> {
     let toplevel = repo_toplevel(root)?;
-    let sha = resolve_base_sha(root, base_ref)?;
+    let sha = resolve_base_sha(&toplevel, base_ref)?;
     let owner_tmp = std::env::temp_dir().join(format!(
         "unsafe-review-base-{}-{}",
         std::process::id(),
@@ -191,7 +239,7 @@ pub(crate) fn materialize_base(
     }
     Ok(MaterializedBase {
         worktree,
-        anchor: root.to_path_buf(),
+        anchor: toplevel,
         owner_tmp,
     })
 }
@@ -306,6 +354,111 @@ mod tests {
             ));
         }
         Ok(())
+    }
+
+    #[test]
+    fn diverged_branch_materializes_merge_base_not_tip() -> Result<(), String> {
+        let temp = TestTemp::new("diverged")?;
+        let (base, head) = init_repo_with_two_commits(&temp.path)?;
+        if base == head {
+            return Err("fixture setup produced identical base and head".to_string());
+        }
+        // Fork a side branch off the base commit and advance it with a
+        // contract change the three-dot head diff never covers.
+        let previous = git(&temp.path, &["branch", "--show-current"])?;
+        let previous = previous.trim().to_string();
+        if previous.is_empty() {
+            return Err("fixture repo must be on a branch".to_string());
+        }
+        git(&temp.path, &["checkout", "-qb", "side", &base])?;
+        std::fs::write(
+            temp.path.join("lib.rs"),
+            "pub fn base_only() {}\n// Safety: base-side contract note.\n",
+        )
+        .map_err(|err| format!("write side lib.rs failed: {err}"))?;
+        git(&temp.path, &["add", "-A"])?;
+        git(&temp.path, &["commit", "-qm", "side contract change"])?;
+        let tip = git(&temp.path, &["rev-parse", "HEAD"])?;
+        git(&temp.path, &["checkout", "-q", &previous])?;
+        let at = git(&temp.path, &["rev-parse", "HEAD"])?;
+        if at.trim() != head {
+            return Err("fixture must return to the head commit".to_string());
+        }
+        if tip.trim() == base {
+            return Err("side branch must advance past the base".to_string());
+        }
+        let merge_base = git(&temp.path, &["merge-base", "side", "HEAD"])?;
+        if merge_base.trim() != base {
+            return Err("fixture merge base must be the base commit".to_string());
+        }
+        let materialized = materialize_base(&temp.path, "side")
+            .map_err(|err| format!("materialize diverged ref failed: {err}"))?;
+        let content = std::fs::read_to_string(materialized.path().join("lib.rs"))
+            .map_err(|err| format!("read materialized lib.rs failed: {err}"))?;
+        if content != "pub fn base_only() {}\n" {
+            return Err(format!(
+                "materialized tree must match the merge base, not the diverged tip; got: {content:?}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn nested_root_maps_to_matching_subtree() -> Result<(), String> {
+        let temp = TestTemp::new("nested-root")?;
+        let (base, _) = init_repo_with_two_commits(&temp.path)?;
+        let materialized = materialize_base(&temp.path, &base)
+            .map_err(|err| format!("materialize base failed: {err}"))?;
+        let top = materialized
+            .analysis_root_for(&temp.path)
+            .map_err(|err| format!("toplevel mapping failed: {err}"))?;
+        if top != materialized.path() {
+            return Err(format!(
+                "the toplevel must map to the worktree itself, got {}",
+                top.display()
+            ));
+        }
+        let nested = temp.path.join("nested");
+        std::fs::create_dir_all(&nested)
+            .map_err(|err| format!("create nested dir failed: {err}"))?;
+        let mapped = materialized
+            .analysis_root_for(&nested)
+            .map_err(|err| format!("nested mapping failed: {err}"))?;
+        if mapped != materialized.path().join("nested") {
+            return Err(format!(
+                "a nested root must map to the matching subtree, got {}",
+                mapped.display()
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn root_outside_tree_is_not_mapped() -> Result<(), String> {
+        let temp = TestTemp::new("outside-root")?;
+        let (base, _) = init_repo_with_two_commits(&temp.path)?;
+        let materialized = materialize_base(&temp.path, &base)
+            .map_err(|err| format!("materialize base failed: {err}"))?;
+        let outside = TestTemp::new("outside-tree")?;
+        match materialized.analysis_root_for(&outside.path) {
+            Err(BaseMaterializationError::NotARepo { root, detail }) => {
+                if root != outside.path {
+                    return Err(format!(
+                        "outside-tree error must name the requested root, got {}",
+                        root.display()
+                    ));
+                }
+                if detail.is_empty() {
+                    return Err("outside-tree error must carry a cause".to_string());
+                }
+                Ok(())
+            }
+            Err(other) => Err(format!("expected NotARepo, got {other}")),
+            Ok(mapped) => Err(format!(
+                "a root outside the tree must not map, got {}",
+                mapped.display()
+            )),
+        }
     }
 
     #[test]

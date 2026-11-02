@@ -162,9 +162,20 @@ pub(crate) fn compute_movement_section(
             return unknown_section(err.to_string(), None, head_sha);
         }
     };
+    // The head side analyzes the requested `--root` (which may be a subtree
+    // of the work tree); the base census must cover the corresponding
+    // directory under the materialized worktree, not the worktree top, or
+    // root-relative subject identities stop matching. A requested root
+    // outside the repository tree degrades to unknown with the cause.
+    let base_root = match materialized.analysis_root_for(root) {
+        Ok(base_root) => base_root,
+        Err(err) => {
+            return unknown_section(err.to_string(), None, head_sha);
+        }
+    };
     let base_sha = resolve_head_sha(materialized.path());
     let base = match unsafe_review_core::analyze(AnalyzeInput {
-        root: materialized.path().to_path_buf(),
+        root: base_root,
         scope: Scope::Repo,
         diff: DiffSource::NoneRepoScan,
         mode: AnalysisMode::Draft,
