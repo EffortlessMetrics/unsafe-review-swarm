@@ -11410,3 +11410,71 @@ fn first_pr_movement_subdir_root_inherits_context_card() -> Result<(), Box<dyn E
     );
     Ok(())
 }
+
+// #2271 PR3: the pr terminal path projects the already-computed base/head
+// movement line additively after the unchanged ledger movement line, and
+// movement.json is written. Probe shape is reused from PR2.
+#[test]
+fn pr_movement_line_projects_base_head_summary_on_terminal_path() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-pr-movement-front-panel-e2e")?;
+    let repo = temp.path().join("probe");
+    fs::create_dir_all(repo.join("src"))?;
+    fs::write(
+        repo.join("Cargo.toml"),
+        "[package]\nname = \"movement-probe\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )?;
+    let base_lib = "pub mod legacy;\n\npub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n\npub fn read_flag(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
+    let legacy = "pub fn read_legacy(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n";
+    fs::write(repo.join("src/lib.rs"), base_lib)?;
+    fs::write(repo.join("src/legacy.rs"), legacy)?;
+    git(&repo, &["init", "-q"])?;
+    git(&repo, &["config", "user.name", "movement e2e"])?;
+    git(&repo, &["config", "user.email", "movement@example.test"])?;
+    git(&repo, &["config", "commit.gpgsign", "false"])?;
+    git(&repo, &["config", "core.autocrlf", "false"])?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe base"])?;
+    let base = git(&repo, &["rev-parse", "HEAD"])?;
+    let base = base.trim().to_string();
+    let head_lib = "pub mod legacy;\n\npub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n\npub fn peek_value(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n";
+    fs::write(repo.join("src/lib.rs"), head_lib)?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe head"])?;
+
+    let out_dir = temp.path().join("out");
+    let output = run_success([
+        os("pr"),
+        os("--root"),
+        repo.as_os_str().to_os_string(),
+        os("--base"),
+        os(&base),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(
+        stdout.contains("unsafe-review pr"),
+        "pr terminal path must render the pr front panel; got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains(
+            "Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 2"
+        ),
+        "pr front panel must carry the base/head movement line; got:\n{stdout}"
+    );
+    let ledger_pos = stdout.find("Movement: new ");
+    let movement_pos = stdout.find("Base/head movement:");
+    assert!(
+        ledger_pos.is_some() && movement_pos.is_some() && ledger_pos < movement_pos,
+        "pr front panel must keep the ledger movement line ahead of the additive movement line; got:\n{stdout}"
+    );
+
+    let movement = parse_json(&fs::read_to_string(out_dir.join("movement.json"))?)?;
+    assert_eq!(movement["schema_version"], "movement/v1");
+    assert_eq!(movement["status"], "complete");
+    assert_eq!(movement["summary"]["introduced"], 1);
+    assert_eq!(movement["summary"]["inherited"], 1);
+    assert_eq!(movement["summary"]["unknown"], 2);
+    Ok(())
+}
