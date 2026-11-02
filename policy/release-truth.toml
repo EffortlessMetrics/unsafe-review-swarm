@@ -1,0 +1,58 @@
+schema_version = "1.0"
+
+# Historical-vs-current classification note.
+#
+# This file records current release truth: what the latest published release
+# is, where its registry artifacts live, which source commit it was promoted
+# from, and whether its tag, GitHub Release, and installed smoke receipt exist.
+# Historical receipts (docs/releases/*), handoffs (docs/handoffs/*), and
+# CHANGELOG entries keep their original wording, versions, and SHAs: they are
+# evidence of what was true when written, not claims about the present. A
+# front panel that still names a prior release (for example v0.4.0) as the
+# latest available surface is stale, not historical, and the standalone
+# check-release-truth checker reports it. Workspace/dev version state (the 0.3.8
+# workbench checkout) and registry publication state (0.5.0) are represented
+# separately below and must never be conflated or fudged: the 0.5.0 version
+# bump lives on a non-ancestor side branch, so this workbench remains 0.3.8
+# while the published registry state is 0.5.0.
+classification = "current-release-truth; history stays in receipts, handoffs, and CHANGELOG"
+
+# Workspace/dev version as-is in this checkout. Recorded separately from the
+# registry state on purpose; do not bump to match crates.io.
+workspace_version = "0.3.8"
+
+# Source promotion the current release was cut from (source merge f1eda818,
+# carrying the 0.5.0 publication receipt).
+public_source_commit = "f1eda818"
+
+# Installed smoke receipt for the published 0.5.0 CLI (SHA-256 of the
+# installed binary recorded in the 0.5.0 publication receipt mirror).
+installed_smoke_receipt = "3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634e51bab4bbff7b4c"
+
+[workbench]
+# Version/availability of this workbench checkout. Unpublished swarm main;
+# not a public release claim.
+version = "0.3.8"
+availability = "unpublished-swarm-main"
+
+[crates_io]
+# Registry publication state for the current release. All three packages
+# resolved on the public index at 0.5.0 (dry run 35175350041 green, publish
+# run 35177910918 success).
+version = "0.5.0"
+unsafe_review_core = "published"
+unsafe_review_cli = "published"
+unsafe_review = "published"
+
+[tag]
+# Tag follow-through observed after the receipt was written: v0.5.0 exists on
+# source and points at the promotion commit.
+exists = true
+target = "f1eda818"
+
+[github_release]
+# Release follow-through observed after the receipt was written: v0.5.0
+# published; the receipt's "separate explicit go" for tag and Release has
+# happened since.
+exists = true
+published_at = "2026-09-17T05:57:40Z"

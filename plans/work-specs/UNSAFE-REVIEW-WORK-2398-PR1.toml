@@ -1,0 +1,71 @@
+# Issue-linked work specification for release-truth authority and checker (first PR).
+# Basis: main c2618e9b (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398"
+kind = "correctness"
+objective = "Derive current release truth into a checked-in authority and enforce it offline: add a release-truth authority file plus a standalone checker with negative tests that reject stale front-panel claims (stale prior-release version, wrong tag target, claimed-but-absent Release, cross-panel disagreement) without any network access."
+user_outcome = "A maintainer (or CI) running the checker gets a pass only when the front panels agree with the recorded release truth; stale version claims fail with the surface and field named. Historical receipts stay immutable."
+claim_boundary = "This slice proves authority-plus-checker via unit tests and the offline gates; it edits no front-panel content (PR2), adds no runbook mapping (PR3), and performs no publication, tag, Release, source-merge, or network operation."
+
+[scope]
+included = [
+    "Settled design (verbatim): new authority input policy/release-truth.toml mirroring the public-surfaces.toml/doc-artifacts.toml pattern, with fields workspace_version, per-crate crates_io states, public_source_commit, tag {exists, target}, github_release {exists, published_at}, installed_smoke_receipt, and workbench version/availability. Seeded from the 0.5.0 publication receipt, the publication-sync handoff, and CHANGELOG: crates/tag/Release/smoke true for 0.5.0; workspace recorded as 0.3.8 as-is (the 0.5.0 bump lives on a non-ancestor side branch; the schema represents workspace and registry states separately, never fudged).",
+    "Settled design (verbatim): new standalone checker (xtask release_truth module with a check-release-truth command arm), deliberately NOT wired into check-pr (check-pr behavior stays byte-identical; wiring belongs to the PR3 release-flow integration). The checker parses the authority, scans current surfaces (README release row, SUPPORT_SUMMARY, RELEASE_COMPATIBILITY, RELEASE_DOCS_MATRIX) for release claims, and fails offline on stale prior-release versions, wrong tag targets, claimed-but-absent Releases, missing required fields, and cross-panel disagreement.",
+    "Settled design (verbatim): focused tests beside the existing support_tiers tests: negative fixtures for a stale v0.4.0-as-current claim and a crates-published/tag-pending transition, plus a positive fixture matching corrected panels; error messages name the surface and field.",
+    "Settled design (verbatim): historical receipts, handoffs, and CHANGELOG entries are explicitly out of mutation scope; the authority file carries a historical-vs-current classification note.",
+]
+excluded = [
+    "Any edit to front-panel content (README row, SUPPORT_SUMMARY, RELEASE_COMPATIBILITY, RELEASE_DOCS_MATRIX) — owned by PR2. Release-runbook step-to-field mapping and simulated version-bump proof — owned by PR3.",
+    "Wiring the checker into check-pr or any CI gate in this slice; crate publication, tag/Release mutation, source merge, Action moves, analyzer/receipt semantic changes, broad docs redesign, and live-network calls anywhere.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The checker is offline-only: it parses checked-in text and never touches the network; check-pr behavior is unchanged."
+
+[[invariant]]
+id = "INV-2"
+text = "Historical evidence (receipts, handoffs, CHANGELOG) is immutable; only the new authority file and checker are added."
+
+[[invariant]]
+id = "INV-3"
+text = "Workspace/dev version and registry publication state are represented separately, never conflated or fudged."
+
+[[acceptance]]
+id = "AC-2398-PR1-1"
+text = "Authority file seeded truthfully from receipt, handoff, and CHANGELOG with the workspace/registry split explicit."
+proof = ["cargo run --locked -p xtask -- check-release-truth"]
+
+[[acceptance]]
+id = "AC-2398-PR1-2"
+text = "Checker rejects injected stale-version and crates-published/tag-pending fixtures with surface- and field-naming errors, and passes the positive fixture."
+proof = ["cargo test --locked -p xtask release_truth"]
+
+[[acceptance]]
+id = "AC-2398-PR1-3"
+text = "Existing offline gates (check-docs, check-doc-artifacts, check-public-surfaces, check-support-tiers, check-pr, git diff --check) pass with unchanged behavior."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "release_truth_checker"
+expected = "Standalone check-release-truth command; check-pr andCI gates untouched in this slice."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Standalone checker plus tests only; no panel edits and no gate wiring means the worst case is an unused checker, never a broken gate."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Workspace-version semantics (0.3.8 workbench vs 0.5.0 registry) confirmed from git history in the scoping packet; the schema models the split explicitly instead of forcing a bump."
+
+[compatibility]
+posture = "Additive authority file plus standalone checker and tests; no analyzer, panel, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the authority file, the checker module and arm, and its tests; every gate behaves exactly as before."

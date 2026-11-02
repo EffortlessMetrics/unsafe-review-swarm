@@ -46,6 +46,7 @@ pub(crate) enum XtaskCommand {
     CheckRealPrCorpus,
     CheckCorpusPartitions,
     CheckSeamBatch,
+    CheckReleaseTruth,
     CheckEvidenceLossChallenges,
     CheckExternalPilots,
     ExternalPilotRollup,
@@ -173,6 +174,9 @@ impl XtaskCommand {
             ),
             Some("check-real-pr-corpus") => {
                 parse_no_extra(args, "check-real-pr-corpus", Self::CheckRealPrCorpus)
+            }
+            Some("check-release-truth") => {
+                parse_no_extra(args, "check-release-truth", Self::CheckReleaseTruth)
             }
             Some("check-corpus-partitions") => {
                 parse_no_extra(args, "check-corpus-partitions", Self::CheckCorpusPartitions)
