@@ -9586,6 +9586,37 @@ jobs:
     }
 
     #[test]
+    fn release_truth_rejects_cross_panel_disagreement() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let panels = [
+            (
+                "README.md",
+                "release-row",
+                "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.5.0; advisory-only, 0.x.y) |",
+            ),
+            (
+                "docs/status/SUPPORT_SUMMARY.md",
+                "public-release-claim",
+                "The last public release is `v0.4.0` (2026-09-17).",
+            ),
+        ];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("cross-panel disagreement should fail".to_string());
+        };
+        assert!(err.contains("release panels disagree"));
+        assert!(err.contains("README.md"));
+        assert!(err.contains("release-row"));
+        assert!(err.contains("SUPPORT_SUMMARY.md"));
+        assert!(err.contains("public-release-claim"));
+        assert!(err.contains("0.4.0"));
+        assert!(err.contains("0.5.0"));
+        Ok(())
+    }
+
+    #[test]
     fn release_truth_rejects_authority_missing_required_field() -> Result<(), String> {
         let text = release_truth_authority_fixture(false, false)
             .replace("published_at = \"2026-09-17T05:57:40Z\"\n", "");
