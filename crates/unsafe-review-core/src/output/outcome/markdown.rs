@@ -6,14 +6,15 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
     out.push_str("# unsafe-review outcome\n\n");
     out.push_str("Static comparison of two existing unsafe-review JSON snapshots.\n\n");
     out.push_str("## Summary\n\n");
-    out.push_str("| New | Resolved | Improved | Regressed | Unchanged |\n");
-    out.push_str("|---:|---:|---:|---:|---:|\n");
+    out.push_str("| New | Resolved | Improved | Regressed | Unknown | Unchanged |\n");
+    out.push_str("|---:|---:|---:|---:|---:|---:|\n");
     out.push_str(&format!(
-        "| {} | {} | {} | {} | {} |\n\n",
+        "| {} | {} | {} | {} | {} | {} |\n\n",
         report.summary.new,
         report.summary.resolved,
         report.summary.improved,
         report.summary.regressed,
+        report.summary.unknown,
         report.summary.unchanged
     ));
     out.push_str("## Reviewer delta\n\n");
@@ -36,6 +37,10 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
     out.push_str(&format!(
         "- Unchanged cards: {}\n",
         report.reviewer_delta.unchanged_cards
+    ));
+    out.push_str(&format!(
+        "- Unknown cards: {}\n",
+        report.reviewer_delta.unknown_cards
     ));
     out.push_str(&format!(
         "- Receipt movement: {} improved, {} regressed\n",
@@ -67,7 +72,7 @@ pub(super) fn render_markdown(report: &OutcomeReport) -> String {
     out.push_str("## Movement reasons\n\n");
     if report.reviewer_delta.movement_reasons.is_empty() {
         out.push_str(
-            "- No new, resolved, improved, or regressed ReviewCards in these saved snapshots.\n\n",
+            "- No new, resolved, improved, regressed, or unknown ReviewCards in these saved snapshots.\n\n",
         );
     } else {
         for reason in &report.reviewer_delta.movement_reasons {
@@ -127,6 +132,7 @@ fn movement_count(report: &OutcomeReport) -> usize {
         + report.summary.resolved
         + report.summary.improved
         + report.summary.regressed
+        + report.summary.unknown
 }
 
 fn markdown_state(state: Option<&OutcomeCardState>) -> String {

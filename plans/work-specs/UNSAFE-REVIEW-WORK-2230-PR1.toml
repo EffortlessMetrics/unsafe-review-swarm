@@ -1,0 +1,106 @@
+# Issue-linked work specification for outcome comparability (first slice).
+# Basis: main 9b64033e (2026-11-01). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2230
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2230"
+kind = "correctness"
+objective = "Teach the outcome comparator (output/outcome) comparability: read the completeness and identity facts the analyzer already emits, add an explicit unknown bucket, and stop reporting resolved/improved on incomparable, narrowed, capped, or failed after-snapshots. Legacy snapshots without the new fields keep today's behavior byte-identical."
+user_outcome = "A maintainer comparing two saved snapshots sees omitted cards reported as unknown with the reason instead of false resolved; genuinely removed operations still report resolved under complete comparable inputs; adverse/inconclusive receipts still show evidence movement while the work stays open; unknown class strings and drifted obligation sets never silently map to improved."
+claim_boundary = "This slice proves comparability-gated outcome comparison via unit tests, one CLI e2e, and surface parity checks; it does not rewrite the movement evaluator (#2271), the ledger/baseline policy, or any projection beyond the outcome report itself; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release claim."
+
+[scope]
+included = [
+    "Settled design (verbatim): Snapshot gains optional scope, scan_capped, unresolved_diff_files, and rejected_diff_files (all serde-defaulted); SnapshotCard gains optional obligation_evidence keys read from the obligation_evidence arrays cards.json already emits. No producer changes; legacy files without these fields keep today's verdicts byte-identical.",
+    "Settled design (verbatim): new explicit unknown bucket (OutcomeSummary.unknown, OutcomeCards.unknown, OutcomeReviewerDelta.unknown_cards) with markdown row/line; summary counts reconcile exactly across all six buckets; movement reasons name the cause. Review refinement: unknown cards with an actionable after leg (or before leg when head-absent) stay in top_remaining_gaps, preserving the existing priority sort and five-card limit; before_id/after_id fingerprints feed the new verdict-relevant fields (scope, scan_capped, unresolved/rejected lists with list-boundary labels, per-card obligation keys with a presence marker) while legacy snapshots without the new fields hash exactly as before.",
+    "Settled design (verbatim): head-only cards report new only when the base snapshot is complete (uncapped, no unresolved/rejected files) AND repo-scoped; base-only cards report resolved only when the after snapshot is complete AND repo-scoped; otherwise disappearance/appearance is unknown, never resolved or new. Review refinement: scope is a closed vocabulary -- only an absent scope (legacy) or the literal \"repo\" counts as repo-scoped; any other value yields unknown. Discovery-filter narrowing (--include/--exclude) emits no producer signal and stays a deferred producer-side follow-up, not a consumer gate.",
+    "Settled design (verbatim): both-present cards compare evidence as today, plus two fail-closed guards: unknown or unrecognized class strings on either side yield unknown instead of silent improved (the actionability table only fires on the closed known vocabulary), and differing obligation-key sets yield unknown instead of unchanged/improved (the missing-string count comparison alone cannot establish evidence identity). Review refinement: the obligation guard fires only where both sides supply obligation evidence (Option-gated); a legacy side that omits the array carries no identity to drift from, so mixed-version pairs keep today's verdict per INV-3.",
+    "Settled design (verbatim): adverse/inconclusive receipt additions keep the existing evidence-movement semantics (missing-count drop and witness-label change may read improved) while the card stays open and actionable; nothing in this slice retires work or clears urgency on a verdict.",
+    "Unit tests for every acceptance leg through the public compare_outcome_json API (genuinely removed operation resolves; narrowed/capped/partial/failed after never resolves; adverse/inconclusive receipt keeps work open; equal counts with different obligation keys are unknown; unknown/new classes map to unknown; changed owner splits into introduced/resolved without collapse; legacy snapshots unchanged).",
+    "One CLI e2e driving outcome --before/--after on crafted complete vs narrowed snapshots asserting the unknown bucket and no false resolved in JSON and markdown.",
+]
+excluded = [
+    "Any producer change to cards.json shape, fixture goldens, or the analyzer pipeline; the consumer only reads fields the producer already emits.",
+    "The base/head movement evaluator (crates/unsafe-review-core/src/analysis/movement.rs, owned by #2271), the saved-baseline ledger and policy semantics, and the witness/receipt import path (owned by #2273).",
+    "New outcome vocabulary beyond the unknown bucket, universal cross-file matching, installed-editor/agent loops (#1887), partial/failed bundle handling (#1883), and measurement/calibration (#2224/#2231).",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Omitted cards never report resolved: disappearance without a complete repo-scoped after snapshot is unknown with the reason, never a repair verdict."
+
+[[invariant]]
+id = "INV-2"
+text = "Unrecognized class strings and drifted obligation sets never silently map to improved, regressed, or unchanged; they yield unknown."
+
+[[invariant]]
+id = "INV-3"
+text = "Legacy snapshots without the new optional fields behave byte-identically to today; comparability gating applies only where the new fields establish the inputs."
+
+[[invariant]]
+id = "INV-4"
+text = "Adverse/inconclusive observations keep work open and urgent; evidence improvement never retires the underlying gap or lowers priority as verification success."
+
+[[invariant]]
+id = "INV-5"
+text = "Summary counts and per-card buckets reconcile exactly, in JSON and markdown alike."
+
+[[acceptance]]
+id = "AC-2230-PR1-1"
+text = "Complete after snapshot with the operation deliberately removed reports resolved; the same card absent only because the after snapshot is narrower, capped, partial, or failed reports unknown, never resolved."
+proof = ["cargo test --locked -p unsafe-review-core outcome"]
+
+[[acceptance]]
+id = "AC-2230-PR1-2"
+text = "Same operation with a confirmed/inconclusive receipt added shows evidence movement while the card stays open and actionable with unchanged urgency."
+proof = ["cargo test --locked -p unsafe-review-core outcome"]
+
+[[acceptance]]
+id = "AC-2230-PR1-3"
+text = "Equal missing counts with different obligation keys report unknown rather than unchanged; unknown or new class strings map to unknown rather than silent improved."
+proof = ["cargo test --locked -p unsafe-review-core outcome"]
+
+[[acceptance]]
+id = "AC-2230-PR1-4"
+text = "Changed owner splits into introduced/resolved without collapsing; legacy snapshots without the new fields keep today's verdicts."
+proof = ["cargo test --locked -p unsafe-review-core outcome"]
+
+[[acceptance]]
+id = "AC-2230-PR1-5"
+text = "CLI e2e drives outcome --before/--after on crafted complete vs narrowed snapshots and asserts the unknown bucket with no false resolved in JSON and markdown."
+proof = ["cargo test -p unsafe-review --test e2e --locked"]
+
+[[acceptance]]
+id = "AC-2230-PR1-6"
+text = "Full lane gates pass with no new Clippy warnings and no unwrap() in new tests."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "outcome_report"
+expected = "The report gains the unknown bucket (summary, cards, reviewer delta) and unknown reasons while every existing field keeps its meaning for comparable inputs."
+
+[[integration]]
+surface = "movement_evaluator_boundary"
+expected = "The #2271 movement evaluator is untouched; this slice owns only saved-snapshot comparability inside compare_outcome_json, and the two never share verdict logic."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and the exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "All new snapshot fields are optional with serde defaults and legacy behavior is pinned by the existing matrix tests plus explicit legacy-shape regression tests, so old snapshots cannot change verdicts."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "The unknown bucket is additive to the report shape and markdown gains a row; surface-parity tests assert both renderers agree, and e2e asserts JSON and markdown together."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Keep the unknown-class vocabulary closed and explicit (actionable list plus the four known non-actionable classes); anything else is unknown, never silently mapped."
+
+[compatibility]
+posture = "Additive consumer-side gating plus one additive report bucket; no analyzer, ledger, policy, movement, receipt, release, or publication behavior changes."
+
+[rollback]
+strategy = "Revert the single delivery PR; saved snapshots on disk are unchanged, and pre-change binaries keep working because unknown JSON fields are ignored on read."

@@ -6792,23 +6792,20 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     let after_path = temp.path().join("after.json");
     let outcome_path = temp.path().join("outcome.json");
 
+    // Repo-scoped snapshots are complete censuses, so appearance counts.
     run_success([
-        os("check"),
+        os("repo"),
         os("--root"),
         before_fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        before_fixture.join("change.diff").into_os_string(),
         os("--format"),
         os("json"),
         os("--out"),
         before_path.as_os_str().to_os_string(),
     ])?;
     run_success([
-        os("check"),
+        os("repo"),
         os("--root"),
         after_fixture.as_os_str().to_os_string(),
-        os("--diff"),
-        after_fixture.join("change.diff").into_os_string(),
         os("--format"),
         os("json"),
         os("--out"),
@@ -6954,10 +6951,95 @@ fn outcome_compares_existing_json_snapshots_without_safety_claim() -> Result<(),
     assert!(markdown.contains("not site-execution evidence"));
     assert!(markdown.contains("not calibrated precision/recall"));
     assert!(markdown.contains("not policy-ready status"));
-    assert!(markdown.contains("| 1 | 0 | 0 | 0 | 0 |"));
+    assert!(markdown.contains("| 1 | 0 | 0 | 0 | 0 | 0 |"));
     assert!(markdown.contains("raw_pointer_read"));
     assert!(markdown.contains("unsafe { ptr.cast::<Header>().read() }"));
     assert!(markdown.contains("Add or expose"));
+
+    Ok(())
+}
+
+#[test]
+fn outcome_narrowed_snapshot_reports_unknown_not_introduced() -> Result<(), Box<dyn Error>> {
+    // Diff-scoped snapshots cannot confirm appearance: the same card that
+    // reads `new` from complete repo snapshots must read `unknown` here.
+    let before_fixture = fixture_root("safe_code_no_cards");
+    let after_fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-outcome-narrowed-e2e")?;
+    let before_path = temp.path().join("before.json");
+    let after_path = temp.path().join("after.json");
+    let outcome_path = temp.path().join("outcome.json");
+    let markdown_path = temp.path().join("outcome.md");
+
+    run_success([
+        os("check"),
+        os("--root"),
+        before_fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        before_fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        before_path.as_os_str().to_os_string(),
+    ])?;
+    run_success([
+        os("check"),
+        os("--root"),
+        after_fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        after_fixture.join("change.diff").into_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        after_path.as_os_str().to_os_string(),
+    ])?;
+    run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("json"),
+        os("--out"),
+        outcome_path.as_os_str().to_os_string(),
+    ])?;
+
+    let outcome = parse_json(&fs::read_to_string(&outcome_path)?)?;
+    assert_eq!(outcome["summary"]["new"], 0);
+    assert_eq!(outcome["summary"]["resolved"], 0);
+    assert_eq!(outcome["summary"]["unknown"], 1);
+    assert_eq!(outcome["reviewer_delta"]["unknown_cards"], 1);
+    assert!(
+        outcome["reviewer_delta"]["top_remaining_gaps"]
+            .as_array()
+            .is_some_and(|gaps| gaps.len() == 1),
+        "the single unknown card must stay in remaining work: {}",
+        outcome["reviewer_delta"]["top_remaining_gaps"]
+    );
+    assert!(
+        outcome["cards"]["unknown"][0]["reason"]
+            .as_str()
+            .unwrap_or("")
+            .contains("did not scan"),
+        "unknown verdict must name the narrowed scope: {}",
+        outcome["cards"]["unknown"][0]["reason"]
+    );
+
+    run_success([
+        os("outcome"),
+        os("--before"),
+        before_path.as_os_str().to_os_string(),
+        os("--after"),
+        after_path.as_os_str().to_os_string(),
+        os("--format"),
+        os("markdown"),
+        os("--out"),
+        markdown_path.as_os_str().to_os_string(),
+    ])?;
+    let markdown = fs::read_to_string(&markdown_path)?;
+    assert!(markdown.contains("| 0 | 0 | 0 | 0 | 1 | 0 |"));
+    assert!(markdown.contains("- Unknown cards: 1"));
 
     Ok(())
 }
