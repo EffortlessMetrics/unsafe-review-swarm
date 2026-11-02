@@ -867,18 +867,25 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
     // Verdict-relevant comparability inputs participate in the fingerprint
     // so distinct comparison inputs cannot share an ID. Each feed is
     // conditional so legacy snapshots without the new fields hash exactly
-    // as before.
+    // as before. List feeds carry a label so adjacent lists cannot merge
+    // across their boundary (["a"],["b"] must differ from ["a","b"],[]).
     if let Some(scope) = &snapshot.scope {
         feed_hash(&mut hash, scope);
     }
     if snapshot.summary.scan_capped == Some(true) {
         feed_hash(&mut hash, "scan_capped");
     }
-    for file in snapshot.unresolved_diff_files.as_deref().unwrap_or(&[]) {
-        feed_hash(&mut hash, file);
+    if let Some(files) = &snapshot.unresolved_diff_files {
+        feed_hash(&mut hash, "unresolved_diff_files");
+        for file in files {
+            feed_hash(&mut hash, file);
+        }
     }
-    for file in snapshot.rejected_diff_files.as_deref().unwrap_or(&[]) {
-        feed_hash(&mut hash, file);
+    if let Some(files) = &snapshot.rejected_diff_files {
+        feed_hash(&mut hash, "rejected_diff_files");
+        for file in files {
+            feed_hash(&mut hash, file);
+        }
     }
     let mut cards = snapshot.cards.iter().collect::<Vec<_>>();
     cards.sort_by(|left, right| left.id.cmp(&right.id));
@@ -945,6 +952,9 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
             feed_hash(&mut hash, missing);
         }
         if let Some(obligations) = &card.obligation_evidence {
+            // Presence marker: an absent array (legacy, guard skipped) and
+            // a present-but-empty array (guard armed) are different inputs.
+            feed_hash(&mut hash, "obligation_evidence");
             for obligation in obligations {
                 feed_hash(&mut hash, &obligation.key);
             }
@@ -1288,6 +1298,43 @@ mod tests {
 }}"#,
             cards.len(),
             cards.len(),
+            cards.join(",\n    ")
+        )
+    }
+
+    fn scoped_snapshot_with_files_json(
+        cards: &[String],
+        scope: &str,
+        scan_capped: bool,
+        unresolved: &[&str],
+        rejected: &[&str],
+    ) -> String {
+        let files = |items: &[&str]| {
+            items
+                .iter()
+                .map(|item| format!(r#""{item}""#))
+                .collect::<Vec<_>>()
+                .join(", ")
+        };
+        format!(
+            r#"{{
+  "schema_version": "0.1",
+  "scope": "{scope}",
+  "summary": {{
+    "cards": {},
+    "open_actionable_gaps": {},
+    "scan_capped": {scan_capped}
+  }},
+  "unresolved_diff_files": [{}],
+  "rejected_diff_files": [{}],
+  "cards": [
+    {}
+  ]
+}}"#,
+            cards.len(),
+            cards.len(),
+            files(unresolved),
+            files(rejected),
             cards.join(",\n    ")
         )
     }
@@ -1658,6 +1705,61 @@ mod tests {
         assert_reconciled(&repo_report)?;
         assert_reconciled(&diff_report)?;
         assert_reconciled(&legacy_report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_ids_distinguish_file_list_boundaries() -> Result<(), String> {
+        // Unlabelled consecutive feeds would merge ["a"],["b"] with
+        // ["a","b"],[]; the list labels keep the boundary visible.
+        let before = scoped_snapshot_json(
+            &[card("UR-f-c1", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let split = scoped_snapshot_with_files_json(&[], "repo", false, &["a"], &["b"]);
+        let merged = scoped_snapshot_with_files_json(&[], "repo", false, &["a", "b"], &[]);
+        let split_report = compare_json(&before, &split)?;
+        let merged_report = compare_json(&before, &merged)?;
+        // Both afters are incomplete, so both read unknown; the inputs
+        // must still fingerprint distinctly.
+        assert_eq!(split_report.summary.unknown, 1);
+        assert_eq!(merged_report.summary.unknown, 1);
+        assert_ne!(split_report.after_id, merged_report.after_id);
+        assert_reconciled(&split_report)?;
+        assert_reconciled(&merged_report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_ids_distinguish_absent_and_empty_obligation_evidence() -> Result<(), String> {
+        // Absent (legacy, guard skipped) and present-but-empty (guard
+        // armed) are different inputs even when the verdict coincides.
+        let before_absent = scoped_snapshot_json(
+            &[card("UR-p-c1", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let before_empty = scoped_snapshot_json(
+            &[card_with_obligations(
+                "UR-p-c1",
+                "guard_missing",
+                "high",
+                &["guard"],
+                &[],
+            )],
+            "repo",
+            false,
+        );
+        let after = scoped_snapshot_json(&[], "repo", false);
+        let absent_report = compare_json(&before_absent, &after)?;
+        let empty_report = compare_json(&before_empty, &after)?;
+        assert_eq!(absent_report.summary.resolved, 1);
+        assert_eq!(empty_report.summary.resolved, 1);
+        assert_ne!(absent_report.before_id, empty_report.before_id);
+        assert_eq!(absent_report.after_id, empty_report.after_id);
+        assert_reconciled(&absent_report)?;
+        assert_reconciled(&empty_report)?;
         Ok(())
     }
 
