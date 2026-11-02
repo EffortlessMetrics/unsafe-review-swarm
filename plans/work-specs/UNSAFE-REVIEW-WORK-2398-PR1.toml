@@ -36,7 +36,7 @@ text = "Workspace/dev version and registry publication state are represented sep
 [[acceptance]]
 id = "AC-2398-PR1-1"
 text = "Authority file seeded truthfully from receipt, handoff, and CHANGELOG with the workspace/registry split explicit."
-proof = ["cargo run --locked -p xtask -- check-release-truth"]
+proof = ["cargo test --locked -p xtask release_truth"]
 
 [[acceptance]]
 id = "AC-2398-PR1-2"
