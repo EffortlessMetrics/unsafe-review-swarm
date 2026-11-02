@@ -11025,3 +11025,388 @@ fn base_head_movement_distinguishes_introduced_from_inherited() -> Result<(), Bo
     assert_eq!(report.summary.inherited, report.summary.subjects - 1);
     Ok(())
 }
+
+// #2271 PR2: first-pr wires the movement evaluator over a materialized base.
+// Probe shape through the real command: a byte-identical context card on a
+// changed file is inherited, a genuinely new operation is introduced, a
+// removed operation is unknown with the removal-not-established reason (the
+// conservative no-resolved rule: a diff-scoped head cannot distinguish
+// removal from scope-gated emission), and an unchanged-file base-only card
+// is unknown with the reason. Counts reconcile exactly.
+#[test]
+fn first_pr_movement_reports_inherited_introduced_and_unknown_with_reconciled_summary()
+-> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-first-pr-movement-e2e")?;
+    let repo = temp.path().join("probe");
+    fs::create_dir_all(repo.join("src"))?;
+    fs::write(
+        repo.join("Cargo.toml"),
+        "[package]\nname = \"movement-probe\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )?;
+    let base_lib = "pub mod legacy;\n\npub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n\npub fn read_flag(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n";
+    let legacy = "pub fn read_legacy(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n";
+    fs::write(repo.join("src/lib.rs"), base_lib)?;
+    fs::write(repo.join("src/legacy.rs"), legacy)?;
+    git(&repo, &["init", "-q"])?;
+    git(&repo, &["config", "user.name", "movement e2e"])?;
+    git(&repo, &["config", "user.email", "movement@example.test"])?;
+    git(&repo, &["config", "commit.gpgsign", "false"])?;
+    git(&repo, &["config", "core.autocrlf", "false"])?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe base"])?;
+    let base = git(&repo, &["rev-parse", "HEAD"])?;
+    let base = base.trim().to_string();
+    let head_lib = "pub mod legacy;\n\npub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n\npub fn peek_value(ptr: *const u32) -> u32 {\n    unsafe { *ptr }\n}\n";
+    fs::write(repo.join("src/lib.rs"), head_lib)?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe head"])?;
+
+    let out_dir = temp.path().join("out");
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        repo.as_os_str().to_os_string(),
+        os("--base"),
+        os(&base),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(
+        stdout.contains(
+            "Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 2"
+        ),
+        "stdout must carry the reconciled movement overview line; got:\n{stdout}"
+    );
+
+    let movement = parse_json(&fs::read_to_string(out_dir.join("movement.json"))?)?;
+    assert_eq!(movement["schema_version"], "movement/v1");
+    assert_eq!(movement["status"], "complete");
+    let summary = &movement["summary"];
+    assert_eq!(summary["introduced"], 1);
+    assert_eq!(summary["worsened"], 0);
+    assert_eq!(summary["improved"], 0);
+    assert_eq!(summary["resolved"], 0);
+    assert_eq!(summary["inherited"], 1);
+    assert_eq!(summary["unknown"], 2);
+    let subjects = json_array(&movement["subjects"], "movement.subjects")?;
+    assert_eq!(subjects.len(), 4, "subjects: {subjects:?}");
+    let total: u64 = [
+        "introduced",
+        "worsened",
+        "improved",
+        "resolved",
+        "inherited",
+        "unknown",
+    ]
+    .iter()
+    .map(|bucket| summary[bucket].as_u64().unwrap_or(999))
+    .sum();
+    assert_eq!(
+        total,
+        subjects.len() as u64,
+        "movement summary buckets must reconcile with per-card verdicts"
+    );
+    for subject in subjects {
+        if subject["movement"].as_str().is_none() {
+            return Err("every movement subject must carry a verdict".into());
+        }
+        if subject["reason"]
+            .as_str()
+            .is_none_or(|reason| reason.is_empty())
+        {
+            return Err("every movement subject must carry a reason".into());
+        }
+    }
+    let entry_for = |needle: &str| -> Result<&Value, Box<dyn Error>> {
+        subjects
+            .iter()
+            .find(|entry| {
+                entry["subject"]
+                    .as_str()
+                    .is_some_and(|subject| subject.contains(needle))
+            })
+            .ok_or_else(|| format!("movement.json must contain a {needle:?} subject").into())
+    };
+    assert_eq!(entry_for("peek-value")?["movement"], "introduced");
+    assert_eq!(entry_for("read-header")?["movement"], "inherited");
+    let removed = entry_for("read-flag")?;
+    assert_eq!(removed["movement"], "unknown");
+    assert!(
+        removed["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("removal")),
+        "removed operation must be unknown with the removal-not-established reason; got: {}",
+        removed["reason"]
+    );
+    let gated = entry_for("read-legacy")?;
+    assert_eq!(gated["movement"], "unknown");
+    assert!(
+        gated["reason"]
+            .as_str()
+            .is_some_and(|reason| !reason.is_empty()),
+        "emission-gated base-only card must carry its reason"
+    );
+
+    // Head output stays intact: the diff-scoped review still reports its own cards.
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    assert_eq!(cards["summary"]["cards"], 2);
+    assert!(out_dir.join("pr-summary.md").is_file());
+    assert!(out_dir.join("review-kit.json").is_file());
+    Ok(())
+}
+
+// #2271 PR2: fail-soft movement. With `--diff` input there is no base ref, so
+// no base commit can be materialized; the run reports an unknown movement
+// section naming the cause while the head output and exit path stay intact.
+#[test]
+fn first_pr_movement_reports_unknown_when_no_base_can_be_materialized() -> Result<(), Box<dyn Error>>
+{
+    let fixture = fixture_root("raw_pointer_alignment");
+    let temp = TempDir::new("unsafe-review-first-pr-movement-unknown-e2e")?;
+    let out_dir = temp.path().join("out");
+
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        fixture.as_os_str().to_os_string(),
+        os("--diff"),
+        fixture.join("change.diff").into_os_string(),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(
+        stdout.contains(
+            "Base/head movement: introduced 0, worsened 0, improved 0, resolved 0, inherited 0, unknown 1"
+        ),
+        "stdout must carry the unknown movement overview line; got:\n{stdout}"
+    );
+    assert!(
+        stdout.contains("no base ref"),
+        "unknown movement line must name the cause; got:\n{stdout}"
+    );
+
+    let movement = parse_json(&fs::read_to_string(out_dir.join("movement.json"))?)?;
+    assert_eq!(movement["schema_version"], "movement/v1");
+    assert_eq!(movement["status"], "unknown");
+    assert!(
+        movement["reason"]
+            .as_str()
+            .is_some_and(|reason| reason.contains("no base ref")),
+        "unknown section must carry the cause; got: {}",
+        movement["reason"]
+    );
+    assert_eq!(movement["summary"]["unknown"], 1);
+    assert_eq!(movement["summary"]["subjects"], 1);
+    let subjects = json_array(&movement["subjects"], "movement.subjects")?;
+    assert_eq!(subjects.len(), 1);
+    assert_eq!(subjects[0]["movement"], "unknown");
+
+    // Head output and exit path stay exactly as today.
+    let cards = parse_json(&fs::read_to_string(out_dir.join("cards.json"))?)?;
+    assert_eq!(cards["summary"]["cards"], 1);
+    assert!(out_dir.join("pr-summary.md").is_file());
+    Ok(())
+}
+
+// #2271 PR2 FIX 1: a diverged --base ref resolves through the merge base with
+// HEAD, matching the `base...HEAD` three-dot diff the head side is scoped
+// by. The head adds a new operation while a side branch off the base commit
+// strengthens the context card's contract (a Safety comment). Materializing
+// the side tip would compare a stronger-contract base against the head and
+// falsely report the base-side subject as worsened; the merge base keeps the
+// byte-identical subject inherited.
+#[test]
+fn first_pr_movement_diverged_base_uses_merge_base_not_tip() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-first-pr-movement-diverged-e2e")?;
+    let repo = temp.path().join("probe");
+    fs::create_dir_all(repo.join("src"))?;
+    fs::write(
+        repo.join("Cargo.toml"),
+        "[package]\nname = \"movement-diverged\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )?;
+    let context_lib = "pub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n";
+    fs::write(repo.join("src/lib.rs"), context_lib)?;
+    git(&repo, &["init", "-q"])?;
+    git(&repo, &["config", "user.name", "movement e2e"])?;
+    git(&repo, &["config", "user.email", "movement@example.test"])?;
+    git(&repo, &["config", "commit.gpgsign", "false"])?;
+    git(&repo, &["config", "core.autocrlf", "false"])?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe base"])?;
+    let base = git(&repo, &["rev-parse", "HEAD"])?;
+    let base = base.trim().to_string();
+    let head_lib = format!(
+        "{context_lib}\n// context above the new operation\npub fn peek_value(ptr: *const u32) -> u32 {{\n    unsafe {{ *ptr }}\n}}\n"
+    );
+    fs::write(repo.join("src/lib.rs"), &head_lib)?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "probe head"])?;
+    let head = git(&repo, &["rev-parse", "HEAD"])?;
+    let head = head.trim().to_string();
+    // Fork a side branch off the base commit and advance it with a contract
+    // change the three-dot head diff never covers.
+    let previous = git(&repo, &["branch", "--show-current"])?;
+    let previous = previous.trim().to_string();
+    if previous.is_empty() {
+        return Err("fixture repo must be on a branch".into());
+    }
+    git(&repo, &["checkout", "-qb", "base-side", &base])?;
+    let side_lib = "pub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    // Safety: pointer must be valid.\n    unsafe { ptr.cast::<Header>().read() }\n}\n";
+    fs::write(repo.join("src/lib.rs"), side_lib)?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "side contract change"])?;
+    git(&repo, &["checkout", "-q", &previous])?;
+    let at = git(&repo, &["rev-parse", "HEAD"])?;
+    if at.trim() != head {
+        return Err("fixture must return to the head commit".into());
+    }
+
+    let out_dir = temp.path().join("out");
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        repo.as_os_str().to_os_string(),
+        os("--base"),
+        os("base-side"),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(
+        stdout.contains(
+            "Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 0"
+        ),
+        "stdout must carry the reconciled movement overview line; got:\n{stdout}"
+    );
+
+    let movement = parse_json(&fs::read_to_string(out_dir.join("movement.json"))?)?;
+    assert_eq!(movement["status"], "complete");
+    let summary = &movement["summary"];
+    assert_eq!(summary["introduced"], 1);
+    assert_eq!(summary["worsened"], 0);
+    assert_eq!(summary["improved"], 0);
+    assert_eq!(summary["resolved"], 0);
+    assert_eq!(summary["inherited"], 1);
+    assert_eq!(summary["unknown"], 0);
+    let subjects = json_array(&movement["subjects"], "movement.subjects")?;
+    assert_eq!(subjects.len(), 2, "subjects: {subjects:?}");
+    let entry_for = |needle: &str| -> Result<&Value, Box<dyn Error>> {
+        subjects
+            .iter()
+            .find(|entry| {
+                entry["subject"]
+                    .as_str()
+                    .is_some_and(|subject| subject.contains(needle))
+            })
+            .ok_or_else(|| format!("movement.json must contain a {needle:?} subject").into())
+    };
+    assert_eq!(entry_for("read-header")?["movement"], "inherited");
+    assert_eq!(entry_for("peek-value")?["movement"], "introduced");
+    // The base-side subject strengthened on the diverged tip must not leak
+    // into the verdicts as a regression or an introduction.
+    for subject in subjects {
+        let verdict = subject["movement"].as_str().unwrap_or("");
+        assert!(
+            verdict != "worsened",
+            "diverged base tip must not report a worsened subject: {subject}"
+        );
+    }
+    Ok(())
+}
+
+// #2271 PR2 FIX 2: with --root at a nested crate directory, the base census
+// covers the corresponding directory under the materialized worktree so
+// root-relative subject identities match the head side. The fixture sets
+// diff.relative so the three-dot diff paths resolve under the nested root
+// (git emits repository-relative paths from a subdirectory by default, which
+// the diff-scope matcher cannot resolve there: pre-existing head-side
+// behavior outside this lane). A byte-identical context card is then
+// inherited, not introduced; without the subtree mapping the base file
+// identity carries the nested prefix and the same card reports introduced.
+#[test]
+fn first_pr_movement_subdir_root_inherits_context_card() -> Result<(), Box<dyn Error>> {
+    let temp = TempDir::new("unsafe-review-first-pr-movement-subdir-e2e")?;
+    let repo = temp.path().join("repo");
+    fs::create_dir_all(repo.join("nested/src"))?;
+    fs::write(
+        repo.join("nested/Cargo.toml"),
+        "[package]\nname = \"movement-sub\"\nversion = \"0.0.0\"\nedition = \"2021\"\n",
+    )?;
+    let context_lib = "pub struct Header(u32);\n\npub fn read_header(ptr: *const u8) -> Header {\n    unsafe { ptr.cast::<Header>().read() }\n}\n";
+    fs::write(repo.join("nested/src/lib.rs"), context_lib)?;
+    // A top-level operation outside the requested root: the subtree base
+    // census must not see it at all.
+    fs::write(
+        repo.join("top.rs"),
+        "pub fn read_top(ptr: *const u8) -> u8 {\n    unsafe { *ptr }\n}\n",
+    )?;
+    git(&repo, &["init", "-q"])?;
+    git(&repo, &["config", "user.name", "movement e2e"])?;
+    git(&repo, &["config", "user.email", "movement@example.test"])?;
+    git(&repo, &["config", "commit.gpgsign", "false"])?;
+    git(&repo, &["config", "core.autocrlf", "false"])?;
+    git(&repo, &["config", "diff.relative", "true"])?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "nested base"])?;
+    let base = git(&repo, &["rev-parse", "HEAD"])?;
+    let base = base.trim().to_string();
+    let head_lib = format!(
+        "{context_lib}\n// context above the new operation\npub fn peek_value(ptr: *const u32) -> u32 {{\n    unsafe {{ *ptr }}\n}}\n"
+    );
+    fs::write(repo.join("nested/src/lib.rs"), &head_lib)?;
+    git(&repo, &["add", "-A"])?;
+    git(&repo, &["commit", "-qm", "nested head"])?;
+
+    let out_dir = temp.path().join("out");
+    let output = run_success([
+        os("first-pr"),
+        os("--root"),
+        repo.join("nested").as_os_str().to_os_string(),
+        os("--base"),
+        os(&base),
+        os("--out-dir"),
+        out_dir.as_os_str().to_os_string(),
+    ])?;
+    let stdout = stdout_text(&output)?;
+
+    assert!(
+        stdout.contains(
+            "Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 0"
+        ),
+        "stdout must carry the reconciled movement overview line; got:\n{stdout}"
+    );
+
+    let movement = parse_json(&fs::read_to_string(out_dir.join("movement.json"))?)?;
+    assert_eq!(movement["status"], "complete");
+    let summary = &movement["summary"];
+    assert_eq!(summary["introduced"], 1);
+    assert_eq!(summary["worsened"], 0);
+    assert_eq!(summary["improved"], 0);
+    assert_eq!(summary["resolved"], 0);
+    assert_eq!(summary["inherited"], 1);
+    assert_eq!(summary["unknown"], 0);
+    let subjects = json_array(&movement["subjects"], "movement.subjects")?;
+    assert_eq!(subjects.len(), 2, "subjects: {subjects:?}");
+    let entry_for = |needle: &str| -> Result<&Value, Box<dyn Error>> {
+        subjects
+            .iter()
+            .find(|entry| {
+                entry["subject"]
+                    .as_str()
+                    .is_some_and(|subject| subject.contains(needle))
+            })
+            .ok_or_else(|| format!("movement.json must contain a {needle:?} subject").into())
+    };
+    assert_eq!(entry_for("read-header")?["movement"], "inherited");
+    assert_eq!(entry_for("peek-value")?["movement"], "introduced");
+    assert!(
+        entry_for("read-top").is_err(),
+        "subjects outside the requested root must not appear: {subjects:?}"
+    );
+    Ok(())
+}

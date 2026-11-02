@@ -1,0 +1,105 @@
+# Issue-linked work specification for base/head movement wiring (second PR).
+# Basis: main fbf49c35 (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271
+#
+# Direction pivot (recorded): the first PR2 draft specified joining two
+# saved analysis JSONs through the PR1 evaluator unchanged. A bounded
+# writer proved that unimplementable faithfully: ReviewCard has no
+# Deserialize, no AnalyzeOutput JSON loader exists, and the saved-JSON
+# projection is lossy exactly where the evaluator reads (contract
+# presence, witness verdict, reach state). Rebuilding those bits from
+# summary strings would silently diverge semantics. This contract
+# specifies the sound alternative: analyze the materialized base tree
+# in-process (full fidelity) and join with the head output.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271"
+kind = "correctness"
+objective = "Wire the pure movement evaluator (PR1, commit 9b64033e) into the first-pr surface: materialize the base commit to a temp tree, analyze it at repo scope, join with the head output through evaluate_base_head_movement, and render an additive movement section (stdout overview line plus a movement.json bundle file), without touching ledger, policy, counters, outcome, or any existing projection bytes."
+user_outcome = "A maintainer running first-pr without a saved baseline sees context cards reported as inherited rather than new merely because no ledger exists; genuinely new operations report introduced; inputs that cannot establish a verdict report unknown with the reason; removal is never claimed by this surface."
+claim_boundary = "This slice proves base materialization plus the wired join via unit tests, CLI e2e, and a manual Crossbeam characterization table; it does not rewrite policy/baseline semantics, SPEC-0030 counters, the outcome comparator, existing projections, or detector matching; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): new base-materialization helper (git worktree based, temp lifecycle with Drop cleanup, fail-soft error taxonomy: not-a-repo, unknown-sha, worktree-failure) with unit tests proving the materialized tree matches the requested commit and cleans up.",
+    "Settled design (verbatim): first-pr only. After the head output, analyze the materialized base tree with the head's analyzer settings at repo scope (complete census), then call evaluate_base_head_movement(base, head). The head side reuses the already-computed diff-scoped check output; no second head analysis.",
+    "Settled design (verbatim): conservative resolution rule for this surface. Base-only subjects report unknown with a removal-not-established reason even when the head side is complete, because a diff-scoped head analysis cannot distinguish subject removal from scope-gated emission. Resolved stays with the ledger and outcome paths; the full six-verdict semantics remain evaluator-tested for complete-census pairs.",
+    "Settled design (verbatim): additive rendering only. One stdout overview line plus a new movement.json bundle file projecting the MovementReport (additive Serialize derives on the movement report shape as needed). No existing file changes bytes; ledger, policy, outcome, counters, and all projections untouched.",
+    "Settled design (verbatim): materialization or base-analysis failure degrades to a movement section reporting unknown with the cause; the head output, exit code path, and policy gate behave exactly as today.",
+    "CLI e2e on the probe shape (byte-identical context card inherited, new operation introduced, emission-gated base-only card unknown with reason) plus a materialization-failure e2e asserting the unknown section with the head output intact.",
+    "Manual Crossbeam development-input re-run through the wired join with before/after movement tables recorded in the PR body (network fetch of the pinned revisions locally by the writer; input stays exposed development input, never fixture goldens).",
+]
+excluded = [
+    "Any rewrite of policy/baseline semantics, SPEC-0030 counters, pipeline summary counting, the outcome comparator (output/outcome, owned by #2230), existing projections (json/agent/lsp/markdown/comment-plan/badges), detector tuning, or fuzzy/proximity subject matching.",
+    "Joining saved JSON files through the evaluator (proven lossy; see pivot note), single-file emission-window reasoning in the evaluator, repo+repo full-verdict wiring, check-command (non-first-pr) wiring, automatic baseline creation, and Crossbeam goldens.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "A pre-existing card on unchanged or context lines is never reported as PR-introduced merely because no saved baseline exists; introduction requires head-presence without a comparable base subject."
+
+[[invariant]]
+id = "INV-2"
+text = "Stronger evidence is never blanket completion: improved keeps the gap open, unknown/stale receipts never drive improvement."
+
+[[invariant]]
+id = "INV-3"
+text = "Ambiguous duplicate subjects, incomparable analyses, materialization failures, and all base-only subjects on this surface yield unknown, never a forced introduced or resolved verdict."
+
+[[invariant]]
+id = "INV-4"
+text = "Existing baseline-ledger movement, counters, policy gates, and every existing projection file stay byte-identical; the movement section is purely additive."
+
+[[invariant]]
+id = "INV-5"
+text = "Summary counts and per-card verdicts reconcile exactly within the movement section; the evaluator introduces no display-only classifier and no second truth."
+
+[[acceptance]]
+id = "AC-2271-PR2-1"
+text = "CLI e2e on the probe shape: byte-identical context card inherited, new operation introduced, emission-gated base-only card unknown with the removal-not-established reason, counts reconcile."
+proof = ["cargo test -p unsafe-review --test e2e --locked movement"]
+
+[[acceptance]]
+id = "AC-2271-PR2-2"
+text = "Materialization-failure e2e: unknown base (or non-materializable tree) yields a movement section reporting unknown with the cause while the head output and exit path stay intact."
+proof = ["cargo test -p unsafe-review --test e2e --locked movement"]
+
+[[acceptance]]
+id = "AC-2271-PR2-3"
+text = "Manual Crossbeam development-input re-run through the wired join with before/after movement tables in the PR body; input not turned into goldens."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2271-PR2-4"
+text = "Full lane gates pass with no new Clippy warnings, no unwrap() in new tests, and the movement evaluator, outcome comparator, ledger, and counters untouched."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "first_pr_movement_section"
+expected = "first-pr gains one stdout overview line and one movement.json bundle file; every other byte of the bundle and all other commands stay identical."
+
+[[integration]]
+surface = "ledger_policy_outcome_boundary"
+expected = "Summary counters, ledger policy, and the #2230 outcome comparator are untouched; MovementReport carries ledger fields side by side only."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results, the wired Crossbeam before/after tables, and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "The evaluator is frozen and covered by PR1 tests; the wiring only supplies it full-fidelity inputs and renders its report, so attribution semantics cannot silently drift."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "The conservative no-resolved rule plus fail-soft unknown section make the worst case an honest unknown, never a false verdict; malformed-input and failure-path e2e pin both."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Base materialization is isolated in one helper with unit tests (content match, cleanup, failure taxonomy); temp worktrees never escape the command run."
+
+[compatibility]
+posture = "Additive first-pr section plus helper; no analyzer, ReviewCard, ledger, outcome, projection, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the helper, the wiring, the rendering, tests, and the work spec; first-pr behaves exactly as before with no leftover state (temp trees are Drop-cleaned)."

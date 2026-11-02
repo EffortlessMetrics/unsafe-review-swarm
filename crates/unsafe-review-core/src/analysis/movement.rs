@@ -11,10 +11,12 @@
 
 use crate::api::{AnalyzeOutput, Scope};
 use crate::domain::ReviewCard;
+use serde::Serialize;
 use std::collections::BTreeMap;
 
 /// Base/head movement verdict for one canonical subject.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "lowercase")]
 pub enum SubjectMovement {
     /// Present at head, absent from a complete base: the PR introduced it.
     Introduced,
@@ -47,7 +49,7 @@ impl SubjectMovement {
 }
 
 /// One subject's movement verdict with its basis.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct SubjectMovementEntry {
     /// Canonical subject identity (card identity without the per-run
     /// `-cN` counter).
@@ -63,7 +65,7 @@ pub struct SubjectMovementEntry {
 }
 
 /// Reconciled summary counts: the six buckets always sum to `subjects`.
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Serialize)]
 pub struct MovementSummary {
     pub introduced: usize,
     pub worsened: usize,
@@ -75,7 +77,7 @@ pub struct MovementSummary {
 }
 
 /// Evaluated base/head movement for one subject set.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize)]
 pub struct MovementReport {
     pub summary: MovementSummary,
     pub subjects: Vec<SubjectMovementEntry>,
