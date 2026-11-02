@@ -642,10 +642,9 @@ fn outcome_status(
             }
             if let (Some(before_keys), Some(after_keys)) =
                 (obligation_keys(before), obligation_keys(after))
+                && before_keys != after_keys
             {
-                if before_keys != after_keys {
-                    return "unknown";
-                }
+                return "unknown";
             }
             changed_status(before, after)
         }
