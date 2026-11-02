@@ -1,0 +1,71 @@
+# Issue-linked work specification for the pr front-panel movement line (third slice).
+# Basis: main c2618e9b (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2271"
+kind = "correctness"
+objective = "Expose the wired base/head movement summary on the pr front panel: render the already-computed movement_line as an additive second line in format_pr_front_panel, preserving the existing ledger movement line byte-identically."
+user_outcome = "A maintainer running the pr entry point sees the base/head movement summary alongside (never instead of) the ledger movement counts, with the same unknown-instead-of-false-verdict semantics as the first-pr surface."
+claim_boundary = "This slice proves the additive panel line via unit golden updates and a pr-with-base e2e; it changes no evaluator, wiring, ledger, policy, outcome, projection, or detector semantics; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): one additive writeln of the already-computed movement_line in format_pr_front_panel (crates/unsafe-review-cli/src/execute/first_pr.rs), placed after the existing ledger movement line; the ledger line and every other panel byte stay identical.",
+    "Settled design (verbatim): update the 4 unit fixtures that set movement_line empty to carry a representative movement line, asserting the new line renders; no other golden changes.",
+    "Settled design (verbatim): one pr-with-base e2e asserting the Base/head movement line appears on the pr terminal path and movement.json is written, reusing the probe-shape fixtures from PR2.",
+    "Settled design (verbatim): pr remains a read-only projection of already-computed values; no new analysis, no materialization changes, no counter changes.",
+]
+excluded = [
+    "Discovery/gitignore parity, repo+repo full verdicts, resolved semantics on any surface, check-command wiring, cross-file matching, automatic baselines, and any panel redesign beyond the single additive line.",
+    "Any change to the movement evaluator, the PR2 wiring, ledger, policy, counters, outcome, existing projections, or detector tuning.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The ledger movement line is preserved byte-identically; the movement line is strictly additive."
+
+[[invariant]]
+id = "INV-2"
+text = "Unknown and fail-closed semantics from PR2 carry through unchanged; the panel never invents a verdict."
+
+[[invariant]]
+id = "INV-3"
+text = "No other projection, bundle file, counter, or policy output changes."
+
+[[acceptance]]
+id = "AC-2271-PR3-1"
+text = "pr front panel renders the Base/head movement line after the unchanged ledger line; unit goldens updated."
+proof = ["cargo test --locked -p unsafe-review-cli first_pr"]
+
+[[acceptance]]
+id = "AC-2271-PR3-2"
+text = "pr-with-base e2e asserts the movement line and movement.json on the pr terminal path."
+proof = ["cargo test -p unsafe-review --test e2e --locked movement"]
+
+[[acceptance]]
+id = "AC-2271-PR3-3"
+text = "Full lane gates pass with no new Clippy warnings and no unwrap() in new or touched tests."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "pr_front_panel"
+expected = "The pr terminal gains exactly one movement line; every other panel byte and all bundle artifacts stay identical."
+
+[[integration]]
+surface = "ledger_policy_outcome_boundary"
+expected = "Ledger, policy, outcome, counters, and evaluator semantics untouched."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "The line projects an already-computed, already-tested string; golden updates are mechanical and the e2e asserts both lines together."
+
+[compatibility]
+posture = "Additive single-line projection; no analyzer, ledger, outcome, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the writeln, restore the 4 fixtures, drop the e2e; the pr panel returns to ledger-only output."

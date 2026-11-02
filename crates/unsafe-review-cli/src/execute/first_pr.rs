@@ -156,6 +156,7 @@ pub(super) fn format_pr_front_panel(report: &FirstPrReport<'_>) -> String {
         summary.resolved_gaps,
         summary.inherited_gaps
     );
+    let _ = writeln!(out, "{}", report.movement_line);
     if let Some(notice) = summary.capped_scan_notice() {
         let _ = writeln!(out, "Limitation: {notice}");
         let _ = writeln!(
@@ -3792,7 +3793,7 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
-            movement_line: "",
+            movement_line: "- Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 0 (see movement.json)",
             output_bytes: 123,
         };
         let rendered = format_pr_front_panel(&report);
@@ -3808,6 +3809,13 @@ mod tests {
             rendered.contains(&expected_movement),
             format!(
                 "pr front panel should contain movement line `{expected_movement}`; actual: {rendered}"
+            ),
+        )?;
+        require(
+            rendered.contains(report.movement_line),
+            format!(
+                "pr front panel should project the base/head movement line `{}`; actual: {rendered}",
+                report.movement_line
             ),
         )?;
         // Distinct from human header: human starts with "cards:" and never contains "unsafe-review pr"
@@ -3844,10 +3852,17 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
-            movement_line: "",
+            movement_line: "- Base/head movement: introduced 1, worsened 0, improved 0, resolved 0, inherited 1, unknown 0 (see movement.json)",
             output_bytes: 456,
         };
         let rendered = format_pr_front_panel(&report);
+        require(
+            rendered.contains(report.movement_line),
+            format!(
+                "pr front panel should project the base/head movement line `{}`; actual: {rendered}",
+                report.movement_line
+            ),
+        )?;
         // Top action line must contain location, family, class from the ranked ReviewCard
         let expected_location = format!(
             "{}:{}",
@@ -3934,10 +3949,17 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
-            movement_line: "",
+            movement_line: "- Base/head movement: introduced 0, worsened 0, improved 0, resolved 0, inherited 0, unknown 0 (see movement.json)",
             output_bytes: 0,
         };
         let rendered = format_pr_front_panel(&report);
+        require(
+            rendered.contains(report.movement_line),
+            format!(
+                "pr front panel should project the base/head movement line `{}`; actual: {rendered}",
+                report.movement_line
+            ),
+        )?;
         require(
             rendered.contains("Top action: none; no changed evidence gaps were found."),
             "pr no-card path should contain none message",
@@ -4108,10 +4130,17 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
-            movement_line: "",
+            movement_line: "- Base/head movement: introduced 0, worsened 0, improved 0, resolved 0, inherited 0, unknown 0 (see movement.json)",
             output_bytes: 0,
         };
         let rendered = format_pr_front_panel(&report);
+        require(
+            rendered.contains(report.movement_line),
+            format!(
+                "pr front panel should project the base/head movement line `{}`; actual: {rendered}",
+                report.movement_line
+            ),
+        )?;
         require(
             rendered.contains("static unsafe contract review only"),
             "trust boundary should be advisory",

@@ -237,8 +237,45 @@ pub(crate) fn format_movement_overview_line(section: &MovementSection) -> String
         summary.unknown,
     );
     if let Some(reason) = &section.reason {
-        line.push_str(&format!("; {reason}"));
+        let one_line = reason.split_whitespace().collect::<Vec<_>>().join(" ");
+        line.push_str(&format!("; {one_line}"));
     }
     line.push_str(" (see movement.json)");
     line
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn movement_overview_line_collapses_multiline_reason_to_single_line() {
+        let section = unknown_section(
+            "git merge-base failed for base 'nope':\nfatal: no such ref".to_string(),
+            None,
+            None,
+        );
+        let line = format_movement_overview_line(&section);
+        assert!(
+            !line.contains('\n'),
+            "overview line must stay single-line; got:\n{line}"
+        );
+        assert!(
+            !line.contains('\r'),
+            "overview line must stay single-line; got:\n{line}"
+        );
+        assert!(
+            line.contains("git merge-base failed for base 'nope': fatal: no such ref"),
+            "overview line must carry the collapsed cause; got:\n{line}"
+        );
+        let rendered = render_movement_json(&section);
+        assert!(
+            rendered.contains("git merge-base failed for base 'nope':"),
+            "movement.json must keep the full detail; got:\n{rendered}"
+        );
+        assert!(
+            rendered.contains("fatal: no such ref"),
+            "movement.json must keep the full detail; got:\n{rendered}"
+        );
+    }
 }
