@@ -91,6 +91,8 @@ pub(super) struct FirstPrReport<'a> {
     pub(super) no_changed_gaps_message: &'a str,
     pub(super) no_changed_gaps_limitation: &'a str,
     pub(super) artifacts: &'a [&'a str],
+    /// Pre-rendered additive base/head movement overview line (#2271 PR2).
+    pub(super) movement_line: &'a str,
     /// Total bytes written to all artifact files in `out_dir` for this run.
     /// Diagnostic only — not a coverage claim, proof, UB-free, Miri-clean,
     /// site-execution, or performance guarantee.
@@ -109,6 +111,7 @@ pub(super) fn print_first_pr_report(report: FirstPrReport<'_>) {
         report.out_dir,
         report.check,
         report.output_bytes,
+        report.movement_line,
     );
     print_top_card_summary(
         report.output,
@@ -644,10 +647,18 @@ fn print_first_pr_overview(
     out_dir: &Path,
     check: &CheckOptions,
     output_bytes: u64,
+    movement_line: &str,
 ) {
     print!(
         "{}",
-        format_first_pr_overview(terminal_command, output, out_dir, check, output_bytes)
+        format_first_pr_overview(
+            terminal_command,
+            output,
+            out_dir,
+            check,
+            output_bytes,
+            movement_line
+        )
     );
 }
 
@@ -657,6 +668,7 @@ pub(super) fn format_first_pr_overview(
     out_dir: &Path,
     check: &CheckOptions,
     output_bytes: u64,
+    movement_line: &str,
 ) -> String {
     let mut out = String::new();
     let _ = writeln!(out, "unsafe-review {terminal_command}");
@@ -691,6 +703,7 @@ pub(super) fn format_first_pr_overview(
         output.summary.resolved_gaps,
         output.summary.inherited_gaps,
     );
+    let _ = writeln!(out, "{movement_line}");
     // Without this line a capped run is byte-identical to a complete one that
     // genuinely found fewer gaps (#2006).
     if let Some(notice) = output.summary.capped_scan_notice() {
@@ -3779,6 +3792,7 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
+            movement_line: "",
             output_bytes: 123,
         };
         let rendered = format_pr_front_panel(&report);
@@ -3830,6 +3844,7 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
+            movement_line: "",
             output_bytes: 456,
         };
         let rendered = format_pr_front_panel(&report);
@@ -3919,6 +3934,7 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
+            movement_line: "",
             output_bytes: 0,
         };
         let rendered = format_pr_front_panel(&report);
@@ -4092,6 +4108,7 @@ mod tests {
             no_changed_gaps_message: "no gaps",
             no_changed_gaps_limitation: "limitation",
             artifacts: &["cards.json"],
+            movement_line: "",
             output_bytes: 0,
         };
         let rendered = format_pr_front_panel(&report);

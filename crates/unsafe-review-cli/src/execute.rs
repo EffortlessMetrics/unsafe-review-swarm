@@ -46,11 +46,13 @@ use unsafe_review_core::{
 };
 
 mod agent;
+mod base_materialization;
 mod card_lookup;
 mod confirm;
 mod environment;
 mod first_pr;
 mod init;
+mod movement_section;
 mod scope;
 mod work;
 
@@ -136,6 +138,7 @@ const RECEIPT_AUDIT_JSON_ARTIFACT: &str = "receipt-audit.json";
 const POLICY_REPORT_JSON_ARTIFACT: &str = "policy-report.json";
 const POLICY_REPORT_MARKDOWN_ARTIFACT: &str = "policy-report.md";
 const MANUAL_CANDIDATES_ARTIFACT: &str = "manual-candidates.json";
+const MOVEMENT_JSON_ARTIFACT: &str = "movement.json";
 const MANUAL_REPAIR_QUEUE_ARTIFACT: &str = "manual-repair-queue.json";
 const TOKMD_PACKETS_ARTIFACT: &str = "tokmd-packets.json";
 const USEFULNESS_TELEMETRY_ARTIFACT: &str = "usefulness-telemetry.json";
@@ -1952,6 +1955,18 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
     // from `.unsafe-review/candidates/`.
     let manual_candidates = load_manual_candidates(&root)?;
     clock.tick(crate::latency::PHASE_POLICY_EVAL);
+    // Additive base/head movement section (#2271 PR2): materialize the base
+    // commit, analyze it at repo scope with the head's analyzer settings, and
+    // join with the already-computed head output. Fail-soft by construction:
+    // materialization or base-analysis failure yields an unknown section while
+    // the head output, exit path, and policy gate stay exactly as today.
+    let movement_section = movement_section::compute_movement_section(
+        &root,
+        check.base.as_deref(),
+        check.max_cards,
+        &output,
+    );
+    let movement_line = movement_section::format_movement_overview_line(&movement_section);
 
     fs::create_dir_all(&options.out_dir)
         .map_err(|err| artifact_write_failure("create", &options.out_dir, err))?;
@@ -2023,6 +2038,14 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         ),
     ));
     rendered_artifacts.push((GATE_MANIFEST_ARTIFACT, render_gate_manifest(&output)));
+    // The movement bundle file rides the same artifact write path (so the
+    // reported output-byte total stays exact) but is deliberately NOT part of
+    // FIRST_PR_ARTIFACTS: the review-kit manifest, the "Artifacts: N files"
+    // line, and every existing projection stay byte-identical.
+    rendered_artifacts.push((
+        MOVEMENT_JSON_ARTIFACT,
+        movement_section::render_movement_json(&movement_section),
+    ));
     clock.tick(crate::latency::PHASE_PROJECTIONS);
     // Accumulate bytes written across all artifact writes.  The total is
     // the disk footprint of this run's output bundle — diagnostic only,
@@ -2080,6 +2103,7 @@ fn first_pr(options: FirstPrOptions) -> Result<(), String> {
         no_changed_gaps_limitation: NO_CHANGED_GAPS_LIMITATION,
         artifacts: &FIRST_PR_ARTIFACTS,
         output_bytes,
+        movement_line: movement_line.as_str(),
     });
 
     Ok(())
