@@ -1,0 +1,91 @@
+# Issue-linked work specification for the 0.6 delivery inventory and cutline (first PR).
+# Basis: main 9a0f5bf4 (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2401
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2401"
+kind = "correctness"
+objective = "Freeze the 0.6 product delta on paper: record a delivery inventory across both repository heads, the actual v0.5.0 tag target and published package source receipt, the source-sync checkpoint, every release-relevant open PR with a disposition, a full compatibility table of the proposed candidate versus installed 0.5.0, and dependency decisions, as a new cutline TOML plus human summary reusing the 1915 cutline schema and freeze/amendment rules."
+user_outcome = "A maintainer opening the cutline sees exactly what 0.6 would ship and freeze: both main heads, the v0.5.0 tag versus Release truth, each open PR disposed (required, optional-before-freeze, deferred, or rejected-for-evidence), the candidate-vs-0.5.0 compatibility rows, and the dependency verdicts with rationale. Nothing is published, tagged, merged, or uploaded by this slice."
+claim_boundary = "This slice proves inventory accuracy via offline checkers and the documented gates; it performs no registry upload, source release merge, tag/Release/v1 movement, runner-policy expansion, or support/calibration promotion; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): delivery inventory section naming both current main SHAs (refreshed from the 2026-10-22 audit heads), the v0.5.0 tag target distinct from the Release immutable flag, the package source receipt (source commit, crates at 0.5.0, index max_version), and the source-sync checkpoint from source-divergence.",
+    "Settled design (verbatim): per-delta rows for every release-relevant open PR in both repos (swarm #2349/#2404/#2394/#2380 plus constituents counted once, source parser/group mirrors, asm chain #2291/#2292/#2293/#2301 — note swarm #2356 is already merged and must not be listed as open), each with actual merge SHA, source files, inclusion class (published-0.5.0 / public-source-only / integrated-swarm / draft-only), user-visible behavior plus affected schemas/commands, owner plus proof, and a disposition of required, optional-before-freeze, deferred, or rejected-for-evidence. Invalid-without-it consumer and release-note claims are marked per row.",
+    "Settled design (verbatim): full compatibility table for the exact proposed candidate versus installed 0.5.0 across all 8 row groups from the issue (crate versions, public Rust API plus intra-workspace dep versions, CLI spelling/defaults/aliases plus 0/1/2 exits, cards/review-kit/receipt/outcome/saved-plus-live LSP/SARIF/repair-queue/new input-environment-aperture-agent surfaces, required versus additive fields, unknown-version/closed-enum/legacy-weaker-receipt handling, producer/consumer floors, tokmd plus ub-review plus saved-editor consumer revisions, MSRV plus exact qualification toolchain plus promised platforms). Rebuild the table as the freeze artifact; do not refresh the stale in-place panels as the freeze record.",
+    "Settled design (verbatim): dependency decisions recorded with rationale — #2349 included only with syntax/detector/fixture/corpus deltas plus supported MSRV else deferred; #2397-group per-package behavior evidence with freeze-or-defer plus rationale and no blanket merge; asm chain qualified under bounded behavior or left unmerged out.",
+    "Settled design (verbatim): version verdict row — 0.6.0 stays proposed-only until the API/CLI/schema/MSRV assessment settles it, with the 0.3.8-workbench versus 0.5.0-registry split modeled explicitly (manifests read 0.3.8; the 0.5.0 bump lives on a non-ancestor side branch; establish the version-bump convention in the row, do not force a bump).",
+    "Settled design (verbatim): new cutline TOML under plans/release-cutline/ reusing the 1915 schema plus a human summary; 0.4.0 and 0.5.0 receipts, handoffs, and CHANGELOG entries stay immutable; lockfile SHA plus toolchain/MSRV/platform scope recorded reproducibly.",
+]
+excluded = [
+    "Registry upload, source release merge, tag/Release/v1 movement, runner-policy expansion, support/calibration promotion, scheduler/backlog copies, a second compatibility policy beyond SPEC-0011, toolchain bumps past Rust 1.98 / qualification 1.98.1, and rebinding old runs by editing dates.",
+    "Front-panel content edits (owned by #2398 PR2), release-runbook mapping (owned by #2398 PR3), analyzer/receipt/detector changes, and any live-network proof step.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The cutline records truth as found: workspace and registry versions stay split, the v0.5.0 tag target stays distinct from Release immutability, and no SHA, date, or version is fudged to look consistent."
+
+[[invariant]]
+id = "INV-2"
+text = "Every release-relevant open PR in both repos has exactly one disposition row; merged items (#2356) are never listed as open decisions."
+
+[[invariant]]
+id = "INV-3"
+text = "Historical evidence (0.4.0/0.5.0 receipts, handoffs, CHANGELOG) is immutable; the new cutline only adds."
+
+[[invariant]]
+id = "INV-4"
+text = "0.6.0 remains proposed-only until the API/CLI/schema/MSRV assessment settles it; the freeze amendment rules from the 0.4.0 cutline apply."
+
+[[acceptance]]
+id = "AC-2401-PR1-1"
+text = "Inventory section names both refreshed main SHAs, the v0.5.0 tag target with Release flag, the package source receipt, and the source-sync checkpoint."
+proof = ["cargo run --locked -p xtask -- source-divergence"]
+
+[[acceptance]]
+id = "AC-2401-PR1-2"
+text = "Every release-relevant open PR in both repos carries exactly one disposition row with the required fields; merged #2356 is not listed as open."
+proof = ["cargo run --locked -p xtask -- check-docs"]
+
+[[acceptance]]
+id = "AC-2401-PR1-3"
+text = "Compatibility table covers all 8 issue row groups for the exact proposed candidate versus installed 0.5.0 with consumer revisions named."
+proof = ["cargo run --locked -p xtask -- check-doc-artifacts"]
+
+[[acceptance]]
+id = "AC-2401-PR1-4"
+text = "Dependency decisions recorded with per-package rationale; version verdict row keeps 0.6.0 proposed-only with the 0.3.8/0.5.0 split modeled."
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
+
+[[acceptance]]
+id = "AC-2401-PR1-5"
+text = "New cutline TOML validates against the 1915-derived shape and the offline gates pass with no other behavior change."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "release_cutline"
+expected = "New 0.6 cutline TOML plus human summary under plans/release-cutline/; 0.4.0/0.5.0 history untouched."
+
+[[integration]]
+surface = "docs_truth_boundary"
+expected = "Front panels are read as evidence only in this slice; #2398 owns their reconciliation."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Paper-only slice: no publication, merge, tag, or gate behavior changes, so the worst case is a stale document, never a broken release."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "The 1915 schema plus freeze/amendment rules are reused verbatim, and the 0.3.8/0.5.0 split is modeled explicitly instead of forcing a version bump."
+
+[compatibility]
+posture = "Additive plans/docs artifacts only; no analyzer, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the cutline TOML and summary; every gate behaves exactly as before."

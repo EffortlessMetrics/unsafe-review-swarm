@@ -1,0 +1,247 @@
+# UNSAFE-REVIEW-CUTLINE-2401
+# Issue-linked delivery inventory and proposed 0.6 cutline (first PR: inventory on paper).
+# Reuses the 1915 cutline schema and freeze/amendment rules; freezes nothing.
+# Status is draft_inventory until #2400 and the chosen fixes/dependencies settle,
+# at which point a follow-up PR refreshes the SHAs and flips status to frozen.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2401"
+candidate = "9a0f5bf4b8a752794ff75eb738c29edaeb71a843"
+status = "draft_inventory"
+swarm_base = "9a0f5bf4b8a752794ff75eb738c29edaeb71a843"
+source_base = "735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1"
+candidate_commit = "9a0f5bf4b8a752794ff75eb738c29edaeb71a843"
+candidate_commit_rationale = "Proposed candidate is swarm main 9a0f5bf4 (feat(movement): project base/head movement line on the pr front panel (#2418)) at audit 2026-11-02. Advisory snapshot only: not a freeze, tag, publication, or version decision. 0.6.0 stays proposed-only until the API/CLI/schema/MSRV assessment settles it."
+audited_at = "2026-11-02"
+owner = "repo-infra"
+semver_rationale = "Proposed release number is 0.6.0, not frozen or published. All three workspace manifests still read 0.3.8 while the tree contains the published 0.5.0 feature set plus post-0.5.0 workbench deltas; the public registry holds 0.5.0. That workbench-versus-registry split is modeled explicitly in [version_verdict]; no bump is forced by this slice."
+dependency_freeze = "inactive (no 0.6 freeze exists yet; the 1916 freeze activated 2026-09-16 for candidate 0.4.0 only and its closeout stands as an audit record)"
+rollback = "Remove this cutline TOML and its human summary; every gate behaves exactly as before. Supersede with a dated cutline artifact and retain this file as an audit record; do not alter source history, tags, publication state, or public releases."
+
+# Disposition answers "is this required to qualify the candidate?" and is an
+# owner decision recorded here. Integration answers the separate factual
+# question "is this work present on swarm main today?" refreshed from the git
+# log at this audit. The two are independent: deferred work can still be
+# integrated, and required work can still be absent.
+
+[inventory]
+swarm_main = "9a0f5bf4b8a752794ff75eb738c29edaeb71a843"
+swarm_main_subject = "feat(movement): project base/head movement line on the pr front panel (#2418)"
+source_main = "735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1"
+source_sync = "new_source_commits=0; acknowledged source main 735fb7ba via docs/handoffs/2026-10-05-source-init-native-sync.md; raw_swarm_only=76 expected unpromoted workbench commits"
+v050_tag_target = "f1eda818 (source PR #572 merge; tag v0.5.0 exists on source and points at f1eda818)"
+v050_release_flag = "published 2026-09-17T05:57:40Z (GitHub Release v0.5.0; the receipt's 'separate explicit go' for tag and Release has happened since the receipt was written)"
+v050_source_receipt = "source main e718c063 (promotion #570 merged as 71cf254d, release-prep #571 merged as e718c063); crates unsafe-review-core, unsafe-review-cli, unsafe-review published at 0.5.0 (dry run 35175350041 green, publish run 35177910918 success; all three resolve at max_version 0.5.0 on the public index); installed binary SHA-256 3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634bba1bbff7b4c"
+v050_tag_vs_receipt = "The 0.5.0 receipt (docs/releases/0.5.0-publication-receipt.md, mirrored verbatim from source) records the published packages and explicitly leaves tag v0.5.0 and the GitHub Release to a separate go; the 2026-09-18 handoff records that both have since happened (tag at f1eda818, Release published 2026-09-17T05:57:40Z). Tag target and Release flag stay distinct facts; neither is re-decided here."
+lockfile_method = "sha256sum of the exact Cargo.lock bytes at the recorded commit (git show <commit>:Cargo.lock redirected to a file; blob hash 6f5846e50f8f12b321247bd872538d779d18acd4 matches git rev-parse HEAD:Cargo.lock, so the hashed bytes are exact)"
+lockfile_sha256 = "c3ad9ce9580c4e581be8cd7a13775aedb7060fab606dd8b3921cc163d51a0164"
+lockfile_pinned = "ra_ap_syntax 0.0.350; sha2 0.11.0; serde_json 1.0.151; tokio 1.53.1; signal-hook 0.4.4; toml 1.1.5+spec-1.1.0; proptest 1.11.0 (all read live from Cargo.lock at 9a0f5bf4)"
+toolchain = "rust-toolchain.toml channel 1.98 (rustfmt, clippy, minimal profile); issue baseline is Rust 1.98 / qualification 1.98.1; no toolchain bump in this slice"
+manifest_versions = "unsafe-review 0.3.8, unsafe-review-cli 0.3.8, unsafe-review-core 0.3.8; intra-workspace path deps pinned at 0.3.8 (facade -> cli+core, cli -> core)"
+
+[[delta]]
+id = "PUBLISHED-0.5.0"
+state = "integrated"
+inclusion = "published-0.5.0"
+merge_evidence = ["swarm cutline f281e130 pre-publish #2250", "source promotion #570 merged as 71cf254d", "source release-prep #571 merged as e718c063", "source receipt PR #572 merged as f1eda818"]
+source_files = ["analyzer evidence (SAFETY contract, caller-contract routing, get_unchecked fold)", "witness test-first cue", "reach scope", "--short risk-ranked output", "slot-level missing counts", "0/1/2 exit-code contract", "sha2 0.10.9 -> 0.11.0 (#2207)"]
+behavior = "--short one-line-per-card output for check/repo/pilot (rejected for policy report); SAFETY: doc comments count as contract evidence; inner unsafe-fn sites route to caller-contract review; deref-of-get_unchecked folds into the single get_unchecked card; unreached witness commands stay behind a test-first cue; slot-level missing counts in headers; 0/1/2 exit-code contract in review-command helps"
+disposition = "required"
+disposition_reason = "This is the published public baseline everything else deltas against; the candidate cannot ship without carrying exactly this set."
+proof = ["0.5.0 receipt carried-over proof: fmt/clippy/doc clean, 2109 tests passed, check-pr ok, six-conflict promotion tree, re-blessed goldens, dogfood-exec --strict 15 ok / 0 failed, public smoke (--version 0.5.0, doctor green, check-first-pr-artifacts ok)"]
+consumer_claim = "Release notes and consumer floors may cite the 0.5.0 feature set only because this set is published at max_version 0.5.0; no post-0.5.0 workbench delta inherits that standing."
+
+[[delta]]
+id = "SWARM-2349"
+state = "open_pr"
+inclusion = "draft-only"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2349"
+head = "250436f2d771bdbb9d6729f48da1cf6fa6e1b7d7"
+source_files = ["Cargo.lock", "crates/unsafe-review-core/Cargo.toml"]
+behavior = "Dependabot bump ra_ap_syntax 0.0.350 -> 0.0.352 (lockfile plus core manifest pin only; no analyzer, schema, CLI, or fixture change in the PR diff)"
+disposition = "deferred"
+disposition_reason = "Per the issue contract the parser update is included only with focused syntax/detector/fixture/corpus deltas plus supported MSRV, else deferred explicitly. This PR carries no such deltas, so it is deferred pending a focused proof slice; the workbench stays on 0.0.350."
+proof = ["none claimed; targeted proof required before any un-deferral: parser/input tests, detector contracts, fixture/calibration parity, surface determinism, real-PR/evidence-loss corpus where relevant, full check-pr"]
+consumer_claim = "No release-note or consumer-floor claim may cite a 0.0.352 parser until the focused deltas land; the candidate parser remains 0.0.350."
+
+[[delta]]
+id = "SWARM-2404"
+state = "open_pr"
+inclusion = "draft-only"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2404"
+head = "65362ce2a727fd9eea203ba5c2cba140d1721438"
+source_files = ["Cargo.lock"]
+behavior = "Dependabot cargo-minor-and-patch group (6 updates, lockfile only): serde_json 1.0.151->1.0.154, tokio 1.53.1->1.53.2, signal-hook 0.4.4->0.4.5, toml 1.1.5->1.1.8+spec-1.1.0, proptest 1.11.0->1.12.0, sha2 0.11.0->0.11.1. No analyzer, schema, CLI, or fixture change in the PR diff."
+disposition = "deferred"
+disposition_reason = "Per the issue contract group updates are examined per package and included before freeze or deferred with rationale, never blanket-merged because the group is labelled patch/minor. At inventory time the examination is recorded in [dependencies] and the merge is deferred to the freeze decision."
+proof = ["none claimed; per-package reset receipts named in [dependencies]; merging requires affected tests, clippy, check-pr, and a refreshed lockfile SHA"]
+consumer_claim = "Invalid without it: no availability, process/signal/config-behavior, or freshness claim may cite these versions until the freeze decision merges them with green proof. Release omission is not abandonment; the PR stays open/parked."
+
+[[delta]]
+id = "SWARM-2397"
+state = "closed_unmerged"
+inclusion = "draft-only"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2397"
+head = "385d53ea3ac3c3e0d707dd3e7b44f9e4b4a85f06"
+closed_at = "2026-10-27T10:54:17Z"
+source_files = ["Cargo.lock"]
+behavior = "Dependabot cargo-minor-and-patch group (3 updates: tokio 1.53.2, signal-hook 0.4.5, toml 1.1.6); strict subset of SWARM-2404."
+disposition = "deferred"
+disposition_reason = "Closed unmerged, superseded by SWARM-2404 which covers the same three packages plus serde_json, proptest, and sha2. No separate decision; counted once under SWARM-2404 so the group is not double-counted."
+proof = []
+consumer_claim = "None; superseded drafts carry no claim."
+
+[[delta]]
+id = "SWARM-2394"
+state = "open_pr"
+inclusion = "draft-only"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2394"
+head = "5288d77c2d72b1d1d292e06feb8639fa0c7772d7"
+source_files = ["crates/unsafe-review-cli/src/execute/confirm.rs", "crates/unsafe-review-cli/tests/e2e.rs", "crates/unsafe-review-core/src/input/scope_git.rs", "crates/unsafe-review/tests/e2e.rs", "docs/contributing/BUILD_CACHE_SETUP.md", "plans/work-specs/examples/UNSAFE-REVIEW-WORK-2173.toml", "xtask/src/cli_command.rs", "xtask/src/main.rs", "xtask/src/real_pr_corpus.rs"]
+behavior = "Consolidates the six reviewed Windows CI baseline repairs under #2393 as the single proposed integration unit: locked Cargo child cwd identity, Windows confirm executable quoting plus parsed-program regression, native absolute receipt-install-note fixture, exact typed aperture file population, real direct-child Windows timeout capture, two-line Windows Clippy fixture cleanup. Product parser, one-second timeout, path rejection, and Unix-only coverage boundaries unchanged."
+constituents_counted_once = ["#2381 (61d835fe, Cargo child cwd identity; OPEN)", "#2384 (8b48d42d, Windows confirm quoting; OPEN)", "#2386 (f31f7b64, native receipt-install-note fixture; OPEN)", "#2388 (e05b926c, exact typed aperture paths; OPEN)", "#2390 (2d3376c3, direct-child Windows timeout; OPEN)", "#2392 (f6ba1a09, Windows Clippy fixture cleanup; OPEN)"]
+constituent_note = "All six preserved source PRs, branches, reviews, and causal red/green evidence remain open until verified supersession/integration. This row is their single disposition; they are not counted again and no independent writers or readiness changes are admitted on the source lanes."
+disposition = "optional-before-freeze"
+disposition_reason = "Windows baseline repairs are CI-truth work, not product behavior, but a credible Windows qualification before freeze needs them. Optional (not required to establish the advisory contract) yet the preferred pre-freeze integration unit; #2380 is explicitly excluded and unchanged by this PR."
+proof = ["39 focused tests plus fresh combined local baseline per #2393 evidence; same-head formatting/focused proof, fresh workspace check, all-target clippy, pinned structured tests/doctests, corrected-diagnostics validation, warnings-denied rustdoc, literal check-pr; independent combined-tree review found no actionable defects"]
+consumer_claim = "Invalid without it: no Windows platform-availability or Windows-installed qualification claim may be made until this (or an equivalent superseding) unit merges with green proof. Its own body claims no native qualification or whole-run fit."
+
+[[delta]]
+id = "SWARM-2380"
+state = "open_pr"
+inclusion = "draft-only"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2380"
+head = "a9f175c56f01b0757e6706e9a9d834460e5eab09"
+source_files = [".ci/ scripts (core, finalize, run, supervise, native_deadline, test-admission, test-central-contract, test-native-deadline, test-run)", ".github/workflows/ci.yml", "docs/ci/ (interruption supervision, native admission, PR CI, review-owner bootstrap)", "docs/handoffs/2026-10-14-contabo-consumer.md", "docs/specs/UNSAFE-REVIEW-SPEC-0024-ci-design.md", "policy/ci-lane-whitelist.toml", "policy/workflow-allowlist.toml", "rust-toolchain.toml", "scripts/ci/ qualification/supervision tests", "xtask/src/ci_routing_contract.rs"]
+behavior = "Central-migration CI architecture: Contabo proof on the central standard caller; rewrites workflow routing, lane whitelist, admission/budget eligibility, and supervision scaffolding. #2394's body names it as a separate owner whose lane is excluded and unchanged."
+disposition = "deferred"
+disposition_reason = "Separate owner's central migration with its own admission/runner/budget eligibility; it is CI architecture, not 0.6 product delta, and #2394 explicitly excludes it. Required-check admission, runner, and budget eligibility must resolve on its own lane before any release train can depend on it."
+proof = ["none claimed here; Contabo proof belongs to its own lane"]
+consumer_claim = "No release train timing, runner, or hosted-capacity claim may depend on #2380 until its lane proves out; release omission is not abandonment."
+
+[[delta]]
+id = "ASM-CHAIN"
+state = "integrated_with_open_remainder"
+inclusion = "integrated-swarm"
+pr = "https://github.com/EffortlessMetrics/unsafe-review-swarm/pull/2356 (MERGED 2026-10-30; never listed as open)"
+merge_evidence = ["1ae42dea3ec549404b6226d0bdda2e249675ec80 fix(analysis): name self-contradictory asm options in discharge summary (#2356)", "24cd42e7d65a4c0bdd82499c313621ad50b46468 fix(analysis): route asm contradiction cards to the code-fix next action (#2406, MERGED 2026-10-30)"]
+source_files = ["crates/unsafe-review-core/src/analysis/evidence.rs", "crates/unsafe-review-core/src/analysis/evidence/asm_discharge.rs", "crates/unsafe-review-core/src/analysis/pipeline/action_summary.rs", "crates/unsafe-review-core/src/analysis/pipeline/mod.rs", "fixtures/asm_options_contradiction/ (fixture, change diff, expected cards)", "plans/work-specs/UNSAFE-REVIEW-WORK-2291-PR1.toml, UNSAFE-REVIEW-WORK-2293-PR1.toml"]
+behavior = "Self-contradictory asm options (nomem/readonly vs memory access) card distinctly from sound asm; the contradiction is named in the discharge summary and routed to the code-fix next action instead of docs. Issues #2291, #2292, #2293 are CLOSED (2026-10-30/31); the bounded asm behavior is qualified under existing #2291/#2292/#2293 ownership per the issue contract, so no unmerged detector chain enters this release."
+open_remainder = "#2301 (model: typed obligation evidence with dispositions/reasons/facts) stays OPEN; its phased model migration (Present/Missing/Violated/Unknown/Unsupported, reason enums, prose-marker replacement) is broader than the asm slice and is deferred out of 0.6 scope. The asm slice itself does not depend on prose markers anymore for its routed behavior."
+disposition = "required"
+disposition_reason = "The merged asm contradiction behavior is part of the candidate surface and must be covered by qualification; the unmerged remainder (#2301) is deferred as post-0.6 model work."
+proof = ["fixture expected.cards.json for asm_options_contradiction; detector-contract and parity coverage per merged slices; full check-pr at lane head"]
+consumer_claim = "Release notes may claim code-fix routing for asm contradiction cards only because #2356+#2406 are merged; without them the cards would advise docs instead of the code fix."
+
+[[delta]]
+id = "POST-0.5.0-INTEGRATED"
+state = "integrated"
+inclusion = "integrated-swarm"
+merge_evidence = ["CHANGELOG Unreleased section (post-0.5.0 cutline f281130e): #2254 adverse-verdict open cards", "#2251 staged adverse-receipt acceptance for #2248", "#2255/#2256 reach scope and wording", "#2257 non-null guard vs pointer-live discharge (delivers #2226)", "#2253 repo-signal pause", "1ff74ca4fe6847f62b77923efa99b127e4c2b7a3 static-mut (#2408)", "213413def619d8d873789811fd80563ed9b817cd union_field_read (#2410)", "83365f0d54b249a9f2ac59c778b044b6c281f5f0 is_x86_feature_detected guards (#2411)", "7c74338bc66bd015e590cb374c40fcf459e8f0f0 receipt subject gating (#2413)", "9b64033e506bfdc6f9df026bd9b20a6e00819996 movement evaluator (#2414)", "079e8149eaeb0ece88b54c1e049034ab671237e5 outcome unknown bucket (#2415)", "fbf49c35f5386fdfc5bb90d5ce984db295fdc47b live-confirm-as-unknown (#2416)", "c2618e9b23ab8eec47e37b4ba859e2cf27831343 movement wiring (#2417)", "1a29511257f7506ced9658d45c082a7ab783ce27 discharge summaries (#2409)"]
+behavior = "Adverse-verdict cards stay open with verdict-aware next actions; executable adverse-receipt acceptance staged; reach scope masks non-code shapes with grammatical summaries; non-null guard evidence separated from pointer-liveness discharge; repo-signal pause replaces fixed sleep; new detector families (static-mut, union field reads, target-feature guard credit); receipt imports gated on subject applicability; outcome new/resolved gated on snapshot comparability with explicit unknown bucket; live confirm execution flows through import as unknown; base/head movement evaluation and front-panel projection."
+disposition = "required"
+disposition_reason = "Already-landed candidate surface: qualification must cover it because it ships in the candidate tree, and several rows (unknown bucket, receipt gating, verdict-aware actions) change user-visible semantics versus 0.5.0."
+proof = ["merged-slice tests plus full check-pr at lane head; no separate qualification claimed"]
+consumer_claim = "A consumer or release note that describes outcome comparability, receipt import, or next-action routing is invalid unless it accounts for the unknown bucket, subject gating, and verdict-aware actions; legacy 0.5.0 wording alone does not describe the candidate."
+
+[[delta]]
+id = "SOURCE-MIRRORS-575-582"
+state = "open_pr_source"
+inclusion = "public-source-only"
+pr = "source #575 (ra_ap_syntax 0.0.350->0.0.352, OPEN, head d8def1f3ee9c1c1a6bd764357ffb2069677a0a33); source #582 (cargo-minor-and-patch group 6 updates, OPEN, head 81af969696a3fdbd9041623d8d9256d5ef)"
+behavior = "Source-repository duplicates of the swarm dependency PRs: parser bump mirrors SWARM-2349; group bump mirrors SWARM-2404."
+disposition = "deferred"
+disposition_reason = "Source duplicates get one promotion path with an evidence-backed disposition. The swarm rows carry the workbench decision; the source path stays owner-gated and no duplicate history is merged. Unmerged optional work remains open/parked."
+proof = []
+consumer_claim = "None until one path merges with proof."
+
+[[compat]]
+id = "COMPAT-1-CRATES"
+group = "crate versions"
+candidate = "Workspace manifests at 9a0f5bf4 read 0.3.8 for unsafe-review, unsafe-review-cli, unsafe-review-core (verified live); candidate tree contains the 0.5.0 feature set plus POST-0.5.0-INTEGRATED deltas."
+installed = "crates.io 0.5.0 for all three crates (max_version 0.5.0 per the 0.5.0 receipt); installed binary reports 0.5.0, doctor green."
+verdict = "Split modeled explicitly: candidate code is newer but version-stamped older. No consumer may infer candidate behavior from either version string alone; the [version_verdict] convention governs the bump."
+
+[[compat]]
+id = "COMPAT-2-API"
+group = "public Rust API plus intra-workspace dependency versions"
+candidate = "Public Rust API deltas are additive at this audit: new detector families (static-mut, union_field_read), target-feature guard crediting, typed asm discharge module, outcome unknown bucket, receipt subject gating, movement evaluator. Intra-workspace deps stay path-based and pinned at 0.3.8 (facade -> cli+core, cli -> core; verified live). No public item removal or rename observed."
+installed = "0.5.0 public API (SAFETY contract evidence, --short output, receipt import adapters, witness-plan artifacts)."
+verdict = "Additive-only posture holds at the proposed candidate; any removal/rename before freeze must follow SPEC-0011's deprecation window (at least one published minor release, affected-artifact schema change, producer-floor advancement)."
+
+[[compat]]
+id = "COMPAT-3-CLI"
+group = "CLI spelling, defaults, aliases, 0/1/2 exits"
+candidate = "pr is the preferred first-use entrypoint with the bounded action-first front panel plus the new base/head movement line; first-pr and review remain compatibility names for the same advisory bundle and detailed route; doctor, explain, context, saved artifacts, baseline init, and top-level preview-only init (applies nothing; explicit --out writes only proposal JSON) carry over; --short stays rejected for the policy report; review-command helps print the 0/1/2 exit-code footer."
+installed = "Same spelling/aliases/exits at 0.5.0 (0/1/2 exit-code contract shipped in 0.5.0 per the receipt)."
+verdict = "No CLI spelling, default, alias, or exit-semantics change in the proposed candidate; movement line is an additive front-panel section, not a new command."
+
+[[compat]]
+id = "COMPAT-4-SURFACES"
+group = "cards, review-kit, receipt, outcome, saved/live LSP, SARIF, repair queue, new input/environment/aperture/agent surfaces"
+candidate = "ReviewCard remains the canonical product unit; review-kit manifest 0.1; saved LSP 0.2 (first-PR verifier rejects 0.1); gate manifest unsafe-review-gate/v1; repo-scan-status/v1; manual-candidate v1 envelopes; tokmd packet input sidecar; SARIF standard envelope with ReviewCard-derived fields; repair queue 0.1 separate from manual-candidate handoff. New since 0.5.0: outcome unknown bucket on snapshot incomparability, receipt subject-applicability gating, typed aperture file population (pending #2394), movement evaluator/projection, verdict-aware adverse actions, live-confirm-as-unknown import flow."
+installed = "0.5.0 surfaces per the receipt (cards JSON, PR summary, SARIF, saved LSP, repair queue, witness-plan artifacts, receipt audit, outcome snapshot)."
+verdict = "No schema-version bump observed in the candidate; changes are additive behaviors and stricter gates (unknown bucket, subject gating), which can only turn previously successful-looking empty/comparable outputs into explicit unknown/rejected states. Per the issue: a rejected/unknown/stale legacy artifact stays explicit; compatibility never turns it into a successful empty report."
+
+[[compat]]
+id = "COMPAT-5-FIELDS"
+group = "required fields, additive fields, unknown versions, closed enums, legacy weaker receipts, producer/consumer floors"
+candidate = "SPEC-0011 contract carries over unchanged: eighteen exact (path, kind, format, schema_version/null) artifact identities with payload discriminators; required fields stay required; unknown object fields are additive and accepted unless a field contract closes its vocabulary; non-empty additive operation_family must propagate consistently; literal unknown and closed vocabularies keep their meanings; tool_version must be valid semver at least 0.3.8 (producer floor); no field deprecated."
+installed = "0.5.0 producer at floor 0.5.0 output; legacy weaker receipts (e.g. saved LSP 0.1) render only under the SPEC-0012 legacy bound, never reconstructed into 0.2 semantics."
+verdict = "Producer floor stays 0.3.8 minimum; candidate output at manifest 0.3.8 remains consumable wherever the floor is honored. Legacy weaker receipts deserialize per the accepted contract but contribute no discharge or safety claim."
+
+[[compat]]
+id = "COMPAT-6-CONSUMERS"
+group = "selected tokmd, ub-review, saved-editor consumer revisions"
+candidate = "No new consumer qualification in this slice: tokmd historical receipt covers five presets with tokmd 1.15.0 at 3d278c56 (does not qualify current candidate output); ub-review smoke receipt at 6f595070 covers selected fixtures only; saved-editor surface is the VS Code saved-bundle MVP with live client deferred (SPEC-0012 bounds legacy 0.1 rendering). #1921 retains the execution gap for the current candidate."
+installed = "Same named historical receipts; 0.5.0 publication smoke (cargo install into a clean prefix, --version 0.5.0, doctor green, first-pr bundle, check-first-pr-artifacts ok) is the only installed-consumer evidence."
+verdict = "Contract acceptance does not qualify consumers. Before any consumer-compatibility claim, the #1921-style matrix must execute actual candidate output against named consumer versions with redacted receipts."
+
+[[compat]]
+id = "COMPAT-7-TOOLCHAIN"
+group = "MSRV, exact qualification toolchain, promised platforms"
+candidate = "Workspace MSRV Rust 1.98 (rust-toolchain.toml channel 1.98; verified live); issue baseline keeps Rust 1.98 / qualification 1.98.1 with no opportunistic calendar upgrade. Promised platforms: none broadened; Unix-only coverage boundaries stand; Windows qualification depends on unmerged #2394 (draft explicitly claims no native qualification)."
+installed = "0.5.0 qualified on its toolchain per the receipt; public install path cargo install --version 0.5.0 --locked."
+verdict = "MSRV increase or toolchain move requires a reviewed dependency cause (none in this slice: sha2 0.11.1's MSRV 1.88 note and signal-hook's Android-floor change are inside deferred #2404, not the candidate). No new platform promise."
+
+[[compat]]
+id = "COMPAT-8-EXIT-DOCTOR"
+group = "candidate-vs-installed behavioral check summary"
+candidate = "At 9a0f5bf4: unknown exit/unknown receipt states are explicit (unknown bucket, subject gating, live-confirm-as-unknown); asm contradiction routes to the code fix; adverse cards stay open with verdict-aware actions."
+installed = "At 0.5.0: legacy wording without the unknown bucket and without asm code-fix routing."
+verdict = "Behavioral delta is stricter-and-more-explicit, never looser: a 0.5.0-trained consumer reading candidate output must handle explicit unknown/rejected states and new card families additively. Public behavior (not only JSON deserialization) is what the freeze matrix must check."
+
+[dependencies]
+lockfile = "c3ad9ce9580c4e581be8cd7a13775aedb7060fab606dd8b3921cc163d51a0164 at 9a0f5bf4 (method pinned in [inventory])"
+freeze = "inactive for 0.6; the 1916 freeze (active for 0.4.0) stands as an audit record and is not repurposed"
+decision_2349 = "deferred: ra_ap_syntax 0.0.350->0.0.352 arrives with no focused syntax/detector/fixture/corpus deltas and no MSRV statement, so the issue's include-only-with-deltas rule defers it. Un-deferral requires the targeted parser proof battery plus hosted gate green."
+decision_2404_tokio = "deferred to freeze examination: 1.53.1->1.53.2 is a bugfix rollup (Windows wait unregistration before child-handle close, mpsc/semaphore/broadcast fixes, timer/waker lock discipline). Process/child-handle behavior touches the confirm/test surface, so affected-signal/process tests plus full check-pr are the reset receipts."
+decision_2404_signal_hook = "deferred to freeze examination: 0.4.4->0.4.5 sets FD_CLOEXEC on pipe::register_raw descriptors and drops the 32-bit Android fallback (Android below API 21 unsupported). Rationale for care: descriptor-inheritance and platform-floor changes touch process/signal behavior; signal-handling tests plus workspace proof are the reset receipts."
+decision_2404_toml = "deferred to freeze examination: 1.1.5->1.1.8+spec-1.1.0 includes a parser unsoundness-risk fix (synthetic parser events) and display key-encoding fixes plus perf work. Rationale for care: config parsing soundness; config/policy-manifest round-trip tests plus check-pr are the reset receipts."
+decision_2404_proptest = "deferred to freeze examination: 1.11.0->1.12.0 (dev-only property testing; rand_chacha->chacha20 swap, fork-replay fix). Lowest product risk; dev-suite green suffices."
+decision_2404_serde_json = "deferred to freeze examination: 1.0.151->1.0.154 (UTF-8 error positions, -0 sign, float/INFINITY comparison). Output-rendering adjacent; golden/snapshot tests plus check-pr are the reset receipts."
+decision_2404_sha2 = "deferred to freeze examination: 0.11.0->0.11.1 (AArch64 round-constant loading fix, unsafe_op_in_unsafe_fn lint fix with MSRV 1.88 note). Rationale: digest output feeds badge/proof hashing; hash-golden tests plus check-pr are the reset receipts. Does not inherit the #2135 sha2-0.10.9-subtree authorization."
+no_blanket_merge = "Recorded per the issue: the group label patch/minor never substitutes for per-package behavior evidence."
+
+[version_verdict]
+proposed = "0.6.0"
+standing = "proposed-only; not frozen, not published, not tagged"
+split = "Workbench manifests read 0.3.8 at 9a0f5bf4 while the public registry holds 0.5.0; the 0.5.0 bump lived on the non-ancestor release-prep side branch (#571), never as a workbench-main version commit. The 0.6 convention follows the same shape: the bump lands with release-prep on its side branch when the API/CLI/schema/MSRV assessment settles the number; this slice forces no bump."
+settlement_inputs = ["API/CLI/schema/MSRV assessment per issue #2401 acceptance", "freeze amendment rules below", "#2400 integration baseline"]
+
+[[rule]]
+id = "FREEZE-2401-1"
+text = "This inventory freezes nothing. A follow-up PR refreshes bases, included commits, package/lockfile identities, schema/consumer matrix, required acceptance IDs, and optional omissions, and only then flips status to frozen."
+
+[[rule]]
+id = "FREEZE-2401-2"
+text = "After freeze, changes require a bounded amendment naming the defect, the changed packaged bytes/contracts, and the affected proof. Rerun invalidated evidence; never reset unrelated successful rows without a reason, and never rebind old runs to a new SHA by editing dates."
+
+[[rule]]
+id = "FREEZE-2401-3"
+text = "0.4.0/0.5.0 receipts, handoffs, and CHANGELOG entries are immutable; the new cutline only adds. Stale in-place panels (docs/status/*) are read as evidence only and are reconciled by #2398, never refreshed as the freeze record."
+
+[[rule]]
+id = "BOUNDARY-2401"
+text = "This record proves inventory accuracy via offline checkers and the documented gates. It performs no registry upload, source release merge, tag/Release/v1 movement, runner-policy expansion, support/calibration promotion, or release qualification; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or policy-readiness claim."
+
+claim_boundary = "unsafe-review finds unsafe Rust changes missing a safety contract, guard, test, or witness. This cutline states what 0.6 would ship and freeze; it establishes nothing beyond the audited facts above."
