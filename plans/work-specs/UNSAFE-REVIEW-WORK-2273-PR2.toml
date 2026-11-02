@@ -35,7 +35,7 @@ text = "Existing #2273 behavior is byte-identical: all prior acceptance tests ke
 [[acceptance]]
 id = "AC-2273-PR2-1"
 text = "New live CLI e2e executes confirm, installs the executed receipt, and asserts the bound-subject facts plus unknown-with-invocation-reason on re-review with the gap still open."
-proof = ["cargo test -p unsafe-review --test e2e --locked live_confirm"]
+proof = ["cargo test -p unsafe-review --test e2e --locked confirm_live_override"]
 
 [[acceptance]]
 id = "AC-2273-PR2-2"
