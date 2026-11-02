@@ -49,6 +49,7 @@ mod markdown;
 mod public_badges;
 mod public_surfaces;
 mod real_pr_corpus;
+mod release_truth;
 mod seam_batch;
 mod self_unsafe;
 mod source_sync;
@@ -77,6 +78,9 @@ use support_tiers::{
     check_support_tiers_text, support_capability_from_row, support_summary_posture_from_row,
     support_tier_from_row,
 };
+
+#[cfg(test)]
+use release_truth::{check_release_truth_texts, parse_release_truth_text};
 
 #[cfg(test)]
 use workflow_allowlist::{
@@ -950,6 +954,7 @@ fn run(args: Vec<String>) -> Result<(), String> {
             fixture_surfaces::check_surface_determinism()
         }
         commands::XtaskCommand::CheckRealPrCorpus => real_pr_corpus::check(),
+        commands::XtaskCommand::CheckReleaseTruth => release_truth::check_release_truth(),
         commands::XtaskCommand::CheckCorpusPartitions => corpus_partitions::check(),
         commands::XtaskCommand::CheckSeamBatch => seam_batch::check(),
         commands::XtaskCommand::CheckEvidenceLossChallenges => evidence_loss_challenges::check(),
@@ -991,7 +996,7 @@ fn print_help() {
 /// command list; the trailing note records that classification.
 fn help_text() -> String {
     format!(
-        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, latency-baseline [--out <path>] [--runs <N>] [--skip-lsp] [--skip-repo], sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-corpus-partitions, check-seam-batch, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
+        "xtask options before command: [--workspace-root <path>] (or {WORKSPACE_ROOT_ENV})\nxtask commands: check-pr, check-docs, check-policy, check-support-tiers, check-fixtures, check-calibration, check-dogfood, check-fuzz, cleanup-audit, check-doc-artifacts, check-work-specs, check-subagent-briefs, check-subagent-results, check-docs-automation, check-spec-status, check-public-surfaces, check-package-boundary, check-ci-lanes, ci-test (run structured tests), ci-test-validate <dir> (validate structured diagnostics), check-advisory-artifacts <dir>, check-first-pr-artifacts <dir>, check-manual-candidate-examples, check-first-hour, dogfood-usefulness, external-pilot-rollup, lsp-smoke, latency-baseline [--out <path>] [--runs <N>] [--skip-lsp] [--skip-repo], sync-calibration-snapshot, source-divergence, check-source-sync, bless-goldens [fixture ...], corpus-backstop [--out <path>], check-corpus-backstop-schema <path>, corpus-usefulness [--out <path>], check-corpus-usefulness-schema <path>, check-detector-contracts, check-self-unsafe, check-stance-decisions, check-stance-coverage, check-spec-coverage, check-fixture-surface-parity, check-surface-determinism, check-real-pr-corpus, check-release-truth, check-corpus-partitions, check-seam-batch, check-evidence-loss-challenges, check-external-pilots, check-local [--base <ref>] [--format human|json] [--out <path>], dogfood-exec [--target <id>] [--include-holdout] [--work-dir <path>] [--max-cards <N>] [--strict] [--clean] [--timeout <secs>], workflow-pin-sync [--check] [--write] [--format human|json]\nnot listed: check-goals (deprecated compatibility) and check-local-run (internal subprocess plumbing); both remain parseable"
     )
 }
 
@@ -9440,6 +9445,186 @@ jobs:
 
         assert!(err.contains("unknown support summary posture"));
         assert!(err.contains("Unsupported"));
+        Ok(())
+    }
+
+    fn release_truth_authority_fixture(tag_pending: bool, release_pending: bool) -> String {
+        let tag_block = if tag_pending {
+            "[tag]\nexists = false\n".to_string()
+        } else {
+            "[tag]\nexists = true\ntarget = \"f1eda818\"\n".to_string()
+        };
+        let release_block = if release_pending {
+            "[github_release]\nexists = false\n".to_string()
+        } else {
+            "[github_release]\nexists = true\npublished_at = \"2026-09-17T05:57:40Z\"\n".to_string()
+        };
+        [
+            "schema_version = \"1.0\"".to_string(),
+            "workspace_version = \"0.3.8\"".to_string(),
+            "public_source_commit = \"f1eda818\"".to_string(),
+            "installed_smoke_receipt = \"3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634e51bab4bbff7b4c\""
+                .to_string(),
+            "[workbench]\nversion = \"0.3.8\"\navailability = \"unpublished-swarm-main\"\n"
+                .to_string(),
+            "[crates_io]\nversion = \"0.5.0\"\nunsafe_review_core = \"published\"\nunsafe_review_cli = \"published\"\nunsafe_review = \"published\"\n"
+                .to_string(),
+            tag_block,
+            release_block,
+        ]
+        .join("\n")
+    }
+
+    fn release_truth_corrected_panels() -> Vec<(&'static str, &'static str, &'static str)> {
+        vec![
+            (
+                "README.md",
+                "release-row",
+                "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.5.0; advisory-only, 0.x.y) |",
+            ),
+            (
+                "docs/status/SUPPORT_SUMMARY.md",
+                "public-release-claim",
+                "The last public release is `v0.5.0` (2026-09-17); post-release candidate work on Swarm main is unfrozen again.",
+            ),
+            (
+                "docs/status/RELEASE_COMPATIBILITY.md",
+                "distribution-posture",
+                "In public `v0.5.0`, `pr` is the preferred first-use entrypoint. The three published packages are `0.5.0` (2026-09-17). Tag `v0.5.0` exists and points at `f1eda818`.",
+            ),
+            (
+                "docs/status/RELEASE_DOCS_MATRIX.md",
+                "availability-matrix",
+                "| First-use CLI | docs | Experimental | Current bundle ships in public v0.5.0; GitHub Release `v0.5.0` published 2026-09-17T05:57:40Z |",
+            ),
+        ]
+    }
+
+    #[test]
+    fn release_truth_accepts_corrected_panels() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        check_release_truth_texts(&truth, &release_truth_corrected_panels())
+    }
+
+    #[test]
+    fn release_truth_rejects_stale_prior_release_claim() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let panels = [(
+            "README.md",
+            "release-row",
+            "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.4.0; advisory-only, 0.x.y) |",
+        )];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("stale v0.4.0-as-current claim should fail".to_string());
+        };
+        assert!(err.contains("README.md"));
+        assert!(err.contains("release-row"));
+        assert!(err.contains("0.4.0"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_claimed_but_absent_tag_and_release() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(true, true),
+        )?;
+        let panels = [
+            (
+                "docs/status/RELEASE_COMPATIBILITY.md",
+                "distribution-posture",
+                "In public `v0.5.0`, `pr` is the preferred first-use entrypoint. Tag `v0.5.0` exists and points at `f1eda818`.",
+            ),
+            (
+                "docs/status/RELEASE_DOCS_MATRIX.md",
+                "availability-matrix",
+                "| First-use CLI | docs | Experimental | Current bundle ships in public v0.5.0; GitHub Release `v0.5.0` published 2026-09-17T05:57:40Z |",
+            ),
+            (
+                "README.md",
+                "release-row",
+                "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.5.0; advisory-only, 0.x.y) |",
+            ),
+            (
+                "docs/status/SUPPORT_SUMMARY.md",
+                "public-release-claim",
+                "The last public release is `v0.5.0` (2026-09-17).",
+            ),
+        ];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("claimed-but-absent tag and Release should fail".to_string());
+        };
+        assert!(err.contains("distribution-posture") || err.contains("availability-matrix"));
+        assert!(err.contains("pending") || err.contains("no published release"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_wrong_tag_target() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            "In public `v0.5.0`, `pr` is the preferred first-use entrypoint. Tag `v0.5.0` exists and points at `aaaaaaaa`.",
+        )];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("wrong tag target should fail".to_string());
+        };
+        assert!(err.contains("RELEASE_COMPATIBILITY.md"));
+        assert!(err.contains("distribution-posture"));
+        assert!(err.contains("f1eda818"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_cross_panel_disagreement() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let panels = [
+            (
+                "README.md",
+                "release-row",
+                "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.5.0; advisory-only, 0.x.y) |",
+            ),
+            (
+                "docs/status/SUPPORT_SUMMARY.md",
+                "public-release-claim",
+                "The last public release is `v0.4.0` (2026-09-17).",
+            ),
+        ];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("cross-panel disagreement should fail".to_string());
+        };
+        assert!(err.contains("release panels disagree"));
+        assert!(err.contains("README.md"));
+        assert!(err.contains("release-row"));
+        assert!(err.contains("SUPPORT_SUMMARY.md"));
+        assert!(err.contains("public-release-claim"));
+        assert!(err.contains("0.4.0"));
+        assert!(err.contains("0.5.0"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_authority_missing_required_field() -> Result<(), String> {
+        let text = release_truth_authority_fixture(false, false)
+            .replace("published_at = \"2026-09-17T05:57:40Z\"\n", "");
+        let Err(err) = parse_release_truth_text("policy/release-truth.toml", &text) else {
+            return Err("authority missing published_at should fail".to_string());
+        };
+        assert!(err.contains("policy/release-truth.toml"));
+        assert!(err.contains("published_at"));
         Ok(())
     }
 
