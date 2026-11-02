@@ -1,0 +1,73 @@
+# Issue-linked work specification for #2273 close-out (PR2, final slice).
+# Basis: main 079e8149 (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2273
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2273"
+kind = "correctness"
+objective = "Close the last #2273 proof gap (AC8): replace the hand-mirrored bound receipt in the applicability e2e with a genuinely executed confirm receipt, proving the live capture-to-import path end to end, then re-run the full #2273 proof suite at the current head and close the issue."
+user_outcome = "A maintainer running the suite sees a live-executed receipt flow through the real loader, card builder, audit, and outcome path; an author-override execution that does not match the routed verification reads unknown with its reason instead of importing silently; all nine #2273 acceptance legs stay green at the merged head."
+claim_boundary = "This slice adds one CLI e2e and re-verifies existing behavior; it changes no analyzer, loader, receipt, outcome, or policy semantics; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): one new CLI e2e in crates/unsafe-review/tests/e2e.rs that git-initializes a fixture copy, runs confirm --allow-heavy with a --command override helper (the only live-executable shape; the routed cargo-miri command is not e2e-runnable), installs the executed receipt into .unsafe-review/receipts/, re-runs check, and asserts (a) the receipt file carries a real bound subject (invocation digest of the executed command, captured_complete, scope), and (b) the import consumer reports it unknown with the invocation-mismatch reason while the witness gap stays open and actionable.",
+    "Re-run of the four #2273 proof commands at the lane head and recorded results in the PR body: cargo test --locked -p unsafe-review-core --lib receipts, cargo test --locked -p unsafe-review-cli confirm (or the package that owns confirm e2e), cargo test -p unsafe-review --test e2e bound_receipt, cargo run --locked -p xtask -- check-pr.",
+    "Close #2273 with a status comment citing #2413 proof plus this verification, leaving #2230 remainder and #1887 open as tagged follow-ups.",
+]
+excluded = [
+    "Any change to receipt, loader, card-builder, audit, outcome, movement, policy, ledger, or projection behavior; the applicable-import leg stays covered by the existing hand-mirrored e2e (executing the routed cargo-miri verification is environmentally infeasible in e2e).",
+    "New receipt schema fields, producer changes, or witness/receipt import-path changes owned by other lanes.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "A live-executed receipt that does not match the routed verification never imports as applicable evidence; it reads unknown or stale with its reason."
+
+[[invariant]]
+id = "INV-2"
+text = "The witness gap stays open and actionable whenever a receipt cannot be shown to apply; urgency and class are untouched."
+
+[[invariant]]
+id = "INV-3"
+text = "Existing #2273 behavior is byte-identical: all prior acceptance tests keep passing unmodified."
+
+[[acceptance]]
+id = "AC-2273-PR2-1"
+text = "New live CLI e2e executes confirm, installs the executed receipt, and asserts the bound-subject facts plus unknown-with-invocation-reason on re-review with the gap still open."
+proof = ["cargo test -p unsafe-review --test e2e --locked live_confirm"]
+
+[[acceptance]]
+id = "AC-2273-PR2-2"
+text = "Full #2273 proof suite re-run green at the lane head with results recorded in the PR body."
+proof = ["cargo test --locked -p unsafe-review-core --lib receipts", "cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2273-PR2-3"
+text = "No new Clippy warnings, no unwrap() in the new test, fmt clean; #2271 movement evaluator and #2230 outcome comparator untouched."
+
+[[integration]]
+surface = "receipt_import_path"
+expected = "A genuinely executed receipt flows through the unchanged loader, builder, audit, and outcome path; only the test artifact is new."
+
+[[integration]]
+surface = "issue_closeout"
+expected = "#2273 closes citing #2413 plus this verification; #2230 and #1887 stay open as follow-ups."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports the four proof-command results and the exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "The override command is the existing e2e helper binary (fast, hermetic); the test asserts unknown rather than applicable, so no environment-dependent verification command runs."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "No production code changes in this slice if probes confirm current behavior; the diff is test-only plus the spec, so regression surface is minimal."
+
+[compatibility]
+posture = "Test-only addition (plus work spec); no analyzer, ledger, policy, movement, outcome, receipt, release, or publication behavior changes."
+
+[rollback]
+strategy = "Revert the single delivery PR; the new e2e is removed and prior coverage stands unchanged."
