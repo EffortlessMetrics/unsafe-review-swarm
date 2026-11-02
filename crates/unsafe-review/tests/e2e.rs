@@ -7011,6 +7011,13 @@ fn outcome_narrowed_snapshot_reports_unknown_not_introduced() -> Result<(), Box<
     assert_eq!(outcome["summary"]["unknown"], 1);
     assert_eq!(outcome["reviewer_delta"]["unknown_cards"], 1);
     assert!(
+        outcome["reviewer_delta"]["top_remaining_gaps"]
+            .as_array()
+            .is_some_and(|gaps| gaps.len() == 1),
+        "the single unknown card must stay in remaining work: {}",
+        outcome["reviewer_delta"]["top_remaining_gaps"]
+    );
+    assert!(
         outcome["cards"]["unknown"][0]["reason"]
             .as_str()
             .unwrap_or("")

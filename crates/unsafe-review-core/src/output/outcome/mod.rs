@@ -247,10 +247,12 @@ struct SnapshotCard {
     evidence_count: Option<usize>,
     /// Obligation identities present on the card, read from the standard
     /// `obligation_evidence[].key` array that analyzer snapshots already
-    /// emit. Compared as a set: equal missing counts with different
-    /// obligation keys are not the same evidence.
+    /// emit. Compared as a set, but only when both sides supply the field:
+    /// a legacy snapshot that omits the array carries no obligation identity
+    /// to drift from, so mixed-version pairs keep today's verdict.
+    /// Absent on legacy snapshots, which keep today's verdicts unchanged.
     #[serde(default)]
-    obligation_evidence: Vec<SnapshotObligation>,
+    obligation_evidence: Option<Vec<SnapshotObligation>>,
     #[serde(skip)]
     safe_caller: Option<String>,
     #[serde(skip)]
@@ -453,7 +455,7 @@ fn snapshot_card_from_manual_candidate(candidate: ManualCandidate) -> SnapshotCa
         missing: Vec::new(),
         trust_boundary: Some(candidate.trust_boundary),
         evidence_count: Some(evidence_count),
-        obligation_evidence: Vec::new(),
+        obligation_evidence: None,
         safe_caller: Some(candidate.safe_caller),
         invariant: Some(candidate.invariant),
         oracle_map: candidate.oracle_map,
@@ -569,9 +571,10 @@ fn card_identity_key(card: &SnapshotCard) -> String {
 
 /// Comparability of one snapshot side for appearance/disappearance
 /// verdicts. A capped scan or unresolved/rejected diff files mean the
-/// snapshot may have missed cards, so absence proves nothing. A missing
-/// scope field is a legacy snapshot and keeps today's behavior: scope is
-/// only compared when both sides record it.
+/// snapshot may have missed cards, so absence proves nothing. Scope is a
+/// closed vocabulary: only an absent scope (legacy snapshots, which keep
+/// today's behavior) or the literal `"repo"` counts as repo-scoped; any
+/// other value (including `"diff"`, typos, and future scopes) is not.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct SideComparability {
     complete: bool,
@@ -592,7 +595,7 @@ fn side_comparability(snapshot: &Snapshot) -> SideComparability {
             .is_empty();
     SideComparability {
         complete,
-        repo_scoped: snapshot.scope.as_deref() != Some("diff"),
+        repo_scoped: matches!(snapshot.scope.as_deref(), None | Some("repo")),
     }
 }
 
@@ -607,11 +610,13 @@ fn is_known_class(value: &str) -> bool {
         )
 }
 
-fn obligation_keys(card: &SnapshotCard) -> BTreeSet<&str> {
-    card.obligation_evidence
-        .iter()
-        .map(|obligation| obligation.key.as_str())
-        .collect()
+fn obligation_keys(card: &SnapshotCard) -> Option<BTreeSet<&str>> {
+    card.obligation_evidence.as_ref().map(|evidence| {
+        evidence
+            .iter()
+            .map(|obligation| obligation.key.as_str())
+            .collect()
+    })
 }
 
 fn outcome_status(
@@ -635,8 +640,12 @@ fn outcome_status(
             if !is_known_class(&before.class_name) || !is_known_class(&after.class_name) {
                 return "unknown";
             }
-            if obligation_keys(before) != obligation_keys(after) {
-                return "unknown";
+            if let (Some(before_keys), Some(after_keys)) =
+                (obligation_keys(before), obligation_keys(after))
+            {
+                if before_keys != after_keys {
+                    return "unknown";
+                }
             }
             changed_status(before, after)
         }
@@ -856,6 +865,22 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         &mut hash,
         &snapshot.summary.open_actionable_gaps.to_string(),
     );
+    // Verdict-relevant comparability inputs participate in the fingerprint
+    // so distinct comparison inputs cannot share an ID. Each feed is
+    // conditional so legacy snapshots without the new fields hash exactly
+    // as before.
+    if let Some(scope) = &snapshot.scope {
+        feed_hash(&mut hash, scope);
+    }
+    if snapshot.summary.scan_capped == Some(true) {
+        feed_hash(&mut hash, "scan_capped");
+    }
+    for file in snapshot.unresolved_diff_files.as_deref().unwrap_or(&[]) {
+        feed_hash(&mut hash, file);
+    }
+    for file in snapshot.rejected_diff_files.as_deref().unwrap_or(&[]) {
+        feed_hash(&mut hash, file);
+    }
     let mut cards = snapshot.cards.iter().collect::<Vec<_>>();
     cards.sort_by(|left, right| left.id.cmp(&right.id));
     for card in cards {
@@ -919,6 +944,11 @@ fn snapshot_id(snapshot: &Snapshot) -> String {
         }
         for missing in &card.missing {
             feed_hash(&mut hash, missing);
+        }
+        if let Some(obligations) = &card.obligation_evidence {
+            for obligation in obligations {
+                feed_hash(&mut hash, &obligation.key);
+            }
         }
     }
     format!("snapshot-{hash:016x}")
@@ -1026,19 +1056,24 @@ fn top_remaining_gaps(cards: &OutcomeCards) -> Vec<OutcomeRemainingGap> {
         .chain(cards.improved.iter())
         .chain(cards.regressed.iter())
         .chain(cards.unchanged.iter())
+        // Unknown cards stay on the remaining-work list: the comparator
+        // could not determine their status, so the work is still open. The
+        // after leg carries the current evidence; a head-absent card falls
+        // back to its before leg since removal is unconfirmed.
+        .chain(cards.unknown.iter())
         .filter_map(|card| {
-            let after = card.after.as_ref()?;
-            if !is_actionable_class(&after.class_name) {
+            let state = card.after.as_ref().or(card.before.as_ref())?;
+            if !is_actionable_class(&state.class_name) {
                 return None;
             }
             Some(OutcomeRemainingGap {
                 card_id: card.card_id.clone(),
-                class_name: after.class_name.clone(),
-                priority: after.priority.clone(),
-                operation_family: after.operation_family.clone(),
-                proof_path: after.proof_path.clone(),
-                missing_count: after.missing_count,
-                next_action: after.next_action.clone(),
+                class_name: state.class_name.clone(),
+                priority: state.priority.clone(),
+                operation_family: state.operation_family.clone(),
+                proof_path: state.proof_path.clone(),
+                missing_count: state.missing_count,
+                next_action: state.next_action.clone(),
             })
         })
         .collect::<Vec<_>>();
@@ -1539,6 +1574,131 @@ mod tests {
         let report = compare_json(&before_new, &after_new)?;
         assert_eq!(report.summary.new, 1);
         assert_eq!(report.summary.unknown, 0);
+        assert_reconciled(&report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn mixed_version_obligation_absence_keeps_old_verdict() -> Result<(), String> {
+        // A legacy before snapshot without obligation_evidence compared
+        // against a current after snapshot: the legacy side carries no
+        // obligation identity to drift from, so the drift guard does not
+        // fire and the missing-count comparison applies as before.
+        let before = scoped_snapshot_json(
+            &[card("UR-m-c1", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let after = scoped_snapshot_json(
+            &[card_with_obligations(
+                "UR-m-c1",
+                "guard_missing",
+                "high",
+                &["guard"],
+                &["alignment"],
+            )],
+            "repo",
+            false,
+        );
+        let report = compare_json(&before, &after)?;
+        assert_eq!(report.summary.unknown, 0);
+        assert_eq!(report.summary.unchanged, 1);
+        assert_reconciled(&report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn unrecognized_scope_value_is_not_repo_scoped() -> Result<(), String> {
+        // Fail closed on unknown scope vocabulary: only an absent scope
+        // (legacy) or the literal "repo" counts as a repo census.
+        let before = scoped_snapshot_json(
+            &[card("UR-s-c1", "guard_missing", "high", &["guard"])],
+            "workspace",
+            false,
+        );
+        let after = scoped_snapshot_json(&[], "workspace", false);
+        let report = compare_json(&before, &after)?;
+        assert_eq!(report.summary.resolved, 0);
+        assert_eq!(report.summary.unknown, 1);
+        assert!(report.cards.unknown[0].reason.contains("repo scope"));
+        let before_empty = scoped_snapshot_json(&[], "workspace", false);
+        let after_full = scoped_snapshot_json(
+            &[card("UR-s-c1", "guard_missing", "high", &["guard"])],
+            "workspace",
+            false,
+        );
+        let report = compare_json(&before_empty, &after_full)?;
+        assert_eq!(report.summary.new, 0);
+        assert_eq!(report.summary.unknown, 1);
+        assert_reconciled(&report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn snapshot_ids_distinguish_comparability_inputs() -> Result<(), String> {
+        // Same cards, different scope: different comparison inputs must
+        // not share a fingerprint.
+        let before = scoped_snapshot_json(
+            &[card("UR-i-c1", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let after_repo = scoped_snapshot_json(&[], "repo", false);
+        let after_diff = scoped_snapshot_json(&[], "diff", false);
+        let repo_report = compare_json(&before, &after_repo)?;
+        let diff_report = compare_json(&before, &after_diff)?;
+        assert_eq!(repo_report.summary.resolved, 1);
+        assert_eq!(diff_report.summary.unknown, 1);
+        assert_eq!(repo_report.before_id, diff_report.before_id);
+        assert_ne!(repo_report.after_id, diff_report.after_id);
+        // Legacy-shaped snapshots hash as before: no new fields, no new feeds.
+        let legacy_before = snapshot_json(&[card("UR-i-c1", "guard_missing", "high", &["guard"])]);
+        let legacy_after = snapshot_json(&[]);
+        let legacy_report = compare_json(&legacy_before, &legacy_after)?;
+        assert_eq!(legacy_report.summary.resolved, 1);
+        assert_reconciled(&repo_report)?;
+        assert_reconciled(&diff_report)?;
+        assert_reconciled(&legacy_report)?;
+        Ok(())
+    }
+
+    #[test]
+    fn unknown_cards_stay_in_remaining_work() -> Result<(), String> {
+        // Head-only unknown (narrowed before): the after leg is actionable
+        // remaining work. Base-only unknown (capped after): removal is
+        // unconfirmed, so the before leg stays on the list.
+        let narrowed_before = scoped_snapshot_json(&[], "diff", false);
+        let narrowed_after = scoped_snapshot_json(
+            &[card("UR-u-c1", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let report = compare_json(&narrowed_before, &narrowed_after)?;
+        assert_eq!(report.summary.unknown, 1);
+        assert!(
+            report
+                .reviewer_delta
+                .top_remaining_gaps
+                .iter()
+                .any(|gap| gap.card_id == "UR-u-c1"),
+            "head-only unknown card must stay in remaining work"
+        );
+        let capped_before = scoped_snapshot_json(
+            &[card("UR-u-c2", "guard_missing", "high", &["guard"])],
+            "repo",
+            false,
+        );
+        let capped_after = scoped_snapshot_json(&[], "repo", true);
+        let report = compare_json(&capped_before, &capped_after)?;
+        assert_eq!(report.summary.unknown, 1);
+        assert!(
+            report
+                .reviewer_delta
+                .top_remaining_gaps
+                .iter()
+                .any(|gap| gap.card_id == "UR-u-c2"),
+            "base-only unknown card must stay in remaining work"
+        );
         assert_reconciled(&report)?;
         Ok(())
     }
