@@ -49,6 +49,8 @@ mod lsp_smoke;
 mod markdown;
 mod public_badges;
 mod public_surfaces;
+#[cfg(test)]
+mod qualification_manifest;
 mod real_pr_corpus;
 mod release_truth;
 mod seam_batch;
