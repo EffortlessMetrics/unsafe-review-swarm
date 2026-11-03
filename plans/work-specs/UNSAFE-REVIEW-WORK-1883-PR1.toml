@@ -1,0 +1,70 @@
+# Issue-linked work specification for the #1883 failed-rerun falsifier test (first PR).
+# Basis: main 56366f4a (2026-11-03). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1883
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/1883"
+kind = "correctness"
+objective = "Pin the owner-confirmed Option A fail-closed contract for a failed first-pr rerun into an existing bundle with one e2e falsifier test: the rerun must exit 2 with the blocked artifact named plus Recovery text, print no success output, leave the bundle in place, and the check-first-pr-artifacts verifier must reject the resulting mixed bundle (new-run cards prefix, blocked/tail artifacts not overwritten)."
+user_outcome = "A maintainer running the e2e suite gets a deterministic red/green signal on the failed-rerun seam: green means a mid-bundle rerun failure stays fail-closed (exit 2, named artifact, verifier rejects the mix); red means the bundle can go silently mixed-and-accepted."
+claim_boundary = "This slice proves the fail-closed seam via one e2e test plus verifier evidence; it changes no product code, adds no overwrite flag or empty-dir guard, invents no markers, performs no atomic/staged writes (Option C explicitly excluded), and claims no safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification."
+
+[scope]
+included = [
+    "Settled design (verbatim): one new e2e test in crates/unsafe-review-cli/tests/e2e.rs (name contains failed_rerun_into_existing_bundle or failed_rerun_preserves_and_rejects_mixed_bundle) following existing e2e file conventions, with expect-messages and no unwrap() in test names.",
+    "Settled design (verbatim): (a) run first-pr into a disposable out-dir and verify the bundle passes check-first-pr-artifacts; snapshot artifact bytes and input identity. (b) Switch the fixture input so the run would produce observably different cards (raw_pointer_alignment vs raw_pointer_deref), and pre-create a directory at the out-dir review-kit.json path (root-proof failure injection; no chmod tricks). (c) Rerun into the same out-dir and assert exit 2, stderr naming the blocked artifact plus Recovery text, empty success stdout, and source/user files untouched. (d) Assert the product-left seam: cards.json carries new-run bytes (overwrite progressed past the first write, so this is not a create-time failure) while the blocked artifact was not overwritten and post-block tail artifacts retain old-run bytes. (e) Run check-first-pr-artifacts on the mixed dir and assert it rejects (fail-closed verdict). Restore/remove only the injected directory and disposable artifacts on all paths.",
+    "Settled design (verbatim): at most minimal test-helper additions in the same e2e file; no unrelated lanes touched.",
+]
+excluded = [
+    "Any product-code change: no overwrite flag, no clean/empty out-dir guard, no marker files, no atomic/staged writes, no denied-but-present handling, no write-path refactor.",
+    "Any edit to the verifier, analyzer, receipts, policy, docs, CI gates, or unrelated tests and fixtures.",
+    "Safety, UB-free, Miri-clean, site-execution, proof, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Test-only slice: the first-pr write path and the verifier behave byte-identically before and after; only the new e2e test (plus minimal same-file helpers) and this work spec are added."
+
+[[invariant]]
+id = "INV-2"
+text = "Failure injection is root-proof (directory at the blocked artifact path), never permission-bit based; checked-in fixtures are read-only inputs and stay byte-identical."
+
+[[invariant]]
+id = "INV-3"
+text = "The verifier is invoked as-is (cargo run --locked -p xtask -- check-first-pr-artifacts) and its verdict is asserted, never reimplemented in the test."
+
+[[acceptance]]
+id = "AC-1883-PR1-1"
+text = "The new falsifier test runs the full (a)-(e) sequence against current main and its pass/fail outcome is reported with exact head, commands, and wall times."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle"]
+
+[[acceptance]]
+id = "AC-1883-PR1-2"
+text = "The failed rerun exits 2, names review-kit.json plus Recovery guidance on stderr, emits no success stdout, and leaves the bundle directory in place with the product-left mixed seam (new cards prefix, blocked artifact not overwritten, old tail)."
+proof = ["cargo test --locked -p unsafe-review-cli --test e2e failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle"]
+
+[[acceptance]]
+id = "AC-1883-PR1-3"
+text = "check-first-pr-artifacts rejects the mixed bundle; the nearest existing verifier tests still pass and the deterministic core gate passes."
+proof = ["cargo test --locked -p xtask first_pr_artifact_checker", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "e2e_suite"
+expected = "New test follows existing e2e.rs conventions (TempDir helper, fixture_root, checked_output patterns) and is green at least twice in a row (flake check)."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery report states the exact head SHA, files changed, proof results with wall times, uncertainties, and the claim boundary (what the test proves vs does not prove)."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Nested cargo invocation (test shells to cargo run -p xtask for the verifier) contends on the target-dir lock; cargo serializes this safely and only this test does it."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "If cards.json proves byte-unstable across out-dirs (embedded paths/timestamps), the seam assertion falls back to parsed card-identity comparison and the discrepancy is reported rather than papered over."
+
+[compatibility]
+posture = "Additive test plus work spec only; no analyzer, verifier, CLI, gate, docs, or release behavior changes."
+
+[rollback]
+strategy = "Delete the new test and this work spec file; every gate behaves exactly as before."
