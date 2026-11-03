@@ -1,0 +1,72 @@
+# Issue-linked work specification for release runbook mapping and simulated-bump proof (third PR).
+# Basis: main 38dc3814 (2026-11-03). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398
+#
+# Open design decision (coordinator-settled): check-release-truth stays
+# standalone in this slice (no check-pr/CI wiring). The simulated-bump proof
+# exercises the in-memory checker path exactly as the PR1 fixtures do; wiring
+# the gate into CI is explicitly deferred and belongs to release integration,
+# not this slice.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398"
+kind = "correctness"
+objective = "Integrate the release-truth authority into the release flow on paper plus proof: add a runbook step-to-field mapping table identifying which step updates each authority field with what proof, and prove with a simulated 0.6.0 version-bump test that a future bump cannot leave front panels on the previous release while all checks stay green."
+user_outcome = "A release operator following the runbook knows exactly which step updates each release-truth field and what evidence it requires; the simulated-bump test fails loudly if panels ever lag the authority after a bump."
+claim_boundary = "This slice maps steps to fields and adds the simulated proof; it performs no publication, tag, Release, merge, or network operation; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): a mapping table in docs/releases/CRATES_IO_PATCH_RELEASE.md (the durable runbook; the dated 2026-06-13 readiness runbook stays historical) with one row per transition: crate publication, tag creation, GitHub Release publication, installed smoke, and source/swarm synchronization. Each row names the release-truth field(s) it updates, the required proof artifact, and the explicit-go gate where the handoff demands one (tag and Release each require a separate explicit go).",
+    "Settled design (verbatim): one simulated-bump fixture test beside the existing release_truth tests: a synthetic 0.6.0 authority (copied shape, bumped version/tag target/published date) checked against the current 0.5.0 panels must fail naming the stale panels; and a synthetic pending-transition state (crates published, tag/Release pending) must pass exactly as the genuine pending test does.",
+    "Settled design (verbatim): no checker wiring changes; check-release-truth stays standalone. No live-network calls; the simulated authority is in-memory like the existing fixtures.",
+]
+excluded = [
+    "Wiring check-release-truth into check-pr or any CI gate; actual crate publication, tag creation, GitHub Release mutation, source merges, v1 Action moves, or live-network dependencies.",
+    "Panel content changes (owned by PR2, already merged), authority value changes, history rewrites, support/accuracy/safety promotions, and broad runbook redesign.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Every release transition maps to exactly one authority update with its proof artifact; tag and Release each keep their separate explicit go."
+
+[[invariant]]
+id = "INV-2"
+text = "The simulated bump fails loudly on stale panels and passes on genuine pending transitions; the proof is in-memory and network-free."
+
+[[invariant]]
+id = "INV-3"
+text = "The dated 2026-06-13 readiness runbook stays historical; only the durable runbook gains the mapping table."
+
+[[acceptance]]
+id = "AC-2398-PR3-1"
+text = "Runbook mapping table covers all five transitions with fields, proofs, and explicit-go gates."
+proof = ["cargo run --locked -p xtask -- check-docs"]
+
+[[acceptance]]
+id = "AC-2398-PR3-2"
+text = "Simulated 0.6.0 bump test fails on current panels naming stale surfaces, and passes for the genuine pending-transition shape."
+proof = ["cargo test --locked -p xtask release_truth"]
+
+[[acceptance]]
+id = "AC-2398-PR3-3"
+text = "Fmt clean, no new Clippy warnings, no unwrap() in new tests, full lane gates green."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "runbook_mapping"
+expected = "Durable runbook maps each transition to authority fields plus proof; dated runbook untouched."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Docs plus in-memory fixture test only; no gate wiring or publication behavior changes, so the worst case is a misleading table row, caught by review against the authority schema."
+
+[compatibility]
+posture = "Additive docs plus unit tests; no analyzer, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the mapping table rows and the simulated test; the runbook reads as before."

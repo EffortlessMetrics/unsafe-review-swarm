@@ -9839,6 +9839,77 @@ jobs:
         Ok(())
     }
 
+    fn release_truth_simulated_bump_authority(tag_pending: bool, release_pending: bool) -> String {
+        let tag_block = if tag_pending {
+            "[tag]\nexists = false\n".to_string()
+        } else {
+            "[tag]\nexists = true\ntarget = \"aa51ed60\"\n".to_string()
+        };
+        let release_block = if release_pending {
+            "[github_release]\nexists = false\n".to_string()
+        } else {
+            "[github_release]\nexists = true\npublished_at = \"2026-10-31T12:00:00Z\"\n".to_string()
+        };
+        [
+            "schema_version = \"1.0\"".to_string(),
+            "workspace_version = \"0.3.8\"".to_string(),
+            "public_source_commit = \"aa51ed60\"".to_string(),
+            "installed_smoke_receipt = \"3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634e51bab4bbff7b4c\""
+                .to_string(),
+            "[workbench]\nversion = \"0.3.8\"\navailability = \"unpublished-swarm-main\"\n"
+                .to_string(),
+            "[crates_io]\nversion = \"0.6.0\"\nunsafe_review_core = \"published\"\nunsafe_review_cli = \"published\"\nunsafe_review = \"published\"\n"
+                .to_string(),
+            tag_block,
+            release_block,
+        ]
+        .join("\n")
+    }
+
+    #[test]
+    fn release_truth_simulated_bump_fails_loud_on_stale_panels() -> Result<(), String> {
+        let bumped = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_simulated_bump_authority(false, false),
+        )?;
+        let Err(err) = check_release_truth_texts(&bumped, &release_truth_corrected_panels()) else {
+            return Err("simulated 0.6.0 bump against 0.5.0 panels should fail".to_string());
+        };
+        assert!(err.contains("README.md"));
+        assert!(err.contains("release-row"));
+        assert!(err.contains("stale prior-release version"));
+        assert!(err.contains("0.5.0"));
+        assert!(err.contains("0.6.0"));
+        let pending = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_simulated_bump_authority(true, true),
+        )?;
+        let panels = [
+            (
+                "README.md",
+                "release-row",
+                "| Current release | `v0.6.0` pending crates.io indexing; GitHub Release `v0.6.0` pending publication |",
+            ),
+            (
+                "docs/status/SUPPORT_SUMMARY.md",
+                "public-release-claim",
+                "The last public release is `v0.6.0` (pending announcement post).",
+            ),
+            (
+                "docs/status/RELEASE_COMPATIBILITY.md",
+                "distribution-posture",
+                "In public `v0.6.0`, tag `v0.6.0` pending creation; the three published packages are `0.6.0` (2026-10-31).",
+            ),
+            (
+                "docs/status/RELEASE_DOCS_MATRIX.md",
+                "availability-matrix",
+                "Current bundle ships in public v0.6.0; GitHub Release `v0.6.0` pending publication.",
+            ),
+        ];
+        check_release_truth_texts(&pending, &panels)
+            .map_err(|err| format!("simulated 0.6.0 pending transition should pass: {err}"))
+    }
+
     #[test]
     fn first_pr_artifact_list_surfaces_include_full_bundle() -> Result<(), String> {
         public_surfaces::check_first_pr_artifact_list_surfaces()
