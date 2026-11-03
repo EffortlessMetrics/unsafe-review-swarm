@@ -28,6 +28,7 @@
 | Spec style | durable source-of-truth ownership boundaries and artifact role split | `docs/spec-style.md` |
 | Spec rails guide | contributor workflow for source-of-truth rails and tool-state boundaries | `docs/contributing/spec-rails.md` |
 | Agent orchestration | runtime-neutral repository protocol for work contracts, writer ownership, proportional proof, exact-head review, integration, and cleanup | `docs/contributing/AGENT-ORCHESTRATION.md` |
+| Lane proof and admission | backlog-drive rules: gate-evidence ownership, admission-v1 schema, SHA verification, bot triage, and test discipline | `docs/contributing/LANE-PROOF-AND-ADMISSION.md` |
 | Repository lifecycle surface map | authority, consumers, overlaps, and migration dispositions for lifecycle docs, runtime role adapters, and proof commands | `docs/contributing/LIFECYCLE_SURFACE_MAP.md` |
 | Implementation plans | PR-sized sequence and proof commands | `plans/` |
 | Active lane | current dogfood-calibrated evidence loop | `docs/status/DOGFOOD_CALIBRATED_EVIDENCE_LANE.md` |
