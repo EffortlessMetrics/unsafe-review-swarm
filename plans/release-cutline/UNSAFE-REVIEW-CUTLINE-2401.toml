@@ -30,7 +30,7 @@ source_main = "735fb7ba1107b79a9c18bd9b6bf169eeeae68cd1"
 source_sync = "new_source_commits=0; acknowledged source main 735fb7ba via docs/handoffs/2026-10-05-source-init-native-sync.md; raw_swarm_only=76 expected unpromoted workbench commits"
 v050_tag_target = "f1eda818 (source PR #572 merge; tag v0.5.0 exists on source and points at f1eda818)"
 v050_release_flag = "published 2026-09-17T05:57:40Z (GitHub Release v0.5.0; the receipt's 'separate explicit go' for tag and Release has happened since the receipt was written)"
-v050_source_receipt = "source main e718c063 (promotion #570 merged as 71cf254d, release-prep #571 merged as e718c063); crates unsafe-review-core, unsafe-review-cli, unsafe-review published at 0.5.0 (dry run 35175350041 green, publish run 35177910918 success; all three resolve at max_version 0.5.0 on the public index); installed binary SHA-256 3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634bba1bbff7b4c"
+v050_source_receipt = "source main e718c063 (promotion #570 merged as 71cf254d, release-prep #571 merged as e718c063); crates unsafe-review-core, unsafe-review-cli, unsafe-review published at 0.5.0 (dry run 35175350041 green, publish run 35177910918 success; all three resolve at max_version 0.5.0 on the public index); installed binary SHA-256 3a398710dd97fd941576968ee6ad38ae0c24dfc394843c634e51bab4bbff7b4c"
 v050_tag_vs_receipt = "The 0.5.0 receipt (docs/releases/0.5.0-publication-receipt.md, mirrored verbatim from source) records the published packages and explicitly leaves tag v0.5.0 and the GitHub Release to a separate go; the 2026-09-18 handoff records that both have since happened (tag at f1eda818, Release published 2026-09-17T05:57:40Z). Tag target and Release flag stay distinct facts; neither is re-decided here."
 lockfile_method = "sha256sum of the exact Cargo.lock bytes at the recorded commit (git show <commit>:Cargo.lock redirected to a file; blob hash 6f5846e50f8f12b321247bd872538d779d18acd4 matches git rev-parse HEAD:Cargo.lock, so the hashed bytes are exact)"
 lockfile_sha256 = "c3ad9ce9580c4e581be8cd7a13775aedb7060fab606dd8b3921cc163d51a0164"
@@ -42,7 +42,7 @@ manifest_versions = "unsafe-review 0.3.8, unsafe-review-cli 0.3.8, unsafe-review
 id = "PUBLISHED-0.5.0"
 state = "integrated"
 inclusion = "published-0.5.0"
-merge_evidence = ["swarm cutline f281e130 pre-publish #2250", "source promotion #570 merged as 71cf254d", "source release-prep #571 merged as e718c063", "source receipt PR #572 merged as f1eda818"]
+merge_evidence = ["swarm cutline f281130e pre-publish #2250", "source promotion #570 merged as 71cf254d", "source release-prep #571 merged as e718c063", "source receipt PR #572 merged as f1eda818"]
 source_files = ["analyzer evidence (SAFETY contract, caller-contract routing, get_unchecked fold)", "witness test-first cue", "reach scope", "--short risk-ranked output", "slot-level missing counts", "0/1/2 exit-code contract", "sha2 0.10.9 -> 0.11.0 (#2207)"]
 behavior = "--short one-line-per-card output for check/repo/pilot (rejected for policy report); SAFETY: doc comments count as contract evidence; inner unsafe-fn sites route to caller-contract review; deref-of-get_unchecked folds into the single get_unchecked card; unreached witness commands stay behind a test-first cue; slot-level missing counts in headers; 0/1/2 exit-code contract in review-command helps"
 disposition = "required"
@@ -147,7 +147,7 @@ consumer_claim = "A consumer or release note that describes outcome comparabilit
 id = "SOURCE-MIRRORS-575-582"
 state = "open_pr_source"
 inclusion = "public-source-only"
-pr = "source #575 (ra_ap_syntax 0.0.350->0.0.352, OPEN, head d8def1f3ee9c1c1a6bd764357ffb2069677a0a33); source #582 (cargo-minor-and-patch group 6 updates, OPEN, head 81af969696a3fdbd9041623d8d9256d5ef)"
+pr = "source #575 (ra_ap_syntax 0.0.350->0.0.352, OPEN, head d8def1f3ee9c1c1a9bd764357ffb2069677a0a33); source #582 (cargo-minor-and-patch group 6 updates, OPEN, head 81af969696a3f2cbd904129e94566a923d8d5ef8)"
 behavior = "Source-repository duplicates of the swarm dependency PRs: parser bump mirrors SWARM-2349; group bump mirrors SWARM-2404."
 disposition = "deferred"
 disposition_reason = "Source duplicates get one promotion path with an evidence-backed disposition. The swarm rows carry the workbench decision; the source path stays owner-gated and no duplicate history is merged. Unmerged optional work remains open/parked."
@@ -171,9 +171,9 @@ verdict = "Additive-only posture holds at the proposed candidate; any removal/re
 [[compat]]
 id = "COMPAT-3-CLI"
 group = "CLI spelling, defaults, aliases, 0/1/2 exits"
-candidate = "pr is the preferred first-use entrypoint with the bounded action-first front panel plus the new base/head movement line; first-pr and review remain compatibility names for the same advisory bundle and detailed route; doctor, explain, context, saved artifacts, baseline init, and top-level preview-only init (applies nothing; explicit --out writes only proposal JSON) carry over; --short stays rejected for the policy report; review-command helps print the 0/1/2 exit-code footer."
-installed = "Same spelling/aliases/exits at 0.5.0 (0/1/2 exit-code contract shipped in 0.5.0 per the receipt)."
-verdict = "No CLI spelling, default, alias, or exit-semantics change in the proposed candidate; movement line is an additive front-panel section, not a new command."
+candidate = "pr is the preferred first-use entrypoint with the bounded action-first front panel plus the new base/head movement line; first-pr and review remain compatibility names for the same advisory bundle and detailed route; doctor, explain, context, saved artifacts, baseline init, and top-level preview-only init (applies nothing; explicit --out writes only proposal JSON) carry over; --short stays rejected for the policy report; review-command helps print the 0/1/2 exit-code footer; additive post-0.5.0 subcommand spellings (candidate-side additions): scope (#2336), environment (#2337), work (#2344), agent (#2345), each a new subcommand spelling routed in parse.rs."
+installed = "0.5.0 baseline spelling/aliases/exits (0/1/2 exit-code contract shipped in 0.5.0 per the receipt) plus the four post-0.5.0 additive subcommand spellings: scope, environment, work, agent."
+verdict = "Additive spelling additions since 0.5.0: scope (#2336), environment (#2337), work (#2344), agent (#2345) — each a new subcommand spelling routed in parse.rs. pilot and receipt shipped in 0.5.0 (the 0.5.0 receipt names pilot; pre-publish f281130e already routes both) and carry over. No default, alias, or 0/1/2 exit-semantics change: first-pr/review/pr entrypoints and the exit-code footer stand; the movement line is an additive front-panel section, not a new command."
 
 [[compat]]
 id = "COMPAT-4-SURFACES"

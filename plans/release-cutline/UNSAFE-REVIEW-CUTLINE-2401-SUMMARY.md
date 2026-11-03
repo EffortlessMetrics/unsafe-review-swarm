@@ -38,9 +38,10 @@ Audited 2026-11-02 against swarm main
 - Workbench manifests read `0.3.8` while the registry holds `0.5.0`.
   `0.6.0` is proposed-only; the bump lands with release-prep on its side
   branch when the API/CLI/schema/MSRV assessment settles it.
-- Compatibility: no schema-version bump, no CLI spelling/exit change, no
-  removal — only stricter, more explicit states (unknown bucket, subject
-  gating). Legacy rejected/unknown/stale artifacts stay explicit; they never
+- Compatibility: no schema-version bump, no removal — four additive
+  post-0.5.0 CLI spellings (scope, environment, work, agent) with
+  defaults/aliases/0-1-2 exits unchanged — plus only stricter, more
+  explicit states (unknown bucket, subject gating). Legacy rejected/unknown/stale artifacts stay explicit; they never
   become successful empty reports. Consumer qualification (#1921-style matrix
   against tokmd `1.15.0`, ub-review, saved-editor) is still open.
 - MSRV stays Rust `1.98` / qualification `1.98.1`; no platform promise is added
