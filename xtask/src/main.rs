@@ -80,7 +80,9 @@ use support_tiers::{
 };
 
 #[cfg(test)]
-use release_truth::{check_release_truth_texts, parse_release_truth_text};
+use release_truth::{
+    check_release_truth_texts, parse_release_truth_text, release_versions_in_line,
+};
 
 #[cfg(test)]
 use workflow_allowlist::{
@@ -9516,52 +9518,261 @@ jobs:
             &release_truth_authority_fixture(false, false),
         )?;
         let panels = [(
-            "README.md",
-            "release-row",
-            "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.4.0; advisory-only, 0.x.y) |",
+            "docs/status/SUPPORT_SUMMARY.md",
+            "public-release-claim",
+            "The last public release is v0.4.0.",
         )];
         let Err(err) = check_release_truth_texts(&truth, &panels) else {
             return Err("stale v0.4.0-as-current claim should fail".to_string());
         };
-        assert!(err.contains("README.md"));
-        assert!(err.contains("release-row"));
+        assert!(err.contains("docs/status/SUPPORT_SUMMARY.md"));
+        assert!(err.contains("public-release-claim"));
+        assert!(err.contains("stale prior-release version"));
         assert!(err.contains("0.4.0"));
+        assert!(err.contains("0.5.0"));
         Ok(())
     }
 
     #[test]
-    fn release_truth_rejects_claimed_but_absent_tag_and_release() -> Result<(), String> {
+    fn release_truth_extractor_accepts_sentence_end_rejects_four_part() -> Result<(), String> {
+        let sentence_end = release_versions_in_line("The last public release is v0.4.0.");
+        if sentence_end != vec!["0.4.0".to_string()] {
+            return Err(format!(
+                "sentence-end version should extract exactly [`0.4.0`], got {sentence_end:?}"
+            ));
+        }
+        let four_part = release_versions_in_line("Internal build 0.4.0.1 is not a release.");
+        if !four_part.is_empty() {
+            return Err(format!(
+                "four-part version should extract nothing, got {four_part:?}"
+            ));
+        }
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_claimed_but_absent_tag() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(true, false),
+        )?;
+        let Err(err) = check_release_truth_texts(&truth, &release_truth_corrected_panels()) else {
+            return Err("claimed-but-absent tag should fail".to_string());
+        };
+        assert!(err.contains("docs/status/RELEASE_COMPATIBILITY.md"));
+        assert!(err.contains("distribution-posture"));
+        assert!(err.contains("claims tag `v0.5.0`"));
+        assert!(err.contains("records the tag as pending"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_claimed_but_absent_release() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, true),
+        )?;
+        let Err(err) = check_release_truth_texts(&truth, &release_truth_corrected_panels()) else {
+            return Err("claimed-but-absent GitHub Release should fail".to_string());
+        };
+        assert!(err.contains("README.md"));
+        assert!(err.contains("release-row"));
+        assert!(err.contains("claims GitHub Release `v0.5.0`"));
+        assert!(err.contains("records no published release"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_accepts_genuine_pending_tag_and_release() -> Result<(), String> {
         let truth = parse_release_truth_text(
             "policy/release-truth.toml",
             &release_truth_authority_fixture(true, true),
         )?;
         let panels = [
             (
-                "docs/status/RELEASE_COMPATIBILITY.md",
-                "distribution-posture",
-                "In public `v0.5.0`, `pr` is the preferred first-use entrypoint. Tag `v0.5.0` exists and points at `f1eda818`.",
-            ),
-            (
-                "docs/status/RELEASE_DOCS_MATRIX.md",
-                "availability-matrix",
-                "| First-use CLI | docs | Experimental | Current bundle ships in public v0.5.0; GitHub Release `v0.5.0` published 2026-09-17T05:57:40Z |",
-            ),
-            (
                 "README.md",
                 "release-row",
-                "| Current release | [Changelog](CHANGELOG.md) (latest crates.io 0.5.0; latest GitHub Release v0.5.0; advisory-only, 0.x.y) |",
+                "| Current release | `v0.5.0` pending crates.io indexing; GitHub Release `v0.5.0` pending publication |",
             ),
             (
                 "docs/status/SUPPORT_SUMMARY.md",
                 "public-release-claim",
-                "The last public release is `v0.5.0` (2026-09-17).",
+                "The last public release is `v0.5.0` (pending announcement post).",
+            ),
+            (
+                "docs/status/RELEASE_COMPATIBILITY.md",
+                "distribution-posture",
+                "In public `v0.5.0`, tag `v0.5.0` pending creation; the three published packages are `0.5.0` (2026-09-17).",
+            ),
+            (
+                "docs/status/RELEASE_DOCS_MATRIX.md",
+                "availability-matrix",
+                "Current bundle ships in public v0.5.0; GitHub Release `v0.5.0` pending publication.",
             ),
         ];
+        check_release_truth_texts(&truth, &panels)
+    }
+
+    #[test]
+    fn release_truth_rejects_unrelated_unavailable_tag_claim() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(true, false),
+        )?;
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            "Tag `v0.5.0` exists and points at `f1eda818`; the old mirror list is unavailable until Friday.",
+        )];
         let Err(err) = check_release_truth_texts(&truth, &panels) else {
-            return Err("claimed-but-absent tag and Release should fail".to_string());
+            return Err(
+                "tag claim with only an unrelated unavailable note should fail".to_string(),
+            );
         };
-        assert!(err.contains("distribution-posture") || err.contains("availability-matrix"));
-        assert!(err.contains("pending") || err.contains("no published release"));
+        assert!(err.contains("docs/status/RELEASE_COMPATIBILITY.md"));
+        assert!(err.contains("distribution-posture"));
+        assert!(err.contains("claims tag `v0.5.0`"));
+        assert!(err.contains("records the tag as pending"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_rejects_unrelated_unavailable_release_claim() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, true),
+        )?;
+        let panels = [(
+            "docs/status/RELEASE_DOCS_MATRIX.md",
+            "availability-matrix",
+            "Current bundle ships in public v0.5.0; GitHub Release `v0.5.0` published 2026-09-17T05:57:40Z. The playground is unavailable this weekend.",
+        )];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err(
+                "release claim with only an unrelated unavailable note should fail".to_string(),
+            );
+        };
+        assert!(err.contains("docs/status/RELEASE_DOCS_MATRIX.md"));
+        assert!(err.contains("availability-matrix"));
+        assert!(err.contains("claims GitHub Release `v0.5.0`"));
+        assert!(err.contains("records no published release"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_ignores_dev_tooling_install_line() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let mut panels = release_truth_corrected_panels();
+        let readme = panels
+            .iter()
+            .position(|(surface, _, _)| *surface == "README.md")
+            .ok_or_else(|| "corrected panels should include README.md".to_string())?;
+        let with_tooling = format!(
+            "{}\nInstall dev tooling via `cargo install cargo-nextest --version 0.0.72`.",
+            panels[readme].2
+        );
+        let readme_field = panels[readme].1;
+        panels[readme] = ("README.md", readme_field, with_tooling.as_str());
+        check_release_truth_texts(&truth, &panels)
+            .map_err(|err| format!("dev-tooling install line should not extract a claim: {err}"))
+    }
+
+    #[test]
+    fn release_truth_accepts_historical_sha_outside_tag_window() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let mut panels = release_truth_corrected_panels();
+        let compat = panels
+            .iter()
+            .position(|(surface, _, _)| *surface == "docs/status/RELEASE_COMPATIBILITY.md")
+            .ok_or_else(|| {
+                "corrected panels should include RELEASE_COMPATIBILITY.md".to_string()
+            })?;
+        let padding = " ".repeat(64);
+        let with_history = format!(
+            "{}\nPrior notes pinned `deadbeef` on 2026-05-01; tag `v0.5.0` points at `f1eda818`.{padding}`aaaaaaaa`",
+            panels[compat].2
+        );
+        let compat_field = panels[compat].1;
+        panels[compat] = (
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            compat_field,
+            with_history.as_str(),
+        );
+        check_release_truth_texts(&truth, &panels).map_err(|err| {
+            format!("historical and far-window SHAs should not fail the tag check: {err}")
+        })
+    }
+
+    #[test]
+    fn release_truth_scopes_tag_sha_window_at_boundary() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(false, false),
+        )?;
+        let claim_line = "In public `v0.5.0`, the three published packages are `0.5.0`.";
+        // `deadbeef` starts exactly at the window edge (excluded).
+        let outside = format!("Tag `v0.5.0`{}`deadbeef`", " ".repeat(46));
+        let outside_text = format!("{claim_line}\n{outside}");
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            outside_text.as_str(),
+        )];
+        check_release_truth_texts(&truth, &panels).map_err(|err| {
+            format!("SHA starting at the window edge should be out of scope: {err}")
+        })?;
+        // One byte nearer (inside the window) the wrong SHA must fail.
+        let inside = format!("Tag `v0.5.0`{}`deadbeef`", " ".repeat(45));
+        let inside_text = format!("{claim_line}\n{inside}");
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            inside_text.as_str(),
+        )];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("wrong SHA inside the tag window should fail".to_string());
+        };
+        assert!(err.contains("claims tag target `deadbeef`"));
+        assert!(err.contains("f1eda818"));
+        Ok(())
+    }
+
+    #[test]
+    fn release_truth_scopes_pending_exemption_to_claim_clause() -> Result<(), String> {
+        let truth = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_authority_fixture(true, false),
+        )?;
+        let claim_line = "In public `v0.5.0`, the three published packages are `0.5.0`.";
+        // `pending` adjacent to the tag claim exempts the line.
+        let adjacent = format!("Tag `v0.5.0`{}pending creation.", " ".repeat(10));
+        let adjacent_text = format!("{claim_line}\n{adjacent}");
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            adjacent_text.as_str(),
+        )];
+        check_release_truth_texts(&truth, &panels)
+            .map_err(|err| format!("adjacent pending note should exempt the tag claim: {err}"))?;
+        // `pending` far outside the claim clause must not exempt.
+        let distant = format!("Tag `v0.5.0`{}pending creation.", " ".repeat(40));
+        let distant_text = format!("{claim_line}\n{distant}");
+        let panels = [(
+            "docs/status/RELEASE_COMPATIBILITY.md",
+            "distribution-posture",
+            distant_text.as_str(),
+        )];
+        let Err(err) = check_release_truth_texts(&truth, &panels) else {
+            return Err("distant pending note should not exempt the tag claim".to_string());
+        };
+        assert!(err.contains("claims tag `v0.5.0`"));
+        assert!(err.contains("records the tag as pending"));
         Ok(())
     }
 

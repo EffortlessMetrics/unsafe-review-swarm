@@ -1,0 +1,75 @@
+# Issue-linked work specification for release-truth checker precision (follow-up slice).
+# Basis: main d7dff120 (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398
+#
+# Context: post-merge bot review of PR #2420 verified 7 precision defects in
+# the PR1 checker (false negatives/positives against the PR1 contract) plus
+# 1 spec proof-line defect. 4 other threads were correctly declined as new
+# behavior (authority self-consistency, denied-but-present rejection,
+# prerelease semantics, per-surface attribution design) and stay out.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398"
+kind = "correctness"
+objective = "Harden the release-truth checker to match its contracted failure modes exactly: narrow currency-marker extraction, fix sentence-end version recognition, scope the tag-target check to the tag-adjacent SHA, scope pending/unavailable exemptions to the claim clause, and pin each branch with tests that actually reach it."
+user_outcome = "A maintainer running check-release-truth gets no false passes on stale sentence-end claims or unrelated-SHA lines, no false failures on correct panels with dev-tooling version strings, and error messages that name the true cause; the spec proof command is green."
+claim_boundary = "This slice fixes extractor and test precision only; it adds no new failure modes (no authority self-consistency, no denied-but-present rejection, no prerelease semantics, no per-surface attribution redesign); it performs no publication, tag, merge, network, or gate-wiring changes."
+
+[scope]
+included = [
+    "Settled design (verbatim): remove bare latest, cargo install, and --version from CURRENCY_MARKERS so only release-tied markers extract claims; add a test with an otherwise-correct panel set plus a dev-tooling install line asserting Ok.",
+    "Settled design (verbatim): accept a period terminator not followed by a digit in release_versions_in_line (sentence-end versions recognized; four-part versions still rejected); add unit tests for stale-at-sentence-end failing with the stale message and for 0.4.0.1 yielding empty.",
+    "Settled design (verbatim): check_tag_claim compares only the SHA token(s) adjacent to each v<current> tag token (bounded window after the version token) instead of every hex token on the line; historical SHAs elsewhere on the line no longer fail.",
+    "Settled design (verbatim): pending/unavailable exemptions tested in a bounded window adjacent to the v<current> token (same clause) in both check_release_claim and check_tag_claim; add a positive test for a genuine pending line (currently zero coverage).",
+    "Settled design (verbatim): split the claimed-but-absent test into tag-pending-only and release-pending-only tests asserting their respective messages and surfaces; fix the stale-claim negative to a single-version fixture asserting the stale message (not the disagreement message).",
+    "Settled design (verbatim): one-line spec fix — AC-2398-PR1-1 proof becomes cargo test --locked -p xtask release_truth (the live check cannot pass until PR2 reconciles the panels, by design).",
+]
+excluded = [
+    "Authority self-consistency validation (tag target vs promotion commit), denied-but-present rejection, prerelease comparison semantics, and per-surface attribution redesign — all explicitly deferred follow-ups.",
+    "Panel content edits (owned by PR2), gate wiring, publications, tags, merges, network calls, and analyzer changes.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "The checker fails safe on every contracted failure mode with no false passes and no false failures on correct panels."
+
+[[invariant]]
+id = "INV-2"
+text = "Every exemption and error branch has checked-in test coverage, including positive pending-line coverage."
+
+[[invariant]]
+id = "INV-3"
+text = "No new failure modes are introduced; deferred behaviors stay absent, not half-implemented."
+
+[[acceptance]]
+id = "AC-2398-FX-1"
+text = "Narrowed extraction, sentence-end recognition, tag-adjacent SHA scope, and clause-scoped exemptions behave per the settled designs with unit pins."
+proof = ["cargo test --locked -p xtask release_truth"]
+
+[[acceptance]]
+id = "AC-2398-FX-2"
+text = "Split pending tests and single-version stale test assert their exact messages; the disagreement test still pins the multi-claim message."
+proof = ["cargo test --locked -p xtask release_truth"]
+
+[[acceptance]]
+id = "AC-2398-FX-3"
+text = "Spec AC-2398-PR1-1 proof command is green; fmt clean; no new Clippy warnings; no unwrap() in new tests."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "checker_precision"
+expected = "The checker enforces exactly its contracted failure modes; live panels still fail with the designed exit 2 until PR2."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Each fix is pinned by a targeted test plus the full existing suite; the live-panel exit-2 behavior is re-verified unchanged."
+
+[compatibility]
+posture = "Checker-internal precision only; no panel, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Revert the single delivery PR; the checker returns to its PR1 behavior."

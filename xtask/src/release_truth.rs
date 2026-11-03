@@ -37,16 +37,17 @@ pub(crate) const RELEASE_TRUTH_SURFACES: &[(&str, &str)] = &[
 /// Line markers (case-insensitive) that identify a currency claim: the line
 /// asserts what is current/latest/publicly available, so every `X.Y.Z`
 /// version on the line must equal the authority's current release.
+///
+/// Bare `latest`, `cargo install`, and `--version` are deliberately excluded:
+/// dev-tooling install lines name non-release versions, so only release-tied
+/// markers extract claims.
 const CURRENCY_MARKERS: &[&str] = &[
     "current release",
-    "latest",
     "last public",
     "last published",
     "ships in public",
     "ship in public",
     "published packages are",
-    "cargo install",
-    "--version",
     "install the public",
     "installation path",
     "public v",
@@ -267,6 +268,16 @@ pub(crate) fn check_release_truth_texts(
     }
 }
 
+/// Byte window after a `v<current>` token inside which a SHA token must start
+/// to count as the tag-target claim for that tag token. Historical SHAs
+/// elsewhere on the line belong to other clauses and are ignored.
+const TAG_SHA_WINDOW: usize = 48;
+
+/// Byte window on either side of a `v<current>` token inside which a
+/// `pending`/`unavailable` note must sit to exempt the claim on that line.
+/// Notes in unrelated clauses do not exempt.
+const PENDING_EXEMPTION_WINDOW: usize = 32;
+
 fn check_tag_claim(
     truth: &ReleaseTruth,
     surface: &str,
@@ -278,13 +289,19 @@ fn check_tag_claim(
     if !lowered.contains("tag") {
         return Ok(());
     }
-    let versions = release_versions_in_line(line);
-    let claimed_current = versions.contains(&truth.current);
-    if !claimed_current {
+    let spans: Vec<(usize, usize)> = release_version_spans_in_line(line)
+        .into_iter()
+        .filter(|(_, _, version)| version == &truth.current)
+        .map(|(start, end, _)| (start, end))
+        .collect();
+    if spans.is_empty() {
         return Ok(());
     }
     if !truth.tag_exists {
-        if lowered.contains("pending") || lowered.contains("unavailable") {
+        let exempt = spans
+            .iter()
+            .any(|&(start, end)| clause_window_has_exemption(line, start, end));
+        if exempt {
             return Ok(());
         }
         return Err(format!(
@@ -292,14 +309,16 @@ fn check_tag_claim(
             truth.current
         ));
     }
-    for sha in hex_tokens_in_line(line) {
-        if sha_targets_match(&sha, &truth.tag_target) {
-            continue;
+    for (_, end) in &spans {
+        for sha in hex_tokens_starting_in(line, *end, TAG_SHA_WINDOW) {
+            if sha_targets_match(&sha, &truth.tag_target) {
+                continue;
+            }
+            return Err(format!(
+                "{surface}:{line_no} `{field}` claims tag target `{sha}` but the authority records `{}`",
+                truth.tag_target
+            ));
         }
-        return Err(format!(
-            "{surface}:{line_no} `{field}` claims tag target `{sha}` but the authority records `{}`",
-            truth.tag_target
-        ));
     }
     Ok(())
 }
@@ -315,15 +334,21 @@ fn check_release_claim(
     if !lowered.contains("github release") {
         return Ok(());
     }
-    let versions = release_versions_in_line(line);
-    let claimed_current = versions.contains(&truth.current);
-    if !claimed_current {
+    let spans: Vec<(usize, usize)> = release_version_spans_in_line(line)
+        .into_iter()
+        .filter(|(_, _, version)| version == &truth.current)
+        .map(|(start, end, _)| (start, end))
+        .collect();
+    if spans.is_empty() {
         return Ok(());
     }
     if truth.release_exists {
         return Ok(());
     }
-    if lowered.contains("pending") || lowered.contains("unavailable") {
+    let exempt = spans
+        .iter()
+        .any(|&(start, end)| clause_window_has_exemption(line, start, end));
+    if exempt {
         return Ok(());
     }
     Err(format!(
@@ -341,10 +366,15 @@ fn sha_targets_match(panel_sha: &str, authority_target: &str) -> bool {
     panel.starts_with(&target) || target.starts_with(&panel)
 }
 
-/// Extract `X.Y.Z` version tokens (with optional leading `v`) from a line.
-pub(crate) fn release_versions_in_line(line: &str) -> Vec<String> {
+/// Extract `X.Y.Z` version tokens (with optional leading `v`) from a line,
+/// with byte spans of the token excluding the leading `v`.
+///
+/// A trailing period not followed by a digit is a sentence-end terminator, so
+/// the version is still recognized. A period followed by a digit continues
+/// the version (four-part versions such as `0.4.0.1` are rejected).
+fn release_version_spans_in_line(line: &str) -> Vec<(usize, usize, String)> {
     let bytes = line.as_bytes();
-    let mut versions = Vec::new();
+    let mut spans = Vec::new();
     let mut idx = 0;
     while idx < bytes.len() {
         let byte = bytes[idx];
@@ -381,35 +411,76 @@ pub(crate) fn release_versions_in_line(line: &str) -> Vec<String> {
                 break;
             }
         }
-        if parts == 3
-            && (cursor >= bytes.len() || (!bytes[cursor].is_ascii_digit() && bytes[cursor] != b'.'))
-        {
+        if parts == 3 {
             let token_start = if byte == b'v' { idx + 1 } else { idx };
-            versions.push(line[token_start..cursor].to_string());
-            idx = cursor;
-        } else {
-            idx += 1;
+            if cursor < bytes.len() && bytes[cursor] == b'.' {
+                if cursor + 1 < bytes.len() && bytes[cursor + 1].is_ascii_digit() {
+                    // Four-part version: not a release claim.
+                    idx += 1;
+                    continue;
+                }
+                // Sentence-end terminator: the claim ends before the period.
+                spans.push((token_start, cursor, line[token_start..cursor].to_string()));
+                idx = cursor + 1;
+                continue;
+            }
+            if cursor >= bytes.len() || !bytes[cursor].is_ascii_digit() {
+                spans.push((token_start, cursor, line[token_start..cursor].to_string()));
+                idx = cursor;
+                continue;
+            }
         }
+        idx += 1;
     }
-    versions
+    spans
 }
 
-/// Extract hex tokens of length 7..=40 (candidate SHAs) from a line.
-fn hex_tokens_in_line(line: &str) -> Vec<String> {
+/// Extract `X.Y.Z` version tokens (with optional leading `v`) from a line.
+pub(crate) fn release_versions_in_line(line: &str) -> Vec<String> {
+    release_version_spans_in_line(line)
+        .into_iter()
+        .map(|(_, _, version)| version)
+        .collect()
+}
+
+/// Whether a `pending`/`unavailable` note sits in the claim clause: the
+/// bounded window on either side of the `v<current>` token span.
+fn clause_window_has_exemption(line: &str, start: usize, end: usize) -> bool {
+    let bytes = line.as_bytes();
+    let from = start.saturating_sub(PENDING_EXEMPTION_WINDOW);
+    let to = (end + PENDING_EXEMPTION_WINDOW).min(bytes.len());
+    let window = &bytes[from..to];
+    const MARKERS: &[&[u8]] = &[b"pending", b"unavailable"];
+    MARKERS.iter().any(|marker| {
+        window
+            .windows(marker.len())
+            .any(|candidate| candidate.eq_ignore_ascii_case(marker))
+    })
+}
+
+/// Extract hex tokens of length 7..=40 (candidate SHAs) that start inside the
+/// bounded window after `from`. Tokens starting at or beyond the window edge
+/// belong to other clauses.
+fn hex_tokens_starting_in(line: &str, from: usize, window: usize) -> Vec<String> {
+    let bytes = line.as_bytes();
+    let limit = from.saturating_add(window).min(bytes.len());
     let mut tokens = Vec::new();
-    let mut current = String::new();
-    for ch in line.chars() {
-        if ch.is_ascii_hexdigit() {
-            current.push(ch);
-        } else {
-            if (7..=40).contains(&current.len()) {
-                tokens.push(current.clone());
-            }
-            current.clear();
+    let mut idx = from;
+    while idx < bytes.len() {
+        if !bytes[idx].is_ascii_hexdigit() {
+            idx += 1;
+            continue;
         }
-    }
-    if (7..=40).contains(&current.len()) {
-        tokens.push(current);
+        let run_start = idx;
+        while idx < bytes.len() && bytes[idx].is_ascii_hexdigit() {
+            idx += 1;
+        }
+        if run_start >= limit {
+            break;
+        }
+        if (7..=40).contains(&(idx - run_start)) {
+            tokens.push(line[run_start..idx].to_string());
+        }
     }
     tokens
 }
