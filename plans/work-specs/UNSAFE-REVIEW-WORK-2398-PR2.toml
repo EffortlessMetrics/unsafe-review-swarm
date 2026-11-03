@@ -74,7 +74,7 @@ expected = "The delivery PR reports stable AC IDs with proof results and exact-h
 
 [[risk]]
 id = "RISK-1"
-mitigation = "Text-only panel edits against a frozen authority; the checker scans selected release-claim patterns in four panels; FIRST_USE.md and ROADMAP.md require separate inspection, so a missed stale string fails loudly instead of shipping."
+mitigation = "Text-only panel edits against a frozen authority; the checker scans selected release-claim patterns in four panels and fails loudly on a missed stale string there; FIRST_USE.md and ROADMAP.md are not machine-checked and require separate inspection before shipping."
 
 [[risk]]
 id = "RISK-2"
