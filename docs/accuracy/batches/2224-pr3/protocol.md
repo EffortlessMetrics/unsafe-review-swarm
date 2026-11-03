@@ -1,12 +1,15 @@
 # #2224 PR3 batch protocol: matching rules and baseline questions
 #
-# Status: batch-scoped skeleton. These rules govern only
+# Status: batch-scoped. These rules govern only
 # `docs/accuracy/batches/2224-pr3/`. They do not define global precision or
 # recall. Counting rules are inherited from the PR1 protocol
 # (`docs/accuracy/batches/2224-pr1/protocol.md`): one disposition per emitted
 # card, one outcome per expected seam, the evaluator recomputes every count,
 # quiet-control cards are wrongly-surfaced by rule, and empty denominators
-# stay unknown.
+# stay unknown. Frozen first-run outputs (unsafe-review 0.3.8 at lane
+# revision `30c4b9eb`, one run per case with the manifest command shape)
+# were acquired after the source-first inventory was committed; `mapping.toml`
+# carries match/missing judgments against those bytes.
 #
 # Vocabulary is locked, not per-batch: labelers use ONLY the sets in
 # `docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml` (schema v1):
@@ -18,12 +21,6 @@
 #
 # PR3 additions over PR2:
 #
-# - Skeleton discipline. This batch skeleton commits the manifest, frozen
-#   diffs, source-first inventory, and protocol BEFORE any analyzer output is
-#   acquired or consulted (`analyzer_outputs_consulted = false`). The outputs
-#   lane fills `outputs/` and completes `mapping.toml`; `mapping.toml` below
-#   carries `unknown` outcomes only and `check-seam-batch` fails closed on the
-#   missing outputs by design until then.
 # - Zero-seam roles beyond quiet. bytemuck-349 (hardening docs + regression
 #   test) and smallvec-757 (test scaffolding + generated-input fixture) carry
 #   zero expected seams like the quiet control: their changes add no new or
@@ -34,7 +31,11 @@
 # - Debug-only guard note. smallvec-768-S1 judges whether the card respects
 #   the debug-only limit of `debug_assert!(length <= INLINE)` (PR1 getrandom
 #   lesson carried forward).
-#
+# - Partial-run note. smallvec-757's frozen diff adds `tests/proptest.rs`,
+#   but the pinned head tree no longer contains that file (the head commit
+#   removes it), so the analyzer scanned only the resolved files and warns
+#   accordingly. The unscanned file is named in the report; it carries no
+#   seam either way (safe-only test scaffolding).
 # ## The four baseline questions
 #
 # Every expected seam answers all four in `mapping.toml`:

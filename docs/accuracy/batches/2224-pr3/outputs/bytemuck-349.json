@@ -1,0 +1,163 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "F:/Temp/seam-batch/checkouts/bytemuck-349",
+  "summary": {
+    "rust_files": 30,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 1,
+    "cards": 1,
+    "open_actionable_gaps": 1,
+    "production_cards": 1,
+    "test_cards": 0,
+    "generated_cards": 0,
+    "unknown_cards": 0,
+    "contract_missing": 1,
+    "guard_missing": 0,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 0,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-bytemuck-src-lib-rs-try-cast-slice-operation-unsafe_fn_call-try-cast-slice-dd2a97e90360-unknown-c1",
+      "class": "contract_missing",
+      "priority": "high",
+      "confidence": "high",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/lib.rs",
+        "line": 522,
+        "column": 3,
+        "kind": "operation",
+        "owner": "try_cast_slice",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { internal::try_cast_slice(a) }"
+      },
+      "operation": "unsafe { internal::try_cast_slice(a) }",
+      "operation_family": "unsafe_fn_call",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "callee safety preconditions are satisfied"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "callee-contract",
+          "description": "callee safety preconditions are satisfied",
+          "contract": {
+            "present": false,
+            "state": "missing",
+            "summary": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "2 related test files mention owner `try_cast_slice`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "No nearby `# Safety` docs or `SAFETY:` / `Safety:` comment detected",
+      "discharge": "No visible local guard detected",
+      "reach": "2 related test files mention owner `try_cast_slice`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "related_tests": [
+        {
+          "name": "test_try_cast_slice",
+          "file": "tests/cast_slice_tests.rs",
+          "line": 9
+        },
+        {
+          "name": "test_try_cast_slice",
+          "file": "tests/checked_tests.rs",
+          "line": 12
+        }
+      ],
+      "missing": [
+        "Missing `# Safety` documentation or `SAFETY:` / `Safety:` comment",
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add a precise `# Safety` section or `SAFETY:` / `Safety:` comment that names the required conditions.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `contract_missing` ReviewCard for `unsafe { internal::try_cast_slice(a) }`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-bytemuck-src-lib-rs-try-cast-slice-operation-unsafe_fn_call-try-cast-slice-dd2a97e90360-unknown-c1` still maps to `unsafe { internal::try_cast_slice(a) }` at `src/lib.rs:522:3` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "missing",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "needs_human"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-11-03T21:32:47Z",
+    "root_abs": "//?/F:/Temp/seam-batch/checkouts/bytemuck-349",
+    "diff_path": "docs/accuracy/batches/2224-pr3/diffs/bytemuck-349.diff",
+    "diff_sha256": "e860cdb99f419783001496c7904ad050cddf98f3589c46a8aaef8931b24d4cae",
+    "dirty_worktree": false
+  }
+}

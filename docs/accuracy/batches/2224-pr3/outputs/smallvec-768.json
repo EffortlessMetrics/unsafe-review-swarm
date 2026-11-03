@@ -1,0 +1,477 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "F:/Temp/seam-batch/checkouts/smallvec-768",
+  "summary": {
+    "rust_files": 41,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 3,
+    "cards": 3,
+    "open_actionable_gaps": 3,
+    "production_cards": 3,
+    "test_cards": 0,
+    "generated_cards": 0,
+    "unknown_cards": 0,
+    "contract_missing": 0,
+    "guard_missing": 3,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 1,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-smallvec-src-lib-rs-from-buf-operation-copy_nonoverlapping-copy-nonoverlapping-c597625ff74f-pointer_validity-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/lib.rs",
+        "line": 150,
+        "column": 13,
+        "kind": "operation",
+        "owner": "from_buf",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut Item, S);"
+      },
+      "operation": "copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut Item, S);",
+      "operation_family": "copy_nonoverlapping",
+      "hazards": [
+        "pointer_validity",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "source and destination do not overlap",
+        "both ranges are valid for count elements"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "non-overlap",
+          "description": "source and destination do not overlap",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected for the `non-overlap` obligation (no guard pattern is recognized for this obligation)"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `from_buf`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "valid-range",
+          "description": "both ranges are valid for count elements",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `from_buf`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `from_buf`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported",
+          "command": "cargo +nightly miri test from_buf",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions",
+          "command": "cargo +nightly careful test from_buf",
+          "required": false
+        }
+      ],
+      "related_tests": [
+        {
+          "name": "append",
+          "file": "tests/main.rs",
+          "line": 457
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `copy_nonoverlapping` safety obligations: (1) source and destination do not overlap, (2) both ranges are valid for count elements.",
+      "verify_commands": [
+        "cargo +nightly miri test from_buf",
+        "cargo +nightly careful test from_buf"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut Item, S);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf",
+          "route_kind": "miri",
+          "summary": "Build/run `cargo +nightly miri test from_buf` first for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-smallvec-src-lib-rs-from-buf-operation-copy_nonoverlapping-copy-nonoverlapping-c597625ff74f-pointer_validity-c1` still maps to `copy_nonoverlapping(elements.as_ptr(), buf.as_mut_ptr() as *mut Item, S);` at `src/lib.rs:150:13` before upgrading confidence.",
+            "Build/run `cargo +nightly miri test from_buf` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "build/run `cargo +nightly miri test from_buf` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-smallvec-src-lib-rs-from-buf-and-len-operation-pointer_arithmetic-as-mut-ptr-inline-689543811b25-same_allocation-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/lib.rs",
+        "line": 177,
+        "column": 13,
+        "kind": "operation",
+        "owner": "from_buf_and_len",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "let remainder_ptr = vec.raw.as_mut_ptr_inline().add(length);"
+      },
+      "operation": "let remainder_ptr = vec.raw.as_mut_ptr_inline().add(length);",
+      "operation_family": "pointer_arithmetic",
+      "hazards": [
+        "same_allocation",
+        "bounds",
+        "aliasing_or_provenance"
+      ],
+      "obligations": [
+        "pointer arithmetic stays in-bounds or one-past inside the same allocation"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "bounds",
+          "description": "pointer arithmetic stays in-bounds or one-past inside the same allocation",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No length or bounds guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `from_buf_and_len` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `from_buf_and_len` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+          "command": "cargo +nightly careful test from_buf_and_len",
+          "required": false
+        }
+      ],
+      "related_tests": [],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose the local guard that discharges the `pointer_arithmetic` safety obligation.",
+      "verify_commands": [
+        "cargo +nightly miri test from_buf_and_len",
+        "cargo +nightly careful test from_buf_and_len"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `let remainder_ptr = vec.raw.as_mut_ptr_inline().add(length);`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "route_kind": "miri",
+          "summary": "No test reaches `from_buf_and_len` yet; write or identify a focused test for `from_buf_and_len` first, then build/run `cargo +nightly miri test from_buf_and_len` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-smallvec-src-lib-rs-from-buf-and-len-operation-pointer_arithmetic-as-mut-ptr-inline-689543811b25-same_allocation-c1` still maps to `let remainder_ptr = vec.raw.as_mut_ptr_inline().add(length);` at `src/lib.rs:177:13` before upgrading confidence.",
+            "Write or identify a focused test for `from_buf_and_len` first (no test reaches it yet), then build/run `cargo +nightly miri test from_buf_and_len` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `from_buf_and_len` first (no test reaches it yet), then build/run `cargo +nightly miri test from_buf_and_len` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "ready"
+      }
+    },
+    {
+      "id": "UR-smallvec-src-lib-rs-from-buf-and-len-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "source_route_only",
+      "site": {
+        "file": "src/lib.rs",
+        "line": 182,
+        "column": 13,
+        "kind": "operation",
+        "owner": "from_buf_and_len",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut("
+      },
+      "operation": "core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(",
+      "operation_family": "drop_in_place",
+      "hazards": [
+        "pointer_validity",
+        "initialized_memory",
+        "drop_or_deallocation"
+      ],
+      "obligations": [
+        "pointer is valid for dropping one value",
+        "pointed-to value is initialized",
+        "value will not be dropped again or observed after drop"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "pointer-live",
+          "description": "pointer is valid for dropping one value",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No pointer-liveness evidence was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `from_buf_and_len` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "initialized",
+          "description": "pointed-to value is initialized",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `from_buf_and_len` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        },
+        {
+          "key": "ownership",
+          "description": "value will not be dropped again or observed after drop",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": false,
+            "state": "missing",
+            "summary": "No static test mention of owner `from_buf_and_len` was found"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "No static test mention of owner `from_buf_and_len` was found",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "miri",
+          "reason": "Pure-Rust UB-adjacent hazard; Miri is the strongest concrete-execution witness when the path is supported. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "required": false
+        },
+        {
+          "kind": "cargo-careful",
+          "reason": "cargo-careful is a cheaper compatibility-oriented runtime check for several unsafe preconditions. No test currently reaches this site: add a reaching test first, since a filter matching zero tests passes without executing anything.",
+          "command": "cargo +nightly careful test from_buf_and_len",
+          "required": false
+        }
+      ],
+      "related_tests": [],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No related test path was found by static search",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Add or expose local guards for these `drop_in_place` safety obligations: (1) pointer is valid for dropping one value, (2) pointed-to value is initialized, (3) value will not be dropped again or observed after drop.",
+      "verify_commands": [
+        "cargo +nightly miri test from_buf_and_len",
+        "cargo +nightly careful test from_buf_and_len"
+      ],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "route_kind": "miri",
+          "summary": "No test reaches `from_buf_and_len` yet; write or identify a focused test for `from_buf_and_len` first, then build/run `cargo +nightly miri test from_buf_and_len` for this card; attach a matching receipt only if it confirms the route"
+        },
+        "minimal_repro": {
+          "kind": "verify_command",
+          "command": "cargo +nightly miri test from_buf_and_len",
+          "route_kind": "miri",
+          "steps": [
+            "Confirm ReviewCard `UR-smallvec-src-lib-rs-from-buf-and-len-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1` still maps to `core::ptr::drop_in_place(core::ptr::slice_from_raw_parts_mut(` at `src/lib.rs:182:13` before upgrading confidence.",
+            "Write or identify a focused test for `from_buf_and_len` first (no test reaches it yet), then build/run `cargo +nightly miri test from_buf_and_len` as the smallest available command for this card.",
+            "Attach a matching receipt only if that run confirms the same route and ReviewCard identity."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "write or identify a focused test for `from_buf_and_len` first (no test reaches it yet), then build/run `cargo +nightly miri test from_buf_and_len` first, then attach a matching receipt if it confirms the route",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "not_eligible",
+        "agent_lsp_readiness": "ready"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-11-03T21:33:16Z",
+    "root_abs": "//?/F:/Temp/seam-batch/checkouts/smallvec-768",
+    "diff_path": "docs/accuracy/batches/2224-pr3/diffs/smallvec-768.diff",
+    "diff_sha256": "bf3f159d7f9ae9d6a77f0dbc3b641766c3088f6a0a27495e507826ccada978bd",
+    "dirty_worktree": false
+  }
+}

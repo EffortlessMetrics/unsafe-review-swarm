@@ -1,40 +1,65 @@
-# #2224 PR3 card-to-seam mapping (SKELETON).
+# #2224 PR3 card-to-seam mapping.
 #
-# SKELETON: frozen first-run outputs are not yet acquired (no head checkouts
-# in this lane), so every inventoried seam carries outcome unknown with no
-# cards, no card rows exist, and the tally is all zeros. The outputs lane
-# replaces the unknown rows with match/missing judgments after consulting the
-# frozen outputs, adds one row per emitted card, and fills the tally.
-# check-seam-batch fails closed on the missing [[outputs]] array until then,
-# by design. This file never edits seams.toml.
+# Mapped 2026-11-03T21:36:34Z from the frozen outputs, after the source-first
+# inventory was committed. This file never edits seams.toml; disagreements
+# surface as missing / wrongly_surfaced rows and visible unresolved
+# judgments. Counts in [tally] are recomputed by check-seam-batch
+# from these rows; the check fails on any disagreement.
 schema_version = "seam-batch-mapping/v1"
 batch = "2224-pr3"
-mapped_at = "2026-11-04T00:00:00Z"
+mapped_at = "2026-11-03T21:36:34Z"
 
 [mapper]
 type = "agent-drafted"
 identity = "opencode subagent lane/2224-unfamiliar-batch"
-provenance = "skeleton only: no analyzer output consulted; draft structure, not human adjudication"
+provenance = "card-by-card judgment against frozen outputs after source-first inventory; draft evidence, not human adjudication"
+
+# Frozen first-run outputs. Re-running the analyzer is acquisition, not
+# checking: the checker verifies these bytes, it does not need network.
+[[outputs]]
+case = "bytemuck-258"
+file = "outputs/bytemuck-258.json"
+sha256 = "db105637635934b049d31e762c5afa8e85e03c174d2cba6797ddeeef0389dda3"
+
+[[outputs]]
+case = "smallvec-847"
+file = "outputs/smallvec-847.json"
+sha256 = "c89edeecef61e404e5a6f9398320cfb79170ee2597c3994b0b04c09f2f44cd83"
+
+[[outputs]]
+case = "bytemuck-349"
+file = "outputs/bytemuck-349.json"
+sha256 = "514c8bd8e314b365a4306681ca2a235d6320a860671e8826cebc5a7fab20233a"
+
+[[outputs]]
+case = "smallvec-757"
+file = "outputs/smallvec-757.json"
+sha256 = "5b172cdcc4e4459d217b2b9127bb1fe04508d344f075dc785a9986f629a133e2"
+
+[[outputs]]
+case = "smallvec-768"
+file = "outputs/smallvec-768.json"
+sha256 = "b9a497d1970eab97473b7e3b950bec1d39c12bc003594af5131bb80389c31589"
 
 # ---- Seam results: one row per seams.toml row. ----
 
 [[seam_results]]
 seam = "bytemuck-258-S1"
-outcome = "unknown"
-found_family = ""
-family_correct = false
+outcome = "match"
+found_family = "unsafe_fn_call"
+family_correct = true
 obligations_correct = false
 over_credited = false
-useful = false
-action_correct = false
+useful = true
+action_correct = true
 action_specific = false
-action_feasible = false
-cards = []
-notes = "SKELETON: outputs pending; no judgment recorded."
+action_feasible = true
+cards = ["UR-bytemuck-src-allocation-rs-drop-operation-unsafe_fn_call-dealloc-08e5d8c811b3-unknown-c1"]
+notes = "Right site, right family: card sits on the exact edited dealloc line (src/allocation.rs:777) with the inventoried unsafe_fn_call family, names callee-contract, and credits the retargeted SAFETY comment as present. But discharge is reported missing while the added dominating `if self.layout.size() != 0` guard establishes exactly the ownership/allocation adequacy: missed guard credit, the same blindness class as the PR1 memchr finding. The next action (manual contract review plus guard evidence) is directionally right and feasible but generic and would add a redundant check."
 
 [[seam_results]]
 seam = "smallvec-768-S1"
-outcome = "unknown"
+outcome = "missing"
 found_family = ""
 family_correct = false
 obligations_correct = false
@@ -44,27 +69,767 @@ action_correct = false
 action_specific = false
 action_feasible = false
 cards = []
-notes = "SKELETON: outputs pending; no judgment recorded."
+notes = "Genuine recall miss: the analyzer emits no unsafe_declaration card on the changed `from_buf_and_len_unchecked` signature/contract. The 3 emitted cards flag pre-existing body operations in from_buf/from_buf_and_len (copy, add, drop_in_place) whose safety arguments the repr retype does not change; none reviews the caller-held length/init contract that the signature change moves. A declaration-granularity gap, not a guard-credit gap."
 
-# ---- Card results: none until frozen outputs exist. ----
+# ---- Card results: one row per emitted card in the frozen outputs. ----
 
-# Stated tallies: all zeros for the skeleton. check-seam-batch recomputes
-# every value from the rows above and fails on any disagreement (after the
-# outputs gate, which currently fails first by design).
+[[card_results]]
+card = "UR-bytemuck-src-allocation-rs-drop-operation-unsafe_fn_call-dealloc-08e5d8c811b3-unknown-c1"
+case = "bytemuck-258"
+disposition = "matched"
+of_seam = "bytemuck-258-S1"
+useful = true
+action_feasible = true
+inventory_challenge = false
+reason = "Primary match for bytemuck-258-S1: exact edited dealloc site, right family; misses the dominating size guard (see seam note)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-operation-copy_nonoverlapping-copy-nonoverlapping-c597625ff74f-pointer_validity-c1"
+case = "smallvec-768"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping in from_buf (safe fn), reported guard_missing with present SAFETY contract. The PR's edit to this function is the safe buf-declaration retype, not the flagged copy, whose non-overlap/valid-range argument is unchanged; the repr question belongs to the S1 declaration review, which is missing."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-and-len-operation-pointer_arithmetic-as-mut-ptr-inline-689543811b25-same_allocation-c1"
+case = "smallvec-768"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing remainder-pointer add in from_buf_and_len (safe fn) on an unchanged line; the PR's edit to this function is the safe new_inline-to-inline rename. Same-file diff-scope surfacing with no change-specific signal."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-and-len-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1"
+case = "smallvec-768"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing leak-avoidance drop_in_place in from_buf_and_len (safe fn) on an unchanged line; the PR does not touch the drop logic. Same-file diff-scope surfacing with no change-specific signal."
+
+[[card_results]]
+card = "UR-bytemuck-src-lib-rs-try-cast-slice-operation-unsafe_fn_call-try-cast-slice-dd2a97e90360-unknown-c1"
+case = "bytemuck-349"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing internal `unsafe { internal::try_cast_slice(a) }` call on an unchanged context line pulled into scope by the doc-only hunk; reported contract_missing while the PR itself adds alignment-contract prose to the public wrapper. No new or changed unsafe operation; no change-specific signal."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-operation-copy_nonoverlapping-copy-nonoverlapping-c597625ff74f-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `from_buf` (src/lib.rs:154, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-and-len-operation-pointer_arithmetic-as-mut-ptr-inline-689543811b25-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `from_buf_and_len` (src/lib.rs:181, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-buf-and-len-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `from_buf_and_len` (src/lib.rs:186, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-vec-operation-vec_set_len-set-len-f679dc8bed69-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `from_vec` (src/lib.rs:249, guarded_unwitnessed) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-vec-operation-nonnull_unchecked-new-unchecked-38f526fad205-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing nonnull_unchecked site in `from_vec` (src/lib.rs:267, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-raw-parts-operation-nonnull_unchecked-new-unchecked-390e9b6f0e65-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing nonnull_unchecked site in `from_raw_parts` (src/lib.rs:352, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-set-len-unsafe_fn-unsafe_declaration-set-len-b636791f99a7-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_declaration site in `set_len` (src/lib.rs:398, unsafe_unreached) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-capacity-operation-unsafe_fn_call-capacity-b9782dd4bb7b-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `capacity` (src/lib.rs:422, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drain-operation-vec_set_len-set-len-89ec4745b3db-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `drain` (src/lib.rs:440, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drain-operation-nonnull_unchecked-new-unchecked-82521baf7359-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing nonnull_unchecked site in `drain` (src/lib.rs:452, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extract-if-operation-vec_set_len-set-len-b218552f15de-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `extract_if` (src/lib.rs:554, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-try-grow-operation-copy_nonoverlapping-copy-nonoverlapping-03bad25d912c-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `try_grow` (src/lib.rs:701, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-shrink-to-fit-operation-copy_nonoverlapping-copy-nonoverlapping-03bad25d912c-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `shrink_to_fit` (src/lib.rs:771, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-shrink-to-unsafe_block-unknown-shrink-to-294468378367-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unknown site in `shrink_to` (src/lib.rs:801, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-shrink-to-operation-copy_nonoverlapping-copy-nonoverlapping-03bad25d912c-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `shrink_to` (src/lib.rs:808, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-truncate-operation-vec_set_len-set-len-b95d8f5284ad-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `truncate` (src/lib.rs:839, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-truncate-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `truncate` (src/lib.rs:840, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-truncate-operation-pointer_arithmetic-as-mut-ptr-cc1f58e52016-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `truncate` (src/lib.rs:841, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-clear-operation-vec_set_len-set-len-b218552f15de-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `clear` (src/lib.rs:881, guarded_unwitnessed) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-clear-operation-drop_in_place-drop-in-place-db83a5200da3-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `clear` (src/lib.rs:882, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-into-inner-operation-vec_set_len-set-len-834ace65fc2f-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `into_inner` (src/lib.rs:1023, unsafe_unreached) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-into-inner-operation-raw_pointer_read-raw-pointer-read-40a5daf7b703-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing raw_pointer_read site in `into_inner` (src/lib.rs:1028, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-drop_in_place-drop-in-place-749c39fe964c-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `retain_mut` (src/lib.rs:1107, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-pointer_arithmetic-as-mut-ptr-c50a94059a95-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `retain_mut` (src/lib.rs:1107, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-pointer_arithmetic-add-ff64c05544c9-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `retain_mut` (src/lib.rs:1112, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-raw_pointer_deref-deref-0706feaa34ef-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing raw_pointer_deref site in `retain_mut` (src/lib.rs:1112, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-drop_in_place-drop-in-place-80d778ec1021-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `retain_mut` (src/lib.rs:1118, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-pointer_arithmetic-add-1274b21ccb13-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `retain_mut` (src/lib.rs:1124, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-copy_nonoverlapping-copy-nonoverlapping-0d5d0e269477-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `retain_mut` (src/lib.rs:1125, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-retain-mut-operation-vec_set_len-set-len-bfe1204fbdfa-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `retain_mut` (src/lib.rs:1135, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-spare-capacity-mut-operation-slice_from_raw_parts-from-raw-parts-mut-badeeaf04c72-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing slice_from_raw_parts site in `spare_capacity_mut` (src/lib.rs:1216, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-spare-capacity-mut-operation-pointer_arithmetic-as-mut-ptr-2383e412811a-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `spare_capacity_mut` (src/lib.rs:1217, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-slice-copy-operation-pointer_arithmetic-as-mut-ptr-2de8c2e9ee1d-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_slice_copy` (src/lib.rs:1295, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-slice-copy-operation-copy_nonoverlapping-copy-nonoverlapping-01de90652ecc-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `extend_from_slice_copy` (src/lib.rs:1296, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-slice-copy-operation-pointer_arithmetic-add-6a8ce66f5e26-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_slice_copy` (src/lib.rs:1297, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-copy-operation-copy_nonoverlapping-copy-nonoverlapping-daf2f6be5957-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `extend_from_within_copy` (src/lib.rs:1320, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-copy-operation-pointer_arithmetic-add-b38e60bf2507-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_copy` (src/lib.rs:1320, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-copy-operation-pointer_arithmetic-add-6a8ce66f5e26-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_copy` (src/lib.rs:1321, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-try-with-capacity-in-operation-unsafe_fn_call-try-grow-raw-29336003bba0-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `try_with_capacity_in` (src/lib.rs:1358, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-operation-unsafe_fn_call-cfg-87d8853545e8-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `extend_from_within` (src/lib.rs:1398, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-split-off-operation-vec_set_len-set-len-523cfa935301-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `split_off` (src/lib.rs:1452, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-split-off-operation-vec_set_len-set-len-f224173fe058-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `split_off` (src/lib.rs:1453, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-split-off-operation-copy_nonoverlapping-copy-nonoverlapping-b29bc5266867-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing copy_nonoverlapping site in `split_off` (src/lib.rs:1455, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-split-off-operation-pointer_arithmetic-as-ptr-94a6b47b0701-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `split_off` (src/lib.rs:1455, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drop-operation-drop_in_place-slice-from-raw-parts-mut-f30e0c26762a-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `drop` (src/lib.rs:1469, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drop-operation-unsafe_fn_call-deallocate-d65802e807b0-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `drop` (src/lib.rs:1484, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drop-operation-unsafe_fn_call-as-mut-ptr-7d31bb1b81d6-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `drop` (src/lib.rs:1499, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drop-operation-nonnull_unchecked-new-unchecked-1c647f49b719-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing nonnull_unchecked site in `drop` (src/lib.rs:1505, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-drop-operation-drop_in_place-slice-from-raw-parts-mut-20e6eb0832dc-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing drop_in_place site in `drop` (src/lib.rs:1513, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-elem-operation-unsafe_fn_call-spec-from-elem-c5cf2a065dc0-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `from_elem` (src/lib.rs:1534, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-elem-fallback-operation-pointer_arithmetic-add-9416afc589ba-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `from_elem_fallback` (src/lib.rs:1574, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-elem-fallback-operation-pointer_arithmetic-add-67932242fa9c-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `from_elem_fallback` (src/lib.rs:1578, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-elem-fallback-operation-vec_set_len-set-len-87b5b0aba5fd-initialized_memory-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing vec_set_len site in `from_elem_fallback` (src/lib.rs:1585, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-slice-fallback-operation-pointer_arithmetic-pointer-arithmetic-48b1ba019143-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `from_slice_fallback` (src/lib.rs:1621, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-slice-fallback-operation-raw_pointer_deref-deref-a9a4e1b99f24-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing raw_pointer_deref site in `from_slice_fallback` (src/lib.rs:1621, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-from-slice-fallback-operation-pointer_arithmetic-add-c96cb5dfa4da-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `from_slice_fallback` (src/lib.rs:1622, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-fallback-operation-raw_pointer_write-write-15c0ec41b6b6-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing raw_pointer_write site in `extend_fallback` (src/lib.rs:1648, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-fallback-operation-pointer_arithmetic-as-mut-ptr-0929abe7cf3a-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_fallback` (src/lib.rs:1648, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-pointer_arithmetic-add-da6ee22015e4-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_fallback` (src/lib.rs:1679, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-pointer_arithmetic-add-497ac79d6188-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_fallback` (src/lib.rs:1680, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-pointer_arithmetic-pointer-arithmetic-48b1ba019143-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_fallback` (src/lib.rs:1687, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-raw_pointer_deref-deref-a9a4e1b99f24-pointer_validity-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing raw_pointer_deref site in `extend_from_within_fallback` (src/lib.rs:1687, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-pointer_arithmetic-add-c96cb5dfa4da-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_fallback` (src/lib.rs:1688, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-extend-from-within-fallback-operation-pointer_arithmetic-add-6a8ce66f5e26-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `extend_from_within_fallback` (src/lib.rs:1696, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-clone-from-fallback-operation-unsafe_fn_call-split-at-unchecked-ebadf2902c7e-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `clone_from_fallback` (src/lib.rs:1709, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-unknown-unsafe_impl-unknown-unsafe-impl-798157466128-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unknown site in `unknown` (src/lib.rs:1901, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-advance-mut-operation-pointer_arithmetic-add-2a9e9d63775b-same_allocation-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing pointer_arithmetic site in `advance_mut` (src/lib.rs:1919, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-chunk-mut-operation-unsafe_fn_call-capacity-b3bf26b7a37d-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `chunk_mut` (src/lib.rs:1930, guard_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+[[card_results]]
+card = "UR-smallvec-src-lib-rs-chunk-mut-operation-unsafe_fn_call-as-mut-ptr-7d31bb1b81d6-unknown-c1"
+case = "smallvec-757"
+disposition = "wrongly_surfaced"
+of_seam = ""
+useful = false
+action_feasible = true
+inventory_challenge = false
+reason = "Pre-existing unsafe_fn_call site in `chunk_mut` (src/lib.rs:1931, contract_missing) surfaced via the broad fmt-reflow diff scope (patch 3/6 touches 101 lines across the file). The PR adds no new or changed unsafe operation: the Arbitrary impl is safe-only, the reflow is formatting, and Cargo.lock churn carries no code. No change-specific signal; not an inventory challenge (no flagged site changed semantics)."
+
+# Stated tallies. check-seam-batch recomputes every value from the rows above
+# and fails on any disagreement. No inventory challenges: every wrongly-surfaced
+# card flags a pre-existing site whose semantics the PR does not change.
 [tally]
 expected_seams = 2
-matched = 0
-missing = 0
-unknown = 2
-family_correct = 0
-family_total = 0
+matched = 1
+missing = 1
+unknown = 0
+family_correct = 1
+family_total = 1
 over_credited = 0
 obligations_correct = 0
-obligations_total = 0
-emitted_cards = 0
+obligations_total = 1
+emitted_cards = 74
 duplicates = 0
-wrongly_surfaced = 0
-useful = 0
-quiet_cards = 0
+wrongly_surfaced = 73
+useful = 1
+quiet_cards = 70
 challenge_seams = 0
 challenge_found = 0

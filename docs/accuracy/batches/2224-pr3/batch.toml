@@ -1,23 +1,20 @@
-# #2224 PR3 seam-denominator batch manifest (SKELETON).
+# #2224 PR3 seam-denominator batch manifest.
 #
 # Third growth increment: five unfamiliar pinned real PRs across two new
 # projects (bytemuck, smallvec), one per owner-directed family slot:
 # unsafe-relevant, quiet, hardening, test/fixture-heavy, non-NonNull.
 # Source-first expected seams live in seams.toml; the card-to-seam mapping
-# skeleton in mapping.toml carries unknown outcomes only; frozen first-run
-# outputs under outputs/ are NOT YET ACQUIRED (no head checkouts were made in
-# this lane; acquisition is one recorded procedure, checks stay offline).
-# check-seam-batch therefore fails closed on the missing outputs by design
-# until the outputs lane lands. Matching rules and the four baseline questions
-# live in protocol.md. Vocabulary is locked in
+# in mapping.toml answers the four baseline questions against the frozen
+# first-run outputs under outputs/. Matching rules live in protocol.md.
+# Vocabulary is locked in
 # docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml.
 schema_version = "seam-batch/v1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
 protocol = "docs/accuracy/batches/2224-pr3/protocol.md"
 label_schema = "docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml"
 partition = "growth"
-label_status = "agent-drafted source-first skeleton; not human adjudication"
-outputs_status = "pending: frozen first-run outputs not yet acquired; check-seam-batch fails closed until outputs/ and mapping are completed"
+label_status = "agent-drafted source-first; not human adjudication"
+outputs_status = "frozen: first-run outputs acquired 2026-11-03 from pinned head checkouts; check-seam-batch verifies pins and tallies"
 trust_boundary = "Static unsafe contract review only. This batch measures ReviewCard seam recall, emitted-card correctness, obligation over-credit, selection usefulness, duplicates, and quiet-PR false alarms on five pinned PRs. It is not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, and not a merge verdict for any sampled PR."
 
 [acquisition]
@@ -26,13 +23,14 @@ network_on_check_path = false
 diff_dir = "docs/accuracy/batches/2224-pr3/diffs"
 
 [analyzer]
-# Pinned at assembly time. No run has been performed in this lane, so there
-# is no binary hash yet; the outputs lane records it with the frozen outputs.
+# Pinned at freeze time. The published-0.4.0 fixed-comparison slot is
+# reserved but unfilled: 0.4.0 is not yet published. The frozen baseline is
+# the exact development revision below (skeleton base was 56366f4a).
 binary = "target/debug/unsafe-review"
 version = "0.3.8"
-revision = "56366f4a43b7bbf338ef5e6c1ed842ae7c8ee116"
-revision_role = "exact development revision (origin/main at batch assembly; no analyzer run yet)"
-fixed_comparison_040 = "unfilled: frozen outputs pending; the manifest reserves outputs/outputs-0.4.0/ for the comparison run"
+revision = "30c4b9eb1f290180ad8d6a46e31659f3373a9f88"
+revision_role = "exact development revision (lane head at frozen-output run)"
+fixed_comparison_040 = "unfilled: 0.4.0 not yet published; manifest reserves outputs/outputs-0.4.0/ for the comparison run"
 
 [run_config]
 command_shape = "cargo run --locked -p unsafe-review -- check --root <head-checkout> --diff <case-diff> --format json --out <frozen-output>"
