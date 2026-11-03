@@ -5978,6 +5978,13 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
     let partial_path = temp.path().join("repo.json.partial");
     let status_path = temp.path().join("repo.json.status.json");
 
+    // Timing margins: the child needs seconds of startup (process spawn,
+    // discovery, policy/receipt loads) before the first scan event, which
+    // already exceeds a 1s budget on loaded Windows runners and then times
+    // out at files_scanned=0 with no partial retained. The 15s budget keeps
+    // startup comfortably below the deadline, while the 20s injected
+    // post-scan pause (thread::sleep runs at least the requested duration)
+    // forces the timeout deterministically at files_scanned=1.
     let output = Command::new(env!("CARGO_BIN_EXE_unsafe-review"))
         .args([
             os("repo"),
@@ -5988,7 +5995,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
             os("--out"),
             report_path.as_os_str().to_os_string(),
             os("--timeout-seconds"),
-            os("1"),
+            os("15"),
         ])
         .env(
             "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCANNED",
@@ -5996,7 +6003,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
         )
         .env(
             "UNSAFE_REVIEW_INTERNAL_REPO_SIGNAL_TEST_PAUSE_AFTER_SCAN_MS",
-            "1100",
+            "20000",
         )
         .output()?;
     if output.status.success() {
@@ -6011,7 +6018,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
     assert_eq!(stdout_text(&output)?.trim(), "");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        stderr.contains("repo scan timed out after 1s"),
+        stderr.contains("repo scan timed out after 15s"),
         "stderr should explain the timeout: {stderr}"
     );
     assert!(
@@ -6052,7 +6059,7 @@ fn repo_timeout_keeps_completed_file_partial_snapshot() -> Result<(), Box<dyn Er
         status["error"]
             .as_str()
             .unwrap_or("")
-            .contains("repo scan timed out after 1s")
+            .contains("repo scan timed out after 15s")
     );
     assert!(
         status["partial_path"]
