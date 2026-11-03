@@ -13,7 +13,7 @@ Background `check-pr`/gate jobs die with the subagent session that spawned
 them. A lane reporting "waiting on gate" may be waiting on a job that will
 never report. The finishing lane re-runs (or re-verifies) the gate itself
 at its own exact head before PR/admission. Cross-session gate status is a
-rumor, not evidence. (Refines `AGENT-ORCHESTRATION.md` §6: proof attaches
+rumor, not evidence. (Refines `AGENT-ORCHESTRATION.md` §7: proof attaches
 to the exact commit being considered.)
 
 ## 2. Native admission marker schema (exact)
