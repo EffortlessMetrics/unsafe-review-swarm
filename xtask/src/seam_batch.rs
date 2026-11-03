@@ -19,6 +19,7 @@ use crate::{parse_toml_file, workspace_path};
 const BATCH_DIRS: &[&str] = &[
     "docs/accuracy/batches/2224-pr1",
     "docs/accuracy/batches/2224-pr2",
+    "docs/accuracy/batches/2224-pr3",
 ];
 
 pub(crate) fn check() -> Result<(), String> {

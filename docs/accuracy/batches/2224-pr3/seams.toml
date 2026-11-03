@@ -1,0 +1,72 @@
+# #2224 PR3 source-first expected-seam inventory (SKELETON).
+#
+# Recorded 2026-11-04 from diff reading plus enclosing-function reads at each
+# pinned head via read-only file fetch (no clones, no analyzer runs). No
+# analyzer output has been consulted for any case in this batch
+# (analyzer_outputs_consulted = false). Mapping must not edit this inventory
+# to fit outputs. Families and obligation keys use only the locked sets in
+# docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml (schema v1).
+schema_version = "seam-batch-seams/v1"
+batch = "2224-pr3"
+recorded_at = "2026-11-04T00:00:00Z"
+analyzer_outputs_consulted = false
+
+[labeler]
+type = "agent-drafted"
+identity = "opencode subagent lane/2224-unfamiliar-batch"
+provenance = "source-first diff reading plus enclosing-function reads at pinned heads before any analyzer run on these cases; useful draft evidence, not human adjudication"
+
+trust_boundary = "Static unsafe contract review only. These expected seams describe unsafe operations a reviewer should examine in each sampled PR scope. They are not confirmed bugs, not exploitable vulnerabilities, not memory-safety proof, and not a claim about code outside the sampled diffs."
+
+# smallvec-847 is the quiet control: a one-line doc(cfg) typo fix.
+# Zero expected seams. Any emitted card there is wrongly-surfaced by
+# protocol rule.
+
+# bytemuck-349 is the hardening case: a doc-only alignment-contract note in
+# lib.rs plus a regression test calling safe public APIs (cast_slice,
+# try_cast_slice). Zero expected seams: no new or changed unsafe operation.
+# Any emitted card on the test's safe calls is wrongly-surfaced by rule.
+
+# smallvec-757 is the test/fixture-heavy case: a safe Arbitrary impl, a new
+# safe test file, Cargo.lock churn, and a safe-only fmt reflow. Zero expected
+# seams. Lockfile and formatting churn carry no seams and are excluded
+# considerations, not silent omissions.
+
+# bytemuck-258 S1: the Drop::drop dealloc call itself is edited (dominating
+# zero-size guard added, SAFETY comment retargeted), so the site is in review
+# scope. There is no canonical dealloc family (schema known-gap
+# dealloc-family); the site is inventoried as unsafe_fn_call because dealloc
+# is an unsafe fn, with the ownership/allocation adequacy judged from the
+# SAFETY comment rather than the family name.
+[[seams]]
+id = "bytemuck-258-S1"
+case = "bytemuck-258"
+source_anchor = "src/allocation.rs Drop for BoxBytes::drop: if self.layout.size() != 0 { unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) } } with retargeted SAFETY comment"
+operation_family = "unsafe_fn_call"
+obligation_keys = ["callee-contract"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "UB-fix site: the dominating size check establishes that ptr was allocated with layout (the ZST dangling case is excluded), and the SAFETY comment carries the ownership adequacy. A correct card credits the dominating guard and must not demand a redundant check; crediting the pre-fix comment shape would be stale evidence."
+inclusion = "include"
+
+# The bytemuck-258 regression test (box_bytes_zst) calls safe public APIs
+# only (box_bytes_of, from_box_bytes, try_from_box_bytes), so it contributes
+# no seam (recorded as an excluded consideration in mapping, not a row here).
+
+# smallvec-768 S1: from_buf_and_len_unchecked is a pub const unsafe fn whose
+# signature and contract change (buf: MaybeUninit<[Item; INLINE]> becomes
+# [MaybeUninit<Item>; INLINE]; Safety section keeps the length/init claims).
+# The union field retype and constructor renames are safe code and contribute
+# no seam beyond this declaration. debug_assert!(length <= INLINE) is a
+# debug-only guard: mapping must judge whether the card respects that limit
+# (cf. the PR1 getrandom debug_assert lesson), not this inventory.
+[[seams]]
+id = "smallvec-768-S1"
+case = "smallvec-768"
+source_anchor = "src/lib.rs pub const unsafe fn from_buf_and_len_unchecked(buf: [MaybeUninit<Item>; INLINE], length: usize) with retained Safety section and debug_assert!(length <= INLINE)"
+operation_family = "unsafe_declaration"
+obligation_keys = ["caller-contract"]
+expected_contract = "present"
+expected_discharge = "present"
+rationale = "Changed unsafe declaration: the buffer representation in the signature changes while the Safety section still places length/init on the caller. A correct card reports the caller-held obligations and may credit the debug_assert as a debug-only guard; treating the assert as a release guarantee would be over-credit."
+inclusion = "include"

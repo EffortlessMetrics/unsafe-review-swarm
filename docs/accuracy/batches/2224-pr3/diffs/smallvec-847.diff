@@ -1,0 +1,22 @@
+From bb9b3adcc51d8165f7c443757026dae33137a13e Mon Sep 17 00:00:00 2001
+From: Divyansh Patel <pateldivyansh131@gmail.com>
+Date: Sun, 1 Nov 2026 18:48:40 +0530
+Subject: [PATCH] fix-typo in doc(cfg)
+
+---
+ src/lib.rs | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+
+diff --git a/src/lib.rs b/src/lib.rs
+index 8ace2d93..f21443ae 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -1947,7 +1947,7 @@ impl_rts_array!(
+ );
+ 
+ #[cfg(feature = "schemars")]
+-#[cfg_attr(docsrs, doc(cfg(feature = "scheamrs")))]
++#[cfg_attr(docsrs, doc(cfg(feature = "schemars")))]
+ impl<Item: JsonSchema, const INLINE: usize, Heap: Allocator> JsonSchema
+     for SmallVec<Item, INLINE, Heap>
+ {

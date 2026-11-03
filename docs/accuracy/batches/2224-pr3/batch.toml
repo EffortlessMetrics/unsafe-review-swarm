@@ -1,0 +1,94 @@
+# #2224 PR3 seam-denominator batch manifest (SKELETON).
+#
+# Third growth increment: five unfamiliar pinned real PRs across two new
+# projects (bytemuck, smallvec), one per owner-directed family slot:
+# unsafe-relevant, quiet, hardening, test/fixture-heavy, non-NonNull.
+# Source-first expected seams live in seams.toml; the card-to-seam mapping
+# skeleton in mapping.toml carries unknown outcomes only; frozen first-run
+# outputs under outputs/ are NOT YET ACQUIRED (no head checkouts were made in
+# this lane; acquisition is one recorded procedure, checks stay offline).
+# check-seam-batch therefore fails closed on the missing outputs by design
+# until the outputs lane lands. Matching rules and the four baseline questions
+# live in protocol.md. Vocabulary is locked in
+# docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml.
+schema_version = "seam-batch/v1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+protocol = "docs/accuracy/batches/2224-pr3/protocol.md"
+label_schema = "docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml"
+partition = "growth"
+label_status = "agent-drafted source-first skeleton; not human adjudication"
+outputs_status = "pending: frozen first-run outputs not yet acquired; check-seam-batch fails closed until outputs/ and mapping are completed"
+trust_boundary = "Static unsafe contract review only. This batch measures ReviewCard seam recall, emitted-card correctness, obligation over-credit, selection usefulness, duplicates, and quiet-PR false alarms on five pinned PRs. It is not calibrated precision or recall, not a proof of memory safety, not UB-free status, not a Miri result, not Miri-clean status, not site-execution evidence, not witness adequacy, not policy readiness, and not a merge verdict for any sampled PR."
+
+[acquisition]
+method = "read-only gh pr diff fetch plus pinned-head local checkout for analyzer --root"
+network_on_check_path = false
+diff_dir = "docs/accuracy/batches/2224-pr3/diffs"
+
+[analyzer]
+# Pinned at assembly time. No run has been performed in this lane, so there
+# is no binary hash yet; the outputs lane records it with the frozen outputs.
+binary = "target/debug/unsafe-review"
+version = "0.3.8"
+revision = "56366f4a43b7bbf338ef5e6c1ed842ae7c8ee116"
+revision_role = "exact development revision (origin/main at batch assembly; no analyzer run yet)"
+fixed_comparison_040 = "unfilled: frozen outputs pending; the manifest reserves outputs/outputs-0.4.0/ for the comparison run"
+
+[run_config]
+command_shape = "cargo run --locked -p unsafe-review -- check --root <head-checkout> --diff <case-diff> --format json --out <frozen-output>"
+caps = "default analyzer caps; no timeouts hit; no witness execution"
+
+[[cases]]
+id = "bytemuck-258"
+repository = "Lokathor/bytemuck"
+pr = 258
+role = "unsafe-relevant: UB fix, Drop for BoxBytes gains a dominating zero-size guard before unsafe dealloc, SAFETY comment retargeted, plus ZST regression tests"
+base_sha = "164cedda0eae131bc6cb67902599f4ec253642ca"
+head_sha = "1cb59ea18de4559cda09e731fa9f258f33b33c1b"
+diff_file = "diffs/bytemuck-258.diff"
+diff_sha256 = "aa0dd259c2335d462ac881e67781d37b44e16b5fd531be5f77c1b8205aaeabf2"
+expected_seams = 1
+
+[[cases]]
+id = "smallvec-847"
+repository = "servo/rust-smallvec"
+pr = 847
+role = "quiet control: one-line doc(cfg) typo fix, zero expected seams"
+base_sha = "ed214ff06520d63fa6334f218a1f6fccfc06178"
+head_sha = "bb9b3adcc51d8165f7c443757026dae33137a13e"
+diff_file = "diffs/smallvec-847.diff"
+diff_sha256 = "833da8c702c53b2c8d85be65de774108d76745155a0956f435bc9b8024bc9739"
+expected_seams = 0
+
+[[cases]]
+id = "bytemuck-349"
+repository = "Lokathor/bytemuck"
+pr = 349
+role = "hardening: alignment-contract documentation for cast_slice/try_cast_slice plus a regression test pinning the empty-slice alignment failure; no new or changed unsafe operation"
+base_sha = "164cedda0eae131bc6cb67902599f4ec253642ca"
+head_sha = "a0cb3c0a1a154307eaec4e70d61b543d58a36b10"
+diff_file = "diffs/bytemuck-349.diff"
+diff_sha256 = "e860cdb99f419783001496c7904ad050cddf98f3589c46a8aaef8931b24d4cae"
+expected_seams = 0
+
+[[cases]]
+id = "smallvec-757"
+repository = "servo/rust-smallvec"
+pr = 757
+role = "test/fixture-heavy: new proptest Arbitrary impl (generated-input fixture) plus new tests/proptest.rs, alongside Cargo.lock churn and a safe-only fmt reflow; no new or changed unsafe operation"
+base_sha = "8e72b70c5a824b51047341da22e05180d8db24d2"
+head_sha = "54028c6ba47d2726a4a409be3d45491d3bc2680e"
+diff_file = "diffs/smallvec-757.diff"
+diff_sha256 = "3ba44bfa992fdd4066cb2be8d51c078290383eb0fcfab6f4e7e143c610df69ac"
+expected_seams = 0
+
+[[cases]]
+id = "smallvec-768"
+repository = "servo/rust-smallvec"
+pr = 768
+role = "non-NonNull: union representation change MaybeUninit<[Item; INLINE]> to [MaybeUninit<Item>; INLINE] with renamed constructors and a changed unsafe fn signature; no NonNull-centered change"
+base_sha = "38a5afcb88121e244d1f7de2f188e37bb4996a54"
+head_sha = "82e6a7a70a18204f9640e47f125d4f3b8344834e"
+diff_file = "diffs/smallvec-768.diff"
+diff_sha256 = "bf3f159d7f9ae9d6a77f0dbc3b641766c3088f6a0a27495e507826ccada978bd"
+expected_seams = 1

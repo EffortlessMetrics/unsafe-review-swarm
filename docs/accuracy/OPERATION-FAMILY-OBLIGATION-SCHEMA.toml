@@ -1,0 +1,163 @@
+# Locked operation-family / obligation-key / hazard vocabulary for #2224 seam batches.
+#
+# Status: LOCKED. This file is the single frozen enumeration of the label sets
+# that seam inventories (seams.toml) and card mappings (mapping.toml) may use
+# across docs/accuracy/batches/2224-*. New families, keys, or slugs require an
+# explicit schema-revision note here; labelers must not invent ad-hoc names in
+# batch rows. PR1 used several non-canonical names (recorded under
+# [legacy_names]); PR2 moved to canonical tool names; PR3 and later use only
+# the sets below plus explicitly noted gaps.
+#
+# Code sources (pinned at swarm revision 56366f4a43b7bbf338ef5e6c1ed842ae7c8ee116):
+# - operation families: OperationFamily::as_str
+#   in crates/unsafe-review-core/src/domain/operation.rs
+# - obligation keys: SafetyObligation keys constructed in obligations_for
+#   in crates/unsafe-review-core/src/analysis/obligations/safety.rs
+# - hazard slugs: HazardKind::as_str (ReviewCard identity axis, embedded in
+#   card IDs; NOT the same axis as obligation keys)
+#   in crates/unsafe-review-core/src/domain/hazard.rs
+#
+# Three separate axes; do not conflate them:
+# - operation_family answers Q1 (what unsafe operation is this?).
+# - obligation_keys answer Q2 (what must the reviewer check?).
+# - hazard slugs appear in emitted card IDs and describe the card's own
+#   classification, which the mapping judges against the inventoried family.
+schema_version = "seam-label-schema/v1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+locked_at = "2026-11-04T00:00:00Z"
+locked_at_revision = "56366f4a43b7bbf338ef5e6c1ed842ae7c8ee116"
+status = "locked"
+
+[operation_families]
+source = "crates/unsafe-review-core/src/domain/operation.rs OperationFamily::as_str"
+names = [
+    "raw_pointer_deref",
+    "raw_pointer_read",
+    "raw_pointer_read_unaligned",
+    "raw_pointer_write",
+    "raw_pointer_write_unaligned",
+    "pointer_arithmetic",
+    "ptr_copy",
+    "ptr_replace",
+    "copy_nonoverlapping",
+    "slice_from_raw_parts",
+    "vec_from_raw_parts",
+    "str_from_utf8_unchecked",
+    "maybe_uninit_assume_init",
+    "vec_set_len",
+    "transmute",
+    "zeroed",
+    "drop_in_place",
+    "atomic_pointer_state",
+    "unwrap_unchecked",
+    "unreachable_unchecked",
+    "unsafe_fn_call",
+    "box_from_raw",
+    "nonnull_unchecked",
+    "pin_unchecked",
+    "get_unchecked",
+    "unsafe_impl_send_sync",
+    "ffi",
+    "static_mut",
+    "union_field_read",
+    "inline_asm",
+    "target_feature",
+    "panic_from_safe_js",
+    "stable_byte_source_getter_reentry",
+    "stable_byte_source_rab_async",
+    "stable_byte_source_sab_race",
+    "stable_byte_source_native_ffi_read",
+    "unsafe_declaration",
+    "unknown",
+]
+
+[obligation_keys]
+source = "crates/unsafe-review-core/src/analysis/obligations/safety.rs obligations_for"
+keys = [
+    "initialized",
+    "valid-zero",
+    "valid-value",
+    "unreachable",
+    "callee-contract",
+    "thread-safety",
+    "pin",
+    "bounds",
+    "ownership",
+    "non-null",
+    "global-state",
+    "valid-variant",
+    "asm",
+    "target-feature",
+    "panic-guard",
+    "byte-stability",
+    "caller-contract",
+    "unknown",
+    "pointer-live",
+    "alignment",
+    "allocation",
+    "capacity",
+    "layout",
+    "state-transition",
+    "ordering",
+    "non-overlap",
+    "valid-range",
+    "abi",
+    "return-value",
+    "utf8",
+]
+
+[hazard_slugs]
+source = "crates/unsafe-review-core/src/domain/hazard.rs HazardKind::as_str"
+note = "Card-identity axis only (embedded in ReviewCard IDs). Never use a hazard slug where an obligation key belongs."
+slugs = [
+    "pointer_validity",
+    "alignment",
+    "same_allocation",
+    "bounds",
+    "initialized_memory",
+    "invalid_value",
+    "aliasing_or_provenance",
+    "panic_safety",
+    "drop_or_deallocation",
+    "ffi_abi",
+    "ffi_ownership",
+    "send_sync_invariant",
+    "pin_invariant",
+    "atomic_ordering",
+    "layout_or_repr",
+    "static_mut_global_state",
+    "target_feature",
+    "inline_asm",
+    "leak_or_ownership_transfer",
+    "stable_byte_source",
+    "unknown",
+]
+
+# PR1 used non-canonical names. They are frozen history, not valid for new
+# rows. Nearest-canonical readings below are interpretive guidance for
+# comparing PR1 rows against later batches, not mechanical rewrites.
+[legacy_names]
+ffi_call = "ffi"
+unsafe_call = "unsafe_fn_call"
+slice_from_raw_parts_mut = "slice_from_raw_parts"
+pointer_validity = "pointer-live"
+same_allocation = "allocation"
+in_bounds = "bounds"
+buffer_validity = "bounds"
+initialized_memory = "initialized"
+return_value_validation = "return-value"
+
+# Review questions with no canonical family or key. Labelers must name the
+# nearest set member AND record the gap in the seam rationale (PR2 precedent);
+# stretching a memory key to fit is a Q2 failure in the opposite direction.
+[[known_gaps]]
+id = "send-sync-bound-adequacy"
+note = "No obligation key covers unsafe Send/Sync impl where-clause adequacy. PR2 approximated with pointer-live/allocation; the tool emits thread-safety. The approximation is documented per row, never silently stretched."
+
+[[known_gaps]]
+id = "dealloc-family"
+note = "No operation family names raw deallocation. An edited unsafe dealloc call site is inventoried as unsafe_fn_call (dealloc is an unsafe fn) with callee-contract, and the ownership/allocation adequacy is judged from the SAFETY comment, not the family name."
+
+[[known_gaps]]
+id = "dropck-may-dangle"
+note = "No operation family names drop-checker (may_dangle) soundness. Such rows use family unknown as an explicit aperture probe, never a stretched memory family."

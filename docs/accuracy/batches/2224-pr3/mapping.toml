@@ -1,0 +1,70 @@
+# #2224 PR3 card-to-seam mapping (SKELETON).
+#
+# SKELETON: frozen first-run outputs are not yet acquired (no head checkouts
+# in this lane), so every inventoried seam carries outcome unknown with no
+# cards, no card rows exist, and the tally is all zeros. The outputs lane
+# replaces the unknown rows with match/missing judgments after consulting the
+# frozen outputs, adds one row per emitted card, and fills the tally.
+# check-seam-batch fails closed on the missing [[outputs]] array until then,
+# by design. This file never edits seams.toml.
+schema_version = "seam-batch-mapping/v1"
+batch = "2224-pr3"
+mapped_at = "2026-11-04T00:00:00Z"
+
+[mapper]
+type = "agent-drafted"
+identity = "opencode subagent lane/2224-unfamiliar-batch"
+provenance = "skeleton only: no analyzer output consulted; draft structure, not human adjudication"
+
+# ---- Seam results: one row per seams.toml row. ----
+
+[[seam_results]]
+seam = "bytemuck-258-S1"
+outcome = "unknown"
+found_family = ""
+family_correct = false
+obligations_correct = false
+over_credited = false
+useful = false
+action_correct = false
+action_specific = false
+action_feasible = false
+cards = []
+notes = "SKELETON: outputs pending; no judgment recorded."
+
+[[seam_results]]
+seam = "smallvec-768-S1"
+outcome = "unknown"
+found_family = ""
+family_correct = false
+obligations_correct = false
+over_credited = false
+useful = false
+action_correct = false
+action_specific = false
+action_feasible = false
+cards = []
+notes = "SKELETON: outputs pending; no judgment recorded."
+
+# ---- Card results: none until frozen outputs exist. ----
+
+# Stated tallies: all zeros for the skeleton. check-seam-batch recomputes
+# every value from the rows above and fails on any disagreement (after the
+# outputs gate, which currently fails first by design).
+[tally]
+expected_seams = 2
+matched = 0
+missing = 0
+unknown = 2
+family_correct = 0
+family_total = 0
+over_credited = 0
+obligations_correct = 0
+obligations_total = 0
+emitted_cards = 0
+duplicates = 0
+wrongly_surfaced = 0
+useful = 0
+quiet_cards = 0
+challenge_seams = 0
+challenge_found = 0
