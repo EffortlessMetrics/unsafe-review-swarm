@@ -858,6 +858,283 @@ fn first_pr_artifact_write_failure_prints_recovery() -> Result<(), Box<dyn Error
 }
 
 #[test]
+fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
+-> Result<(), Box<dyn Error>> {
+    // Option A fail-closed falsifier (#1883): a failed first-pr rerun into an
+    // existing bundle must exit 2 naming the blocked artifact, print no
+    // success output, leave the bundle in place, and the verifier must reject
+    // the resulting mixed bundle.
+    //
+    // Write-path basis (verified on current main in
+    // crates/unsafe-review-cli/src/execute.rs): first-pr renders every
+    // artifact in memory, then writes them in place with sequential
+    // fs::write — cards.json first, review-kit.json near-last, gate manifest
+    // / movement / usefulness-telemetry after it — with no temp-dir, rename,
+    // or tombstone. Blocking review-kit.json therefore leaves a genuine
+    // mid-bundle mix: the early prefix carries new-run bytes while the
+    // blocked artifact and everything after it are never overwritten.
+    let fixture_a = fixture_root("raw_pointer_alignment");
+    let fixture_b = fixture_root("raw_pointer_deref");
+    let diff_a_before = fs::read(fixture_a.join("change.diff"))
+        .expect("snapshot fixture A diff bytes before any run");
+    let src_a_before = fs::read(fixture_a.join("src/lib.rs"))
+        .expect("snapshot fixture A source bytes before any run");
+    let diff_b_before = fs::read(fixture_b.join("change.diff"))
+        .expect("snapshot fixture B diff bytes before any run");
+    let src_b_before = fs::read(fixture_b.join("src/lib.rs"))
+        .expect("snapshot fixture B source bytes before any run");
+
+    let temp = TempDir::new("unsafe-review-failed-rerun-falsifier")
+        .expect("create disposable temp dir for the falsifier out-dirs");
+    let mixed_dir = temp.path().join("review-kit");
+    let reference_dir = temp.path().join("reference-kit");
+
+    // (a) First run with input A, then verify the bundle passes as-is.
+    let first = run_first_pr_bundle(&fixture_a, &mixed_dir).expect("spawn the first first-pr run");
+    assert!(
+        first.status.success(),
+        "first run with input A must succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&first.stdout),
+        String::from_utf8_lossy(&first.stderr)
+    );
+    let check = run_check_first_pr_artifacts(&mixed_dir)
+        .expect("spawn check-first-pr-artifacts on the first-run bundle");
+    assert!(
+        check.status.success(),
+        "first-run bundle must verify clean\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&check.stdout),
+        String::from_utf8_lossy(&check.stderr)
+    );
+    let old_cards =
+        fs::read(mixed_dir.join("cards.json")).expect("snapshot old-run cards.json bytes");
+    let old_gate_manifest = fs::read(mixed_dir.join("unsafe-review-gate.json"))
+        .expect("snapshot old-run gate manifest bytes");
+    let old_movement =
+        fs::read(mixed_dir.join("movement.json")).expect("snapshot old-run movement.json bytes");
+    let old_telemetry = fs::read(mixed_dir.join("usefulness-telemetry.json"))
+        .expect("snapshot old-run usefulness-telemetry.json bytes");
+
+    // Independent clean run with input B: defines the new-run bytes without
+    // depending on the failed run's partial state.
+    let reference = run_first_pr_bundle(&fixture_b, &reference_dir)
+        .expect("spawn the reference first-pr run with input B");
+    assert!(
+        reference.status.success(),
+        "reference run with input B must succeed\nstdout:\n{}\nstderr:\n{}",
+        String::from_utf8_lossy(&reference.stdout),
+        String::from_utf8_lossy(&reference.stderr)
+    );
+    let new_cards = fs::read(reference_dir.join("cards.json"))
+        .expect("read new-run cards.json bytes from the reference bundle");
+    assert_ne!(
+        falsifier_card_ids(&old_cards).expect("parse old-run card ids"),
+        falsifier_card_ids(&new_cards).expect("parse new-run card ids"),
+        "fixture switch must produce observably different cards or the rerun proves nothing"
+    );
+
+    // (b) Root-proof failure injection: replace the old review-kit.json file
+    // with a directory, so the rerun's in-place write of that artifact fails
+    // while every earlier artifact write succeeds. No permission-bit tricks:
+    // those are bypassed when tests run as root.
+    fs::remove_file(mixed_dir.join("review-kit.json"))
+        .expect("remove old review-kit.json to stage the failure injection");
+    fs::create_dir(mixed_dir.join("review-kit.json"))
+        .expect("pre-create a directory at the blocked artifact path");
+
+    // (c) Rerun input B into the same out-dir: must fail closed.
+    let rerun = run_first_pr_bundle(&fixture_b, &mixed_dir)
+        .expect("spawn the failed rerun into the existing bundle");
+    assert!(
+        !rerun.status.success(),
+        "rerun into the blocked bundle must fail"
+    );
+    assert_eq!(
+        rerun.status.code(),
+        Some(2),
+        "failed rerun must exit 2 (tool did not complete a review)"
+    );
+    let rerun_stderr = String::from_utf8(rerun.stderr).expect("rerun stderr must be UTF-8");
+    assert!(
+        rerun_stderr.contains("review-kit.json"),
+        "rerun stderr must name the blocked artifact\nstderr:\n{rerun_stderr}"
+    );
+    assert!(
+        rerun_stderr.contains("Recovery:"),
+        "rerun stderr must carry Recovery guidance\nstderr:\n{rerun_stderr}"
+    );
+    assert!(
+        rerun_stderr.contains("unsafe-review doctor"),
+        "rerun stderr must point at the doctor next step\nstderr:\n{rerun_stderr}"
+    );
+    assert!(
+        String::from_utf8(rerun.stdout)
+            .expect("rerun stdout must be UTF-8")
+            .is_empty(),
+        "failed rerun must print no success output"
+    );
+    assert_eq!(
+        fs::read(fixture_a.join("change.diff")).expect("re-read fixture A diff"),
+        diff_a_before,
+        "fixture A diff must be untouched by the rerun"
+    );
+    assert_eq!(
+        fs::read(fixture_a.join("src/lib.rs")).expect("re-read fixture A source"),
+        src_a_before,
+        "fixture A source must be untouched by the rerun"
+    );
+    assert_eq!(
+        fs::read(fixture_b.join("change.diff")).expect("re-read fixture B diff"),
+        diff_b_before,
+        "fixture B diff must be untouched by the rerun"
+    );
+    assert_eq!(
+        fs::read(fixture_b.join("src/lib.rs")).expect("re-read fixture B source"),
+        src_b_before,
+        "fixture B source must be untouched by the rerun"
+    );
+
+    // (d) Product-left seam. Contract-wording note: "review-kit.json ==
+    // old-run bytes" cannot hold as on-disk file bytes under the prescribed
+    // root-proof injection — replacing the old file with a directory
+    // necessarily displaces it. The test therefore asserts the closest seam
+    // the verified write path permits: the blocked artifact was NOT
+    // overwritten (still the injected directory, not a file), the pre-block
+    // prefix carries new-run bytes, and the post-block tail retains old-run
+    // bytes. cards.json comparison is modulo provenance.generated_at, which
+    // is per-run wall time by design; every other field must match exactly.
+    let mixed_cards = fs::read(mixed_dir.join("cards.json"))
+        .expect("read mixed-bundle cards.json after the failed rerun");
+    assert_eq!(
+        normalize_falsifier_cards_json(&mixed_cards).expect("normalize mixed cards.json"),
+        normalize_falsifier_cards_json(&new_cards).expect("normalize new-run cards.json"),
+        "failed rerun must have overwritten cards.json with new-run content: \
+         the failure happened mid-bundle, not at creation"
+    );
+    assert!(
+        mixed_dir.join("review-kit.json").is_dir(),
+        "blocked artifact path must still be the injected directory: \
+         the rerun did not overwrite review-kit.json"
+    );
+    assert!(
+        !mixed_dir.join("review-kit.json").is_file(),
+        "blocked artifact path must not be a regular file after the failed rerun"
+    );
+    assert_eq!(
+        fs::read(mixed_dir.join("unsafe-review-gate.json")).expect("re-read mixed gate manifest"),
+        old_gate_manifest,
+        "gate manifest is written after review-kit.json and must retain old-run bytes"
+    );
+    assert_eq!(
+        fs::read(mixed_dir.join("movement.json")).expect("re-read mixed movement.json"),
+        old_movement,
+        "movement.json is written after review-kit.json and must retain old-run bytes"
+    );
+    assert_eq!(
+        fs::read(mixed_dir.join("usefulness-telemetry.json"))
+            .expect("re-read mixed usefulness-telemetry.json"),
+        old_telemetry,
+        "usefulness-telemetry.json is written last and must retain old-run bytes"
+    );
+    assert!(
+        mixed_dir.is_dir(),
+        "failed rerun must leave the bundle directory in place"
+    );
+
+    // (e) The verifier must reject the mixed bundle (fail-closed verdict).
+    let verdict = run_check_first_pr_artifacts(&mixed_dir)
+        .expect("spawn check-first-pr-artifacts on the mixed bundle");
+    assert!(
+        !verdict.status.success(),
+        "verifier must reject the mixed bundle"
+    );
+    let verdict_text = format!(
+        "{}{}",
+        String::from_utf8_lossy(&verdict.stdout),
+        String::from_utf8_lossy(&verdict.stderr)
+    );
+    assert!(
+        verdict_text.contains("review-kit.json"),
+        "verifier rejection must name the blocked artifact\nverdict:\n{verdict_text}"
+    );
+    assert!(
+        !verdict_text.contains("check-first-pr-artifacts: ok"),
+        "verifier must not report ok on the mixed bundle\nverdict:\n{verdict_text}"
+    );
+
+    // Cleanup on the passing path removes only the injected directory; the
+    // disposable out-dirs vanish with TempDir's Drop on every path.
+    fs::remove_dir(mixed_dir.join("review-kit.json"))
+        .expect("remove the injected directory during cleanup");
+
+    Ok(())
+}
+
+fn run_first_pr_bundle(fixture: &Path, out_dir: &Path) -> Result<Output, Box<dyn Error>> {
+    Ok(Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
+        .arg("unsafe-review")
+        .arg("first-pr")
+        .arg("--root")
+        .arg(fixture)
+        .arg("--diff")
+        .arg(fixture.join("change.diff"))
+        .arg("--out-dir")
+        .arg(out_dir)
+        .output()?)
+}
+
+fn run_check_first_pr_artifacts(dir: &Path) -> Result<Output, Box<dyn Error>> {
+    let workspace_root = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("../..");
+    Ok(Command::new("cargo")
+        .arg("run")
+        .arg("--locked")
+        .arg("-p")
+        .arg("xtask")
+        .arg("--")
+        .arg("check-first-pr-artifacts")
+        .arg(dir)
+        .current_dir(&workspace_root)
+        .output()?)
+}
+
+fn falsifier_card_ids(cards_json: &[u8]) -> Result<Vec<String>, Box<dyn Error>> {
+    let doc: Value = serde_json::from_slice(cards_json)?;
+    let cards = doc
+        .get("cards")
+        .and_then(Value::as_array)
+        .ok_or("cards.json must carry a cards array")?;
+    let mut ids: Vec<String> = Vec::new();
+    for card in cards {
+        let id = card
+            .get("id")
+            .and_then(Value::as_str)
+            .ok_or("every card in cards.json must carry an id")?;
+        ids.push(id.to_string());
+    }
+    ids.sort();
+    assert!(
+        !ids.is_empty(),
+        "cards.json must carry at least one card for the falsifier seam"
+    );
+    Ok(ids)
+}
+
+fn normalize_falsifier_cards_json(cards_json: &[u8]) -> Result<Value, Box<dyn Error>> {
+    let mut doc: Value = serde_json::from_slice(cards_json)?;
+    let provenance = doc
+        .get_mut("provenance")
+        .ok_or("cards.json must carry a provenance object")?;
+    let removed = provenance
+        .as_object_mut()
+        .ok_or("cards.json provenance must be an object")?
+        .remove("generated_at");
+    assert!(
+        removed.is_some(),
+        "cards.json provenance must carry generated_at (per-run wall time, excluded from byte comparison)"
+    );
+    Ok(doc)
+}
+
+#[test]
 fn first_pr_help_shows_exact_external_pr_setup_cue() -> Result<(), Box<dyn Error>> {
     let output = checked_output(
         Command::new(env!("CARGO_BIN_EXE_cargo-unsafe-review"))
