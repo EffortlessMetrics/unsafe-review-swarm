@@ -24,8 +24,8 @@ to the exact commit being considered.)
 `verdict`/`review_kind` keys — those belong to the independent-review-v1
 marker. `tree` MUST come from the merge-commit object
 (`gh api .../git/commits/<integration> --jq .tree.sha`), NEVER from local
-`git rev-parse HEAD^{tree}` — the two differ whenever the merge commit has
-a real tree.
+`git rev-parse HEAD^{tree}` — local rev-parse reads the local HEAD, not the
+merge-commit object, so always source the tree from the merge commit itself.
 
 ## 3. Verify brief SHAs; re-fetch at admission
 
@@ -36,8 +36,8 @@ copied from an earlier packet.
 
 ## 4. Bot-review triage discipline
 
-Verify every bot claim against the exact head with `file:line` evidence —
-bots were right ~70% in this drive. Real catches included fingerprint
+Verify every bot claim against the exact head with `file:line` evidence.
+Real catches included fingerprint
 list-boundary collisions, unscoped pending exemptions, tag-adjacent SHA
 scans, stale tests passing via the wrong branch, missing cross-panel
 coverage, and unscoped CLI claims. Fix in-scope findings immediately with
