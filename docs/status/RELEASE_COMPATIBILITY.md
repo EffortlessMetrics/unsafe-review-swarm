@@ -65,7 +65,7 @@ retain their original producer and consumer identities.
   checkout stays at `0.3.8` (unpublished swarm main) while the published
   registry state is `0.5.0`; the two must never be conflated. Newer Swarm main
   work stays unpublished until separately qualified and released.
-- The VS Code/Open VSX surface is a saved-bundle MVP. Marketplace listings,
+- The VS Code/Open VSX surface is a saved-bundle MVP. For the next candidate, Marketplace listings,
   prebuilt binaries, crates.io candidate publication, GitHub Release, and
   public Action `v1` are unavailable until separately receipted.
 - Live LSP exists as a read-only advisory server, while extension packaging
