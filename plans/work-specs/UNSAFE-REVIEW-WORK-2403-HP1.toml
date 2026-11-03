@@ -1,0 +1,81 @@
+# Issue-linked work specification for installed-candidate harness preparation (unblocked part).
+# Basis: main 38dc3814 (2026-11-04). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2403
+#
+# Scope note: final installed execution stays blocked on the frozen #2401
+# matrix and source #579 package identities. This slice prepares the harness
+# only: row manifest, installed-LSP negative selection, space-in-prefix case,
+# and fixture mapping. No live execution against a candidate.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2403"
+kind = "correctness"
+objective = "Prepare the installed-candidate qualification harness without executing it: a row manifest mapping each qualification row to its fixture, harness, and verdict rule; an installed-LSP executable-selection test proving a wrong/missing executable fails instead of falling back; a space-in-prefix install-path case; and fixture mapping for the named consumers (tokmd, ub-review, saved editor)."
+user_outcome = "A maintainer (or the frozen-matrix lane later) can execute the full installed qualification by filling in the candidate identity: every row has a mapped fixture and an explicit pass/fail rule, and the harness refuses to silently fall back to dev binaries."
+claim_boundary = "This slice builds harness and tests only; it performs no installed execution, no qualification verdict, no publication, and no network access; it makes no safety, UB-free, Miri-clean, or release qualification claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): a row manifest (new file under docs/qualification/ or as a test-module table — writer picks the repo-idiomatic home, documented in the packet) mapping each #2403 acceptance row (installed CLI smoke, LSP/agent loop with saved diagnostics, named-consumer ingestion) to its fixture directory, harness entry point, and verdict rule (pass/fail/not-run with explicit fallback-refusal).",
+    "Settled design (verbatim): installed-LSP executable-selection negative test — harness given a wrong or missing executable path must fail with an explicit diagnostic naming the expected path; no silent fallback to cargo run, PATH lookup, dev binaries, or the installed 0.5.0.",
+    "Settled design (verbatim): space-in-install-prefix case — install and execution paths containing spaces must work or fail loudly with the exact path quoted (extends the existing space-path coverage pattern).",
+    "Settled design (verbatim): fixture mapping for tokmd, ub-review, and the saved editor extension: record the pinned revisions/commands the harness will invoke (no execution, versions as documented, no new pins invented).",
+]
+excluded = [
+    "Any installed execution against a real candidate, any qualification verdict, the frozen #2401 matrix, source #579 identities, registry uploads, crate publication, tag/Release creation, or network access.",
+    "Wiring the harness into check-pr or any CI gate; LSP server behavior changes; consumer code changes.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "No test in this slice executes an installed candidate or touches the network; all new tests run against fixtures and the harness's own selection logic."
+
+[[invariant]]
+id = "INV-2"
+text = "A wrong or missing executable is always a loud failure naming the expected path; silent fallback is never an acceptable outcome in any added test."
+
+[[invariant]]
+id = "INV-3"
+text = "Fixture pins are recorded, never invented; where the frozen matrix is undecided the manifest marks the row blocked with its owner."
+
+[[acceptance]]
+id = "AC-2403-HP-1"
+text = "Row manifest exists mapping each qualification row to fixture, harness entry, and verdict rule."
+proof = ["cargo test --locked -p xtask qualification_manifest"]
+
+[[acceptance]]
+id = "AC-2403-HP-2"
+text = "Installed-LSP executable-selection negative test fails loudly on wrong/missing executables with the expected path named."
+proof = ["cargo test --locked -p xtask qualification_manifest"]
+
+[[acceptance]]
+id = "AC-2403-HP-3"
+text = "Space-in-prefix case covered; consumer fixture mapping recorded."
+proof = ["cargo test --locked -p xtask qualification_manifest"]
+
+[[acceptance]]
+id = "AC-2403-HP-4"
+text = "fmt clean, no new Clippy warnings, no unwrap() in new tests, full lane gates green."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[integration]]
+surface = "harness_manifest"
+expected = "Manifest plus tests; the harness stays unwired from check-pr and performs no live execution."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Harness-only slice with no candidate execution: the worst case is an unused manifest, never a false qualification."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Explicit blocked-rows with owners keep the frozen-matrix and source-identity dependencies visible instead of silently assumed."
+
+[compatibility]
+posture = "Additive harness files plus unit tests; no analyzer, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Remove the manifest file and the new tests; the tree behaves exactly as before."
