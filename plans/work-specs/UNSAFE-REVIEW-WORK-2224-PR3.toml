@@ -1,0 +1,72 @@
+# Issue-linked work specification for the #2224 unfamiliar-batch skeleton (PR3 assembly lane).
+# Basis: origin/main 56366f4a (2026-11-03). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2224"
+kind = "correctness"
+objective = "Assemble the #2224 PR3 unfamiliar-batch skeleton: five unfamiliar pinned real PRs across two new projects (one per owner-directed family slot: unsafe-relevant, quiet, hardening, test/fixture-heavy, non-NonNull), a locked operation-family/obligation-key/hazard schema file, source-first expected-seam inventory with canonical vocabulary, frozen diffs, skeleton mapping/protocol/report, and check-seam-batch wiring that fails closed until frozen outputs land."
+user_outcome = "A reviewer can verify every pinned SHA, reproduce the frozen diff bytes, see exactly which judgments remain unknown, and extend the batch with frozen outputs without reshaping the harness; the checker fails closed rather than silently passing the skeleton."
+claim_boundary = "This slice produces agent-drafted source-first labels as useful draft evidence, not human adjudication; it claims no labeled calibration, no global precision or recall, no memory safety, no witness adequacy, and no policy readiness. No detector tuning. No analyzer runs were performed in this lane (no head checkouts); frozen outputs and completed mapping belong to the outputs lane. The published-0.4.0 comparison slot is reserved but unfilled."
+
+[scope]
+included = [
+    "Locked vocabulary docs/accuracy/OPERATION-FAMILY-OBLIGATION-SCHEMA.toml enumerating the canonical operation-family, obligation-key, and hazard-slug sets with code sources, the PR1 legacy-name table, and the three known vocabulary gaps (send-sync-bound-adequacy, dealloc-family, dropck-may-dangle).",
+    "Batch skeleton docs/accuracy/batches/2224-pr3/batch.toml with five unfamiliar pinned PRs (bytemuck-258 unsafe-relevant, smallvec-847 quiet, bytemuck-349 hardening, smallvec-757 test/fixture-heavy, smallvec-768 non-NonNull): repository, PR number, exact base/head SHAs, diff sha256, analyzer identity, configuration, caps, corpus partition, and acquisition route; frozen diffs under diffs/.",
+    "Source-first expected-seam inventory docs/accuracy/batches/2224-pr3/seams.toml (2 seams) recorded from diff reading plus enclosing-function reads at pinned heads before any analyzer output is consulted, with stable identities, canonical families/keys, inclusion decisions, and draft-label provenance.",
+    "Skeleton mapping docs/accuracy/batches/2224-pr3/mapping.toml with unknown outcomes only and an all-zero tally, batch-scoped protocol docs/accuracy/batches/2224-pr3/protocol.md carrying the locked-vocabulary rule plus skeleton discipline, and skeleton report docs/accuracy/batches/2224-pr3/report.md with inventory counts and explicit unknowns.",
+    "check-seam-batch wiring extended from the two committed batches to include docs/accuracy/batches/2224-pr3 (same fail-closed row accounting; the skeleton fails on missing outputs by design until the outputs lane lands).",
+]
+excluded = [
+    "Frozen analyzer outputs and completed card-to-seam mapping; the skeleton mapping stays all-unknown and the checker stays red on this batch until the outputs lane lands.",
+    "Detector tuning of any kind driven by batch feedback.",
+    "Human adjudication; agent-drafted labels are marked as drafts with provenance.",
+    "The 0.4.0 fixed-comparison run; the manifest reserves the slot and records why it is unfilled.",
+    "Head checkouts, full clones, or any network acquisition on the check path.",
+    "Witness execution, third-party writes, comments, issues, or support promotion.",
+    "Publication, release versioning, source promotion, and safety or execution claims.",
+    "Any PR already used in 2224-pr1/pr2, any pilot input, any issue-named exposed development control (crossbeam-1295/1298, Bytes seed, #2247/#2248, #2251/#2254/#2255/#2257), and anything overlapping the #2402/#2399 release-comparison sets (which reuse exposed development controls; no enumerated five-input list exists in-repo).",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Expected-seam rows are committed with source-first provenance before any frozen outputs are consulted for mapping; mapping never edits the seam inventory to fit the output."
+
+[[invariant]]
+id = "INV-2"
+text = "Only canonical locked-vocabulary names appear in new seam rows; PR1 legacy names are frozen history and vocabulary gaps are recorded per row, never silently stretched."
+
+[[invariant]]
+id = "INV-3"
+text = "The skeleton never fabricates outputs: missing frozen outputs fail check-seam-batch closed rather than passing with invented rows."
+
+[[acceptance]]
+id = "AC-2224-PR3-1"
+text = "Batch manifest pins five unfamiliar PRs (one per family slot, none from prior batches/pilots/exposed controls) with exact base/head SHAs verified fetchable, diff hashes matching committed bytes, analyzer identity, configuration, and partition."
+proof = ["cargo run --locked -p xtask -- check-seam-batch (fails closed on missing outputs after passing diff pins; failure names the missing outputs array)"]
+
+[[acceptance]]
+id = "AC-2224-PR3-2"
+text = "Source-first seam inventory covers every case including zero-output expectations with stable identities, canonical families/keys from the locked schema, inclusion decisions, and draft-label provenance."
+proof = ["cargo run --locked -p xtask -- check-seam-batch", "cargo test --locked -p xtask seam_batch"]
+
+[[acceptance]]
+id = "AC-2224-PR3-3"
+text = "Locked schema file enumerates the full canonical family/key/slug sets with code sources, the PR1 legacy table, and the three known gaps; no new batch row uses an out-of-schema name."
+proof = ["cargo run --locked -p xtask -- check-work-specs"]
+
+[[acceptance]]
+id = "AC-2224-PR3-4"
+text = "PR1/PR2 batches still verify byte-identical under the extended checker; xtask seam-batch unit tests keep pinning known TP/FP/FN/duplicate/unknown counts."
+proof = ["cargo test --locked -p xtask seam_batch"]
+
+[[integration]]
+surface = "2224-pr3-seam-batch"
+notes = "Additive: no PR1/PR2 file is modified. The outputs lane completes mapping.toml and outputs/ without reshaping the harness; check-pr behavior on main is untouched (this lane is not merged)."
+expected = "check-seam-batch enumerates three batch dirs and fails closed naming the pr3 missing outputs; check-work-specs passes the new work spec."
+
+[[risk]]
+id = "RISK-1"
+text = "Wiring a skeleton batch into BATCH_DIRS keeps check-seam-batch (and triggered check-local runs) red on this lane until outputs land; contained by staying on the lane branch and stating the fail-closed expectation in the report."
+
+[rollback]
+strategy = "Remove the 2224-pr3 batch directory, the locked schema file, the PR3 work spec, and the BATCH_DIRS line; every gate behaves exactly as before and PR1/PR2 verify unchanged."

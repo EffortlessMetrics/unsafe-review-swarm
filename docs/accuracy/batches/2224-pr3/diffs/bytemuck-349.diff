@@ -1,0 +1,67 @@
+From a0cb3c0a1a154307eaec4e70d61b543d58a36b10 Mon Sep 17 00:00:00 2001
+From: Teddy Tennant <teddytennant@icloud.com>
+Date: Wed, 8 Jul 2026 12:28:31 -0400
+Subject: [PATCH] docs: note that an empty slice must still satisfy target
+ alignment in cast_slice/try_cast_slice
+
+An empty input slice is not exempt from the alignment requirement: casting
+an empty `&[u8]` to `&[u32]` still returns Err (and cast_slice panics)
+because the slice's data pointer typically only satisfies the source
+alignment. Document this on try_cast_slice and add a regression test that
+builds a deterministically under-aligned empty slice.
+
+Fixes #342
+---
+ src/lib.rs                | 11 +++++++++++
+ tests/cast_slice_tests.rs | 16 ++++++++++++++++
+ 2 files changed, 27 insertions(+)
+
+diff --git a/src/lib.rs b/src/lib.rs
+index e4d70bed..478cac4e 100644
+--- a/src/lib.rs
++++ b/src/lib.rs
+@@ -504,6 +504,17 @@ pub fn try_cast_mut<
+ ///   that's a failure).
+ /// * Similarly, you can't convert between a [ZST](https://doc.rust-lang.org/nomicon/exotic-sizes.html#zero-sized-types-zsts)
+ ///   and a non-ZST.
++///
++/// ## Note
++///
++/// An empty input slice is **not** exempt from the alignment requirement. If
++/// the target type has a greater alignment than the source type then this can
++/// still fail (and [`cast_slice`] can still panic) even when the slice is
++/// empty, because the slice's data pointer must satisfy the target alignment.
++/// An empty slice such as `&[]` typically carries a dangling pointer aligned
++/// only to the source type, which may be under-aligned for the target. If you
++/// need casting an empty slice to always succeed, test for emptiness yourself
++/// and substitute an empty slice of the target type.
+ #[inline]
+ pub fn try_cast_slice<A: NoUninit, B: AnyBitPattern>(
+   a: &[A],
+diff --git a/tests/cast_slice_tests.rs b/tests/cast_slice_tests.rs
+index 7dbb45ea..5d0df17b 100644
+--- a/tests/cast_slice_tests.rs
++++ b/tests/cast_slice_tests.rs
+@@ -41,6 +41,22 @@ fn test_try_cast_slice() {
+   try_cast_slice::<u8, u32>(the_bytes).unwrap();
+ }
+ 
++#[test]
++fn test_cast_slice_empty_alignment() {
++  // Regression/doc test for #342: an EMPTY slice is still subject to the
++  // target alignment requirement. Build a guaranteed 4-aligned byte slice from
++  // a [u32; 1], then `&bytes[1..1]` is a length-0 slice whose pointer is
++  // deterministically base+1 (not 4-aligned).
++  let aligned: [u32; 1] = [0];
++  let bytes: &[u8] = cast_slice(&aligned);
++  let empty_unaligned: &[u8] = &bytes[1..1];
++  assert!(empty_unaligned.is_empty());
++  assert_eq!(
++    try_cast_slice::<u8, u32>(empty_unaligned),
++    Err(PodCastError::TargetAlignmentGreaterAndInputNotAligned)
++  );
++}
++
+ #[test]
+ fn test_try_cast_slice_mut() {
+   // some align4 data

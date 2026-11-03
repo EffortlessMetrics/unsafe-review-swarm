@@ -1,0 +1,157 @@
+{
+  "schema_version": "0.2",
+  "tool": "unsafe-review",
+  "tool_version": "0.3.8",
+  "scope": "diff",
+  "mode": "draft",
+  "policy": "advisory",
+  "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so.",
+  "root": "F:/Temp/seam-batch/checkouts/bytemuck-258",
+  "summary": {
+    "rust_files": 26,
+    "changed_files": 2,
+    "changed_rust_files": 2,
+    "changed_non_rust_files": 0,
+    "unsafe_sites": 1,
+    "cards": 1,
+    "open_actionable_gaps": 1,
+    "production_cards": 1,
+    "test_cards": 0,
+    "generated_cards": 0,
+    "unknown_cards": 0,
+    "contract_missing": 0,
+    "guard_missing": 1,
+    "guarded_unwitnessed": 0,
+    "unsafe_unreached": 0,
+    "requires_loom": 0,
+    "miri_unsupported": 0,
+    "static_unknown": 0,
+    "new_gaps": 1,
+    "worsened_gaps": 0,
+    "improved_gaps": 0,
+    "resolved_gaps": 0,
+    "inherited_gaps": 0,
+    "scan_capped": false
+  },
+  "cards": [
+    {
+      "id": "UR-bytemuck-src-allocation-rs-drop-operation-unsafe_fn_call-dealloc-08e5d8c811b3-unknown-c1",
+      "class": "guard_missing",
+      "priority": "high",
+      "confidence": "medium",
+      "proof_path": "human_review_only",
+      "site": {
+        "file": "src/allocation.rs",
+        "line": 777,
+        "column": 7,
+        "kind": "operation",
+        "owner": "drop",
+        "visibility": "private",
+        "public_api_surface": false,
+        "snippet": "unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };"
+      },
+      "operation": "unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };",
+      "operation_family": "unsafe_fn_call",
+      "hazards": [
+        "unknown"
+      ],
+      "obligations": [
+        "callee safety preconditions are satisfied"
+      ],
+      "obligation_evidence": [
+        {
+          "key": "callee-contract",
+          "description": "callee safety preconditions are satisfied",
+          "contract": {
+            "present": true,
+            "state": "present",
+            "summary": "Nearby `SAFETY:` comment was detected"
+          },
+          "discharge": {
+            "present": false,
+            "state": "missing",
+            "summary": "No obligation-specific guard code was detected"
+          },
+          "reach": {
+            "present": true,
+            "state": "present",
+            "summary": "1 related test file mentions owner `drop`"
+          },
+          "witness": {
+            "present": false,
+            "state": "missing",
+            "summary": "No imported witness receipt was found"
+          }
+        }
+      ],
+      "contract": "Nearby `SAFETY:` comment was detected",
+      "discharge": "No visible local guard detected",
+      "reach": "1 related test file mentions owner `drop`",
+      "witness": "No imported witness receipt was found",
+      "witness_routes": [
+        {
+          "kind": "human-deep-review",
+          "reason": "The analyzer could not infer a precise witness route; use manual unsafe contract review",
+          "command": null,
+          "required": false
+        }
+      ],
+      "related_tests": [
+        {
+          "name": "test_boxed_slices",
+          "file": "tests/cast_slice_tests.rs",
+          "line": 201
+        }
+      ],
+      "missing": [
+        "Missing visible local guard for inferred safety obligations",
+        "No witness receipt imported for this card"
+      ],
+      "next_action": "Review the `unsafe_fn_call` callee contract manually and add obligation-specific guard evidence for this call.",
+      "verify_commands": [],
+      "confirmation_cue": {
+        "hypothesis_to_confirm": "static `guard_missing` ReviewCard for `unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };`; confirm with external evidence before treating it as observed runtime behavior",
+        "build_this_first": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "summary": "No automatic build/run command is available; use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence"
+        },
+        "minimal_repro": {
+          "kind": "witness_route",
+          "command": null,
+          "route_kind": "human-deep-review",
+          "steps": [
+            "Confirm ReviewCard `UR-bytemuck-src-allocation-rs-drop-operation-unsafe_fn_call-dealloc-08e5d8c811b3-unknown-c1` still maps to `unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };` at `src/allocation.rs:777:7` before upgrading confidence.",
+            "Use the `human-deep-review` route from `witness-plan.md` to derive a focused repro or human review target for this card.",
+            "Attach a matching receipt only if the route confirms this card; otherwise keep the finding as a hypothesis to review."
+          ],
+          "limitation": "Minimal repro cue only; unsafe-review did not run this command, observe runtime behavior, prove site execution, prove UB, or prove repository safety."
+        },
+        "confirmation_step": "use the `human-deep-review` route in `witness-plan.md` to derive a focused repro or human review before upgrading confidence",
+        "runtime_executed": false,
+        "confirmation_state": "pending",
+        "trust_boundary": "static unsafe contract review only; not memory-safety proof, not UB-free status, not Miri-clean status, and not a site-execution claim unless a matching witness receipt says so."
+      },
+      "coverage": {
+        "contract_coverage": "present",
+        "guard_coverage": "missing",
+        "test_reach_coverage": "missing",
+        "witness_receipt_coverage": "missing",
+        "manual_context": "absent",
+        "baseline_state": "new",
+        "outcome_movement": "regressed",
+        "comment_plan_status": "selected",
+        "agent_lsp_readiness": "needs_human"
+      }
+    }
+  ],
+  "provenance": {
+    "tool_version": "0.3.8",
+    "generated_at": "2026-11-03T21:32:18Z",
+    "root_abs": "//?/F:/Temp/seam-batch/checkouts/bytemuck-258",
+    "diff_path": "docs/accuracy/batches/2224-pr3/diffs/bytemuck-258.diff",
+    "diff_sha256": "aa0dd259c2335d462ac881e67781d37b44e16b5fd531be5f77c1b8205aaeabf2",
+    "dirty_worktree": false
+  }
+}

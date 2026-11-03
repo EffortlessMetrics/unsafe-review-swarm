@@ -1,0 +1,62 @@
+From 1cb59ea18de4559cda09e731fa9f258f33b33c1b Mon Sep 17 00:00:00 2001
+From: Zachary S <zasample18+github@gmail.com>
+Date: Sun, 28 Jul 2024 23:31:32 -0500
+Subject: [PATCH] Fix UB when dropping BoxBytes owning a zero-sized layout
+
+---
+ src/allocation.rs         | 12 ++++++++----
+ tests/cast_slice_tests.rs | 14 ++++++++++++++
+ 2 files changed, 22 insertions(+), 4 deletions(-)
+
+diff --git a/src/allocation.rs b/src/allocation.rs
+index ae0dca1a..78c30ffb 100644
+--- a/src/allocation.rs
++++ b/src/allocation.rs
+@@ -742,8 +742,9 @@ impl<I: ?Sized, T: ?Sized + TransparentWrapper<I>> TransparentWrapperAlloc<I>
+ 
+ /// As `Box<[u8]>`, but remembers the original alignment.
+ pub struct BoxBytes {
+-  // SAFETY: `ptr` is owned, was allocated with `layout`, and points to
+-  // `layout.size()` initialized bytes.
++  // SAFETY: `ptr` is owned, points to `layout.size()` initialized bytes, and
++  // was allocated with `layout` (unless `layout.size() == 0` in which case it
++  // is dangling).
+   ptr: NonNull<u8>,
+   layout: Layout,
+ }
+@@ -770,8 +771,11 @@ impl DerefMut for BoxBytes {
+ 
+ impl Drop for BoxBytes {
+   fn drop(&mut self) {
+-    // SAFETY: See type invariant.
+-    unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };
++    if self.layout.size() != 0 {
++      // SAFETY: See type invariant: if `self.layout.size() != 0`, then
++      // `self.ptr` is owned and was allocated with `self.layout`.
++      unsafe { alloc::alloc::dealloc(self.ptr.as_ptr(), self.layout) };
++    }
+   }
+ }
+ 
+diff --git a/tests/cast_slice_tests.rs b/tests/cast_slice_tests.rs
+index 71bc4df0..016f8f8a 100644
+--- a/tests/cast_slice_tests.rs
++++ b/tests/cast_slice_tests.rs
+@@ -328,3 +328,17 @@ fn test_arc_slices() {
+   let empty: Arc<[i8]> = cast_slice_arc::<(), i8>(Arc::new([(); 42]));
+   assert!(empty.is_empty());
+ }
++
++#[cfg(feature = "extern_crate_alloc")]
++#[test]
++fn box_bytes_zst() {
++  let x: BoxBytes = box_bytes_of(Box::new([0u8; 0]));
++  let _: Box<[u8]> = from_box_bytes(x);
++
++  let x: BoxBytes = box_bytes_of(Box::new([0u8; 0]));
++  let res: Result<Box<[()]>, _> = try_from_box_bytes(x);
++  assert_eq!(res.unwrap_err().0, PodCastError::SizeMismatch);
++
++  let x: BoxBytes = box_bytes_of(Box::new([(); 0]));
++  let _: Box<[u8]> = from_box_bytes(x);
++}
