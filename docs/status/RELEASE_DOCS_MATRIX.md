@@ -26,7 +26,7 @@ delivery inventory in
 [`UNSAFE-REVIEW-CUTLINE-2401.toml`](../../plans/release-cutline/UNSAFE-REVIEW-CUTLINE-2401.toml)
 ([summary](../../plans/release-cutline/UNSAFE-REVIEW-CUTLINE-2401-SUMMARY.md),
 refreshed by PR #2419, still draft). The
-[draft cutline](RELEASE_CUTLINE.md) and dependency ledger retain their own
+[superseded 1915 cutline snapshot](RELEASE_CUTLINE.md) and dependency ledger retain their own
 audited inputs; neither is repinned or frozen by this documentation snapshot.
 
 ## Stale-claim matrix

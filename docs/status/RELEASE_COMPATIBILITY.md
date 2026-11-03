@@ -2,8 +2,8 @@
 
 Audited 2026-11-03 against swarm `origin/main` at
 `a5c1cffdc7ee36486abb3fdb88946303e216e9d6` and the last public release
-`v0.5.0` (2026-09-17). The next candidate has no frozen version or candidate
-SHA. This is a documentation inventory, not a compatibility guarantee,
+`v0.5.0` (2026-09-17). The 0.6 candidate has no frozen version; the 0.6
+draft cutline names an unfrozen candidate SHA. This is a documentation inventory, not a compatibility guarantee,
 installed qualification result, or publication decision.
 
 The [dependency ledger](DEPENDENCY_FREEZE.md) remains a historical, inactive
