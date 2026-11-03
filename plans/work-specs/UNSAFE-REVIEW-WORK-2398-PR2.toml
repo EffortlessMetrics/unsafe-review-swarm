@@ -58,7 +58,7 @@ proof = ["cargo run --locked -p xtask -- check-pr"]
 [[acceptance]]
 id = "AC-2398-PR2-3"
 text = "No unwrap() in new test code (if any), fmt clean, no new Clippy warnings."
-proof = ["cargo fmt --check"]
+proof = ["cargo fmt --check", "cargo clippy --workspace --all-targets --locked -- -D warnings"]
 
 [[integration]]
 surface = "panel_truth"
@@ -74,7 +74,7 @@ expected = "The delivery PR reports stable AC IDs with proof results and exact-h
 
 [[risk]]
 id = "RISK-1"
-mitigation = "Text-only panel edits against a frozen authority; the checker verifies every claim, so a missed stale string fails loudly instead of shipping."
+mitigation = "Text-only panel edits against a frozen authority; the checker scans selected release-claim patterns in four panels; FIRST_USE.md and ROADMAP.md require separate inspection, so a missed stale string fails loudly instead of shipping."
 
 [[risk]]
 id = "RISK-2"
