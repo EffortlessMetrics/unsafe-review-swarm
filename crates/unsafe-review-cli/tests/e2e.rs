@@ -875,60 +875,49 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
     // blocked artifact and everything after it are never overwritten.
     let fixture_a = fixture_root("raw_pointer_alignment");
     let fixture_b = fixture_root("raw_pointer_deref");
-    let diff_a_before = fs::read(fixture_a.join("change.diff"))
-        .expect("snapshot fixture A diff bytes before any run");
-    let src_a_before = fs::read(fixture_a.join("src/lib.rs"))
-        .expect("snapshot fixture A source bytes before any run");
-    let diff_b_before = fs::read(fixture_b.join("change.diff"))
-        .expect("snapshot fixture B diff bytes before any run");
-    let src_b_before = fs::read(fixture_b.join("src/lib.rs"))
-        .expect("snapshot fixture B source bytes before any run");
+    let diff_a_before = fs::read(fixture_a.join("change.diff"))?;
+    let src_a_before = fs::read(fixture_a.join("src/lib.rs"))?;
+    let diff_b_before = fs::read(fixture_b.join("change.diff"))?;
+    let src_b_before = fs::read(fixture_b.join("src/lib.rs"))?;
 
-    let temp = TempDir::new("unsafe-review-failed-rerun-falsifier")
-        .expect("create disposable temp dir for the falsifier out-dirs");
+    let temp = TempDir::new("unsafe-review-failed-rerun-falsifier")?;
     let mixed_dir = temp.path().join("review-kit");
     let reference_dir = temp.path().join("reference-kit");
 
     // (a) First run with input A, then verify the bundle passes as-is.
-    let first = run_first_pr_bundle(&fixture_a, &mixed_dir).expect("spawn the first first-pr run");
+    let first = run_first_pr_bundle(&fixture_a, &mixed_dir)?;
     assert!(
         first.status.success(),
         "first run with input A must succeed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&first.stdout),
         String::from_utf8_lossy(&first.stderr)
     );
-    let check = run_check_first_pr_artifacts(&mixed_dir)
-        .expect("spawn check-first-pr-artifacts on the first-run bundle");
+    let check = run_check_first_pr_artifacts(&mixed_dir)?;
     assert!(
         check.status.success(),
         "first-run bundle must verify clean\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&check.stdout),
         String::from_utf8_lossy(&check.stderr)
     );
-    let old_cards =
-        fs::read(mixed_dir.join("cards.json")).expect("snapshot old-run cards.json bytes");
-    let old_gate_manifest = fs::read(mixed_dir.join("unsafe-review-gate.json"))
-        .expect("snapshot old-run gate manifest bytes");
-    let old_movement =
-        fs::read(mixed_dir.join("movement.json")).expect("snapshot old-run movement.json bytes");
-    let old_telemetry = fs::read(mixed_dir.join("usefulness-telemetry.json"))
-        .expect("snapshot old-run usefulness-telemetry.json bytes");
+    let old_cards = fs::read(mixed_dir.join("cards.json"))?;
+    let old_gate_manifest = fs::read(mixed_dir.join("unsafe-review-gate.json"))?;
+    let old_movement = fs::read(mixed_dir.join("movement.json"))?;
+    let old_telemetry = fs::read(mixed_dir.join("usefulness-telemetry.json"))?;
 
     // Independent clean run with input B: defines the new-run bytes without
     // depending on the failed run's partial state.
-    let reference = run_first_pr_bundle(&fixture_b, &reference_dir)
-        .expect("spawn the reference first-pr run with input B");
+    let reference = run_first_pr_bundle(&fixture_b, &reference_dir)?;
     assert!(
         reference.status.success(),
         "reference run with input B must succeed\nstdout:\n{}\nstderr:\n{}",
         String::from_utf8_lossy(&reference.stdout),
         String::from_utf8_lossy(&reference.stderr)
     );
-    let new_cards = fs::read(reference_dir.join("cards.json"))
-        .expect("read new-run cards.json bytes from the reference bundle");
+    let new_cards = fs::read(reference_dir.join("cards.json"))?;
+    let old_ids = falsifier_card_ids(&old_cards)?;
+    let new_ids = falsifier_card_ids(&new_cards)?;
     assert_ne!(
-        falsifier_card_ids(&old_cards).expect("parse old-run card ids"),
-        falsifier_card_ids(&new_cards).expect("parse new-run card ids"),
+        old_ids, new_ids,
         "fixture switch must produce observably different cards or the rerun proves nothing"
     );
 
@@ -936,14 +925,11 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
     // with a directory, so the rerun's in-place write of that artifact fails
     // while every earlier artifact write succeeds. No permission-bit tricks:
     // those are bypassed when tests run as root.
-    fs::remove_file(mixed_dir.join("review-kit.json"))
-        .expect("remove old review-kit.json to stage the failure injection");
-    fs::create_dir(mixed_dir.join("review-kit.json"))
-        .expect("pre-create a directory at the blocked artifact path");
+    fs::remove_file(mixed_dir.join("review-kit.json"))?;
+    fs::create_dir(mixed_dir.join("review-kit.json"))?;
 
     // (c) Rerun input B into the same out-dir: must fail closed.
-    let rerun = run_first_pr_bundle(&fixture_b, &mixed_dir)
-        .expect("spawn the failed rerun into the existing bundle");
+    let rerun = run_first_pr_bundle(&fixture_b, &mixed_dir)?;
     assert!(
         !rerun.status.success(),
         "rerun into the blocked bundle must fail"
@@ -953,7 +939,7 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
         Some(2),
         "failed rerun must exit 2 (tool did not complete a review)"
     );
-    let rerun_stderr = String::from_utf8(rerun.stderr).expect("rerun stderr must be UTF-8");
+    let rerun_stderr = String::from_utf8(rerun.stderr)?;
     assert!(
         rerun_stderr.contains("review-kit.json"),
         "rerun stderr must name the blocked artifact\nstderr:\n{rerun_stderr}"
@@ -966,29 +952,28 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
         rerun_stderr.contains("unsafe-review doctor"),
         "rerun stderr must point at the doctor next step\nstderr:\n{rerun_stderr}"
     );
+    let rerun_stdout = String::from_utf8(rerun.stdout)?;
     assert!(
-        String::from_utf8(rerun.stdout)
-            .expect("rerun stdout must be UTF-8")
-            .is_empty(),
+        rerun_stdout.is_empty(),
         "failed rerun must print no success output"
     );
     assert_eq!(
-        fs::read(fixture_a.join("change.diff")).expect("re-read fixture A diff"),
+        fs::read(fixture_a.join("change.diff"))?,
         diff_a_before,
         "fixture A diff must be untouched by the rerun"
     );
     assert_eq!(
-        fs::read(fixture_a.join("src/lib.rs")).expect("re-read fixture A source"),
+        fs::read(fixture_a.join("src/lib.rs"))?,
         src_a_before,
         "fixture A source must be untouched by the rerun"
     );
     assert_eq!(
-        fs::read(fixture_b.join("change.diff")).expect("re-read fixture B diff"),
+        fs::read(fixture_b.join("change.diff"))?,
         diff_b_before,
         "fixture B diff must be untouched by the rerun"
     );
     assert_eq!(
-        fs::read(fixture_b.join("src/lib.rs")).expect("re-read fixture B source"),
+        fs::read(fixture_b.join("src/lib.rs"))?,
         src_b_before,
         "fixture B source must be untouched by the rerun"
     );
@@ -1002,11 +987,11 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
     // prefix carries new-run bytes, and the post-block tail retains old-run
     // bytes. cards.json comparison is modulo provenance.generated_at, which
     // is per-run wall time by design; every other field must match exactly.
-    let mixed_cards = fs::read(mixed_dir.join("cards.json"))
-        .expect("read mixed-bundle cards.json after the failed rerun");
+    let mixed_cards = fs::read(mixed_dir.join("cards.json"))?;
+    let mixed_cards_normalized = normalize_falsifier_cards_json(&mixed_cards)?;
+    let new_cards_normalized = normalize_falsifier_cards_json(&new_cards)?;
     assert_eq!(
-        normalize_falsifier_cards_json(&mixed_cards).expect("normalize mixed cards.json"),
-        normalize_falsifier_cards_json(&new_cards).expect("normalize new-run cards.json"),
+        mixed_cards_normalized, new_cards_normalized,
         "failed rerun must have overwritten cards.json with new-run content: \
          the failure happened mid-bundle, not at creation"
     );
@@ -1020,18 +1005,17 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
         "blocked artifact path must not be a regular file after the failed rerun"
     );
     assert_eq!(
-        fs::read(mixed_dir.join("unsafe-review-gate.json")).expect("re-read mixed gate manifest"),
+        fs::read(mixed_dir.join("unsafe-review-gate.json"))?,
         old_gate_manifest,
         "gate manifest is written after review-kit.json and must retain old-run bytes"
     );
     assert_eq!(
-        fs::read(mixed_dir.join("movement.json")).expect("re-read mixed movement.json"),
+        fs::read(mixed_dir.join("movement.json"))?,
         old_movement,
         "movement.json is written after review-kit.json and must retain old-run bytes"
     );
     assert_eq!(
-        fs::read(mixed_dir.join("usefulness-telemetry.json"))
-            .expect("re-read mixed usefulness-telemetry.json"),
+        fs::read(mixed_dir.join("usefulness-telemetry.json"))?,
         old_telemetry,
         "usefulness-telemetry.json is written last and must retain old-run bytes"
     );
@@ -1041,8 +1025,7 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
     );
 
     // (e) The verifier must reject the mixed bundle (fail-closed verdict).
-    let verdict = run_check_first_pr_artifacts(&mixed_dir)
-        .expect("spawn check-first-pr-artifacts on the mixed bundle");
+    let verdict = run_check_first_pr_artifacts(&mixed_dir)?;
     assert!(
         !verdict.status.success(),
         "verifier must reject the mixed bundle"
@@ -1063,8 +1046,7 @@ fn failed_rerun_into_existing_bundle_preserves_and_rejects_mixed_bundle()
 
     // Cleanup on the passing path removes only the injected directory; the
     // disposable out-dirs vanish with TempDir's Drop on every path.
-    fs::remove_dir(mixed_dir.join("review-kit.json"))
-        .expect("remove the injected directory during cleanup");
+    fs::remove_dir(mixed_dir.join("review-kit.json"))?;
 
     Ok(())
 }
