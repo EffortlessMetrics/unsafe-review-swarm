@@ -170,13 +170,17 @@ artifact. The standalone `cargo run --locked -p xtask -- check-release-truth`
 checker stays unwired; this table is the paper integration. Tag creation and
 GitHub Release publication each require a separate explicit go.
 
+`public_source_commit` is recorded when the source promotion commit is known
+(release prep, before tag creation) so the tag proof reads a current value;
+the synchronization row re-verifies it against the receipt.
+
 | Transition | Release-truth field(s) | Required proof artifact | Explicit-go gate |
 |---|---|---|---|
-| Crate publication | `[crates_io] version`, `unsafe_review_core`, `unsafe_review_cli`, `unsafe_review` | crates.io index entries at the release version plus the `crates-publish` workflow run summary (dry-run and publish runs) | — |
+| Crate publication | `[crates_io] version`, `unsafe_review_core`, `unsafe_review_cli`, `unsafe_review` | crates.io index entries at the release version plus the `crates-publish` workflow run summary (dry-run and publish runs); on the break-glass manual fallback, the source publication receipt recording the crates.io versions | — |
 | Tag creation | `[tag] exists`, `[tag] target` | Source tag listing showing `v<current>` exists and points at `public_source_commit` | Separate explicit go before creating the tag |
 | GitHub Release publication | `[github_release] exists`, `[github_release] published_at` | GitHub Release page for `v<current>` with its published timestamp | Separate explicit go before publishing the Release |
 | Installed smoke | `installed_smoke_receipt` | Installed-binary smoke receipt (SHA-256 of the installed CLI plus the smoke outputs recorded in the publication receipt) | — |
-| Source/swarm synchronization | `public_source_commit`, `workspace_version`, `[workbench]` | Source publication receipt plus the swarm mirror PR advancing the `policy/source-sync.toml` checkpoint | — |
+| Source/swarm synchronization | `public_source_commit`, `[workbench]` (`workspace_version` is recorded as-is and must not be bumped to match the release) | Source publication receipt plus the swarm mirror PR advancing the `policy/source-sync.toml` checkpoint | — |
 
 ## Boundary
 

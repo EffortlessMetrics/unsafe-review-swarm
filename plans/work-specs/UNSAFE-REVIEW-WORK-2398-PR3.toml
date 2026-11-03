@@ -10,7 +10,7 @@
 schema_version = "1"
 issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398"
 kind = "correctness"
-objective = "Integrate the release-truth authority into the release flow on paper plus proof: add a runbook step-to-field mapping table identifying which step updates each authority field with what proof, and prove with a simulated 0.6.0 version-bump test that a future bump cannot leave front panels on the previous release while all checks stay green."
+objective = "Integrate the release-truth authority into the release flow on paper plus proof: add a runbook step-to-field mapping table identifying which step updates each authority field with what proof, and prove with a simulated 0.6.0 version-bump test that the release-truth checker reports stale front panels as a failure. The checker stays standalone in this slice, so the proof covers checker behavior, not gate coverage."
 user_outcome = "A release operator following the runbook knows exactly which step updates each release-truth field and what evidence it requires; the simulated-bump test fails loudly if panels ever lag the authority after a bump."
 claim_boundary = "This slice maps steps to fields and adds the simulated proof; it performs no publication, tag, Release, merge, or network operation; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims."
 

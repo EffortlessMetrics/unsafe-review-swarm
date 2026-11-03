@@ -9911,6 +9911,43 @@ jobs:
     }
 
     #[test]
+    fn release_truth_simulated_bump_rejects_each_stale_panel() -> Result<(), String> {
+        let bumped = parse_release_truth_text(
+            "policy/release-truth.toml",
+            &release_truth_simulated_bump_authority(false, false),
+        )?;
+        for (surface, field, text) in release_truth_corrected_panels() {
+            let panels = [(surface, field, text)];
+            let Err(err) = check_release_truth_texts(&bumped, &panels) else {
+                return Err(format!(
+                    "simulated 0.6.0 bump should fail stale panel {surface} `{field}`"
+                ));
+            };
+            assert!(
+                err.contains(surface),
+                "stale-panel error should name surface {surface}, got: {err}"
+            );
+            assert!(
+                err.contains(field),
+                "stale-panel error should name field {field}, got: {err}"
+            );
+            assert!(
+                err.contains("stale prior-release version"),
+                "stale-panel error should report a stale prior-release version, got: {err}"
+            );
+            assert!(
+                err.contains("0.5.0"),
+                "stale-panel error should name the prior release 0.5.0, got: {err}"
+            );
+            assert!(
+                err.contains("0.6.0"),
+                "stale-panel error should name the current release 0.6.0, got: {err}"
+            );
+        }
+        Ok(())
+    }
+
+    #[test]
     fn first_pr_artifact_list_surfaces_include_full_bundle() -> Result<(), String> {
         public_surfaces::check_first_pr_artifact_list_surfaces()
     }
