@@ -1,0 +1,103 @@
+# Issue-linked work specification for the #2400 Route-A integration (refresh + prove + merge).
+# Basis: main f8bd6301 (2026-11-04). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2400
+#
+# Route decision (owner-selected 2026-11-04 after disposable dry-run recon):
+# Route A — refresh #2394 (consolidated Windows baseline, head 5288d77c,
+# base b5355e2f, 6 commits) onto current main and qualify through the
+# existing legacy gate. Route B (central Contabo migration) explicitly
+# NOT a release prerequisite per the issue. Dry-run merge of #2394 into
+# current main is clean with zero conflicts and zero admission-surface
+# changes (9 files).
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2400"
+kind = "correctness"
+objective = "Integrate the #2394 consolidated Windows baseline onto current main in a separately owned branch, prove it end to end on the existing permitted route (focused interaction tests, fresh exact-head baseline, hosted Unsafe Review Rust Result via native admission with measured runtime), merge through normal protected policy, and reconcile the six constituent PRs as superseded by the merged composition."
+user_outcome = "A maintainer sees one integration branch carrying all six Windows repairs exactly once with source/history mapping preserved, a fresh green proof bound to the exact head (including the required hosted check and measured whole-run fit), and the constituents dispositioned with pointers to the merged replacement."
+claim_boundary = "This slice proves the Route-A integration only; it performs no analyzer changes, crate publication, release tag, source promotion, credential/access/protection/runner-image/host/storage change, or raw evidence upload; draft no-early-CI restrictions stay in force until documented admission conditions are met; it makes no safety, UB-free, Miri-clean, or release qualification claims beyond the gated proof."
+
+[scope]
+included = [
+    "Settled design (verbatim): new integration branch from current origin/main; merge (not cherry-pick, not rebase) the #2394 head so source history survives; record source-to-integration commit mapping, patches retained, resulting tree, and overlap/conflict resolutions (expected: none, per dry-run; any surprise conflict resolved minimally with the constituent owner semantics preserved). Do not force-rewrite constituent lanes or the #2394 branch.",
+    "Settled design (verbatim): focused interaction/falsifier tests FIRST, before the full baseline: all five original Windows failures, three Clippy findings, exact native executable/path population, direct-child timeout/incomplete capture, nonzero-exit control, Cargo warm invocation and changed-source rebuild control; Unix tests preserved and their supported cases executed.",
+    "Settled design (verbatim): one fresh exact-head integration baseline after review: fmt, workspace/all-target check and Clippy, the pinned structured test runner plus doctests, diagnostics validation, warnings-denied rustdoc, all check-pr producers, source-divergence, and the 1915-derived work-spec gate (check-work-specs). Measure and record setup/build/test/policy/finalization/cleanup separately plus the whole-run interval.",
+    "Settled design (verbatim): required Unsafe Review Rust Result obtained through the existing legacy route via native admission (independent exact-head review, admission-v1 marker, exact head/base/integration/tree binding). No restored hosted spending, no admission bypass, no permission or runner/security policy change.",
+    "Settled design (verbatim): merge through normal protected policy only when the exact head is eligible (scoped, reviewed, green, allowed); verify integrated content post-merge; reconcile constituents #2381/#2384/#2386/#2388/#2390/#2392 as superseded by the merged composition with a status comment each (do not close useful branches outside this train).",
+    "Unit/integration proof for any merge-time conflict resolution (if the dry-run result does not reproduce, stop and report before proceeding).",
+]
+excluded = [
+    "Any Route-B work: central Contabo migration, allowance qualification, SPEC-0024 rewrites, NATIVE_ADMISSION docs, workflow allowlist/permission changes, rust-toolchain bumps beyond what #2394 carries, and 20-minute-bound repairs routed to #2383 (measure and report the fit; do not silently widen timeouts or skip tests).",
+    "Analyzer changes, crate publication, release tags, source promotion, credential/access/protection/runner-image/host/storage changes, raw evidence uploads, replacement implementations of the six repairs, and destructive cleanup of other worktrees or caches.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims beyond the gated proof.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Source branch and constituent lanes are never rewritten; the integration is a separately owned merge with a recorded source mapping."
+
+[[invariant]]
+id = "INV-2"
+text = "Focused interaction/falsifier tests run before the full baseline; no skipped, pending, draft-refused, or unbound result is ever treated as passed."
+
+[[invariant]]
+id = "INV-3"
+text = "The required hosted check binds to the exact integration head/base/integration/tree through native admission; protected merge happens only when the exact head is eligible."
+
+[[invariant]]
+id = "INV-4"
+text = "Whole-run runtime is measured and reported as-is; timeouts are never silently widened and tests are never skipped to fit a bound."
+
+[[acceptance]]
+id = "AC-2400-PR1-1"
+text = "Integration branch carries all six Windows repairs exactly once with source/history mapping preserved and any conflicts resolved minimally."
+proof = ["git log --oneline --graph", "cargo run --locked -p xtask -- source-divergence"]
+
+[[acceptance]]
+id = "AC-2400-PR1-2"
+text = "Focused interaction/falsifier tests pass on Windows (five failures, three Clippy findings, path population, timeout/incomplete capture, nonzero-exit, warm/rebuild controls) with Unix tests preserved."
+proof = ["cargo test --locked -p unsafe-review --test e2e", "cargo clippy --workspace --all-targets --locked -- -D warnings"]
+
+[[acceptance]]
+id = "AC-2400-PR1-3"
+text = "Fresh exact-head baseline green: fmt, check, Clippy, structured runner plus doctests, diagnostics, rustdoc, all check-pr producers, work specs, with per-phase timings and the whole-run interval recorded."
+proof = ["cargo fmt --check", "cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2400-PR1-4"
+text = "Required Unsafe Review Rust Result obtained through native admission on the exact head with independent review; no bypass, no permission or policy change."
+proof = ["gh run list --branch lane/2400-route-a"]
+
+[[acceptance]]
+id = "AC-2400-PR1-5"
+text = "Protected merge of the eligible head with post-merge content verification, then constituent PRs dispositioned as superseded with pointers (no destructive cleanup)."
+proof = ["git log --oneline -3 origin/main"]
+
+[[integration]]
+surface = "integration_branch"
+expected = "lane/2400-route-a merges #2394 onto current main with mapping recorded; the #2394 branch itself untouched."
+
+[[integration]]
+surface = "constituent_disposition"
+expected = "Each of the six constituent PRs gets a superseded-by comment with the merged commit once verified in the merged tree."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs, per-phase timings, the whole-run interval, proof results, and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Dry-run merge is already clean with zero conflicts; any deviation stops the lane for re-triage instead of forcing a resolution."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Fail-closed gates at every step (no skipped/pending pass, no bypass, no permission change); a missing prerequisite names its owning issue instead of blocking silently."
+
+[[risk]]
+id = "RISK-3"
+mitigation = "Runtime measured, not fitted: if the whole-run bound cannot be met, the lane reports it and routes repair to #2383 instead of widening timeouts or skipping tests."
+
+[compatibility]
+posture = "Additive integration merge of already-reviewed repairs; no analyzer, policy, permission, runner, or publication behavior changes beyond the six repairs."
+
+[rollback]
+strategy = "Revert the single integration merge; source branch, constituents, and historical evidence are untouched by construction."
