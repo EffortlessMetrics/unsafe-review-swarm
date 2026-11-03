@@ -1,0 +1,50 @@
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2173"
+kind = "maintenance"
+objective = "Keep Windows child Cargo source paths stable across repeated check-pr CLI invocations."
+user_outcome = "Warm deterministic CLI proofs avoid redundant compilation while Cargo still rebuilds changed source."
+claim_boundary = "Scoped Windows invocation/cache repair; no global speedup, full check-pr, hosted integration, release or safety claim."
+affected_files = ["xtask/src/cli_command.rs", "xtask/src/main.rs", "xtask/src/real_pr_corpus.rs", "docs/contributing/BUILD_CACHE_SETUP.md"]
+linked_specs = ["UNSAFE-REVIEW-SPEC-0024"]
+
+[scope]
+included = ["Base b5355e2f917cad5132f5e1b72e2d8d43510b7d8a", "The four locked CLI child constructors", "Windows source-path fingerprint regression and changed-source control", "Bounded actual corpus before/after evidence"]
+excluded = ["Workflow triggers or admission", "Consumer PR #2380", "Proof membership or exit/output semantics", "Dependencies, toolchain, profiles, features, cache framework", "Host, runner, credential, protection and release changes"]
+
+[[invariant]]
+id = "INV-1"
+text = "Every CLI child retains cargo run --locked -p unsafe-review -- and its original arguments, output handling and exit semantics."
+
+[[invariant]]
+id = "INV-2"
+text = "Cargo checks current source on every invocation; no installed or cached executable bypass is introduced."
+
+[[invariant]]
+id = "INV-3"
+text = "Directory spelling changes only when Git identifies the same canonical directory; unsupported/no-Git layouts retain the existing directory."
+
+[[acceptance]]
+id = "AC-1"
+text = "A warm Windows fixture stays warm for capture/status invocations; a changed core source rebuilds and changes the observed output."
+proof = ["cargo test --locked -p xtask cli_command -- --nocapture"]
+
+[[acceptance]]
+id = "AC-2"
+text = "All four real-PR corpus cases preserve their assertions and exit-code requirements, with no unexpected warm recompilation."
+proof = ["cargo run --locked -p xtask -- check-real-pr-corpus"]
+
+[[acceptance]]
+id = "AC-3"
+text = "Formatting, scoped Clippy and applicable policy/docs/work-spec checks pass. Full check-pr and hosted integration remain explicitly unqualified at the draft boundary."
+proof = ["cargo fmt --all --check", "cargo clippy --locked -p xtask --all-targets -- -D warnings", "cargo run --locked -p xtask -- check-work-specs", "cargo run --locked -p xtask -- check-policy", "cargo run --locked -p xtask -- check-docs"]
+
+[[integration]]
+surface = "check-pr CLI children"
+expected = "Reuse one child constructor across success-only, captured advisory, silent advisory and native exit-code helpers."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Require canonical identity equality before selecting Git's ordinary directory spelling; preserve no-Git fallback and test it."
+
+[rollback]
+strategy = "Revert the scoped constructor and call-site change; no workflow or settings transition occurs."
