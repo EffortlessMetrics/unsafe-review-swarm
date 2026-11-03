@@ -1,0 +1,87 @@
+# Issue-linked work specification for front-panel reconciliation to 0.5.0 (second PR).
+# Basis: main 2352ad5f (2026-11-02). Controlling issue:
+# https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398
+#
+# Coordinator decisions on the recon ambiguities (2026-11-02, all recorded):
+# A: MATRIX contradictory install pair becomes a single v0.5.0 path; the stale
+#    v0.3.8-parser sentence is removed, not reframed.
+# B: SUPPORT_SUMMARY audit stamp stays historical; only release sentences change.
+# C: MATRIX stale pointer (46afd708 / PR #2190) points at the 2401 cutline and PR #2419.
+# D: ROADMAP.md and FIRST_USE.md are in scope (#2398 covers any current status/index page).
+# E: Tag target vs Release vs crates-published stay separate authority fields (pending states must stay representable).
+# F: init/baseline-init wording is "ships since 0.4.0, carried in 0.5.0" — never "new in 0.5.0".
+# G: Receipts, handoffs, CHANGELOG, and closeouts stay byte-immutable; current panels may only add links to them.
+schema_version = "1"
+issue = "https://github.com/EffortlessMetrics/unsafe-review-swarm/issues/2398"
+kind = "correctness"
+objective = "Reconcile the six stale front panels to the 0.5.0 release truth so the standalone checker passes on the tree: README release row, SUPPORT_SUMMARY, RELEASE_COMPATIBILITY, RELEASE_DOCS_MATRIX, ROADMAP, FIRST_USE."
+user_outcome = "A reader opening any current status or index page sees 0.5.0 as the last published release (tag f1eda818, GitHub Release 2026-09-17T05:57:40Z, crates 0.5.0, workbench 0.3.8 split explicit) with no contradictory version anywhere; `check-release-truth` exits 0."
+claim_boundary = "This slice edits panel text only, guided by the PR1 authority; it performs no publication, tag, Release, merge, or network operation; it makes no safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims."
+
+[scope]
+included = [
+    "Settled design (verbatim): README.md:234 row becomes latest crates.io 0.5.0 and latest GitHub Release v0.5.0 published 2026-09-17T05:57:40Z, keeping advisory-only 0.x.y wording.",
+    "Settled design (verbatim): SUPPORT_SUMMARY.md release sentences (evidence cell, last-public-release sentence, first-use/init wording) become v0.5.0 citing the receipt and the sync handoff; audit stamp and retained-table wording stay historical.",
+    "Settled design (verbatim): RELEASE_COMPATIBILITY.md header re-audited against v0.5.0 (2026-09-17) with new head/date, install path --version 0.5.0, packages 0.5.0, plus the workbench-0.3.8-vs-registry-0.5.0 split sentence; 0.6 stays proposed.",
+    "Settled design (verbatim): RELEASE_DOCS_MATRIX.md baseline becomes v0.5.0 with new audit head/date; vocab row Public v0.5.0; ship rows v0.5.0; stale draft-cutline pointer updated to the 2401 cutline and PR #2419; first-use contract becomes the single v0.5.0 installation path; init wording follows decision F.",
+    "Settled design (verbatim): ROADMAP.md latest-Release claim and FIRST_USE.md public-version plus install command become v0.5.0 with the dated Release fact.",
+    "Settled design (verbatim): no other file changes; receipts, handoffs, CHANGELOG, and closeouts immutable (links from panels allowed).",
+]
+excluded = [
+    "Runbook step-to-field mapping and simulated version-bump proof (owned by PR3). Tag, Release, publication, merge, network, or gate-wiring changes.",
+    "Support/accuracy/safety/policy promotions, prebuilt binaries, marketplace claims, broad docs redesign, and any analyzer/receipt/detector changes.",
+    "Safety, UB-free, Miri-clean, site-execution, precision/recall, or release qualification claims.",
+]
+
+[[invariant]]
+id = "INV-1"
+text = "Every current panel agrees on one release truth: 0.5.0 published 2026-09-17T05:57:40Z, tag f1eda818, crates 0.5.0, workbench 0.3.8 split explicit."
+
+[[invariant]]
+id = "INV-2"
+text = "Historical evidence (receipts, handoffs, CHANGELOG, closeouts, audit stamps) is never rewritten; only current claims change."
+
+[[invariant]]
+id = "INV-3"
+text = "The checker is the judge: check-release-truth exits 0 on the reconciled tree with no fixture or checker changes in this slice."
+
+[[acceptance]]
+id = "AC-2398-PR2-1"
+text = "All six panels state the 0.5.0 truth with no contradictory version; decisions A-G applied as recorded."
+proof = ["cargo run --locked -p xtask -- check-release-truth"]
+
+[[acceptance]]
+id = "AC-2398-PR2-2"
+text = "Existing offline gates pass with panel-only diffs: check-docs, check-doc-artifacts, check-public-surfaces, check-support-tiers, check-pr, git diff --check."
+proof = ["cargo run --locked -p xtask -- check-pr"]
+
+[[acceptance]]
+id = "AC-2398-PR2-3"
+text = "No unwrap() in new test code (if any), fmt clean, no new Clippy warnings."
+proof = ["cargo fmt --check"]
+
+[[integration]]
+surface = "panel_truth"
+expected = "Six panels reconciled; check-release-truth flips from designed exit 2 to exit 0."
+
+[[integration]]
+surface = "history_boundary"
+expected = "Receipts, handoffs, CHANGELOG, closeouts, and audit stamps byte-identical."
+
+[[integration]]
+surface = "pr_body"
+expected = "The delivery PR reports stable AC IDs with proof results and exact-head admission markers without rewriting this contract."
+
+[[risk]]
+id = "RISK-1"
+mitigation = "Text-only panel edits against a frozen authority; the checker verifies every claim, so a missed stale string fails loudly instead of shipping."
+
+[[risk]]
+id = "RISK-2"
+mitigation = "Decisions A-G are recorded verbatim in this spec; any further ambiguity returns to the issue instead of being guessed."
+
+[compatibility]
+posture = "Panel text only; no analyzer, gate, release, or publication behavior changes."
+
+[rollback]
+strategy = "Revert the panel edits; the checker returns to its designed exit-2 state and every gate behaves as before."

@@ -1,6 +1,6 @@
 # First-use guide
 
-This guide is for a maintainer trying the public `v0.4.0` `unsafe-review` CLI
+This guide is for a maintainer trying the public `v0.5.0` `unsafe-review` CLI
 for the first time. Swarm main may contain newer unpublished candidate work;
 run `unsafe-review --version` and keep any local candidate checkout separate
 from the published install path.
@@ -13,13 +13,14 @@ blocking policy by default.
 ## Install
 
 ```bash
-cargo install unsafe-review --version 0.4.0 --locked
+cargo install unsafe-review --version 0.5.0 --locked
 unsafe-review --help
 ```
 
-The command above installs the public 0.4.0 release from crates.io. It does not
-install the unfrozen Swarm main candidate. A `v0.4.0` GitHub Release exists on
-the source repository; no `v1` or marketplace publication is implied.
+The command above installs the public 0.5.0 release from crates.io. It does not
+install the unfrozen Swarm main candidate. A `v0.5.0` GitHub Release published
+2026-09-17T05:57:40Z exists on the source repository; no `v1` or marketplace
+publication is implied.
 
 If `init` is unknown, check which executable your shell selected before
 retrying. Entering a source checkout does not change PATH.
@@ -45,7 +46,7 @@ is for development.
 
 ## Preview Repository Adoption
 
-Top-level `init` ships in the public `v0.4.0` install above: run
+Top-level `init` ships since 0.4.0, carried in the public `v0.5.0` install above: run
 `unsafe-review init` (preview-only by default) or continue to
 [Get A First Card](#get-a-first-card).
 

@@ -60,8 +60,8 @@ Qualified under swarm #1925; publication mirrored in swarm #1879
 
 Cut from swarm cutline `f281130e` (pre-publish #2250), promoted through
 source #570/#571 with the publication receipt in source #572. Latest
-crates.io version is 0.5.0; latest GitHub Release is v0.4.0. Post-cutline
-fixes (#2251, #2253–#2257) are current-main behavior in `Unreleased`, not
+crates.io version is 0.5.0; latest GitHub Release is v0.5.0 (published
+2026-09-17T05:57:40Z). Post-cutline fixes (#2251, #2253–#2257) are current-main behavior in `Unreleased`, not
 part of the immutable 0.5.0 crates (see CHANGELOG).
 
 - `SAFETY:` doc comments count as contract evidence (#2235)

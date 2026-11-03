@@ -1,8 +1,8 @@
 # Release documentation and support matrix
 
-Audited 2026-09-09 against swarm `origin/main` at
-`46afd7086a90a957f1fcdf08235e42721540253c` and the public source-of-record
-release `v0.3.8` (`2026-06-18`). This is a documentation inventory, not a
+Audited 2026-11-03 against swarm `origin/main` at
+`a5c1cffdc7ee36486abb3fdb88946303e216e9d6` and the public source-of-record
+release `v0.5.0` (`2026-09-17`). This is a documentation inventory, not a
 candidate qualification or publication decision. The experimental/unavailable
 posture below is unchanged; every surface row was re-checked and still holds
 (MSRV floor is now 1.98, parser 0.0.350, all link targets present, schema
@@ -17,12 +17,15 @@ a freeze or rerun its receipts.
 | Label | Meaning |
 | --- | --- |
 | Swarm main | Present in the unpublished workbench checkout; not a public release claim. |
-| Public v0.3.8 | Available from the last published source/release surface. |
+| Public v0.5.0 | Available from the last published source/release surface. |
 | Unavailable | Do not instruct users to acquire or depend on it. |
 | Deferred | Intentionally outside the current documented surface. |
 
-The next candidate has no frozen version; the draft cutline names candidate
-`46afd708` (refresh PR #2190, still draft). The
+The 0.6 candidate has no frozen version; the draft cutline is the 0.6
+delivery inventory in
+[`UNSAFE-REVIEW-CUTLINE-2401.toml`](../../plans/release-cutline/UNSAFE-REVIEW-CUTLINE-2401.toml)
+([summary](../../plans/release-cutline/UNSAFE-REVIEW-CUTLINE-2401-SUMMARY.md),
+refreshed by PR #2419, still draft). The
 [draft cutline](RELEASE_CUTLINE.md) and dependency ledger retain their own
 audited inputs; neither is repinned or frozen by this documentation snapshot.
 
@@ -30,8 +33,8 @@ audited inputs; neither is repinned or frozen by this documentation snapshot.
 
 | Surface | User-facing source | Current posture | Availability | Proof / limits |
 | --- | --- | --- | --- | --- |
-| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Top-level preview-only `init`, the bounded action-first `pr` front panel, `doctor`, `explain`, `context`, and saved artifacts ship in public v0.4.0; newer Swarm main work stays unpublished until separately qualified | `check-pr` and CLI e2e; `first-pr` remains the detailed compatibility route; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
-| Review bundle | [`FIRST_USE.md`](../FIRST_USE.md), [`PR_CI.md`](../ci/PR_CI.md) | Experimental, fixture/workflow-backed | Current bundle ships in public v0.4.0; newer Swarm main work stays unpublished until separately qualified | `check-first-pr-artifacts` and surface parity; tokmd rendering is not claimed by the producer alone |
+| First-use CLI | [`FIRST_USE.md`](../FIRST_USE.md), [`FIRST_HOUR.md`](../FIRST_HOUR.md), [`README.md`](../../README.md) | Experimental, advisory | Top-level preview-only `init`, the bounded action-first `pr` front panel, `doctor`, `explain`, `context`, and saved artifacts ship in public v0.5.0; newer Swarm main work stays unpublished until separately qualified | `check-pr` and CLI e2e; `first-pr` remains the detailed compatibility route; no witness execution, source edits, automatic comments, blocking policy, or safety claim |
+| Review bundle | [`FIRST_USE.md`](../FIRST_USE.md), [`PR_CI.md`](../ci/PR_CI.md) | Experimental, fixture/workflow-backed | Current bundle ships in public v0.5.0; newer Swarm main work stays unpublished until separately qualified | `check-first-pr-artifacts` and surface parity; tokmd rendering is not claimed by the producer alone |
 | Saved LSP / agent packet | [`saved-lsp-json.md`](../editor/saved-lsp-json.md), [`agent-repair-workflow.md`](../explanation/agent-repair-workflow.md) | Experimental, read-only | Swarm main; no live-server or published-editor availability claim | Canonical ReviewCard projection; no source edits, witness execution, or repair success |
 | VS Code / Open VSX | [`editor-extension.md`](../deferred/editor-extension.md), [`extension-mvp.md`](../editor/extension-mvp.md) | Experimental saved-bundle MVP; live client deferred | Swarm main packaging only; marketplace listings unavailable | Packaging and extension smoke lanes; no Marketplace/Open VSX publication |
 | GitHub Action | [`github-action.md`](../ci/github-action.md) | Advisory integration surface | Candidate/source availability must be checked separately; public `v1` is unavailable | No automatic comments or default blocking; do not imply `@v1` resolves |
@@ -42,10 +45,10 @@ audited inputs; neither is repinned or frozen by this documentation snapshot.
 
 ## First-use contract
 
-The public `v0.3.8` installation path remains:
+The public `v0.5.0` installation path is:
 
 ```text
-install the public v0.4.0 CLI
+install the public v0.5.0 CLI
 → doctor
 → pr
 → open the public release's reviewer summary
@@ -55,12 +58,11 @@ install the public v0.4.0 CLI
 ```
 
 For an explicitly identified unpublished swarm checkout, optional top-level
-`init` previews repository adoption before `doctor` and `pr`; the integrated
-`pr` route opens the bounded action-first front panel. `init` applies no
-workflow or configuration, and explicit `--out` writes only the proposal JSON
-in the selected directory. It is separate from `baseline init` and is absent
-from the public `v0.3.8` parser linked in the
-[compatibility receipt](RELEASE_COMPATIBILITY.md#cli-and-distribution-posture).
+`init` previews repository adoption before `doctor` and `pr` (ships since
+0.4.0, carried in 0.5.0); the integrated `pr` route opens the bounded
+action-first front panel. `init` applies no workflow or configuration, and
+explicit `--out` writes only the proposal JSON in the selected directory. It
+is separate from `baseline init`.
 Installed candidate commands still require #1921 qualification. Editor,
 Action, marketplace, and publication surfaces retain their experimental or
 unavailable wording until their receipts independently prove otherwise.

@@ -1,8 +1,8 @@
 # Release compatibility receipt
 
-Audited 2026-09-07 against swarm `origin/main` at
-`a78770cfabe5daf631e5829133a0cae8db0210d7` and the last public release
-`v0.3.8` (2026-06-18). The next candidate has no frozen version or candidate
+Audited 2026-11-03 against swarm `origin/main` at
+`a5c1cffdc7ee36486abb3fdb88946303e216e9d6` and the last public release
+`v0.5.0` (2026-09-17). The next candidate has no frozen version or candidate
 SHA. This is a documentation inventory, not a compatibility guarantee,
 installed qualification result, or publication decision.
 
@@ -50,18 +50,21 @@ retain their original producer and consumer identities.
 
 ## CLI and distribution posture
 
-- In public `v0.4.0`, `pr` is the preferred first-use entrypoint and
+- In public `v0.5.0`, `pr` is the preferred first-use entrypoint and
   presents the bounded action-first front panel; `first-pr` and `review` remain
   compatibility names for the same advisory bundle and detailed route.
 - `doctor`, `explain`, `context`, saved artifacts, `baseline init`, and
-  top-level preview-only `init` ship in public `v0.4.0`: `init` previews an
-  adoption proposal and applies no workflow or configuration. Explicit `--out`
-  writes only the proposal JSON in the selected directory. Baseline creation
-  remains a separate command. The public install path is
-  `cargo install unsafe-review --version 0.4.0 --locked`.
-- Workspace MSRV is Rust `1.98`; the three published packages are `0.4.0`
-  (2026-09-16). Newer Swarm main work stays unpublished until separately
-  qualified and released.
+  top-level preview-only `init` ship in public `v0.5.0`: `init` previews an
+  adoption proposal and applies no workflow or configuration (ships since
+  0.4.0, carried in 0.5.0). Explicit `--out` writes only the proposal JSON in
+  the selected directory. Baseline creation remains a separate command. The
+  public install path is
+  `cargo install unsafe-review --version 0.5.0 --locked`.
+- Workspace MSRV is Rust `1.98`; the three published packages are `0.5.0`
+  (2026-09-17). Tag `v0.5.0` exists and points at `f1eda818`. The workbench
+  checkout stays at `0.3.8` (unpublished swarm main) while the published
+  registry state is `0.5.0`; the two must never be conflated. Newer Swarm main
+  work stays unpublished until separately qualified and released.
 - The VS Code/Open VSX surface is a saved-bundle MVP. Marketplace listings,
   prebuilt binaries, crates.io candidate publication, GitHub Release, and
   public Action `v1` are unavailable until separately receipted.
