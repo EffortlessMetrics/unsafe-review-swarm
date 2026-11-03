@@ -45,7 +45,7 @@ proof = ["cargo test --locked -p unsafe-review-cli --test e2e failed_rerun_into_
 [[acceptance]]
 id = "AC-1883-PR1-3"
 text = "check-first-pr-artifacts rejects the mixed bundle; the nearest existing verifier tests still pass and the deterministic core gate passes."
-proof = ["cargo test --locked -p xtask check_first_pr", "cargo run --locked -p xtask -- check-pr"]
+proof = ["cargo test --locked -p xtask first_pr_artifact_checker", "cargo run --locked -p xtask -- check-pr"]
 
 [[integration]]
 surface = "e2e_suite"
