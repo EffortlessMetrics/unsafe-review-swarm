@@ -51,14 +51,19 @@ profile offline, before Cargo setup; it is not another hosted workflow.
 # Install the pinned linter once; do not add it to application dependencies.
 uv tool install 'jactionlint==2.5.0'
 jactionlint --version
-jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
+jactionlint --config-file .github/jactionlint.yaml --profile correctness --no-online --shellcheck= --pyflakes=
 ```
+
+The explicit repository config excludes user-global rule overrides and fails
+closed if the config is missing; it adds no suppressions or inline-ignore changes.
+`github-script-syntax` requires Node.js 20+ on PATH. Without it, jactionlint skips
+that rule with a note, so a clean run does not prove embedded JavaScript syntax.
 
 If the installed executable is not visible to an existing agent shell, reopen
 it or use the same pinned tool through uv:
 
 ```bash
-uvx --from jactionlint==2.5.0 jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
+uvx --from jactionlint==2.5.0 jactionlint --config-file .github/jactionlint.yaml --profile correctness --no-online --shellcheck= --pyflakes=
 ```
 
 External ShellCheck and Pyflakes are explicitly outside this initial semantic
