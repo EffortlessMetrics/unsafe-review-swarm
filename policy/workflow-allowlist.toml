@@ -38,7 +38,7 @@ actions = [
   "actions/checkout@v7",
   "jdx/jactionlint@9e87e8f34edfc00b849a27807e26eff9d00b936d",
 ]
-reason = "Path-scoped source-of-truth scaffold workflow. It first runs pinned jactionlint 2.5.0 correctness checks offline with external ShellCheck/Pyflakes explicitly outside this initial semantic gate, then validates document, goal, package-boundary, and CI-lane ledgers when policy/spec/status/workflow/xtask rails change. No new workflow, trigger, required status, write permission, publication, witness execution, source edits, or blocking unsafe-review finding policy is introduced."
+reason = "Path-scoped source-of-truth scaffold workflow. It first runs pinned jactionlint 2.5.0 correctness checks offline with external ShellCheck/Pyflakes explicitly outside this initial semantic gate, then validates document, goal, package-boundary, and CI-lane ledgers when policy/spec/status/workflow/linter-config/xtask rails change. No new workflow, event type, required status, write permission, publication, witness execution, source edits, or blocking unsafe-review finding policy is introduced."
 created = "2026-05-20"
 review_after = "2026-07-01"
 
