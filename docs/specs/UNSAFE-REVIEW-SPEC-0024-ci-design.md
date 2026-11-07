@@ -420,7 +420,7 @@ protect spec, policy, package-boundary, docs-automation, goal, and CI-lane ledge
 Runs:
 
 ```text
-jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
+jactionlint --config-file .github/jactionlint.yaml --profile correctness --no-online --shellcheck= --pyflakes=
 cargo-allow doctor --profile spec-system
 cargo-allow check --profile spec-system --mode audit
 cargo-allow worklist --profile spec-system --format json
@@ -454,6 +454,7 @@ docs/templates/**
 docs/specs/**
 docs/status/**
 .github/workflows/**
+.github/jactionlint.yaml
 xtask/**
 ```
 
