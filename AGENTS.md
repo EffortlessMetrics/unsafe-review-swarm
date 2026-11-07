@@ -203,6 +203,12 @@ Ambiguous or user-owned state is preserved.
 
 ## Build, review, and integration
 
+For GitHub workflow changes, run
+`jactionlint --profile correctness --no-online --shellcheck= --pyflakes=` from the
+repository root. Installation and the uv fallback are documented in
+[`docs/ci/PR_CI.md`](docs/ci/PR_CI.md#local-workflow-validation). A YAML parse is
+not a substitute for this check; report unavailable tools and actual exit codes.
+
 Proof must match the claim. Run focused tests first and the broader repository
 gates when practical. The full workspace proof baseline is:
 

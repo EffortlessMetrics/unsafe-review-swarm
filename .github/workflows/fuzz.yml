@@ -43,12 +43,12 @@ jobs:
       - uses: Swatinem/rust-cache@v2
 
       - name: Install cargo-fuzz
-        run: cargo +${FUZZ_TOOLCHAIN} install cargo-fuzz --locked --version 0.11.2
+        run: cargo "+${FUZZ_TOOLCHAIN}" install cargo-fuzz --locked --version 0.11.2
 
       - name: Run fuzz target (bounded wall-clock)
         run: |
           cd fuzz
-          cargo +${FUZZ_TOOLCHAIN} fuzz run analyze -- -max_total_time=120s
+          cargo "+${FUZZ_TOOLCHAIN}" fuzz run analyze -- -max_total_time=120s
 
       - name: Collect crash artifacts (if any)
         if: always()
