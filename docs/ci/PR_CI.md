@@ -41,27 +41,33 @@ Upstream tools produce bounded evidence for that decision.
 That keeps tool churn out of the user-facing CI contract and prevents direct
 upstream-tool invocations from silently becoming new blocking policy.
 
-## Default workspace gate
+## Admitted workspace gate
 
-Default PR CI runs the cheap repository policy gate on the pinned Rust
-toolchain. The full workspace proof set remains:
+Swarm product proof is admitted only by an explicit coordinator PR-body edit
+with a fresh exact-source independent review receipt and current native merge
+subject. See [native admission](NATIVE_ADMISSION.md). Draft, Ready, synchronize,
+push and schedule do not run product proof. Cheap native metadata/result checks
+keep absent or skipped product proof from appearing successful. The immutable public central
+Rust caller selects `standard`; the source requires Rust 1.98 and pins exact
+1.98.1. It uses full history for the existing Markdown-only test skip.
 
-```text
-cargo fmt --check
-cargo check --workspace --all-targets --locked
-cargo clippy --workspace --all-targets --locked -- -D warnings
-cargo test --workspace --all-targets --locked
-RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked
-cargo run --locked -p xtask -- check-pr
-```
+The repository proof preserves fmt, clippy, `xtask ci-test` (pinned nextest and
+explicit doctest parity), rustdoc with warnings denied, and `check-pr`.
+The first product failure remains authoritative even when diagnostic staging
+fails. Cargo output uses `$RUNNER_TEMP/cargo-target`; `target/ci-core` remains
+a runtime receipt path. Central owns runner lifecycle and the 75-minute limit.
 
-This lane protects repository correctness: formatting, build, lint, tests,
-rustdoc, and repo policy checks. The live swarm workflow runs the required
-`Unsafe Review Rust Result` aggregate as fmt + clippy + test + rustdoc
-(`RUSTDOCFLAGS="-D warnings" cargo doc --workspace --no-deps --locked`) +
-`check-pr`; broader workspace checks such as `cargo check` and the full
-`cargo test --workspace --all-targets` remain local, release, or future
-full-lane proof until a live workflow explicitly promotes them.
+This is an unqualified draft migration. The prepared pin
+`8ff77e5876b4a7808a58e053aa6248b1020e02d0` selects closed native review
+admission, native-origin 1,200-second execution supervision and bounded
+seven-day non-fatal failure diagnostics. Source compatibility is not native
+artifact retention or runtime qualification. Bootstrap #2396 landed the three
+semantic/convergence review owners in protected main at `1f99630ade468378c54057ed09635e4183ecaae8`. The consumer still verifies their presence at the actual
+protected base and refuses rather than substituting candidate code. The
+bootstrap metadata authentication and isolated imports are retained.
+Live allowance for this exact pin must also be verified before qualification.
+See [native admission](NATIVE_ADMISSION.md). No dispatch, protection change or
+image activation is part of source preparation. Advisory ub-review stays separate.
 
 It must not run:
 
