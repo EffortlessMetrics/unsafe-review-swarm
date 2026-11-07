@@ -27,7 +27,7 @@ CI lanes have separate jobs and authority:
 The repo-facing control surface is `xtask`. Upstream tools are engine-room
 substrates, not the public repo contract. A workflow may install or invoke tools
 such as `cargo-llvm-cov`, `cargo-deny`, `cargo-nextest`, `ripr`,
-`cargo-mutants`, Miri, `actionlint`, `zizmor`, `taplo`, or `typos`, but the
+`cargo-mutants`, Miri, `jactionlint`, `zizmor`, `taplo`, or `typos`, but the
 repository policy must still be expressed through accepted specs, policy
 ledgers, ReviewCard-derived artifacts, or a stable `xtask` wrapper.
 
@@ -40,6 +40,34 @@ Upstream tools produce bounded evidence for that decision.
 
 That keeps tool churn out of the user-facing CI contract and prevents direct
 upstream-tool invocations from silently becoming new blocking policy.
+
+## Local workflow validation
+
+Run jactionlint from the repository root after workflow, composite-action or
+Dependabot changes. The existing Policy Contracts job uses the same correctness
+profile offline, before Cargo setup; it is not another hosted workflow.
+
+```bash
+# Install the pinned linter once; do not add it to application dependencies.
+uv tool install 'jactionlint==2.5.0'
+jactionlint --version
+jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
+```
+
+If the installed executable is not visible to an existing agent shell, reopen
+it or use the same pinned tool through uv:
+
+```bash
+uvx --from jactionlint==2.5.0 jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
+```
+
+External ShellCheck and Pyflakes are explicitly outside this initial semantic
+gate; it does not claim embedded-script validation. Existing checker lanes
+remain separate. The command is `jactionlint`, not `actionlint`; v2 uses
+double-dash options.
+Report its version and exit status. A Python YAML parse is not equivalent
+workflow validation. This static check does not replace the policy bundle,
+substantive review, hosted execution, or measured cache/release behavior.
 
 ## Default workspace gate
 

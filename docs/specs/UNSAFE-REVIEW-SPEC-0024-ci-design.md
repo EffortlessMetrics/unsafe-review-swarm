@@ -171,7 +171,7 @@ map is:
 | Source exceptions | `cargo-allow` | policy ledgers and receipts when introduced | Exception evidence, not broad suppression |
 | Dependency trust | `cargo-deny`; later `cargo-vet`; RustSec/`cargo-audit` where appropriate | future supply-chain wrapper and policy ledger | Dependency policy only; no unsafe-correctness claims |
 | Public API / release | `cargo-semver-checks`; rustdoc JSON for custom inventories | release-readiness lane | Release/manual proof, not ordinary PR cost |
-| Workflow policy | `actionlint`; `zizmor` | workflow allowlist, CI-lane whitelist, `xtask` checks | Correctness/security linting without expanding tokens |
+| Workflow policy | `jactionlint`; `zizmor` | workflow allowlist, CI-lane whitelist, `xtask` checks | Offline workflow correctness validation in the existing policy lane; embedded-script and security policy remain separate, without expanding tokens |
 | Text and config hygiene | `taplo`; `typos`; markdown/link tooling | docs/policy wrappers | Advisory until baselined, then explicitly gated |
 
 Substrate adoption rules:
@@ -420,6 +420,7 @@ protect spec, policy, package-boundary, docs-automation, goal, and CI-lane ledge
 Runs:
 
 ```text
+jactionlint --profile correctness --no-online --shellcheck= --pyflakes=
 cargo-allow doctor --profile spec-system
 cargo-allow check --profile spec-system --mode audit
 cargo-allow worklist --profile spec-system --format json
@@ -430,6 +431,17 @@ check-ci-lanes
 check-policy
 ```
 
+The workflow linter is jactionlint 2.5.0, pinned through action commit
+`9e87e8f34edfc00b849a27807e26eff9d00b936d`. It runs immediately after checkout,
+before Cargo installation, in the existing job. The correctness profile and
+offline mode are explicit; external ShellCheck and Pyflakes are outside this
+initial semantic gate rather than depending on which executables happen to be
+on the runner. Existing checker lanes are not removed or weakened.
+This adds no workflow, event, required status, token scope, artifact upload,
+application build, or benchmark. Findings fail this static check without
+turning unsafe-review product findings into blockers. It does not establish
+hosted workflow success, release independence, or cold/warm cache timings.
+
 During the swarm CI budget window, pull-request runs are path-scoped to
 source-of-truth artifacts and the legacy parity snapshot:
 
@@ -438,6 +450,7 @@ policy/**
 .allow/**
 .rails/**
 plans/**
+docs/templates/**
 docs/specs/**
 docs/status/**
 .github/workflows/**
