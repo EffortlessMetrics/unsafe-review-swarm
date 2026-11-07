@@ -450,6 +450,7 @@ policy/**
 .allow/**
 .rails/**
 plans/**
+docs/templates/**
 docs/specs/**
 docs/status/**
 .github/workflows/**
