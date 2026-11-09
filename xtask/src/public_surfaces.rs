@@ -74,6 +74,12 @@ pub(crate) fn check() -> Result<(), String> {
 }
 
 pub(crate) fn check_impl() -> Result<usize, String> {
+    check_impl_with_projection(public_badges::check_generated_projection)
+}
+
+pub(crate) fn check_impl_with_projection(
+    projection: impl FnOnce() -> Result<(), String>,
+) -> Result<usize, String> {
     let value = crate::parse_toml_file(&workspace_path(PUBLIC_SURFACES_LEDGER))?;
     require_toml_string(&value, "schema_version", PUBLIC_SURFACES_LEDGER)?;
     require_known(
@@ -90,7 +96,7 @@ pub(crate) fn check_impl() -> Result<usize, String> {
     check_forbidden_terms(&value)?;
 
     public_badges::check_endpoints()?;
-    public_badges::check_generated_projection()?;
+    projection()?;
     for path in PUBLIC_SURFACE_FRONT_DOORS {
         check_front_door(path)?;
     }
