@@ -15538,12 +15538,25 @@ Snapshot reports:
 
     #[test]
     fn public_badge_endpoints_match_generated_repo_projection() -> Result<(), String> {
-        public_badges::check_generated_projection()
+        public_badges::check_fixture_projection()
     }
 
     #[test]
     fn public_surface_checker_validates_current_contract() -> Result<(), String> {
-        public_surfaces::check_impl().map(|_| ())
+        let calls = std::cell::Cell::new(0);
+        public_surfaces::check_impl_with_projection(|| {
+            calls.set(calls.get() + 1);
+            public_badges::check_fixture_projection()
+        })?;
+        assert_eq!(calls.get(), 1);
+        let err = match public_surfaces::check_impl_with_projection(|| {
+            Err("badge projection failed".to_string())
+        }) {
+            Err(err) => err,
+            Ok(_) => return Err("projection failure must fail public surfaces".to_string()),
+        };
+        assert_eq!(err, "badge projection failed");
+        Ok(())
     }
 
     #[test]
