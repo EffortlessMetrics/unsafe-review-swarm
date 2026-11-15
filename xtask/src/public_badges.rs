@@ -314,7 +314,10 @@ mod tests {
 
         let err = match check_generated_projection_at(root, Duration::ZERO) {
             Err(err) => err,
-            Ok(()) => return Err("timeout must not accept old badges".to_string()),
+            Ok(()) => return Err(
+                "zero timeout did not trip: no analyzer progress event reached the timeout check"
+                    .to_string(),
+            ),
         };
         assert!(err.contains("exceeded 0s"), "{err}");
         Ok(())
